@@ -3,6 +3,7 @@ import {Suspense, useEffect, useMemo, useState} from "react";
 import {useRouter, useSearchParams} from "next/navigation";
 import {apiV10, apiV17} from "../lib/api";
 import {Icon, IconName} from "./Icon";
+import {NINA_PORTRAIT} from "./ninaPortrait";
 
 /* Trang chủ — hiện thực hoá Screen 01 của design/clawcompany-ui-canvas.html.
    Mọi số liệu lấy từ /api/v17/workspace/* và /api/v10/events; không có dữ
@@ -186,9 +187,10 @@ function WorkspaceCockpitInner() {
         </div>
       </div>
       <div className="heroArt" style={{textAlign: "center"}}>
-        {/* Chân dung Nina: ảnh thật trong public/, không phải vòng gradient.
-            Mockup dùng một ảnh nhân vật lớn làm điểm nhìn của hero. */}
-        <img src="/nina.jpg" alt="Nina — AI Chief of Staff"
+        {/* Chân dung Nina nhúng sẵn (xem ninaPortrait.ts để biết vì sao không
+            dùng file trong public/). Mockup lấy một ảnh nhân vật lớn làm điểm
+            nhìn của hero. */}
+        <img src={NINA_PORTRAIT} alt="Nina — AI Chief of Staff"
              className="portrait" width={168} height={168}
              style={{width: 168, height: 168}}/>
         <div style={{marginTop: 12}}>
