@@ -192,12 +192,57 @@ def test_a_failed_project_does_not_abort_the_whole_pass():
     assert "failed.append" in body
 
 
-def test_sync_is_bounded_and_org_scoped():
+def test_sync_is_bounded():
     from app.services import progress_autosync
 
     assert 0 < progress_autosync.MAX_SYNC <= 1000
-    body = _source("app/services/progress_autosync.py").split("def _projects(", 1)[1]
-    assert "Project.organization_id == organization_id" in body
+
+
+def test_projects_are_scoped_to_one_organization():
+    """Scope phải đi qua project -> company -> organization.
+
+    Assertion gốc grep chuỗi ``Project.organization_id == organization_id``
+    trong source -- và chính dòng đó là LỖI: bảng ``projects`` không có cột
+    organization_id, nên ``GET /api/v33/progress/drift`` trả 500
+    (``AttributeError: type object 'Project' has no attribute
+    'organization_id'``), đo được trên bản chạy thật. Một test grep source
+    như vậy không phát hiện lỗi, nó bảo tồn lỗi -- giống y trường hợp
+    ``live_channel`` của v35. Thay bằng kiểm chứng hành vi trên SQLite thật,
+    có hai tenant để chứng minh không rò rỉ chéo.
+    """
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from app.db.base import Base
+    from app.models import Company, Organization, Project
+    from app.services import progress_autosync
+
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(bind=engine)
+    db = sessionmaker(bind=engine, autoflush=False, autocommit=False)()
+    try:
+        made = {}
+        for slug in ("mine", "theirs"):
+            org = Organization(name=slug, slug=f"{slug}-v33-scope")
+            db.add(org); db.commit(); db.refresh(org)
+            company = Company(organization_id=org.id, name=f"{slug} co", status="active")
+            db.add(company); db.commit(); db.refresh(company)
+            project = Project(company_id=company.id, name=f"P {slug}",
+                              status="active", progress=0)
+            db.add(project); db.commit(); db.refresh(project)
+            made[slug] = (org.id, company.id, project.id)
+
+        mine_org, mine_company, mine_project = made["mine"]
+        theirs_org, _, theirs_project = made["theirs"]
+
+        assert [p.id for p in progress_autosync._projects(db, mine_org, None)] == [mine_project]
+        assert [p.id for p in progress_autosync._projects(db, theirs_org, None)] == [theirs_project]
+        # Lọc thêm theo company vẫn phải nằm trong org
+        assert [p.id for p in progress_autosync._projects(db, mine_org, mine_company)] == [mine_project]
+        assert progress_autosync._projects(db, theirs_org, mine_company) == []
+        assert not hasattr(Project, "organization_id")
+    finally:
+        db.close()
 
 
 # -- ranked retrieval -------------------------------------------------------

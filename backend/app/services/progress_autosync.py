@@ -19,7 +19,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.entities import Project
+from app.models.entities import Company, Project
 from app.services import board_truth
 from app.services.company_event_bus import emit_event
 
@@ -49,7 +49,20 @@ def policy() -> dict:
 
 
 def _projects(db: Session, organization_id: int, company_id: int | None) -> list[Project]:
-    stmt = select(Project).where(Project.organization_id == organization_id)
+    """Dự án thuộc một organization.
+
+    Bảng ``projects`` KHÔNG có cột ``organization_id``: quan hệ là
+    project -> company -> organization. Bản gốc lọc thẳng
+    ``Project.organization_id`` nên ``GET /api/v33/progress/drift`` trả 500
+    (``AttributeError: type object 'Project' has no attribute
+    'organization_id'``) -- đo được trên bản chạy thật, xem
+    ``_reports/local-runtime.md``. Cùng lớp lỗi với ``live_channel`` của v35.
+    """
+    stmt = (
+        select(Project)
+        .join(Company, Project.company_id == Company.id)
+        .where(Company.organization_id == organization_id)
+    )
     if company_id is not None:
         stmt = stmt.where(Project.company_id == company_id)
     return list(db.execute(stmt).scalars().all())

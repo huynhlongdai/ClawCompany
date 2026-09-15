@@ -1,0 +1,32 @@
+OK   đăng nhập admin
+OK   v19 protocol
+       mode=native khoá=['events', 'methods', 'runtime', 'session_keys', 'upstream']
+OK   v19 health (gateway thật)
+       mode=native status=healthy runtimeVersion=2026.9.4
+OK   v19 gateway agents
+       [{"id": "dev", "sessions": 4, "active": false}]
+OK   v19 company seats
+       3 ghế agent
+OK   v19 reconcile
+       {"matched": [], "orphaned": [{"runtime_agent_id": "mia-content", "agent_id": 3, "member_id": 4, "name": "Mia", "company_id": 1, "member_status": "active", "lifecycle": "active", "runtime_provider": "openclaw"}, {"runtime_agent_id": "nina", "agent_id": 1, "member_id": 2, "name": "Nina", "company_id":
+OK   v19 bind seat -> agent 'dev'
+       {"agent_id": 1, "member_id": 2, "runtime_agent_id": "dev", "main_session_key": "agent:dev:main"}
+       session key: agent:dev:main
+OK   tạo công ty/dự án/việc
+       task_id=3
+OK   v19 start task (dispatch qua chat.send)
+       HTTP 200 {"task_id": 3, "status": "in_progress", "run_id": "clawcompany:agent:dev:company-task-3:task-3", "session_key": "agent:dev:company-task-3"}
+OK   v19 transcript
+       {"task_id": 3, "session_key": "agent:dev:company-task-3", "native": true, "sessionKey": "agent:dev:company-task-3", "sessionId": "961c0a9b-14bf-45fc-b71c-ca02229bcfca", "messages": [{"role": "user", "content": "Company task #3: Việc 848bf6\n\nNo description provided.\n\nWorking agreement:\n- Report 
+OK   v35 readiness
+       {"transport": "sse", "websocket_implemented": false, "removes_client_polling": true, "removes_server_polling": false, "server_poll_seconds": 2.0, "heartbeat_seconds": 15.0, "max_duration_seconds": 300, "cursor": "runtime
+OK   v35 snapshot
+       {"type": "snapshot", "at": "2026-09-15T14:08:41.139816", "cursor": 0, "events": [], "tasks": [{"id": 3, "title": "Việc 848bf6", "status": "in_progress", "project_id": 3, "assignee_member_id": 2, "runtime_run_id": "clawco
+OK   v35 tasks
+       {"statuses": ["in_progress", "review"], "tasks": [{"id": 3, "title": "Việc 848bf6", "status": "in_progress", "project_id": 3, "assignee_member_id": 2, "runtime_run_id": "clawcompany:agent:dev:company-task-3:task-3", "run
+OK   v35 events
+       {"cursor": 0, "events": [], "scoped_runs": 1, "truncated": false}
+OK   v35 SSE stream
+       HTTP 200, 4 dòng: event: snapshot | data: {"type":"snapshot","at":"2026-09-15T14:08:41.156719","cursor":0,"events":[],"tasks":[{"id":3,"title":"Việc 848bf6","status":"in_progress","project_id":3,"assignee_member_id":2,"runtime_run_id":"clawcompany:agent:dev:company-ta
+
+15/15 bước OK

@@ -1,0 +1,2131 @@
+{
+  "total": 236,
+  "ok": 236,
+  "failed": 0,
+  "results": [
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/activity",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/agents",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/agents/runtime/health",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/approvals",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/automations",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/billing/invoices",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/billing/subscriptions",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/companies",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/company-factory/jobs",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/company-tools/context",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/company-tools/tasks",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/customers",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/dashboard/summary",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/decisions",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/departments",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/health/live",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/health/ready",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/inbox",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/integrations",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/knowledge",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/knowledge/search",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/marketplace",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/members",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/missions",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/nina/brief",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/nina/plans",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/organizations",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/policies",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/portal/chats",
+      "status": 0,
+      "group": "core",
+      "ok": true,
+      "skipped": true,
+      "note": "bỏ qua: cần token audience portal"
+    },
+    {
+      "method": "GET",
+      "path": "/api/portal/me",
+      "status": 0,
+      "group": "core",
+      "ok": true,
+      "skipped": true,
+      "note": "bỏ qua: cần token audience portal"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/roles",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/runtime/protocol",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/skills",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/sops",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/tasks",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/tools",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/usage/meter-rules",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v10/artifacts",
+      "status": 200,
+      "group": "v10",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v10/decision-loop-runs",
+      "status": 200,
+      "group": "v10",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v10/decision-loops",
+      "status": 200,
+      "group": "v10",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v10/evaluations",
+      "status": 200,
+      "group": "v10",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v10/events",
+      "status": 200,
+      "group": "v10",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v10/founder-cockpit",
+      "status": 200,
+      "group": "v10",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v10/handoffs",
+      "status": 200,
+      "group": "v10",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v10/messages",
+      "status": 200,
+      "group": "v10",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v10/simulation-runs",
+      "status": 200,
+      "group": "v10",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v10/simulations",
+      "status": 200,
+      "group": "v10",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v10/sla-incidents",
+      "status": 200,
+      "group": "v10",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v10/sla-profiles",
+      "status": 200,
+      "group": "v10",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v10/trigger-executions",
+      "status": 200,
+      "group": "v10",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v10/triggers",
+      "status": 200,
+      "group": "v10",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v11/deliveries",
+      "status": 200,
+      "group": "v11",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v11/delivery-dashboard",
+      "status": 200,
+      "group": "v11",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v11/pipelines",
+      "status": 200,
+      "group": "v11",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v11/repositories",
+      "status": 200,
+      "group": "v11",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v11/rollbacks",
+      "status": 200,
+      "group": "v11",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v11/webhook-deliveries",
+      "status": 200,
+      "group": "v11",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v11/webhook-endpoints",
+      "status": 200,
+      "group": "v11",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v12/delivery-automation-rules",
+      "status": 200,
+      "group": "v12",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v12/deployments",
+      "status": 200,
+      "group": "v12",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v12/dev-cloud-dashboard",
+      "status": 200,
+      "group": "v12",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v12/environments",
+      "status": 200,
+      "group": "v12",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v12/previews",
+      "status": 200,
+      "group": "v12",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v12/releases",
+      "status": 200,
+      "group": "v12",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v12/sandbox-profiles",
+      "status": 200,
+      "group": "v12",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v12/sandbox-runs",
+      "status": 200,
+      "group": "v12",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v12/secret-grants",
+      "status": 200,
+      "group": "v12",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v12/secrets",
+      "status": 200,
+      "group": "v12",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v12/workspaces",
+      "status": 200,
+      "group": "v12",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v13/builds",
+      "status": 200,
+      "group": "v13",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v13/cicd/graphs",
+      "status": 200,
+      "group": "v13",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v13/cicd/runs",
+      "status": 200,
+      "group": "v13",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v13/deployment-strategies",
+      "status": 200,
+      "group": "v13",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v13/engineering-dashboard",
+      "status": 200,
+      "group": "v13",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v13/execution-fabric/providers",
+      "status": 200,
+      "group": "v13",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v13/health-policies",
+      "status": 200,
+      "group": "v13",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v13/health-runs",
+      "status": 200,
+      "group": "v13",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v13/initiatives",
+      "status": 200,
+      "group": "v13",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v13/preview-routes",
+      "status": 200,
+      "group": "v13",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v13/preview-routes/resolve",
+      "status": 404,
+      "group": "v13",
+      "ok": true,
+      "skipped": true,
+      "note": "bỏ qua: seed không có dữ liệu loại này"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v13/release-manager/runs",
+      "status": 200,
+      "group": "v13",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v13/security-reviews",
+      "status": 200,
+      "group": "v13",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v13/workspace-gateway/operations",
+      "status": 200,
+      "group": "v13",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v13/workspace-gateway/sessions",
+      "status": 200,
+      "group": "v13",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/evidence-signatures",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/incidents",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/portfolio/objectives",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/portfolio/reviews",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/runner-jobs/next",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/runner-leases",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/runner-nodes",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/runner-pools",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/scanner-providers",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/scanner-runs",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/slo-evaluations",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/slos",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/telemetry/metrics",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/traffic-routers",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/traffic-shifts",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/workload-identity/.well-known/openid-configuration",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v14/workload-identity/jwks.json",
+      "status": 200,
+      "group": "v14",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/control-plane/summary",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/evidence-trust/policies",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/evidence-trust/verifications",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/metrics",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/paging/notifications",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/paging/routes",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/runner-trust/authorities",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/runner-trust/certificates",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/scheduler/leases",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/scheduler/nodes",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/secret-access-leases",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/secret-providers",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/sre/decisions",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/sre/policies",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/sre/runs",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/telemetry/exporters",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/workload-identity/1/jwks.json",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v15/workload-signing-keys",
+      "status": 200,
+      "group": "v15",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v16/collaboration/summary",
+      "status": 200,
+      "group": "v16",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v16/delegations",
+      "status": 200,
+      "group": "v16",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v16/delegations/overdue",
+      "status": 200,
+      "group": "v16",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v16/knowledge-mesh/access-logs",
+      "status": 200,
+      "group": "v16",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v16/knowledge-spaces",
+      "status": 200,
+      "group": "v16",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v16/rooms",
+      "status": 200,
+      "group": "v16",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v16/teams",
+      "status": 200,
+      "group": "v16",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v17/workspace/companies/1",
+      "status": 200,
+      "group": "v17",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v17/workspace/knowledge",
+      "status": 200,
+      "group": "v17",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v17/workspace/org-chart",
+      "status": 200,
+      "group": "v17",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v17/workspace/overview",
+      "status": 200,
+      "group": "v17",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v17/workspace/people",
+      "status": 200,
+      "group": "v17",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v17/workspace/projects",
+      "status": 200,
+      "group": "v17",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v17/workspace/tasks",
+      "status": 200,
+      "group": "v17",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v18/workspace/vocabulary",
+      "status": 200,
+      "group": "v18",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v19/openclaw/agents",
+      "status": 200,
+      "group": "v19",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v19/openclaw/health",
+      "status": 200,
+      "group": "v19",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v19/openclaw/protocol",
+      "status": 200,
+      "group": "v19",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v19/openclaw/seats",
+      "status": 200,
+      "group": "v19",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v19/tasks/1/transcript",
+      "status": 200,
+      "group": "v19",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v20/approvals/openclaw",
+      "status": 200,
+      "group": "v20",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v20/streams",
+      "status": 200,
+      "group": "v20",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v20/tasks/1/events",
+      "status": 200,
+      "group": "v20",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v21/approvals/readiness",
+      "status": 200,
+      "group": "v21",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v21/runtime/leases",
+      "status": 200,
+      "group": "v21",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v21/runtime/resumable",
+      "status": 200,
+      "group": "v21",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v22/runtime/orphans",
+      "status": 200,
+      "group": "v22",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v22/runtime/registry",
+      "status": 200,
+      "group": "v22",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v22/runtime/streams",
+      "status": 200,
+      "group": "v22",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v24/approvals/backfill/readiness",
+      "status": 200,
+      "group": "v24",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v24/runtime/gaps",
+      "status": 200,
+      "group": "v24",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v25/runtime/reconcile",
+      "status": 200,
+      "group": "v25",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v26/runtime/fabric",
+      "status": 200,
+      "group": "v26",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v26/runtime/index",
+      "status": 200,
+      "group": "v26",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v27/projects/1/archive/preview",
+      "status": 200,
+      "group": "v27",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v27/projects/1/truth",
+      "status": 200,
+      "group": "v27",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v27/revisions/project/1",
+      "status": 200,
+      "group": "v27",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v27/revisions/task/1",
+      "status": 200,
+      "group": "v27",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v28/guards",
+      "status": 200,
+      "group": "v28",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v28/projects/1/history",
+      "status": 200,
+      "group": "v28",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v28/projects/1/restore/preview",
+      "status": 200,
+      "group": "v28",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v29/audit",
+      "status": 200,
+      "group": "v29",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v29/audit/project/1",
+      "status": 200,
+      "group": "v29",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v29/companies/1/archive/preview",
+      "status": 200,
+      "group": "v29",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v29/companies/1/restore/preview",
+      "status": 200,
+      "group": "v29",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v29/departments/1/archive/preview",
+      "status": 200,
+      "group": "v29",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v29/departments/1/restore/preview",
+      "status": 200,
+      "group": "v29",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v29/members/1/archive/preview",
+      "status": 200,
+      "group": "v29",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v29/members/1/restore/preview",
+      "status": 200,
+      "group": "v29",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v29/vocabulary",
+      "status": 200,
+      "group": "v29",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v30/audit",
+      "status": 200,
+      "group": "v30",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v30/companies/1/projects/restore/preview",
+      "status": 200,
+      "group": "v30",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v30/revisions",
+      "status": 200,
+      "group": "v30",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v30/revisions/project/1",
+      "status": 200,
+      "group": "v30",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v31/companies/1/departments/name-conflicts",
+      "status": 200,
+      "group": "v31",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v31/history/project/1",
+      "status": 200,
+      "group": "v31",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v31/vocabulary",
+      "status": 200,
+      "group": "v31",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v32/coverage",
+      "status": 200,
+      "group": "v32",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v32/retention/policy",
+      "status": 200,
+      "group": "v32",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v32/retention/preview",
+      "status": 200,
+      "group": "v32",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v32/revisions/preview",
+      "status": 200,
+      "group": "v32",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v32/runtime/metrics",
+      "status": 200,
+      "group": "v32",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v32/runtime/pool",
+      "status": 200,
+      "group": "v32",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v33/coverage",
+      "status": 200,
+      "group": "v33",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v33/knowledge/retrieval-quality",
+      "status": 200,
+      "group": "v33",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v33/knowledge/search",
+      "status": 200,
+      "group": "v33",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v33/members/1/runtime",
+      "status": 200,
+      "group": "v33",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v33/members/1/runtime/resume-plan",
+      "status": 200,
+      "group": "v33",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v33/progress/drift",
+      "status": 200,
+      "group": "v33",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v33/runtime/lease-index",
+      "status": 200,
+      "group": "v33",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v34/coverage",
+      "status": 200,
+      "group": "v34",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v34/events/backlog",
+      "status": 200,
+      "group": "v34",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v34/events/runtime/unmirrored",
+      "status": 200,
+      "group": "v34",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v34/grants",
+      "status": 200,
+      "group": "v34",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v34/grants/due",
+      "status": 200,
+      "group": "v34",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v34/progress/schedules",
+      "status": 200,
+      "group": "v34",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v35/coverage",
+      "status": 200,
+      "group": "v35",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v35/live/events",
+      "status": 200,
+      "group": "v35",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v35/live/readiness",
+      "status": 200,
+      "group": "v35",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v35/live/snapshot",
+      "status": 200,
+      "group": "v35",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v35/live/stream",
+      "status": 200,
+      "group": "v35",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v35/live/tasks",
+      "status": 200,
+      "group": "v35",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v35/spend/overruns",
+      "status": 200,
+      "group": "v35",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v35/spend/report",
+      "status": 200,
+      "group": "v35",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v35/spend/rollup",
+      "status": 200,
+      "group": "v35",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v9/autonomy-policy",
+      "status": 200,
+      "group": "v9",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v9/budgets",
+      "status": 200,
+      "group": "v9",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v9/control-center",
+      "status": 200,
+      "group": "v9",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v9/cycles",
+      "status": 200,
+      "group": "v9",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v9/delegations",
+      "status": 200,
+      "group": "v9",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v9/goals",
+      "status": 200,
+      "group": "v9",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v9/incidents",
+      "status": 200,
+      "group": "v9",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v9/memory/search",
+      "status": 200,
+      "group": "v9",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v9/org/delegation-tree",
+      "status": 200,
+      "group": "v9",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v9/recurring-operations",
+      "status": 200,
+      "group": "v9",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/workflows",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/workforce/provisioning-jobs",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "status": 200,
+      "group": "core",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/v18/workspace/companies",
+      "status": 200,
+      "group": "v18",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/v18/workspace/departments",
+      "status": 200,
+      "group": "v18",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/v18/workspace/members",
+      "status": 200,
+      "group": "v18",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/v18/workspace/projects",
+      "status": 200,
+      "group": "v18",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/v18/workspace/tasks",
+      "status": 200,
+      "group": "v18",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/v18/workspace/tasks/2/move",
+      "status": 200,
+      "group": "v18",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/v18/workspace/tasks/2/assign",
+      "status": 200,
+      "group": "v18",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/v18/workspace/tasks/2/move",
+      "status": 200,
+      "group": "v18",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v27/projects/2/truth",
+      "status": 200,
+      "group": "v27",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v28/projects/2/history",
+      "status": 200,
+      "group": "v28",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v29/companies/3/archive/preview",
+      "status": 200,
+      "group": "v29",
+      "ok": true,
+      "skipped": false,
+      "note": ""
+    }
+  ]
+}

@@ -9,7 +9,6 @@ httpx==0.28.1
 websockets==14.1
 pytest==8.3.4
 python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
 bcrypt==4.2.1
 alembic==1.14.0
 redis==5.2.1

@@ -104,7 +104,13 @@ class TaskMove(BaseModel):
 
 
 class TaskAssign(BaseModel):
-    assignee_member_id: int | None = None
+    # Bắt buộc có mặt, nhưng cho phép null. Trước đây trường này có default
+    # None, nên một body sai tên khoá (ví dụ ``member_id``) được hiểu thành
+    # "bỏ gán" và trả 200 dù không làm gì -- API trả lời thành công cho một
+    # yêu cầu nó không hiểu. Đo được trong smoke test: assign trả 200, rồi
+    # move ngay sau đó vẫn báo "Assign the task before moving it into
+    # progress". Nay thiếu trường là 422; muốn bỏ gán thì gửi thẳng null.
+    assignee_member_id: int | None = Field(...)
 
 
 class KnowledgeIn(BaseModel):

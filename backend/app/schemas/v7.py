@@ -1,5 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 
+from app.schemas.auth import StoredEmail
+
 class VectorSearchRequest(BaseModel):
     organization_id: int
     query: str
@@ -42,7 +44,9 @@ class PortalRegister(BaseModel):
     display_name: str = ""
 
 class PortalLogin(BaseModel):
-    email: EmailStr
+    # Cùng lý do như LoginRequest: seed tạo client@acme.local, và đăng nhập
+    # không được phép từ chối một identity đã lưu. Xem app/schemas/auth.py.
+    email: StoredEmail
     password: str
 
 class PortalToken(BaseModel):

@@ -93,7 +93,22 @@ Gateway dev không có credential model, nên một lượt chạy sẽ dừng �
 `no authentication source configured for openai`. Đó là giới hạn cấu hình,
 không phải giao thức.
 
-### Không có Docker (như sandbox tiếp nhận)
+### Không có Docker: dựng Postgres + Redis thật ngay tại chỗ
+
+`tools/devstack.py` nhúng PostgreSQL 16 (kèm pgvector) và Redis ở user-space —
+không cần Docker, không cần root. Đây là cách toàn bộ tầng dữ liệu của dự án
+được kiểm chứng lần đầu.
+
+```bash
+.venv/bin/python tools/devstack.py up
+eval "$(.venv/bin/python tools/devstack.py env)"
+cd backend && ../.venv/bin/python -m alembic upgrade head && ../.venv/bin/python seed.py
+bash tools/run_api.sh                      # API 127.0.0.1:8000
+.venv/bin/python tools/smoke.py            # 236 endpoint
+.venv/bin/python tools/e2e_openclaw.py     # đường dây OpenClaw đầu-cuối
+```
+
+### Không có Docker (chỉ chạy test)
 
 **Bắt buộc Python 3.12.** Code dùng `int | None` trong annotation mà
 SQLAlchemy đánh giá lúc chạy, nên Python 3.9/3.10 sẽ nổ ngay khi import model.
@@ -114,13 +129,19 @@ npm install && npx next build
 
 | Hạng mục | Trạng thái | Bằng chứng |
 | --- | --- | --- |
-| Test suite | **636 passed · 0 failed · 1 skipped** | `_reports/pytest-after-repair.log` |
+| Test suite | **640 passed · 0 failed · 1 skipped** | `_reports/pytest-after-repair.log` |
+| Smoke 236 endpoint trên bản chạy thật | **236/236 OK** | `_reports/smoke.txt` |
+| Đường dây OpenClaw đầu-cuối qua API | **15/15 bước OK** | `_reports/e2e-openclaw.txt` |
 | Lần chạy đầu tiên | 582 passed · 37 failed | `_reports/pytest-first-run.log` |
 | Frontend build | **xanh**, 49 route prerender | `npx next build` |
 | Bridge contract | **192/192** khớp route thật | `tools/inventory.py` |
-| Migration | chưa chạy thật (không có Postgres) | — |
+| Migration | **đã chạy trên Postgres 16 thật**, 160 bảng | `_reports/local-runtime.md` |
 | OpenClaw native | **đã kết nối được gateway thật** (2026.9.4) | `_reports/native-probe-after-fix.log` |
-| Postgres/pgvector/Redis/mTLS/cosign/OTLP | **chưa từng kiểm chứng** | không có test nào chạm tới |
+| Postgres + pgvector | **đã chạy thật** (pgserver) | `_reports/local-runtime.md` |
+| Redis (lease/registry v21–v26) | **đã chạy thật**, báo `cluster_wide: true` | `_reports/local-runtime.md` |
+| Celery worker | **lên được**, đăng ký đủ task | `_reports/local-runtime.md` |
+| Frontend `next dev`, 6 route chính | HTTP 200 | `_reports/local-runtime.md` |
+| mTLS runner / cosign / OTLP export | **chưa từng kiểm chứng** | cần hạ tầng ngoài |
 
 Trước lượt tiếp nhận này, **chưa một test nào từng được thực thi** — docs
 v20→v35 đều ghi "tests written but not executed".
@@ -148,7 +169,22 @@ Các lỗi code thật đã sửa, mỗi lỗi kèm test canh giữ:
    `exec.approval.resolve` gửi kèm `sessionKey`, không nằm trong
    `ExecApprovalResolveParamsSchema` (`closedObject`), nên bị gateway từ chối.
    Cũng bỏ bộ lọc `sessionKey` mà v24 suy đoán cho `exec.approval.list`.
-5. **Frontend chưa từng build được** (`2414256`). `tsconfig.json` không khai
+5. **Chuỗi migration không chạy được trên Postgres** (`5e03242`).
+   `alembic_version.version_num` là VARCHAR(32) còn revision id dài tới 42 ký
+   tự; và `0001_baseline` tạo sẵn những cột mà 0013/0014 mới được quyền thêm.
+   Cả hai đều ẩn với SQLite. Kèm `tests/test_migration_chain.py`.
+6. **Không ai đăng nhập được vào bản cài mới** (`99150bb`). `seed.py` tạo
+   `admin@clawcompany.local` và README quảng cáo đúng tài khoản đó, nhưng
+   `EmailStr` từ chối TLD `.local` → 422; `UserOut.email` cũng vậy nên
+   `/auth/me` sẽ 500. Đăng nhập và đọc identity đã lưu nay dùng `StoredEmail`;
+   đăng ký vẫn giữ `EmailStr`.
+7. **`GET /api/v33/progress/drift` trả 500** (`99150bb`) — `Project.organization_id`
+   không tồn tại, đúng cùng lớp lỗi với `live_channel`. Test cũ grep source
+   ghim chính dòng lỗi; đã thay bằng kiểm chứng hai tenant.
+8. **`assign` trả 200 cho body nó không hiểu** (`99150bb`).
+   `TaskAssign.assignee_member_id` có default `None` nên sai tên khoá thành
+   "bỏ gán" và trả 200 dù không làm gì.
+9. **Frontend chưa từng build được** (`2414256`). `tsconfig.json` không khai
    `baseUrl`/`paths` trong khi 29 file import qua `@/`; `lib/api.ts` khai
    `request<T>` không có default nên 288 lời gọi trả `Promise<unknown>`.
 
@@ -187,11 +223,17 @@ toàn (636 passed), nhưng **xanh không đồng nghĩa với đã kiểm chứn
 vẫn chạy trên double. Hai file v28/v30 là mẫu nên noi theo — model ORM thật,
 SQLite in-memory, assertion hành vi.
 
-### P2 — hạ tầng chưa được chứng minh
+### P2 — ĐÃ ĐÓNG PHẦN LỚN: hạ tầng đã được chứng minh
 
-Không có test nào cần Postgres, pgvector, Redis, mTLS, cosign hay OTLP. Mọi
-phát biểu trong docs về các lớp đó là **thiết kế**, không phải kết quả đo.
-Cần một lần chạy `docker compose up` + `alembic upgrade head` thật.
+Postgres 16 + pgvector, Redis, Celery, API, frontend và một gateway OpenClaw
+thật đều đã chạy cùng lúc; migration đi hết chuỗi; 236 endpoint xanh; đường dây
+dispatch agent đi đầu-cuối. Chi tiết và những chỗ còn hổng:
+`_reports/local-runtime.md`.
+
+Còn lại trong P2: mTLS runner, cosign, OTLP export, Firecracker/Kubernetes —
+những thứ cần hạ tầng ngoài chứ không phải cấu hình. Và đây **không phải** phép
+thử `docker compose up`: nó chứng minh code chạy với Postgres/Redis thật, không
+chứng minh file compose đúng.
 
 ### P3 — vệ sinh mã nguồn
 
@@ -247,6 +289,13 @@ Cần một lần chạy `docker compose up` + `alembic upgrade head` thật.
 | `_reports/native-probe-before-fix.log` | bằng chứng 1008 trước khi sửa |
 | `_reports/native-probe-after-fix.log` | bằng chứng kết nối được sau khi sửa |
 | `tools/probe_*.py` | script dò adapter với gateway thật |
+| `_reports/local-runtime.md` | biên bản chạy thật cả stack |
+| `_reports/smoke.txt` · `smoke.json` | kết quả 236 endpoint |
+| `_reports/e2e-openclaw.txt` | đường dây OpenClaw đầu-cuối |
+| `tools/devstack.py` | dựng Postgres + Redis nhúng |
+| `tools/run_api.sh` | khởi động API trên devstack |
+| `tools/smoke.py` | smoke toàn bộ bề mặt API |
+| `tools/e2e_openclaw.py` | kiểm chứng đường dây agent đầu-cuối |
 | `_reports/pytest-first-run.log` | log chạy test lần đầu tiên |
 | `_reports/pytest-after-repair.log` | log sau khi sửa |
 | `docs/architecture-v*.md` | thiết kế từng version (25 file) |
