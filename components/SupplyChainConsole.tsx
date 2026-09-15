@@ -1,0 +1,12 @@
+"use client";
+import {useEffect,useState} from "react";
+import {apiV13} from "../lib/api";
+type Any=Record<string,any>;
+export function SupplyChainConsole(){
+ const [builds,setBuilds]=useState<Any[]>([]),[reviews,setReviews]=useState<Any[]>([]),[error,setError]=useState("");
+ useEffect(()=>{Promise.all([apiV13.builds(),apiV13.securityReviews()]).then(([b,r])=>{setBuilds(b as Any[]);setReviews(r as Any[])}).catch((e:any)=>setError(e.message))},[]);
+ return <>{error&&<div className="portalError">{error}</div>}<section className="v13SupplyHero"><div><span>SOFTWARE SUPPLY CHAIN</span><h2>Every release can explain exactly what source went in and which gate approved it.</h2><p>ClawCompany emits a source manifest, SPDX 2.3 JSON and SLSA-style provenance statement as ordinary immutable Artifacts, so they can be reviewed and handed off like code.</p></div><div className="v13Evidence"><article><b>SPDX 2.3</b><small>file checksums</small></article><article><b>SLSA-style</b><small>builder + materials</small></article><article><b>SHA-256</b><small>source digest</small></article></div></section>
+ <div className="v13Split"><section className="v8Card"><div className="v8CardHead"><div><b>Build evidence</b><small>Commit → manifest → SBOM → provenance</small></div></div><div className="v13Builds">{builds.map(x=><article key={x.id}><div><b>Build #{x.id}</b><em>{x.status}</em></div><code>{x.commit_sha?.slice(0,14)}</code><small>{x.source_digest?.slice(0,18)}…</small></article>)}{!builds.length&&<div className="v8Empty">No build evidence yet</div>}</div></section>
+ <section className="v8Card"><div className="v8CardHead"><div><b>Security reviewer</b><small>Fail-closed release gate</small></div></div><div className="v13SecurityList">{reviews.map(x=><article key={x.id}><div><span className={`v13Shield ${x.verdict}`}>⌾</span><div><b>Review #{x.id}</b><small>{x.summary}</small></div></div><strong>{Math.round(x.score||0)}</strong><em>{x.verdict}</em></article>)}{!reviews.length&&<div className="v8Empty">No security review yet</div>}</div></section></div>
+ <section className="v13Guardrail"><div><b>What this scanner does</b><p>Detects deterministic high-risk source patterns such as committed private keys, shell execution, unsafe deserialization and disabled TLS verification.</p></div><div><b>What it does not claim</b><p>It is not a dependency CVE database, SAST replacement or formal supply-chain attestation service. Those remain provider adapters for a hardened deployment.</p></div></section></>
+}

@@ -1,0 +1,180 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: clawcompany
+      POSTGRES_USER: clawcompany
+      POSTGRES_PASSWORD: clawcompany
+    ports:
+      - "5432:5432"
+    volumes:
+      - clawcompany_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U clawcompany -d clawcompany"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD","redis-cli","ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./backend
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+      - clawcompany_artifacts:/workspace-artifacts
+      - clawcompany_repositories:/workspace-repositories
+      - clawcompany_dev_workspaces:/workspace-dev
+      - clawcompany_deployments:/workspace-deployments
+      - clawcompany_traffic:/workspace-traffic
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    environment:
+      DATABASE_URL: postgresql+psycopg://clawcompany:clawcompany@db:5432/clawcompany
+      CORS_ORIGINS: http://localhost:3000
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      JWT_SECRET: local-dev-change-me
+      OPENCLAW_MODE: mock
+      ARTIFACT_WORKSPACE_ROOT: /workspace-artifacts
+      REPOSITORY_WORKSPACE_ROOT: /workspace-repositories
+      DEV_WORKSPACE_ROOT: /workspace-dev
+      DEPLOYMENT_WORKSPACE_ROOT: /workspace-deployments
+      SANDBOX_DOCKER_ENABLED: "false"
+      SANDBOX_DEFAULT_PROVIDER: mock
+      REPOSITORY_TEST_ALLOWED_EXECUTABLES: python,python3,pytest,npm,pnpm,yarn,node
+      EVENT_WEBHOOK_ALLOWED_HOSTS: localhost,127.0.0.1
+      VECTOR_BACKEND: pgvector
+      EMBEDDING_PROVIDER: hash384
+      WORKLOAD_IDENTITY_ISSUER: http://localhost:8000/api/v14/workload-identity
+      WORKLOAD_IDENTITY_ALGORITHM: HS256
+      WORKLOAD_IDENTITY_DEV_SECRET: local-dev-workload-change-me
+      SUPPLY_CHAIN_SIGNING_KEY: local-dev-signing-change-me
+      TRAFFIC_ROUTER_CONFIG_ROOT: /workspace-traffic
+      TRAFFIC_ROUTER_KUBERNETES_ENABLED: "false"
+      RUNNER_MTLS_REQUIRED: "false"
+      TELEMETRY_EXPORT_ALLOWED_HOSTS: localhost,127.0.0.1
+      SECRET_PROVIDER_ALLOWED_HOSTS: localhost,127.0.0.1
+      INCIDENT_PAGING_ALLOWED_HOSTS: localhost,127.0.0.1
+      SCHEDULER_NODE_KEY: control-plane-v15
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ./backend
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+      - clawcompany_artifacts:/workspace-artifacts
+      - clawcompany_repositories:/workspace-repositories
+      - clawcompany_dev_workspaces:/workspace-dev
+      - clawcompany_deployments:/workspace-deployments
+      - clawcompany_traffic:/workspace-traffic
+    command: sh -c "celery -A app.worker.celery_app worker --loglevel=INFO"
+    environment:
+      DATABASE_URL: postgresql+psycopg://clawcompany:clawcompany@db:5432/clawcompany
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      JWT_SECRET: local-dev-change-me
+      OPENCLAW_MODE: mock
+      ARTIFACT_WORKSPACE_ROOT: /workspace-artifacts
+      REPOSITORY_WORKSPACE_ROOT: /workspace-repositories
+      DEV_WORKSPACE_ROOT: /workspace-dev
+      DEPLOYMENT_WORKSPACE_ROOT: /workspace-deployments
+      SANDBOX_DOCKER_ENABLED: "false"
+      SANDBOX_DEFAULT_PROVIDER: mock
+      REPOSITORY_TEST_ALLOWED_EXECUTABLES: python,python3,pytest,npm,pnpm,yarn,node
+      EVENT_WEBHOOK_ALLOWED_HOSTS: localhost,127.0.0.1
+      VECTOR_BACKEND: pgvector
+      EMBEDDING_PROVIDER: hash384
+      WORKLOAD_IDENTITY_ISSUER: http://localhost:8000/api/v14/workload-identity
+      WORKLOAD_IDENTITY_ALGORITHM: HS256
+      WORKLOAD_IDENTITY_DEV_SECRET: local-dev-workload-change-me
+      SUPPLY_CHAIN_SIGNING_KEY: local-dev-signing-change-me
+      TRAFFIC_ROUTER_CONFIG_ROOT: /workspace-traffic
+      TRAFFIC_ROUTER_KUBERNETES_ENABLED: "false"
+      RUNNER_MTLS_REQUIRED: "false"
+      TELEMETRY_EXPORT_ALLOWED_HOSTS: localhost,127.0.0.1
+      SECRET_PROVIDER_ALLOWED_HOSTS: localhost,127.0.0.1
+      INCIDENT_PAGING_ALLOWED_HOSTS: localhost,127.0.0.1
+      SCHEDULER_NODE_KEY: control-plane-v15
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+
+  beat:
+    build:
+      context: ./backend
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+    command: sh -c "celery -A app.worker.celery_app beat --loglevel=INFO"
+    environment:
+      DATABASE_URL: postgresql+psycopg://clawcompany:clawcompany@db:5432/clawcompany
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      JWT_SECRET: local-dev-change-me
+      OPENCLAW_MODE: mock
+      ARTIFACT_WORKSPACE_ROOT: /workspace-artifacts
+      VECTOR_BACKEND: pgvector
+      EMBEDDING_PROVIDER: hash384
+      WORKLOAD_IDENTITY_ISSUER: http://localhost:8000/api/v14/workload-identity
+      WORKLOAD_IDENTITY_ALGORITHM: HS256
+      WORKLOAD_IDENTITY_DEV_SECRET: local-dev-workload-change-me
+      SUPPLY_CHAIN_SIGNING_KEY: local-dev-signing-change-me
+      TRAFFIC_ROUTER_CONFIG_ROOT: /workspace-traffic
+      TRAFFIC_ROUTER_KUBERNETES_ENABLED: "false"
+      RUNNER_MTLS_REQUIRED: "false"
+      TELEMETRY_EXPORT_ALLOWED_HOSTS: localhost,127.0.0.1
+      SECRET_PROVIDER_ALLOWED_HOSTS: localhost,127.0.0.1
+      INCIDENT_PAGING_ALLOWED_HOSTS: localhost,127.0.0.1
+      SCHEDULER_NODE_KEY: control-plane-v15
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - clawcompany_node_modules:/app/node_modules
+    command: sh -c "npm install && npm run dev -- -H 0.0.0.0"
+    environment:
+      NEXT_PUBLIC_API_BASE: http://localhost:8000/api
+      NEXT_PUBLIC_AUTH_REQUIRED: "true"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  clawcompany_pg:
+  clawcompany_node_modules:
+  clawcompany_artifacts:
+  clawcompany_repositories:
+  clawcompany_dev_workspaces:
+  clawcompany_deployments:
+  clawcompany_traffic:

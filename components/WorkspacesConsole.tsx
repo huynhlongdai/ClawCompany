@@ -1,0 +1,13 @@
+"use client";
+import {useEffect,useState} from "react";
+import {apiV12} from "../lib/api";
+type Any=Record<string,any>;
+export function WorkspacesConsole(){
+ const [items,setItems]=useState<Any[]>([]),[err,setErr]=useState("");
+ const [name,setName]=useState("Feature workspace"),[key,setKey]=useState(`feature-${Date.now().toString().slice(-5)}`),[repo,setRepo]=useState("");
+ const load=async()=>{try{setItems(await apiV12.workspaces() as Any[]);setErr("")}catch(e:any){setErr(e.message)}};useEffect(()=>{load()},[]);
+ const create=async()=>{try{await apiV12.createWorkspace({organization_id:1,name,workspace_key:key,repository_id:repo?Number(repo):null,ttl_minutes:720});await load()}catch(e:any){setErr(e.message)}};
+ const destroy=async(id:number)=>{try{await apiV12.destroyWorkspace(id);await load()}catch(e:any){setErr(e.message)}};
+ return <><div className="v12Two"><section className="v8Card"><div className="v8CardHead"><div><b>Create isolated workspace</b><small>Repository worktree or clean managed directory</small></div></div><div className="v9Form"><label>Name<input value={name} onChange={e=>setName(e.target.value)}/></label><label>Workspace key<input value={key} onChange={e=>setKey(e.target.value)}/></label><label>Repository ID (optional)<input value={repo} onChange={e=>setRepo(e.target.value)} placeholder="1"/></label><button className="v8Primary" onClick={create}>Provision workspace</button></div>{err&&<div className="portalError">{err}</div>}</section><section className="v12PolicyCard"><b>Workspace contract</b><p>Agents receive a path scoped to one organization and one job. Repository workspaces use detached Git worktrees; non-repository workspaces stay under the configured development root.</p><div><span>TTL cleanup</span><strong>Enabled</strong></div><div><span>Path traversal</span><strong>Blocked</strong></div><div><span>Shared agent home</span><strong>Disabled</strong></div></section></div>
+ <section className="v8Card"><div className="v8CardHead"><div><b>Development workspaces</b><small>Ephemeral collaboration surface shared through ClawCompany, not through model-specific local storage.</small></div></div><div className="v12WorkspaceGrid">{items.map(x=><article key={x.id}><header><span>▤</span><div><b>{x.name}</b><small>{x.workspace_key}</small></div><em>{x.status}</em></header><code>{x.root_path||"provisioning…"}</code><div className="v12Meta"><span>Repo <b>{x.repository_id||"—"}</b></span><span>Owner <b>{x.owner_member_id||"—"}</b></span><span>Base <b>{x.base_ref||"—"}</b></span></div><footer><button onClick={()=>destroy(x.id)}>Destroy</button></footer></article>)}</div></section></>
+}

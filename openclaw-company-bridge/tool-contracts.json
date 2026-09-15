@@ -1,0 +1,1507 @@
+{
+  "tools": [
+    {
+      "name": "company.context",
+      "method": "GET",
+      "path": "/api/company-tools/context",
+      "scope": "company.context:read",
+      "description": "Return organization/company/department/manager context for the current OpenClaw agent."
+    },
+    {
+      "name": "company.tasks.list",
+      "method": "GET",
+      "path": "/api/company-tools/tasks",
+      "scope": "company.tasks:read",
+      "description": "List business tasks assigned to the current agent."
+    },
+    {
+      "name": "company.task.status",
+      "method": "POST",
+      "path": "/api/company-tools/tasks/{task_id}/status",
+      "scope": "company.tasks:write",
+      "description": "Update status of an assigned Company task."
+    },
+    {
+      "name": "company.knowledge.search",
+      "method": "POST",
+      "path": "/api/company-tools/knowledge/search",
+      "scope": "company.knowledge:read",
+      "description": "Search permitted Company knowledge using vector search."
+    },
+    {
+      "name": "company.approval.request",
+      "method": "POST",
+      "path": "/api/company-tools/approval/request",
+      "scope": "company.approvals:write",
+      "description": "Evaluate policy and create an approval request when required."
+    },
+    {
+      "name": "company.message.owner",
+      "method": "POST",
+      "path": "/api/company-tools/message/owner",
+      "scope": "company.messages:write",
+      "description": "Escalate an agent message to its manager/owner inbox."
+    },
+    {
+      "name": "company.artifact.create",
+      "method": "POST",
+      "path": "/api/v10/artifacts",
+      "scope": "company.artifacts:write",
+      "description": "Register source code, files or deliverables with immutable version/checksum metadata."
+    },
+    {
+      "name": "company.artifact.list",
+      "method": "GET",
+      "path": "/api/v10/artifacts",
+      "scope": "company.artifacts:read",
+      "description": "List artifacts available in the current organization/bundle/task scope."
+    },
+    {
+      "name": "company.artifact.handoff",
+      "method": "POST",
+      "path": "/api/v10/artifacts/{artifact_id}/handoff",
+      "scope": "company.artifacts:write",
+      "description": "Hand an exact artifact version to another member/agent for review, continuation or commit."
+    },
+    {
+      "name": "company.handoffs.list",
+      "method": "GET",
+      "path": "/api/v10/handoffs",
+      "scope": "company.artifacts:read",
+      "description": "Read pending artifact handoffs for a member/agent."
+    },
+    {
+      "name": "company.agent.message",
+      "method": "POST",
+      "path": "/api/v10/messages",
+      "scope": "company.messages:write",
+      "description": "Send a persistent internal message to another member/agent."
+    },
+    {
+      "name": "company.events.emit",
+      "method": "POST",
+      "path": "/api/v10/events",
+      "scope": "company.events:write",
+      "description": "Emit a durable company event for trigger-based automation."
+    },
+    {
+      "name": "company.events.list",
+      "method": "GET",
+      "path": "/api/v10/events",
+      "scope": "company.events:read",
+      "description": "Read company event stream within tenant scope."
+    },
+    {
+      "name": "company.artifact.evaluate",
+      "method": "POST",
+      "path": "/api/v10/artifacts/{artifact_id}/evaluate",
+      "scope": "company.artifacts:write",
+      "description": "Run/store QA evaluation for a deliverable before downstream execution."
+    },
+    {
+      "name": "company.handoff.accept",
+      "method": "POST",
+      "path": "/api/v10/handoffs/{handoff_id}/accept",
+      "scope": "company.artifacts:write",
+      "description": "Accept an artifact handoff assigned to the receiving member/agent."
+    },
+    {
+      "name": "company.artifact.materialize",
+      "method": "POST",
+      "path": "/api/v10/artifacts/{artifact_id}/materialize",
+      "scope": "company.artifacts:write",
+      "description": "Materialize an inline artifact into the controlled tenant workspace after policy/QA checks."
+    },
+    {
+      "name": "company.agent.messages.list",
+      "method": "GET",
+      "path": "/api/v10/messages",
+      "scope": "company.messages:read",
+      "description": "Read persistent internal message traffic available in tenant scope."
+    },
+    {
+      "name": "company.repositories.list",
+      "method": "GET",
+      "path": "/api/v11/repositories",
+      "scope": "company.repositories:read",
+      "description": "List repositories available to the current tenant identity."
+    },
+    {
+      "name": "company.delivery.create",
+      "method": "POST",
+      "path": "/api/v11/deliveries",
+      "scope": "company.delivery:write",
+      "description": "Create a repository delivery run from an immutable Artifact Registry bundle."
+    },
+    {
+      "name": "company.delivery.prepare",
+      "method": "POST",
+      "path": "/api/v11/deliveries/{run_id}/prepare",
+      "scope": "company.delivery:write",
+      "description": "Materialize bundle artifacts into an isolated Git worktree and create the Commit Agent commit + patch artifact."
+    },
+    {
+      "name": "company.delivery.tests",
+      "method": "POST",
+      "path": "/api/v11/deliveries/{run_id}/tests",
+      "scope": "company.delivery:write",
+      "description": "Run the delivery pipeline test profile against the isolated worktree."
+    },
+    {
+      "name": "company.delivery.review",
+      "method": "POST",
+      "path": "/api/v11/reviews/{review_id}/decision",
+      "scope": "company.delivery:review",
+      "description": "Submit an identity-bound human/AI code review decision."
+    },
+    {
+      "name": "company.delivery.merge",
+      "method": "POST",
+      "path": "/api/v11/deliveries/{run_id}/merge",
+      "scope": "company.delivery:merge",
+      "description": "Merge a delivery only after test and review gates pass and repository permission allows it."
+    },
+    {
+      "name": "company.delivery.rollback",
+      "method": "POST",
+      "path": "/api/v11/merge-requests/{merge_request_id}/rollback",
+      "scope": "company.delivery:rollback",
+      "description": "Revert a merged delivery using the controlled repository rollback agent."
+    },
+    {
+      "name": "company.workspaces.list",
+      "method": "GET",
+      "path": "/api/v12/workspaces",
+      "scope": "company.devcloud:read",
+      "description": "List controlled development workspaces available to the current tenant identity."
+    },
+    {
+      "name": "company.workspace.create",
+      "method": "POST",
+      "path": "/api/v12/workspaces",
+      "scope": "company.devcloud:write",
+      "description": "Provision a tenant-bounded development workspace or detached repository worktree."
+    },
+    {
+      "name": "company.sandbox.run",
+      "method": "POST",
+      "path": "/api/v12/sandbox-runs",
+      "scope": "company.devcloud:execute",
+      "description": "Execute an argv command inside a policy-bound sandbox profile with optional short-lived secret grants."
+    },
+    {
+      "name": "company.releases.list",
+      "method": "GET",
+      "path": "/api/v12/releases",
+      "scope": "company.releases:read",
+      "description": "List immutable commit-pinned releases for the current organization."
+    },
+    {
+      "name": "company.release.create",
+      "method": "POST",
+      "path": "/api/v12/releases",
+      "scope": "company.releases:write",
+      "description": "Create a release from a verified Git commit or merged repository delivery."
+    },
+    {
+      "name": "company.release.deploy",
+      "method": "POST",
+      "path": "/api/v12/releases/{release_id}/deploy",
+      "scope": "company.deployments:write",
+      "description": "Deploy a release through environment policy and approval gates."
+    },
+    {
+      "name": "company.deployment.rollback",
+      "method": "POST",
+      "path": "/api/v12/deployments/{deployment_id}/rollback",
+      "scope": "company.deployments:rollback",
+      "description": "Rollback an environment to the previous successful deployment lineage."
+    },
+    {
+      "name": "company.handoff.trigger_delivery",
+      "method": "POST",
+      "path": "/api/v12/handoffs/{handoff_id}/trigger-delivery",
+      "scope": "company.delivery:write",
+      "description": "Evaluate delivery automation rules for an accepted artifact handoff and create repository delivery runs."
+    },
+    {
+      "name": "company.workspace.gateway.open",
+      "method": "POST",
+      "path": "/api/v13/workspace-gateway/sessions",
+      "scope": "company.workspace:write",
+      "description": "Open an identity-bound provider-neutral workspace session for an AI employee."
+    },
+    {
+      "name": "company.workspace.gateway.write",
+      "method": "POST",
+      "path": "/api/v13/workspace-gateway/sessions/{session_id}/write",
+      "scope": "company.workspace:write",
+      "description": "Write a text file inside the bounded development workspace without repository credentials."
+    },
+    {
+      "name": "company.workspace.gateway.read",
+      "method": "GET",
+      "path": "/api/v13/workspace-gateway/sessions/{session_id}/read",
+      "scope": "company.workspace:read",
+      "description": "Read a bounded workspace text file through the audited Workspace Gateway."
+    },
+    {
+      "name": "company.workspace.gateway.snapshot",
+      "method": "POST",
+      "path": "/api/v13/workspace-gateway/sessions/{session_id}/snapshot",
+      "scope": "company.workspace:snapshot",
+      "description": "Snapshot workspace source into versioned Artifact Registry entries for downstream handoff."
+    },
+    {
+      "name": "company.cicd.run",
+      "method": "POST",
+      "path": "/api/v13/cicd/runs",
+      "scope": "company.cicd:execute",
+      "description": "Execute a versioned CI/CD DAG against an immutable Git commit."
+    },
+    {
+      "name": "company.security.review",
+      "method": "POST",
+      "path": "/api/v13/security-reviews",
+      "scope": "company.security:execute",
+      "description": "Run the deterministic source security reviewer and persist findings."
+    },
+    {
+      "name": "company.release_manager.assess",
+      "method": "POST",
+      "path": "/api/v13/release-manager/assess",
+      "scope": "company.releases:write",
+      "description": "Evaluate CI, security, approval and deployment evidence for release promotion."
+    },
+    {
+      "name": "company.engineering.initiative.run",
+      "method": "POST",
+      "path": "/api/v13/initiatives/{initiative_id}/run",
+      "scope": "company.cicd:execute",
+      "description": "Advance a Nina-governed engineering initiative through CI, evidence, security, release and deployment gates."
+    },
+    {
+      "name": "company.runner.lease",
+      "method": "POST",
+      "path": "/api/v14/runner-leases",
+      "scope": "company.runners:execute",
+      "description": "Acquire a capability-matched, time-bounded remote runner lease for an AI workload."
+    },
+    {
+      "name": "company.runner.job.create",
+      "method": "POST",
+      "path": "/api/v14/runner-jobs",
+      "scope": "company.runners:execute",
+      "description": "Enqueue a workload for the runner node bound to an active lease."
+    },
+    {
+      "name": "company.workload_identity.token",
+      "method": "POST",
+      "path": "/api/v14/workload-identity/token",
+      "scope": "company.runners:execute",
+      "description": "Issue a short-lived workload JWT bound to an active runner lease and explicit scopes."
+    },
+    {
+      "name": "company.supply_chain.sign",
+      "method": "POST",
+      "path": "/api/v14/evidence-signatures",
+      "scope": "company.supply_chain:write",
+      "description": "Sign a digest-bound build evidence artifact using a configured signer reference."
+    },
+    {
+      "name": "company.security.scan.external",
+      "method": "POST",
+      "path": "/api/v14/scanner-runs",
+      "scope": "company.security:execute",
+      "description": "Run a configured deterministic/SAST/CVE scanner adapter against an immutable repository commit."
+    },
+    {
+      "name": "company.telemetry.emit",
+      "method": "POST",
+      "path": "/api/v14/telemetry/metrics",
+      "scope": "company.telemetry:write",
+      "description": "Emit a tenant-bound deployment or release telemetry sample for SLO evaluation."
+    },
+    {
+      "name": "company.canary.run",
+      "method": "POST",
+      "path": "/api/v14/canary-runs",
+      "scope": "company.deployments:write",
+      "description": "Execute persisted canary traffic steps and halt/rollback on SLO breach."
+    },
+    {
+      "name": "company.incident.create",
+      "method": "POST",
+      "path": "/api/v14/incidents",
+      "scope": "company.incidents:write",
+      "description": "Open an auditable operational incident visible to Nina and human operators."
+    },
+    {
+      "name": "company.portfolio.review",
+      "method": "POST",
+      "path": "/api/v14/portfolio/reviews",
+      "scope": "company.portfolio:read",
+      "description": "Ask Nina's deterministic portfolio layer to summarize engineering delivery health and recommendations."
+    },
+    {
+      "name": "company.runner.trust.certificates",
+      "method": "GET",
+      "path": "/api/v15/runner-trust/certificates",
+      "scope": "company.runners:read",
+      "description": "Inspect active/revoked runner client certificate identities without exposing private keys."
+    },
+    {
+      "name": "company.workload_identity.jwks",
+      "method": "GET",
+      "path": "/api/v15/workload-identity/{organization_id}/jwks.json",
+      "scope": "company.runners:read",
+      "description": "Read tenant workload identity public signing keys during controlled key rotation."
+    },
+    {
+      "name": "company.supply_chain.verify",
+      "method": "POST",
+      "path": "/api/v15/evidence-trust/verify",
+      "scope": "company.supply_chain:read",
+      "description": "Verify signed build evidence against a tenant trust policy before release promotion."
+    },
+    {
+      "name": "company.telemetry.otlp.emit",
+      "method": "POST",
+      "path": "/api/v15/telemetry/otlp-json",
+      "scope": "company.telemetry:write",
+      "description": "Ingest OTLP JSON metric points with tenant/release attribution for SLO evaluation."
+    },
+    {
+      "name": "company.secret.lease",
+      "method": "POST",
+      "path": "/api/v15/secret-access-leases",
+      "scope": "company.secrets:use",
+      "description": "Request a short-lived secret access lease; plaintext secret values are never returned by this API."
+    },
+    {
+      "name": "company.incident.page",
+      "method": "POST",
+      "path": "/api/v15/incidents/{incident_id}/page",
+      "scope": "company.incidents:write",
+      "description": "Queue governed incident paging through configured console/webhook routes."
+    },
+    {
+      "name": "company.sre.plan",
+      "method": "POST",
+      "path": "/api/v15/sre/plan",
+      "scope": "company.incidents:write",
+      "description": "Have Nina create a deterministic recovery plan with risk/approval gating for an incident."
+    },
+    {
+      "name": "company.sre.execute",
+      "method": "POST",
+      "path": "/api/v15/sre/runs/{run_id}/execute",
+      "scope": "company.incidents:write",
+      "description": "Execute an approved SRE recovery run; critical actions cannot bypass approval unless authorized admin force is used."
+    },
+    {
+      "name": "company.team.create",
+      "method": "POST",
+      "path": "/api/v16/teams",
+      "scope": "company.collaboration:write",
+      "description": "Create an agent team, optionally spanning companies, with a coordination mode."
+    },
+    {
+      "name": "company.team.roster",
+      "method": "GET",
+      "path": "/api/v16/teams",
+      "scope": "company.collaboration:read",
+      "description": "List agent teams and their members with roles and turn order."
+    },
+    {
+      "name": "company.room.open",
+      "method": "POST",
+      "path": "/api/v16/rooms",
+      "scope": "company.collaboration:write",
+      "description": "Open a collaboration room for a team with a turn mode and max turn budget."
+    },
+    {
+      "name": "company.room.read",
+      "method": "GET",
+      "path": "/api/v16/rooms/{room_id}",
+      "scope": "company.collaboration:read",
+      "description": "Read a room, its seats and its append-only transcript."
+    },
+    {
+      "name": "company.room.speak",
+      "method": "POST",
+      "path": "/api/v16/rooms/{room_id}/turns",
+      "scope": "company.collaboration:write",
+      "description": "Post a turn. Rejected if it is not the caller's turn or the turn type needs decision rights."
+    },
+    {
+      "name": "company.room.close",
+      "method": "POST",
+      "path": "/api/v16/rooms/{room_id}/close",
+      "scope": "company.collaboration:write",
+      "description": "Close a room and optionally publish its summary into the knowledge mesh."
+    },
+    {
+      "name": "company.delegation.propose",
+      "method": "POST",
+      "path": "/api/v16/delegations",
+      "scope": "company.delegation:write",
+      "description": "Propose a delegation contract with objective, acceptance criteria, deadline and cost ceiling."
+    },
+    {
+      "name": "company.delegation.respond",
+      "method": "POST",
+      "path": "/api/v16/delegations/{contract_id}/accept",
+      "scope": "company.delegation:write",
+      "description": "Accept a proposed delegation contract as the assignee."
+    },
+    {
+      "name": "company.delegation.list",
+      "method": "GET",
+      "path": "/api/v16/delegations",
+      "scope": "company.delegation:read",
+      "description": "List delegation contracts with their state machine status."
+    },
+    {
+      "name": "company.knowledge_mesh.search",
+      "method": "POST",
+      "path": "/api/v16/knowledge-mesh/search",
+      "scope": "company.knowledge_mesh:read",
+      "description": "Search shared knowledge as a specific member; results are filtered by effective permission and every attempt is logged."
+    },
+    {
+      "name": "company.knowledge_mesh.contribute",
+      "method": "POST",
+      "path": "/api/v16/knowledge-spaces/{space_id}/entries",
+      "scope": "company.knowledge_mesh:write",
+      "description": "Contribute a versioned entry to a knowledge space the caller may write to."
+    },
+    {
+      "name": "company.knowledge_mesh.permission",
+      "method": "GET",
+      "path": "/api/v16/knowledge-spaces/{space_id}/permission",
+      "scope": "company.knowledge_mesh:read",
+      "description": "Resolve the effective permission a member has on a knowledge space."
+    },
+    {
+      "name": "company.collaboration.summary",
+      "method": "GET",
+      "path": "/api/v16/collaboration/summary",
+      "scope": "company.collaboration:read",
+      "description": "Summary of teams, open rooms, delegation states and mesh activity."
+    },
+    {
+      "name": "company.org.create_company",
+      "method": "POST",
+      "path": "/api/v18/workspace/companies",
+      "scope": "company.workspace:write",
+      "description": "Stand up a new company in the organization. Rejects duplicate names."
+    },
+    {
+      "name": "company.org.create_department",
+      "method": "POST",
+      "path": "/api/v18/workspace/departments",
+      "scope": "company.workspace:write",
+      "description": "Create a department under a company, optionally with a head member."
+    },
+    {
+      "name": "company.org.create_member",
+      "method": "POST",
+      "path": "/api/v18/workspace/members",
+      "scope": "company.workspace:write",
+      "description": "Add a human seat, or an agent seat plus its openclaw runtime binding."
+    },
+    {
+      "name": "company.org.move_member",
+      "method": "PATCH",
+      "path": "/api/v18/workspace/members/{member_id}",
+      "scope": "company.workspace:write",
+      "description": "Reassign a seat's company, department, manager, role or status. Reporting cycles are rejected."
+    },
+    {
+      "name": "company.work.create_project",
+      "method": "POST",
+      "path": "/api/v18/workspace/projects",
+      "scope": "company.workspace:write",
+      "description": "Open a project for a company with an optional owner."
+    },
+    {
+      "name": "company.work.update_project",
+      "method": "PATCH",
+      "path": "/api/v18/workspace/projects/{project_id}",
+      "scope": "company.workspace:write",
+      "description": "Update project status, progress, owner or description."
+    },
+    {
+      "name": "company.work.create_task",
+      "method": "POST",
+      "path": "/api/v18/workspace/tasks",
+      "scope": "company.workspace:write",
+      "description": "File a task on a project. New tasks always start in backlog."
+    },
+    {
+      "name": "company.work.move_task",
+      "method": "POST",
+      "path": "/api/v18/workspace/tasks/{task_id}/move",
+      "scope": "company.workspace:write",
+      "description": "Move a task along a legal transition. Skipping review is rejected."
+    },
+    {
+      "name": "company.work.assign_task",
+      "method": "POST",
+      "path": "/api/v18/workspace/tasks/{task_id}/assign",
+      "scope": "company.workspace:write",
+      "description": "Assign or unassign a task. Inactive members cannot receive work."
+    },
+    {
+      "name": "company.work.vocabulary",
+      "method": "GET",
+      "path": "/api/v18/workspace/vocabulary",
+      "scope": "company.context:read",
+      "description": "Read allowed statuses, priorities and legal task transitions before attempting a write."
+    },
+    {
+      "name": "company.runtime.protocol",
+      "method": "GET",
+      "path": "/api/v19/openclaw/protocol",
+      "scope": "company.context:read",
+      "description": "Read which OpenClaw gateway contract this deployment speaks, plus the legacy-to-upstream method map."
+    },
+    {
+      "name": "company.runtime.health",
+      "method": "GET",
+      "path": "/api/v19/openclaw/health",
+      "scope": "company.context:read",
+      "description": "Check the OpenClaw gateway connection before dispatching work."
+    },
+    {
+      "name": "company.runtime.gateway_agents",
+      "method": "GET",
+      "path": "/api/v19/openclaw/agents",
+      "scope": "company.context:read",
+      "description": "List the agents the OpenClaw gateway actually has configured."
+    },
+    {
+      "name": "company.runtime.seats",
+      "method": "GET",
+      "path": "/api/v19/openclaw/seats",
+      "scope": "company.context:read",
+      "description": "List company agent seats and the OpenClaw agentId each one is bound to."
+    },
+    {
+      "name": "company.runtime.reconcile",
+      "method": "POST",
+      "path": "/api/v19/openclaw/reconcile",
+      "scope": "company.runtime:write",
+      "description": "Compare company agent seats with the gateway roster and flag drift. Seats whose agent is gone become 'detached'; nothing is deleted."
+    },
+    {
+      "name": "company.runtime.bind_seat",
+      "method": "POST",
+      "path": "/api/v19/openclaw/bind",
+      "scope": "company.runtime:write",
+      "description": "Bind a company agent seat to an existing OpenClaw agentId. OpenClaw agents are created by the operator with `openclaw agents add`."
+    },
+    {
+      "name": "company.runtime.start_task",
+      "method": "POST",
+      "path": "/api/v19/tasks/{task_id}/start",
+      "scope": "company.runtime:write",
+      "description": "Send a task to its agent's own OpenClaw session (agent:<id>:company-task-<task>) and move it to in_progress."
+    },
+    {
+      "name": "company.runtime.abort_task",
+      "method": "POST",
+      "path": "/api/v19/tasks/{task_id}/abort",
+      "scope": "company.runtime:write",
+      "description": "Abort the running OpenClaw session for a task and park the task back on the board."
+    },
+    {
+      "name": "company.runtime.transcript",
+      "method": "GET",
+      "path": "/api/v19/tasks/{task_id}/transcript",
+      "scope": "company.context:read",
+      "description": "Read the chat history of the OpenClaw session behind a task."
+    },
+    {
+      "name": "company.runtime.streams",
+      "method": "GET",
+      "path": "/api/v20/streams",
+      "scope": "company.context:read",
+      "description": "List OpenClaw session followers running in this API process, plus whether auto-dispatch is on."
+    },
+    {
+      "name": "company.runtime.follow_task",
+      "method": "POST",
+      "path": "/api/v20/tasks/{task_id}/follow",
+      "scope": "company.runtime:write",
+      "description": "Keep a task's OpenClaw session subscription open so its events, status changes and approval prompts are recorded."
+    },
+    {
+      "name": "company.runtime.unfollow_task",
+      "method": "POST",
+      "path": "/api/v20/tasks/{task_id}/unfollow",
+      "scope": "company.runtime:write",
+      "description": "Stop following a task's OpenClaw session in this process."
+    },
+    {
+      "name": "company.runtime.task_events",
+      "method": "GET",
+      "path": "/api/v20/tasks/{task_id}/events",
+      "scope": "company.context:read",
+      "description": "Read the persisted runtime events recorded for a task's OpenClaw session."
+    },
+    {
+      "name": "company.board.move_task",
+      "method": "POST",
+      "path": "/api/v20/board/tasks/{task_id}/move",
+      "scope": "company.runtime:write",
+      "description": "Move a task on the board and, for agent-owned work entering in_progress, dispatch and follow it automatically."
+    },
+    {
+      "name": "company.runtime.approvals",
+      "method": "GET",
+      "path": "/api/v20/approvals/openclaw",
+      "scope": "company.context:read",
+      "description": "List approval rows created from OpenClaw gateway permission prompts."
+    },
+    {
+      "name": "company.runtime.leases",
+      "method": "GET",
+      "path": "/api/v21/runtime/leases",
+      "scope": "company.context:read",
+      "description": "Show which backend owns session-follow leases (redis or process memory) and which sessions this process holds."
+    },
+    {
+      "name": "company.runtime.resumable",
+      "method": "GET",
+      "path": "/api/v21/runtime/resumable",
+      "scope": "company.context:read",
+      "description": "List tasks that are mid-run with an OpenClaw session but currently unobserved, e.g. after a restart."
+    },
+    {
+      "name": "company.runtime.resume",
+      "method": "POST",
+      "path": "/api/v21/runtime/resume",
+      "scope": "company.runtime:write",
+      "description": "Re-attach session followers for in-flight tasks. Lease-guarded, so it is safe to call from every worker."
+    },
+    {
+      "name": "company.approvals.readiness",
+      "method": "GET",
+      "path": "/api/v21/approvals/readiness",
+      "scope": "company.context:read",
+      "description": "Check whether an approval decided in ClawCompany can actually be delivered to the OpenClaw gateway."
+    },
+    {
+      "name": "company.approvals.decide",
+      "method": "POST",
+      "path": "/api/v21/approvals/{approval_id}/decide",
+      "scope": "company.runtime:write",
+      "description": "Approve or deny an OpenClaw permission prompt from the company queue; reports recorded and delivered separately."
+    },
+    {
+      "name": "company.runtime.registry",
+      "method": "GET",
+      "path": "/api/v22/runtime/registry",
+      "scope": "company.context:read",
+      "description": "Report whether run reporting is shared across workers and whether the orphan-takeover sweep is enabled."
+    },
+    {
+      "name": "company.runtime.orphans",
+      "method": "GET",
+      "path": "/api/v22/runtime/orphans",
+      "scope": "company.context:read",
+      "description": "List mid-run sessions that currently have no lease holder, i.e. nobody is recording their events."
+    },
+    {
+      "name": "company.runtime.claim",
+      "method": "POST",
+      "path": "/api/v22/runtime/claim",
+      "scope": "company.runtime:write",
+      "description": "Take over unattended OpenClaw sessions. Lease-guarded: one worker wins, the rest are declined."
+    },
+    {
+      "name": "company.runtime.cluster_streams",
+      "method": "GET",
+      "path": "/api/v22/runtime/streams",
+      "scope": "company.context:read",
+      "description": "List session followers reported by every API worker. Reports process_local=true when the view covers this process only."
+    },
+    {
+      "name": "company.runtime.gaps",
+      "method": "GET",
+      "path": "/api/v24/runtime/gaps",
+      "scope": "company.context:read",
+      "description": "List unattended OpenClaw sessions and how long they went unobserved. Missed events are never replayed."
+    },
+    {
+      "name": "company.approvals.backfill_readiness",
+      "method": "GET",
+      "path": "/api/v24/approvals/backfill/readiness",
+      "scope": "company.context:read",
+      "description": "Report whether exec.approval.list can be called: needs the operator.approvals scope and a native runtime."
+    },
+    {
+      "name": "company.approvals.backfill",
+      "method": "POST",
+      "path": "/api/v24/approvals/backfill",
+      "scope": "company.runtime:write",
+      "description": "Pull approval prompts the gateway raised while no follower was attached into the company queue. Idempotent."
+    },
+    {
+      "name": "company.runtime.reconcile_status",
+      "method": "GET",
+      "path": "/api/v25/runtime/reconcile",
+      "scope": "company.context:read",
+      "description": "Report automatic reconciliation passes made by this API worker, plus whether approval listing is possible. History is process-local."
+    },
+    {
+      "name": "company.runtime.reconcile_session",
+      "method": "POST",
+      "path": "/api/v25/runtime/reconcile",
+      "scope": "company.runtime:write",
+      "description": "Force a reconciliation pass for one task's OpenClaw session: record the observation gap and pull pending approval prompts. Bypasses the cooldown."
+    },
+    {
+      "name": "company.runtime.fabric_status",
+      "method": "GET",
+      "path": "/api/v26/runtime/fabric",
+      "scope": "company.context:read",
+      "description": "One answer for this worker's shared Redis fabric: pool state, lease store, stream registry, reconcile ledger, and whether they agree with each other."
+    },
+    {
+      "name": "company.runtime.index_health",
+      "method": "GET",
+      "path": "/api/v26/runtime/index",
+      "scope": "company.context:read",
+      "description": "Lease and registry index-set health. Reading it also prunes members whose key has already expired."
+    },
+    {
+      "name": "company.runtime.fabric_reconnect",
+      "method": "POST",
+      "path": "/api/v26/runtime/fabric/reconnect",
+      "scope": "company.runtime:write",
+      "description": "Skip the reconnect backoff and dial Redis now, after an outage has been fixed."
+    },
+    {
+      "name": "company.project.truth",
+      "method": "GET",
+      "path": "/api/v27/projects/{project_id}/truth",
+      "scope": "company.context:read",
+      "description": "Progress derived from the task board, the stored column, and the drift between them."
+    },
+    {
+      "name": "company.project.progress_sync",
+      "method": "POST",
+      "path": "/api/v27/projects/{project_id}/progress/sync",
+      "scope": "company.workspace:write",
+      "description": "Write the board-derived progress onto the project; no-op when nothing is measurable."
+    },
+    {
+      "name": "company.project.archive_preview",
+      "method": "GET",
+      "path": "/api/v27/projects/{project_id}/archive/preview",
+      "scope": "company.context:read",
+      "description": "What archiving this project would cancel, and any live OpenClaw session blocking it."
+    },
+    {
+      "name": "company.project.archive",
+      "method": "POST",
+      "path": "/api/v27/projects/{project_id}/archive",
+      "scope": "company.workspace:write",
+      "description": "Archive a project by cancelling the work it still owed. Nothing is deleted."
+    },
+    {
+      "name": "company.task.guarded_move",
+      "method": "POST",
+      "path": "/api/v27/tasks/{task_id}/move",
+      "scope": "company.workspace:write",
+      "description": "Move a task only if expected_revision still matches, so a stale read cannot overwrite newer work."
+    },
+    {
+      "name": "company.board.guards",
+      "method": "GET",
+      "path": "/api/v28/guards",
+      "scope": "company.context:read",
+      "description": "List entities and fields that accept a guarded (compare-and-set) write."
+    },
+    {
+      "name": "company.project.guarded_update",
+      "method": "POST",
+      "path": "/api/v28/guarded/projects/{project_id}",
+      "scope": "company.workspace:write",
+      "description": "Update a project only if its revision is unchanged; the database enforces it."
+    },
+    {
+      "name": "company.task.guarded_update",
+      "method": "POST",
+      "path": "/api/v28/guarded/tasks/{task_id}",
+      "scope": "company.workspace:write",
+      "description": "Update task fields under a binding revision guard (does not apply status transition rules)."
+    },
+    {
+      "name": "company.company.guarded_update",
+      "method": "POST",
+      "path": "/api/v28/guarded/companies/{company_id}",
+      "scope": "company.workspace:write",
+      "description": "Update a company under a binding revision guard."
+    },
+    {
+      "name": "company.department.guarded_update",
+      "method": "POST",
+      "path": "/api/v28/guarded/departments/{department_id}",
+      "scope": "company.workspace:write",
+      "description": "Update a department under a binding revision guard."
+    },
+    {
+      "name": "company.member.guarded_update",
+      "method": "POST",
+      "path": "/api/v28/guarded/members/{member_id}",
+      "scope": "company.workspace:write",
+      "description": "Update a member under a binding revision guard."
+    },
+    {
+      "name": "company.project.restore_preview",
+      "method": "GET",
+      "path": "/api/v28/projects/{project_id}/restore/preview",
+      "scope": "company.context:read",
+      "description": "Show what un-archiving a project would restore and what it would skip."
+    },
+    {
+      "name": "company.project.restore",
+      "method": "POST",
+      "path": "/api/v28/projects/{project_id}/restore",
+      "scope": "company.workspace:write",
+      "description": "Reverse an archive, reopening the tasks that archive cancelled."
+    },
+    {
+      "name": "company.project.board_history",
+      "method": "GET",
+      "path": "/api/v28/projects/{project_id}/history",
+      "scope": "company.context:read",
+      "description": "Derived progress, archive preview and restore state for one project."
+    },
+    {
+      "name": "company.archive.vocabulary",
+      "method": "GET",
+      "path": "/api/v29/vocabulary",
+      "scope": "company.context:read",
+      "description": "Which entities the cascade archive can touch and which status words it writes."
+    },
+    {
+      "name": "company.company.archive_preview",
+      "method": "GET",
+      "path": "/api/v29/companies/{company_id}/archive/preview",
+      "scope": "company.context:read",
+      "description": "Blast radius of archiving a company: departments, members, projects, live sessions."
+    },
+    {
+      "name": "company.company.archive",
+      "method": "POST",
+      "path": "/api/v29/companies/{company_id}/archive",
+      "scope": "company.workspace:write",
+      "description": "Archive a company and cascade to its departments, members and open projects."
+    },
+    {
+      "name": "company.company.restore_preview",
+      "method": "GET",
+      "path": "/api/v29/companies/{company_id}/restore/preview",
+      "scope": "company.context:read",
+      "description": "What un-archiving a company would restore, and which prior states are known."
+    },
+    {
+      "name": "company.company.restore",
+      "method": "POST",
+      "path": "/api/v29/companies/{company_id}/restore",
+      "scope": "company.workspace:write",
+      "description": "Un-archive a company, returning each row to its recorded prior state."
+    },
+    {
+      "name": "company.department.archive_preview",
+      "method": "GET",
+      "path": "/api/v29/departments/{department_id}/archive/preview",
+      "scope": "company.context:read",
+      "description": "Blast radius of archiving a department, including live OpenClaw sessions."
+    },
+    {
+      "name": "company.department.archive",
+      "method": "POST",
+      "path": "/api/v29/departments/{department_id}/archive",
+      "scope": "company.workspace:write",
+      "description": "Archive a department: lock its access level and offboard its members."
+    },
+    {
+      "name": "company.department.restore_preview",
+      "method": "GET",
+      "path": "/api/v29/departments/{department_id}/restore/preview",
+      "scope": "company.context:read",
+      "description": "What un-archiving a department would restore."
+    },
+    {
+      "name": "company.department.restore",
+      "method": "POST",
+      "path": "/api/v29/departments/{department_id}/restore",
+      "scope": "company.workspace:write",
+      "description": "Un-archive a department and reinstate the members it offboarded."
+    },
+    {
+      "name": "company.member.archive_preview",
+      "method": "GET",
+      "path": "/api/v29/members/{member_id}/archive/preview",
+      "scope": "company.context:read",
+      "description": "Blast radius of offboarding a member, including agents and live sessions."
+    },
+    {
+      "name": "company.member.archive",
+      "method": "POST",
+      "path": "/api/v29/members/{member_id}/archive",
+      "scope": "company.workspace:write",
+      "description": "Offboard a member; agent rows stay registered and live sessions are reported."
+    },
+    {
+      "name": "company.member.restore_preview",
+      "method": "GET",
+      "path": "/api/v29/members/{member_id}/restore/preview",
+      "scope": "company.context:read",
+      "description": "What reinstating a member would restore."
+    },
+    {
+      "name": "company.member.restore",
+      "method": "POST",
+      "path": "/api/v29/members/{member_id}/restore",
+      "scope": "company.workspace:write",
+      "description": "Reinstate an offboarded member at the status recorded at archive time."
+    },
+    {
+      "name": "company.audit.feed",
+      "method": "GET",
+      "path": "/api/v29/audit",
+      "scope": "company.context:read",
+      "description": "Write audit feed: guarded writes, lost races, archives and restores."
+    },
+    {
+      "name": "company.audit.entity",
+      "method": "GET",
+      "path": "/api/v29/audit/{entity_type}/{entity_id}",
+      "scope": "company.context:read",
+      "description": "Audit trail for one row: who changed it, when, and which fields moved."
+    },
+    {
+      "name": "company.revision.modes",
+      "method": "GET",
+      "path": "/api/v30/revisions",
+      "scope": "company.context:read",
+      "description": "Which entity kinds carry an exact revision counter and which fall back to timestamps."
+    },
+    {
+      "name": "company.revision.read",
+      "method": "GET",
+      "path": "/api/v30/revisions/{kind}/{entity_id}",
+      "scope": "company.context:read",
+      "description": "Read a row's revision token, legacy token, and whether a guarded write would be exact."
+    },
+    {
+      "name": "company.row.guarded_update",
+      "method": "POST",
+      "path": "/api/v30/guarded/{kind}/{entity_id}",
+      "scope": "company.workspace:write",
+      "description": "Compare-and-set on any guarded entity using a counter or timestamp revision token."
+    },
+    {
+      "name": "company.audit.page",
+      "method": "GET",
+      "path": "/api/v30/audit",
+      "scope": "company.context:read",
+      "description": "Paged write audit feed; pass next_cursor back as cursor to walk history."
+    },
+    {
+      "name": "company.company.projects_restore_preview",
+      "method": "GET",
+      "path": "/api/v30/companies/{company_id}/projects/restore/preview",
+      "scope": "company.context:read",
+      "description": "Which projects a company archive cancelled and which would reopen in a batch restore."
+    },
+    {
+      "name": "company.company.projects_restore",
+      "method": "POST",
+      "path": "/api/v30/companies/{company_id}/projects/restore",
+      "scope": "company.workspace:write",
+      "description": "Reopen every project cancelled by a company archive, each through the v28 project restore."
+    },
+    {
+      "name": "company.fields.vocabulary",
+      "method": "GET",
+      "path": "/api/v31/vocabulary",
+      "scope": "company.context:read",
+      "description": "Department statuses, clearable columns, and the clear sentinel used by guarded writes."
+    },
+    {
+      "name": "company.fields.history",
+      "method": "GET",
+      "path": "/api/v31/history/{entity_type}/{entity_id}",
+      "scope": "company.context:read",
+      "description": "Per-field value timeline for one row, rebuilt from recorded before-values."
+    },
+    {
+      "name": "company.department.update",
+      "method": "PATCH",
+      "path": "/api/v31/departments/{department_id}",
+      "scope": "company.workspace:write",
+      "description": "Edit a department name, head, access level or status; names are unique per company."
+    },
+    {
+      "name": "company.department.name_conflicts",
+      "method": "GET",
+      "path": "/api/v31/companies/{company_id}/departments/name-conflicts",
+      "scope": "company.context:read",
+      "description": "Duplicate department names in a company, which block migration 0014."
+    },
+    {
+      "name": "company.project.set_owner",
+      "method": "POST",
+      "path": "/api/v31/projects/{project_id}/owner",
+      "scope": "company.workspace:write",
+      "description": "Assign a project owner, or unassign one with clear_owner true."
+    },
+    {
+      "name": "company.audit.coverage",
+      "method": "GET",
+      "path": "/api/v32/coverage",
+      "scope": "company.context:read",
+      "description": "Which write paths record before-values, plus the retention and revision-adoption policies. Read this before claiming a field history is complete."
+    },
+    {
+      "name": "company.events.retention_preview",
+      "method": "GET",
+      "path": "/api/v32/retention/preview",
+      "scope": "company.context:read",
+      "description": "Events a prune would delete, by tier, and which undo records are protected because their row is still archived."
+    },
+    {
+      "name": "company.events.prune",
+      "method": "POST",
+      "path": "/api/v32/retention/prune",
+      "scope": "company.workspace:write",
+      "description": "Delete expired company events. dry_run defaults to true; admin role required for human callers."
+    },
+    {
+      "name": "company.revision.adoption_preview",
+      "method": "GET",
+      "path": "/api/v32/revisions/preview",
+      "scope": "company.context:read",
+      "description": "Rows still guarded by a timestamp instead of an exact counter, and how many are old enough to adopt one safely."
+    },
+    {
+      "name": "company.revision.backfill",
+      "method": "POST",
+      "path": "/api/v32/revisions/backfill",
+      "scope": "company.workspace:write",
+      "description": "Adopt a revision counter of 1 for rows older than the quiet period. Never renumbers a row that already has one. dry_run defaults to true."
+    },
+    {
+      "name": "company.runtime.pool",
+      "method": "GET",
+      "path": "/api/v32/runtime/pool",
+      "scope": "company.context:read",
+      "description": "Shared Redis pool state and the exponential backoff schedule."
+    },
+    {
+      "name": "company.runtime.metrics",
+      "method": "GET",
+      "path": "/api/v32/runtime/metrics",
+      "scope": "company.context:read",
+      "description": "Prometheus text exposition for the lease store and Redis pool."
+    },
+    {
+      "name": "company.member.runtime_orphans",
+      "method": "GET",
+      "path": "/api/v33/members/{member_id}/runtime",
+      "scope": "company.context:read",
+      "description": "Tasks still holding a dead runtime session after a member restore."
+    },
+    {
+      "name": "company.member.runtime_resume_plan",
+      "method": "GET",
+      "path": "/api/v33/members/{member_id}/runtime/resume-plan",
+      "scope": "company.context:read",
+      "description": "The dispatch calls that would restart parked work. Never executed here."
+    },
+    {
+      "name": "company.member.runtime_park",
+      "method": "POST",
+      "path": "/api/v33/members/{member_id}/runtime/park",
+      "scope": "company.workspace:write",
+      "description": "Drop dead session keys so the board stops claiming a runner exists. Dry run by default."
+    },
+    {
+      "name": "company.progress.drift",
+      "method": "GET",
+      "path": "/api/v33/progress/drift",
+      "scope": "company.context:read",
+      "description": "Where typed project progress disagrees with the task board."
+    },
+    {
+      "name": "company.progress.sync",
+      "method": "POST",
+      "path": "/api/v33/progress/sync",
+      "scope": "company.workspace:write",
+      "description": "Write derived progress onto drifted projects. Dry run by default."
+    },
+    {
+      "name": "company.knowledge.retrieve",
+      "method": "GET",
+      "path": "/api/v33/knowledge/search",
+      "scope": "company.context:read",
+      "description": "Ranked retrieval over readable knowledge spaces (keyword, semantic or hybrid)."
+    },
+    {
+      "name": "company.knowledge.retrieval_quality",
+      "method": "GET",
+      "path": "/api/v33/knowledge/retrieval-quality",
+      "scope": "company.context:read",
+      "description": "What the hash384 ranker is and is not good at."
+    },
+    {
+      "name": "company.runtime.lease_index",
+      "method": "GET",
+      "path": "/api/v33/runtime/lease-index",
+      "scope": "company.context:read",
+      "description": "Lease index size plus a dry-run prune preview."
+    },
+    {
+      "name": "company.runtime.lease_index_prune",
+      "method": "POST",
+      "path": "/api/v33/runtime/lease-index/prune",
+      "scope": "company.workspace:write",
+      "description": "Remove index members whose lease key is gone. Bounded, dry run by default."
+    },
+    {
+      "name": "company.recovery.coverage",
+      "method": "GET",
+      "path": "/api/v33/coverage",
+      "scope": "company.context:read",
+      "description": "What v33 repairs and what it deliberately leaves alone."
+    },
+    {
+      "name": "company.events.backlog",
+      "description": "List company events whose trigger side effects never ran (status pending/error, older than the quiet window).",
+      "method": "GET",
+      "path": "/api/v34/events/backlog",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {
+        "limit": "int?",
+        "company_id": "int?"
+      },
+      "read_only": true
+    },
+    {
+      "name": "company.events.detail",
+      "description": "Read one company event with its payload to decide whether replaying it is safe.",
+      "method": "GET",
+      "path": "/api/v34/events/{event_id}",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {
+        "event_id": "int"
+      },
+      "read_only": true
+    },
+    {
+      "name": "company.events.replay",
+      "description": "Re-run the trigger pass for stuck company events. Dry run by default; admin floor because trigger actions write.",
+      "method": "POST",
+      "path": "/api/v34/events/replay",
+      "scopes": [
+        "company.workspace:write"
+      ],
+      "input": {
+        "dry_run": "bool",
+        "limit": "int?",
+        "statuses": "string[]?",
+        "company_id": "int?"
+      },
+      "read_only": false
+    },
+    {
+      "name": "company.events.runtime_unmirrored",
+      "description": "Runtime events stored on disk whose run never produced a company event.",
+      "method": "GET",
+      "path": "/api/v34/events/runtime/unmirrored",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {
+        "limit": "int?"
+      },
+      "read_only": true
+    },
+    {
+      "name": "company.events.runtime_reemit",
+      "description": "Put specific runtime events back on the company bus. Never re-meters usage.",
+      "method": "POST",
+      "path": "/api/v34/events/runtime/reemit",
+      "scopes": [
+        "company.workspace:write"
+      ],
+      "input": {
+        "runtime_event_ids": "int[]",
+        "dry_run": "bool"
+      },
+      "read_only": false
+    },
+    {
+      "name": "company.progress.schedules",
+      "description": "List scheduled project progress sync operations and whether they have ever fired.",
+      "method": "GET",
+      "path": "/api/v34/progress/schedules",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {
+        "company_id": "int?"
+      },
+      "read_only": true
+    },
+    {
+      "name": "company.progress.schedule_create",
+      "description": "Register a cron schedule that runs the project progress drift sweep. Manager floor.",
+      "method": "POST",
+      "path": "/api/v34/progress/schedules",
+      "scopes": [
+        "company.workspace:write"
+      ],
+      "input": {
+        "schedule": "string",
+        "timezone": "string",
+        "limit": "int?",
+        "dry_run_runs": "bool",
+        "enabled": "bool",
+        "company_id": "int?",
+        "name": "string?"
+      },
+      "read_only": false
+    },
+    {
+      "name": "company.progress.schedule_toggle",
+      "description": "Enable or disable a progress sync schedule and recompute its next run.",
+      "method": "POST",
+      "path": "/api/v34/progress/schedules/{operation_id}/enabled",
+      "scopes": [
+        "company.workspace:write"
+      ],
+      "input": {
+        "operation_id": "int",
+        "enabled": "bool"
+      },
+      "read_only": false
+    },
+    {
+      "name": "company.grants.ledger",
+      "description": "Standing OpenClaw grants with review deadlines. Expiry is recorded locally, never enforced on the gateway.",
+      "method": "GET",
+      "path": "/api/v34/grants",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {
+        "include_revoked": "bool?",
+        "company_id": "int?"
+      },
+      "read_only": true
+    },
+    {
+      "name": "company.grants.due",
+      "description": "Standing grants already expired or expiring soon, with the session keys an operator must clear by hand.",
+      "method": "GET",
+      "path": "/api/v34/grants/due",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {
+        "within_days": "int?"
+      },
+      "read_only": true
+    },
+    {
+      "name": "company.grants.revoke",
+      "description": "Close a standing grant ledger row after an operator clears it on the gateway host. Admin floor.",
+      "method": "POST",
+      "path": "/api/v34/grants/revoke",
+      "scopes": [
+        "company.workspace:write"
+      ],
+      "input": {
+        "grant_key": "string",
+        "note": "string?",
+        "confirmed_cleared_upstream": "bool"
+      },
+      "read_only": false
+    },
+    {
+      "name": "company.replay.coverage",
+      "description": "What v34 repairs and where each piece stops: replay scope, scheduler readiness, grant expiry enforcement.",
+      "method": "GET",
+      "path": "/api/v34/coverage",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {},
+      "read_only": true
+    },
+    {
+      "name": "company.spend.coverage",
+      "description": "Where v35 stops: how delegation spend is attributed and what the SSE live channel does not do.",
+      "method": "GET",
+      "path": "/api/v35/coverage",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {},
+      "read_only": true
+    },
+    {
+      "name": "company.spend.report",
+      "description": "Delegation contracts with budget, attributable spend and status (within/warning/over/unbudgeted/unattributable).",
+      "method": "GET",
+      "path": "/api/v35/spend/report",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {
+        "company_id": "int?",
+        "statuses": "string?",
+        "limit": "int?"
+      },
+      "read_only": true
+    },
+    {
+      "name": "company.spend.rollup",
+      "description": "Organization level budget vs spend totals for delegation contracts.",
+      "method": "GET",
+      "path": "/api/v35/spend/rollup",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {
+        "company_id": "int?",
+        "limit": "int?"
+      },
+      "read_only": true
+    },
+    {
+      "name": "company.spend.overruns",
+      "description": "Delegation contracts that burned past max_cost_usd, optionally including warnings at 80 percent.",
+      "method": "GET",
+      "path": "/api/v35/spend/overruns",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {
+        "company_id": "int?",
+        "include_warnings": "bool?",
+        "limit": "int?"
+      },
+      "read_only": true
+    },
+    {
+      "name": "company.spend.detail",
+      "description": "One delegation contract with the usage_events rows behind its attributed spend.",
+      "method": "GET",
+      "path": "/api/v35/spend/delegations/{delegation_id}",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {
+        "delegation_id": "int"
+      },
+      "read_only": true
+    },
+    {
+      "name": "company.spend.flag_overruns",
+      "description": "Emit one delegation.budget.overrun event per contract over budget. Dry run by default, never blocks work, admin only.",
+      "method": "POST",
+      "path": "/api/v35/spend/flag-overruns",
+      "scopes": [
+        "company.workspace:write"
+      ],
+      "input": {
+        "dry_run": "bool?",
+        "company_id": "int?",
+        "include_warnings": "bool?",
+        "limit": "int?"
+      },
+      "read_only": false
+    },
+    {
+      "name": "company.live.readiness",
+      "description": "Transport and limits of the live channel: SSE, server still polls, no websocket.",
+      "method": "GET",
+      "path": "/api/v35/live/readiness",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {},
+      "read_only": true
+    },
+    {
+      "name": "company.live.snapshot",
+      "description": "One renderable frame: recent runtime events, live tasks, followers, cursor to stream from.",
+      "method": "GET",
+      "path": "/api/v35/live/snapshot",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {
+        "cursor": "int?"
+      },
+      "read_only": true
+    },
+    {
+      "name": "company.live.events",
+      "description": "Cursor based catch-up of runtime events for clients that cannot hold an SSE connection.",
+      "method": "GET",
+      "path": "/api/v35/live/events",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {
+        "cursor": "int?",
+        "run_id": "string?",
+        "limit": "int?"
+      },
+      "read_only": true
+    },
+    {
+      "name": "company.live.tasks",
+      "description": "Tasks currently in_progress or review, with their runtime run and session keys.",
+      "method": "GET",
+      "path": "/api/v35/live/tasks",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {
+        "limit": "int?"
+      },
+      "read_only": true
+    },
+    {
+      "name": "company.live.stream",
+      "description": "Server-sent event stream of runtime events for one organization. Closes itself and returns a cursor to reconnect with.",
+      "method": "GET",
+      "path": "/api/v35/live/stream",
+      "scopes": [
+        "company.context:read"
+      ],
+      "input": {
+        "cursor": "int?",
+        "run_id": "string?",
+        "seconds": "int?"
+      },
+      "read_only": true
+    }
+  ]
+}

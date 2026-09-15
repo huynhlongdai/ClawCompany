@@ -1,0 +1,14 @@
+"use client";
+import {useEffect,useState} from "react";
+import {apiV12} from "../lib/api";
+type Any=Record<string,any>;
+export function SecretsConsole(){
+ const [items,setItems]=useState<Any[]>([]),[grants,setGrants]=useState<Any[]>([]),[err,setErr]=useState("");
+ const [name,setName]=useState("Deployment Token"),[ref,setRef]=useState("env:DEPLOYMENT_TOKEN");
+ const load=async()=>{try{const [s,g]=await Promise.all([apiV12.secrets(),apiV12.secretGrants()]);setItems(s as Any[]);setGrants(g as Any[]);setErr("")}catch(e:any){setErr(e.message)}};useEffect(()=>{load()},[]);
+ const create=async()=>{try{await apiV12.createSecret({organization_id:1,name,provider:"env",external_ref:ref,classification:"restricted"});await load()}catch(e:any){setErr(e.message)}};
+ return <><div className="v12SecretHero"><div><span>SECRET CONTROL PLANE</span><h2>Agents receive permission to use a secret — never the secret as data.</h2><p>ClawCompany stores provider references and grants. Secret values are resolved only at execution time and mounted into the sandbox as temporary files.</p></div><div className="v12SecretFlow"><b>Secret Ref</b><i>→</i><b>Grant</b><i>→</i><b>Sandbox</b><i>→</i><b>/run/secrets/*</b></div></div>
+ <div className="v12Two"><section className="v8Card"><div className="v8CardHead"><div><b>Register secret reference</b><small>No plaintext field exists in this form.</small></div></div><div className="v9Form"><label>Name<input value={name} onChange={e=>setName(e.target.value)}/></label><label>External ref<input value={ref} onChange={e=>setRef(e.target.value)}/></label><button className="v8Primary" onClick={create}>Register reference</button></div>{err&&<div className="portalError">{err}</div>}</section><section className="v12PolicyCard"><b>Secret policy</b><div><span>Database plaintext</span><strong>Never</strong></div><div><span>Prompt injection</span><strong>Never</strong></div><div><span>Execution mount</span><strong>Short-lived file</strong></div><div><span>Identity binding</span><strong>Required by grant</strong></div></section></div>
+ <section className="v8Card"><div className="v8CardHead"><div><b>Secret references</b><small>Only metadata is visible.</small></div></div><div className="v12Secrets">{items.map(x=><article key={x.id}><span>⌁</span><div><b>{x.name}</b><small>{x.provider} · {x.external_ref}</small></div><em>{x.classification}</em><code>{x.value}</code></article>)}</div></section>
+ <section className="v8Card"><div className="v8CardHead"><div><b>Active grants</b><small>Scoped to member, agent, sandbox profile or deployment environment.</small></div></div><div className="v12GrantTable">{grants.map(x=><div key={x.id}><b>Grant #{x.id}</b><span>secret #{x.secret_reference_id}</span><span>member #{x.member_id||"—"}</span><span>agent #{x.agent_id||"—"}</span><span>profile #{x.sandbox_profile_id||"—"}</span><em>{x.is_active?"active":"disabled"}</em></div>)}</div></section></>
+}

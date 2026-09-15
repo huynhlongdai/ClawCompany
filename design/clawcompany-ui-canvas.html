@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ClawCompany — UI Design Canvas v17</title>
+<style>
+:root{
+  --ink:#1b1a17; --ink-2:#4a463f; --muted:#8b857a; --line:#e7e2d8;
+  --paper:#faf7f2; --card:#ffffff; --cream:#f3ede2;
+  --brand:#1f1d1a; --accent:#c2703d; --accent-soft:#f6e7db;
+  --ok:#2f7d52; --ok-soft:#e3f2e8; --warn:#b3761b; --warn-soft:#fbeed6;
+  --risk:#b4453f; --risk-soft:#fbe3e1; --info:#2d5fa8; --info-soft:#e4ecf9;
+  --pink:#d76a94; --blue:#4a7fd4; --violet:#8b6cd0; --green:#4f9e6a;
+  --r-sm:8px; --r:14px; --r-lg:22px;
+  --sh:0 1px 2px rgba(27,26,23,.05), 0 8px 24px rgba(27,26,23,.06);
+  --font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --serif:Georgia,"Times New Roman",serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.55}
+h1,h2,h3,h4{margin:0;font-weight:650;letter-spacing:-.01em}
+small{color:var(--muted)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--cream);padding:1px 5px;border-radius:6px}
+
+/* ---------- canvas chrome ---------- */
+.canvas{max-width:1480px;margin:0 auto;padding:28px 24px 80px}
+.canvasHead{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:8px}
+.canvasHead h1{font-size:26px}
+.canvasHead p{margin:6px 0 0;color:var(--ink-2);max-width:720px}
+.badge{display:inline-block;padding:4px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:600}
+.section{margin-top:36px}
+.sectionHead{display:flex;align-items:baseline;gap:12px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.sectionHead h2{font-size:18px}
+.sectionHead span{color:var(--muted);font-size:13px}
+.frame{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh);overflow:hidden}
+.frameLabel{display:flex;justify-content:space-between;align-items:center;padding:9px 16px;background:var(--cream);border-bottom:1px solid var(--line);font-size:12px;font-weight:600;color:var(--ink-2);letter-spacing:.04em;text-transform:uppercase}
+.frameLabel em{font-style:normal;font-weight:500;text-transform:none;letter-spacing:0;color:var(--muted)}
+
+/* ---------- tokens ---------- */
+.tokenGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.swatch{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--card)}
+.swatch .chip{height:54px}
+.swatch .meta{padding:8px 10px;font-size:12px}
+.swatch b{display:block}
+.typeRow{display:flex;align-items:baseline;gap:16px;padding:10px 0;border-bottom:1px dashed var(--line)}
+.typeRow span{min-width:150px;color:var(--muted);font-size:12px}
+
+/* ---------- app shell mock ---------- */
+.app{display:grid;grid-template-columns:248px 1fr;min-height:720px;background:var(--paper)}
+.side{background:var(--brand);color:#efe9df;padding:18px 14px;display:flex;flex-direction:column;gap:16px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,#e8c9a8,#c2703d);display:grid;place-items:center;font-size:17px}
+.brand b{font-size:15px}
+.brand small{display:block;color:#a49b8d;font-size:11px}
+.navLabel{font-size:10px;letter-spacing:.14em;color:#8d8479;margin:6px 2px 2px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;color:#ded6c9;text-decoration:none;font-size:13px}
+.nav a i{font-style:normal;width:18px;text-align:center;opacity:.8}
+.nav a .count{margin-left:auto;font-size:11px;color:#9a9184;background:rgba(255,255,255,.08);padding:1px 7px;border-radius:99px}
+.nav a.active{background:rgba(255,255,255,.12);color:#fff;font-weight:600}
+.sideFoot{margin-top:auto;display:flex;gap:10px;align-items:center;padding:10px;border-radius:12px;background:rgba(255,255,255,.06)}
+.sideFoot b{font-size:13px}
+.sideFoot small{color:#a49b8d}
+.main{padding:20px 24px;overflow:hidden}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}
+.search{flex:1;max-width:420px;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px;color:var(--muted);font-size:13px}
+.topActions{display:flex;gap:8px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--card);padding:7px 13px;border-radius:999px;font-size:13px;cursor:pointer}
+.btn.dark{background:var(--brand);color:#fff;border-color:var(--brand)}
+.avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#d9c3a5,#b58256)}
+
+/* ---------- hero ---------- */
+.hero{display:grid;grid-template-columns:1.4fr .9fr;gap:18px;background:linear-gradient(120deg,#fdf8f1,#f3e7d8);border:1px solid var(--line);border-radius:var(--r-lg);padding:26px 28px;margin-bottom:18px}
+.eyebrow{color:var(--muted);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.hero h2{font-size:30px;margin:4px 0 6px}
+.hero p{margin:0 0 12px;color:var(--ink-2)}
+.quote{font-family:var(--serif);font-style:italic;color:var(--ink-2);border-left:3px solid var(--accent);padding-left:12px;margin:12px 0}
+.heroArt{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
+.portrait{width:92px;height:92px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f5e3cf,#c99a6b)}
+.ninaNote{font-family:var(--serif);font-style:italic;color:var(--ink-2);font-size:13px}
+
+/* ---------- metrics ---------- */
+.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px}
+.metric{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.metric label{display:block;color:var(--muted);font-size:12px}
+.metric strong{display:block;font-size:22px;margin-top:4px}
+.metric span{font-size:12px;color:var(--ok)}
+.metricIcon{width:26px;height:26px;border-radius:8px;background:var(--cream);display:grid;place-items:center;margin-bottom:8px}
+
+/* ---------- panels ---------- */
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px;margin-bottom:18px}
+.panelHead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.panelHead b{font-size:15px}
+.panelHead .muted{display:block;color:var(--muted);font-size:12px;font-weight:400}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+
+/* ---------- org tree ---------- */
+.root{background:var(--brand);color:#fff;border-radius:var(--r);padding:14px 18px;text-align:center;max-width:340px;margin:0 auto}
+.root small{color:#b6ada0;display:block;margin-top:4px}
+.vline{width:1px;height:22px;background:var(--line);margin:0 auto}
+.companyGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.companyCard{border:1px solid var(--line);border-radius:var(--r);padding:14px;background:var(--card)}
+.companyTop{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+.companyLogo{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;color:#fff;font-size:16px}
+.pink{background:var(--pink)}.blue{background:var(--blue)}.violet{background:var(--violet)}.green{background:var(--green)}
+.companyCard small{display:block;color:var(--muted)}
+.companyMeta{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px}
+.faces i{display:inline-block;width:20px;height:20px;border-radius:50%;background:var(--cream);border:2px solid #fff;margin-left:-6px}
+
+/* ---------- tables / tags ---------- */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--muted);font-weight:500;font-size:12px;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:10px;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:none}
+.tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:500}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.risk{background:var(--risk-soft);color:var(--risk)}
+.tag.info{background:var(--info-soft);color:var(--info)}
+.bar{height:6px;border-radius:99px;background:var(--cream);width:120px;display:inline-block;vertical-align:middle}
+.bar i{display:block;height:6px;border-radius:99px;background:var(--accent)}
+
+/* ---------- agent cards ---------- */
+.agentCard{border:1px solid var(--line);border-radius:var(--r);padding:14px;background:var(--card)}
+.agentTop{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+.agentAvatar{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#e9d8c3,#b98e63);display:grid;place-items:center;color:#fff}
+.agentStats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:12px;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px}
+.agentStats b{display:block;color:var(--ink);font-size:14px}
+
+/* ---------- collaboration room ---------- */
+.room{display:grid;grid-template-columns:210px 1fr 230px;gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.roomCol{padding:14px}
+.roomCol+.roomCol{border-left:1px solid var(--line)}
+.seat{display:flex;gap:9px;align-items:center;padding:7px;border-radius:10px;font-size:13px}
+.seat.turn{background:var(--accent-soft)}
+.seat .dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.seat small{display:block;color:var(--muted);font-size:11px}
+.turnItem{border-left:2px solid var(--line);padding:0 0 14px 12px;position:relative}
+.turnItem:before{content:"";position:absolute;left:-5px;top:4px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.turnItem .who{font-weight:600;font-size:13px}
+.turnItem .kind{font-size:11px;color:var(--muted);margin-left:6px}
+.turnItem p{margin:3px 0 0;color:var(--ink-2);font-size:13px}
+.composer{display:flex;gap:8px;margin-top:8px}
+.composer input{flex:1;border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-size:13px}
+
+/* ---------- mesh permission ---------- */
+.permLadder{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.perm{padding:6px 12px;border-radius:10px;border:1px dashed var(--line);font-size:12px;color:var(--muted)}
+.perm.on{border-style:solid;border-color:var(--accent);color:var(--accent);background:var(--accent-soft);font-weight:600}
+.flowNote{font-size:12px;color:var(--muted);margin-top:8px}
+.stateFlow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px}
+.state{padding:6px 12px;border-radius:999px;background:var(--cream);border:1px solid var(--line)}
+.state.done{background:var(--ok-soft);border-color:var(--ok-soft);color:var(--ok)}
+.state.bad{background:var(--risk-soft);border-color:var(--risk-soft);color:var(--risk)}
+.arrow{color:var(--muted)}
+
+/* ---------- spec list ---------- */
+.specs{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.spec{border:1px solid var(--line);border-radius:var(--r);padding:14px;background:var(--card)}
+.spec h4{font-size:14px;margin-bottom:6px}
+.spec ul{margin:6px 0 0 16px;padding:0;color:var(--ink-2);font-size:13px}
+@media(max-width:1100px){.app{grid-template-columns:1fr}.side{display:none}.metrics{grid-template-columns:repeat(2,1fr)}.companyGrid{grid-template-columns:repeat(2,1fr)}.room{grid-template-columns:1fr}.grid2,.grid3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <header class="canvasHead">
+    <div>
+      <span class="badge">Design canvas · v17</span>
+      <h1>ClawCompany — AI Organization OS</h1>
+      <p>Canvas thiết kế dựng lại từ UI mẫu: design tokens, app shell, màn hình nghiệp vụ (Trang chủ / Công ty / AI Agents / Dự án) và hai màn hình mới của v16 (Collaboration Room, Knowledge Mesh). Dùng làm nguồn sự thật khi implement React component.</p>
+    </div>
+    <div><small>Nova Holding · Nina AI Chief of Staff</small></div>
+  </header>
+
+  <!-- ============ 1. TOKENS ============ -->
+  <section class="section">
+    <div class="sectionHead"><h2>1 · Design tokens</h2><span>Màu, chữ, bán kính, đổ bóng — trích từ UI mẫu (nền kem, mực đen ấm, điểm nhấn terracotta)</span></div>
+    <div class="frame"><div class="frameLabel">Palette<em>CSS variables</em></div>
+      <div style="padding:18px">
+        <div class="tokenGrid">
+          <div class="swatch"><div class="chip" style="background:#1b1a17"></div><div class="meta"><b>--ink</b>#1b1a17</div></div>
+          <div class="swatch"><div class="chip" style="background:#faf7f2"></div><div class="meta"><b>--paper</b>#faf7f2</div></div>
+          <div class="swatch"><div class="chip" style="background:#f3ede2"></div><div class="meta"><b>--cream</b>#f3ede2</div></div>
+          <div class="swatch"><div class="chip" style="background:#c2703d"></div><div class="meta"><b>--accent</b>#c2703d</div></div>
+          <div class="swatch"><div class="chip" style="background:#2f7d52"></div><div class="meta"><b>--ok</b>#2f7d52</div></div>
+          <div class="swatch"><div class="chip" style="background:#b3761b"></div><div class="meta"><b>--warn</b>#b3761b</div></div>
+          <div class="swatch"><div class="chip" style="background:#b4453f"></div><div class="meta"><b>--risk</b>#b4453f</div></div>
+          <div class="swatch"><div class="chip" style="background:#2d5fa8"></div><div class="meta"><b>--info</b>#2d5fa8</div></div>
+        </div>
+        <div style="margin-top:18px">
+          <div class="typeRow"><span>Display / hero</span><div style="font-size:30px;font-weight:650">Long 👋</div></div>
+          <div class="typeRow"><span>Section title</span><div style="font-size:18px;font-weight:650">Tổ chức của bạn</div></div>
+          <div class="typeRow"><span>Body</span><div>Phòng phối hợp có thứ tự lượt và transcript bất biến.</div></div>
+          <div class="typeRow"><span>Quote (serif)</span><div class="quote" style="margin:0">“A great company is a group of great minds, human and AI.”</div></div>
+          <div class="typeRow"><span>Radius / shadow</span><div><code>--r-sm 8</code> <code>--r 14</code> <code>--r-lg 22</code> · <code>--sh</code> mềm, không viền đậm</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2. HOME ============ -->
+  <section class="section">
+    <div class="sectionHead"><h2>2 · Trang chủ (app shell + dashboard)</h2><span>Route <code>/app/os</code> · dữ liệu từ <code>/api/v17/workspace/overview</code></span></div>
+    <div class="frame"><div class="frameLabel">Screen 01 — Trang chủ<em>sidebar cố định 248px · nội dung tự giãn</em></div>
+      <div class="app">
+        <aside class="side">
+          <div class="brand"><div class="logo">🐾</div><div><b>ClawCompany</b><small>AI Organization OS</small></div></div>
+          <div>
+            <div class="navLabel">TỔ CHỨC</div>
+            <nav class="nav">
+              <a class="active" href="#"><i>⌂</i><span>Trang chủ</span></a>
+              <a href="#"><i>▤</i><span>Công ty</span><span class="count">4</span></a>
+              <a href="#"><i>⊞</i><span>Phòng ban</span><span class="count">18</span></a>
+              <a href="#"><i>◫</i><span>Nhân sự</span><span class="count">128</span></a>
+              <a href="#"><i>✦</i><span>AI Agents</span><span class="count">86</span></a>
+            </nav>
+            <div class="navLabel">VẬN HÀNH</div>
+            <nav class="nav">
+              <a href="#"><i>▣</i><span>Dự án</span><span class="count">27</span></a>
+              <a href="#"><i>☑</i><span>Nhiệm vụ</span></a>
+              <a href="#"><i>◇</i><span>Kiến thức</span></a>
+              <a href="#"><i>▥</i><span>Báo cáo</span></a>
+              <a href="#"><i>↻</i><span>Tự động hóa</span></a>
+            </nav>
+            <div class="navLabel">PHỐI HỢP AGENT · v16</div>
+            <nav class="nav">
+              <a href="#"><i>⛬</i><span>Collaboration</span><span class="count">5</span></a>
+              <a href="#"><i>◈</i><span>Knowledge Mesh</span></a>
+              <a href="#"><i>♔</i><span>Nina SRE</span></a>
+            </nav>
+          </div>
+          <div class="sideFoot"><div class="avatar"></div><div><b>Long</b><small>Founder &amp; CEO</small></div></div>
+        </aside>
+        <main class="main">
+          <div class="top">
+            <div class="search">🔍 Tìm công ty, agent, dự án, tài liệu…</div>
+            <div class="topActions"><button class="btn">＋ Tạo mới</button><button class="btn dark">Nói chuyện với Nina</button><div class="avatar"></div></div>
+          </div>
+          <div class="hero">
+            <div>
+              <div class="eyebrow">Chào mừng trở lại,</div>
+              <h2>Long 👋</h2>
+              <p>Cùng AI xây dựng những điều lớn lao hơn.</p>
+              <div class="quote">“A great company is a group of great minds, human and AI, working toward a meaningful future.”</div>
+              <button class="btn dark">Nói chuyện với Nina →</button>
+              <button class="btn">Xem báo cáo hôm nay</button>
+            </div>
+            <div class="heroArt">
+              <div class="ninaNote">“ Biến ý tưởng thành hành động, cùng nhau. ”</div>
+              <div class="portrait"></div>
+              <div><b>Nina</b><br/><small>Your AI Chief of Staff</small></div>
+            </div>
+          </div>
+          <div class="metrics">
+            <div class="metric"><div class="metricIcon">▥</div><label>Doanh thu (tháng)</label><strong>$42,380</strong><span>+12%</span></div>
+            <div class="metric"><div class="metricIcon">▣</div><label>Dự án đang chạy</label><strong>27</strong><span>+3</span></div>
+            <div class="metric"><div class="metricIcon">✦</div><label>AI Agents</label><strong>86</strong><span>+6</span></div>
+            <div class="metric"><div class="metricIcon">◫</div><label>Nhân sự (Human)</label><strong>42</strong><span>+2</span></div>
+            <div class="metric"><div class="metricIcon">♣</div><label>Khách hàng</label><strong>38</strong><span>+5</span></div>
+          </div>
+          <div class="panel">
+            <div class="panelHead"><div><b>Tổ chức của bạn</b><span class="muted">Nova Holding › Tổng quan tổ chức và các công ty con</span></div>
+              <div><button class="btn">Xem sơ đồ đầy đủ</button><button class="btn dark">＋ Thêm công ty</button></div></div>
+            <div class="root"><b>NOVA HOLDING</b><small>Long (Founder &amp; CEO) · 4 công ty con · 128 thành viên</small></div>
+            <div class="vline"></div>
+            <div class="companyGrid">
+              <div class="companyCard"><div class="companyTop"><div class="companyLogo pink">👗</div><div><b>Nova Fashion</b><small>Thời trang nữ</small></div></div><div class="companyMeta"><div class="faces"><i></i><i></i><i></i></div><span>42 members</span></div></div>
+              <div class="companyCard"><div class="companyTop"><div class="companyLogo blue">▶</div><div><b>Nova Media</b><small>Nội dung &amp; Truyền thông</small></div></div><div class="companyMeta"><div class="faces"><i></i><i></i><i></i></div><span>36 members</span></div></div>
+              <div class="companyCard"><div class="companyTop"><div class="companyLogo violet">⚗</div><div><b>Nova Labs</b><small>AI Products</small></div></div><div class="companyMeta"><div class="faces"><i></i><i></i><i></i></div><span>27 members</span></div></div>
+              <div class="companyCard"><div class="companyTop"><div class="companyLogo green">🛒</div><div><b>Nova Commerce</b><small>E-commerce</small></div></div><div class="companyMeta"><div class="faces"><i></i><i></i><i></i></div><span>31 members</span></div></div>
+            </div>
+          </div>
+          <div class="grid2">
+            <div class="panel" style="margin:0">
+              <div class="panelHead"><b>Dự án gần đây</b><small>Xem tất cả →</small></div>
+              <table>
+                <thead><tr><th>Dự án</th><th>Công ty</th><th>Tiến độ</th><th>Trạng thái</th></tr></thead>
+                <tbody>
+                  <tr><td>Ra mắt BST Thu Đông</td><td>Nova Fashion</td><td><span class="bar"><i style="width:72%"></i></span> 72%</td><td><span class="tag ok">on track</span></td></tr>
+                  <tr><td>Chuỗi video thương hiệu</td><td>Nova Media</td><td><span class="bar"><i style="width:45%"></i></span> 45%</td><td><span class="tag warn">review</span></td></tr>
+                  <tr><td>Agent Mesh v16</td><td>Nova Labs</td><td><span class="bar"><i style="width:88%"></i></span> 88%</td><td><span class="tag ok">active</span></td></tr>
+                  <tr><td>Tối ưu giỏ hàng</td><td>Nova Commerce</td><td><span class="bar"><i style="width:23%"></i></span> 23%</td><td><span class="tag risk">at risk</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="panel" style="margin:0">
+              <div class="panelHead"><b>Hoạt động agent hôm nay</b><small>từ event bus</small></div>
+              <div class="turnItem"><span class="who">Nina</span><span class="kind">· delegation</span><p>Giao “Dựng kịch bản video” cho Mia — hạn 16:00, ngân sách $8.</p></div>
+              <div class="turnItem"><span class="who">Dex</span><span class="kind">· room turn</span><p>Đề xuất phương án cấu trúc bảng cho mesh search.</p></div>
+              <div class="turnItem"><span class="who">Oli</span><span class="kind">· knowledge</span><p>Đóng góp “Brand voice 2026” vào không gian <i>Nova Media · Brand</i>.</p></div>
+              <div class="turnItem"><span class="who">Mesh</span><span class="kind">· denied</span><p>Agent Nova Commerce bị từ chối đọc không gian <i>Labs · Confidential</i>.</p></div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3. AGENTS ============ -->
+  <section class="section">
+    <div class="sectionHead"><h2>3 · AI Agents</h2><span>Route <code>/app/os?tab=agents</code> · <code>/api/v17/workspace/people?member_type=agent</code></span></div>
+    <div class="frame"><div class="frameLabel">Screen 02 — Danh bạ agent<em>card grid + bảng chi tiết</em></div>
+      <div style="padding:18px">
+        <div class="grid3" style="margin-bottom:16px">
+          <div class="agentCard"><div class="agentTop"><div class="agentAvatar">✦</div><div><b>Nina</b><small>AI Chief of Staff · Holding</small></div></div>
+            <div class="agentStats"><div><b>97%</b>thành công</div><div><b>$42</b>chi phí 30d</div><div><b>low</b>rủi ro</div></div></div>
+          <div class="agentCard"><div class="agentTop"><div class="agentAvatar">✦</div><div><b>Dex</b><small>Backend agent · Nova Labs</small></div></div>
+            <div class="agentStats"><div><b>93%</b>thành công</div><div><b>$118</b>chi phí 30d</div><div><b>medium</b>rủi ro</div></div></div>
+          <div class="agentCard"><div class="agentTop"><div class="agentAvatar">✦</div><div><b>Mia</b><small>Content agent · Nova Media</small></div></div>
+            <div class="agentStats"><div><b>89%</b>thành công</div><div><b>$64</b>chi phí 30d</div><div><b>low</b>rủi ro</div></div></div>
+        </div>
+        <table>
+          <thead><tr><th>Agent</th><th>Công ty</th><th>Phòng ban</th><th>Model</th><th>Runtime</th><th>Trạng thái</th></tr></thead>
+          <tbody>
+            <tr><td>Nina</td><td>Nova Holding</td><td>Executive</td><td>openclaw-core</td><td><code>oc-nina</code></td><td><span class="tag ok">active</span></td></tr>
+            <tr><td>Dex</td><td>Nova Labs</td><td>Engineering</td><td>openclaw-code</td><td><code>oc-dex</code></td><td><span class="tag ok">active</span></td></tr>
+            <tr><td>Mia</td><td>Nova Media</td><td>Content</td><td>openclaw-write</td><td><code>oc-mia</code></td><td><span class="tag warn">busy</span></td></tr>
+            <tr><td>Oli</td><td>Nova Commerce</td><td>Growth</td><td>openclaw-core</td><td><code>oc-oli</code></td><td><span class="tag info">idle</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4. COLLABORATION ROOM ============ -->
+  <section class="section">
+    <div class="sectionHead"><h2>4 · Collaboration Room (v16)</h2><span>Route <code>/app/collaboration</code> · luật lượt nói cưỡng chế ở backend</span></div>
+    <div class="frame"><div class="frameLabel">Screen 03 — Phòng phối hợp<em>ghế ngồi · transcript · hợp đồng uỷ thác</em></div>
+      <div style="padding:18px">
+        <div class="room">
+          <div class="roomCol">
+            <b style="font-size:13px">Thành viên · round robin</b>
+            <div style="margin-top:8px">
+              <div class="seat"><span class="dot"></span><div>Nina<small>lead · can decide</small></div></div>
+              <div class="seat turn"><span class="dot"></span><div>Dex<small>contributor · đang tới lượt</small></div></div>
+              <div class="seat"><span class="dot"></span><div>Mia<small>reviewer</small></div></div>
+              <div class="seat"><span class="dot" style="background:#b6ada0"></span><div>Oli<small>observer · bị bỏ qua lượt</small></div></div>
+            </div>
+            <div class="flowNote">Turn 7/20 · <code>max_turns</code> chặn vòng lặp agent</div>
+          </div>
+          <div class="roomCol">
+            <b style="font-size:13px">Transcript (append-only)</b>
+            <div style="margin-top:10px">
+              <div class="turnItem"><span class="who">Nina</span><span class="kind">· message · #4</span><p>Mục tiêu phiên: chốt kiến trúc tìm kiếm cho knowledge mesh trước 15:00.</p></div>
+              <div class="turnItem"><span class="who">Dex</span><span class="kind">· proposal · #5</span><p>Dùng embedding hash384 sẵn có, fallback ilike khi chưa index.</p></div>
+              <div class="turnItem"><span class="who">Mia</span><span class="kind">· message · #6</span><p>Cần giữ nguyên nhật ký truy cập để audit nội dung thương hiệu.</p></div>
+              <div class="turnItem"><span class="who">Nina</span><span class="kind">· decision · #7</span><p>Chốt phương án của Dex. Publish tóm tắt vào mesh khi đóng phòng.</p></div>
+            </div>
+            <div class="composer"><input placeholder="Chỉ agent đúng lượt mới gửi được…"/><button class="btn dark">Gửi lượt</button></div>
+          </div>
+          <div class="roomCol">
+            <b style="font-size:13px">Hợp đồng uỷ thác</b>
+            <div style="margin-top:10px;font-size:13px">
+              <div style="border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px">
+                <b>Dựng kịch bản video</b><br/><small>Nina → Mia · hạn 16:00 · tối đa $8</small><br/><span class="tag warn">delivered</span>
+              </div>
+              <div style="border:1px solid var(--line);border-radius:12px;padding:10px">
+                <b>Viết migration 0013</b><br/><small>Nina → Dex · hạn 18:00 · tối đa $15</small><br/><span class="tag ok">accepted</span>
+              </div>
+            </div>
+            <div class="stateFlow" style="margin-top:12px">
+              <span class="state">proposed</span><span class="arrow">→</span><span class="state">accepted</span><span class="arrow">→</span><span class="state">delivered</span><span class="arrow">→</span><span class="state done">completed</span>
+            </div>
+            <div class="flowNote">Nhánh phụ: <span class="tag risk">rejected</span> <span class="tag risk">cancelled</span> · close(rework) ↩ accepted</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 5. KNOWLEDGE MESH ============ -->
+  <section class="section">
+    <div class="sectionHead"><h2>5 · Knowledge Mesh (v16)</h2><span>Route <code>/app/knowledge-mesh</code> · deny-by-default + grant có hạn + nhật ký</span></div>
+    <div class="frame"><div class="frameLabel">Screen 04 — Tri thức dùng chung<em>không gian · quyền · tìm kiếm theo danh tính agent</em></div>
+      <div style="padding:18px">
+        <div class="grid2">
+          <div>
+            <b style="font-size:13px">Không gian tri thức</b>
+            <table style="margin-top:8px">
+              <thead><tr><th>Tên</th><th>Chủ sở hữu</th><th>Phân loại</th><th>Mặc định</th></tr></thead>
+              <tbody>
+                <tr><td>Brand voice</td><td>Nova Media</td><td><span class="tag info">org_public</span></td><td>read</td></tr>
+                <tr><td>Product research</td><td>Nova Labs</td><td><span class="tag warn">restricted</span></td><td>none</td></tr>
+                <tr><td>Customer PII</td><td>Nova Commerce</td><td><span class="tag risk">confidential</span></td><td>none</td></tr>
+              </tbody>
+            </table>
+            <div class="flowNote">Với <code>confidential</code>, <code>default_permission</code> bị bỏ qua hoàn toàn — chỉ grant tường minh mới mở được.</div>
+          </div>
+          <div>
+            <b style="font-size:13px">Quyền hiệu lực của Mia · không gian “Product research”</b>
+            <div class="permLadder" style="margin-top:10px">
+              <span class="perm">none</span><span class="arrow">→</span>
+              <span class="perm on">read</span><span class="arrow">→</span>
+              <span class="perm">contribute</span><span class="arrow">→</span>
+              <span class="perm">admin</span>
+            </div>
+            <table style="margin-top:12px">
+              <thead><tr><th>Nguồn quyền</th><th>Giá trị</th><th>Hiệu lực</th></tr></thead>
+              <tbody>
+                <tr><td>default_permission</td><td>none</td><td>—</td></tr>
+                <tr><td>cùng công ty sở hữu</td><td>contribute</td><td>không áp dụng</td></tr>
+                <tr><td>grant · department: Content</td><td>read</td><td>đến 30/09 ✓</td></tr>
+              </tbody>
+            </table>
+            <div class="flowNote">Kết quả = max(tất cả nguồn) = <b>read</b>. Mọi lượt tìm kiếm đều ghi log kèm kết quả cho phép/từ chối.</div>
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <b style="font-size:13px">Nhật ký truy cập</b>
+          <table style="margin-top:8px">
+            <thead><tr><th>Thời điểm</th><th>Agent</th><th>Không gian</th><th>Hành động</th><th>Kết quả</th></tr></thead>
+            <tbody>
+              <tr><td>09:12</td><td>Mia</td><td>Product research</td><td>search</td><td><span class="tag ok">cho phép</span></td></tr>
+              <tr><td>09:14</td><td>Oli</td><td>Customer PII</td><td>search</td><td><span class="tag risk">từ chối</span></td></tr>
+              <tr><td>09:20</td><td>Dex</td><td>Product research</td><td>contribute</td><td><span class="tag ok">cho phép</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6. IMPLEMENTATION SPEC ============ -->
+  <section class="section">
+    <div class="sectionHead"><h2>6 · Ghi chú cho người implement</h2><span>ánh xạ canvas → component → endpoint</span></div>
+    <div class="specs">
+      <div class="spec"><h4>App shell</h4><ul>
+        <li><code>components/V17AppShell.tsx</code></li>
+        <li>Sidebar 248px, nền <code>--brand</code>, nhóm nav có nhãn</li>
+        <li>Badge số lấy từ <code>/v17/workspace/overview</code></li>
+      </ul></div>
+      <div class="spec"><h4>Trang chủ</h4><ul>
+        <li><code>components/WorkspaceCockpit.tsx</code></li>
+        <li>Hero + 5 metric + cây tổ chức + 2 panel dưới</li>
+        <li><code>overview</code>, <code>org-chart</code></li>
+      </ul></div>
+      <div class="spec"><h4>Danh bạ</h4><ul>
+        <li>Nhân sự và AI Agents dùng chung shape</li>
+        <li><code>/v17/workspace/people?member_type=</code></li>
+        <li>Agent có thêm model, success_rate, cost_30d</li>
+      </ul></div>
+      <div class="spec"><h4>Collaboration room</h4><ul>
+        <li><code>components/CollaborationFabricConsole.tsx</code></li>
+        <li>Highlight ghế đang tới lượt bằng <code>--accent-soft</code></li>
+        <li>Composer disable khi không đúng lượt</li>
+      </ul></div>
+      <div class="spec"><h4>Knowledge mesh</h4><ul>
+        <li><code>components/KnowledgeMeshConsole.tsx</code></li>
+        <li>Thang quyền none → read → contribute → admin</li>
+        <li>Luôn hiển thị lượt bị từ chối, không ẩn</li>
+      </ul></div>
+      <div class="spec"><h4>Nguyên tắc chung</h4><ul>
+        <li>Không dùng dữ liệu demo trong component</li>
+        <li>Trạng thái rỗng luôn có câu tiếng Việt rõ ràng</li>
+        <li>Lỗi API hiển thị thật, không đổi sang dữ liệu giả</li>
+      </ul></div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
