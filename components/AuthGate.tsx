@@ -1,23 +1,72 @@
 "use client";
-import {useEffect,useState} from "react";
-import {login,token} from "../lib/auth";
+import {useEffect, useState} from "react";
+import {login, token} from "../lib/auth";
+import {Icon} from "./Icon";
 
-export function AuthGate({children}:{children:React.ReactNode}){
-  const required=process.env.NEXT_PUBLIC_AUTH_REQUIRED==="true";
-  const [authed,setAuthed]=useState(!required);
-  useEffect(()=>{if(required && token()) setAuthed(true)},[required]);
-  const [email,setEmail]=useState("admin@clawcompany.local");
-  const [password,setPassword]=useState("ChangeMe123!");
-  const [error,setError]=useState("");
-  if(authed) return <>{children}</>;
-  return <div style={{minHeight:"100vh",display:"grid",placeItems:"center",background:"#f6f8fc"}}>
-    <div style={{width:360,background:"#fff",border:"1px solid #e8edf5",borderRadius:18,padding:24,boxShadow:"0 20px 50px rgba(15,23,42,.08)"}}>
-      <div style={{fontWeight:800,fontSize:20}}>ClawCompany</div>
-      <div style={{color:"#667085",fontSize:12,marginTop:4}}>Đăng nhập vào AI Organization OS</div>
-      <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" style={{width:"100%",marginTop:18,height:40,border:"1px solid #e8edf5",borderRadius:10,padding:"0 12px"}}/>
-      <input value={password} onChange={e=>setPassword(e.target.value)} type="password" placeholder="Password" style={{width:"100%",marginTop:10,height:40,border:"1px solid #e8edf5",borderRadius:10,padding:"0 12px"}}/>
-      {error&&<div style={{fontSize:11,color:"#b42318",marginTop:8}}>{error}</div>}
-      <button onClick={async()=>{try{await login(email,password);setAuthed(true)}catch(e){setError(String(e))}}} style={{width:"100%",marginTop:14,height:40,border:0,borderRadius:10,color:"#fff",background:"linear-gradient(135deg,#715cff,#8a76ff)",fontWeight:700}}>Đăng nhập</button>
+/* Cửa đăng nhập — màn hình đầu tiên ai cũng thấy, nên nó phải nói cùng ngôn
+   ngữ với phần còn lại. Bản trước dùng inline style với gradient tím, không
+   liên quan gì tới design canvas; nay dùng class .portalLogin* của design
+   system. */
+
+export function AuthGate({children}: {children: React.ReactNode}) {
+  const required = process.env.NEXT_PUBLIC_AUTH_REQUIRED === "true";
+  const [authed, setAuthed] = useState(!required);
+  useEffect(() => { if (required && token()) setAuthed(true); }, [required]);
+
+  const [email, setEmail] = useState("admin@clawcompany.local");
+  const [password, setPassword] = useState("ChangeMe123!");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    setBusy(true); setError("");
+    try {
+      await login(email, password);
+      setAuthed(true);
+    } catch (e: any) {
+      // Thông báo lỗi của FastAPI là JSON dài; cắt cho người đọc được.
+      const raw = String(e?.message || e);
+      setError(raw.length > 180 ? raw.slice(0, 180) + "…" : raw);
+    } finally { setBusy(false); }
+  }
+
+  if (authed) return <>{children}</>;
+
+  return <div className="portalLogin">
+    <div className="portalLoginCard">
+      <div className="portalBrand">
+        <span className="brandMark"/>
+        <div>
+          <b>ClawCompany</b>
+          <span>AI Organization OS</span>
+        </div>
+      </div>
+
+      <h1>Đăng nhập</h1>
+      <p>Công ty của bạn, vận hành cùng đội agent.</p>
+
+      <label htmlFor="cc-email">Email</label>
+      <input id="cc-email" value={email} autoComplete="username"
+             onChange={e => setEmail(e.target.value)}
+             onKeyDown={e => e.key === "Enter" && submit()}
+             placeholder="ban@congty.com"/>
+
+      <label htmlFor="cc-password">Mật khẩu</label>
+      <input id="cc-password" value={password} type="password" autoComplete="current-password"
+             onChange={e => setPassword(e.target.value)}
+             onKeyDown={e => e.key === "Enter" && submit()}
+             placeholder="••••••••"/>
+
+      {error && <div className="portalError" style={{marginTop: 12}}>{error}</div>}
+
+      <button onClick={submit} disabled={busy}>
+        {busy ? "Đang đăng nhập…" : "Đăng nhập"}
+        {!busy && <Icon name="arrow-right" size={16}/>}
+      </button>
+
+      <small style={{display: "block", marginTop: 14, textAlign: "center"}}>
+        Bản cài demo dùng <code>admin@clawcompany.local</code>
+      </small>
     </div>
-  </div>
+  </div>;
 }

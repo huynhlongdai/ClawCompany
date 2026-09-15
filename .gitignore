@@ -36,3 +36,5 @@ Thumbs.db
 
 .devstack/
 .smoke/
+
+tsconfig.tsbuildinfo

@@ -133,7 +133,10 @@ def env_lines(info: dict) -> list[str]:
         'export EMBEDDING_PROVIDER="hash384"',
         'export OPENCLAW_MODE="native"',
         'export OPENCLAW_GATEWAY_WS="ws://127.0.0.1:18789"',
-        'export CORS_ORIGINS="http://localhost:3000"',
+        # Cả hai origin: trình duyệt coi localhost và 127.0.0.1 là khác nhau.
+        # Chỉ khai một cái thì mở UI bằng địa chỉ còn lại sẽ bị CORS chặn --
+        # đã gặp thật khi chụp ảnh UI bằng headless chromium ở 127.0.0.1:3000.
+        'export CORS_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"',
     ]
 
 
