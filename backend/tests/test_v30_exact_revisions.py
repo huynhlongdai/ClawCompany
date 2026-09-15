@@ -6,10 +6,13 @@ these pin is decision logic -- token shape, guard mode, cursor advancement,
 batch skip rules -- not the SQL. The conditional UPDATE against a counter
 column still needs a real database, ideally with two concurrent writers.
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import create_engine, Integer, String, DateTime, Text
+from sqlalchemy.orm import DeclarativeBase, Session, mapped_column, Mapped
+from sqlalchemy.pool import StaticPool
 
 from app.services import cascade_restore as cr
 from app.services import row_guard as rg
@@ -119,6 +122,77 @@ class FakeDb:
         return self.get_map.get(key)
 
 
+# ---------------------------------------------------------------------------
+# Real-ORM harness for tests that must exercise the actual conditional UPDATE
+# ---------------------------------------------------------------------------
+
+class _GuardBase(DeclarativeBase):
+    pass
+
+
+class _GuardProject(_GuardBase):
+    """Throwaway project model on in-memory SQLite.
+
+    Mirrors every column compare_and_set touches.  __entity_kind__ = "project"
+    makes row_revision.kind_of() return "project", matching WRITABLE and
+    COUNTED_KINDS.  Legacy rows set row_revision=None (predates migration 0013).
+    Production code is not touched.
+    """
+    __tablename__ = "guard_projects"
+    __entity_kind__ = "project"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(200), default="P")
+    description: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(32), default="active")
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    owner_member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    company_id: Mapped[int] = mapped_column(Integer, default=7)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    row_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+@pytest.fixture
+def db():
+    """Fresh in-memory SQLite per test.  StaticPool shares one connection so
+    out-of-band UPDATEs (simulating a write race) are visible within the
+    same session object."""
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    _GuardBase.metadata.create_all(engine)
+    with Session(engine) as session:
+        yield session
+    engine.dispose()
+
+
+@pytest.fixture
+def proj_counted(db):
+    """Project with row_revision=3 (counter mode, first row → id=1)."""
+    p = _GuardProject(name="P", status="cancelled", updated_at=STAMP, row_revision=3, company_id=7)
+    db.add(p); db.commit(); db.refresh(p)
+    return p
+
+
+@pytest.fixture
+def proj_legacy(db):
+    """Legacy project: row_revision IS NULL — predates migration 0013."""
+    p = _GuardProject(name="Old", status="active", updated_at=STAMP, row_revision=None, company_id=7)
+    db.add(p); db.commit(); db.refresh(p)
+    return p
+
+
+@pytest.fixture
+def proj_r9(db):
+    """Project with row_revision=9 — simulates a row the guard has already
+    advanced far past the token a stale client still holds."""
+    p = _GuardProject(name="P", status="cancelled", updated_at=STAMP, row_revision=9, company_id=7)
+    db.add(p); db.commit(); db.refresh(p)
+    return p
+
+
 @pytest.fixture(autouse=True)
 def no_events(monkeypatch):
     monkeypatch.setattr(rg, "emit_event", lambda *a, **k: None)
@@ -184,40 +258,37 @@ def test_next_counter_adopts_an_uncounted_row_at_one():
 # -- guarded writes ---------------------------------------------------------
 
 
-def test_counter_token_guards_on_the_counter_column():
-    db = FakeDb(rowcount=1)
-    project = FakeProject(counter=3)
-    out = rg.compare_and_set(db, project, {"name": "New"},
-                             expected_revision="project:1:r3")
+def test_counter_token_guards_on_the_counter_column(db, proj_counted):
+    # proj_counted has row_revision=3; WHERE row_revision=3 matches → success.
+    out = rg.compare_and_set(db, proj_counted, {"name": "New"},
+                             expected_revision=f"project:{proj_counted.id}:r3")
     assert out["applied"] is True
     assert out["guard_mode"] == rev.COUNTER_MODE
     assert out["exact"] is True
 
 
-def test_a_guarded_write_bumps_the_counter():
-    db = FakeDb(rowcount=1)
-    project = FakeProject(counter=3)
-    rg.compare_and_set(db, project, {"name": "New"}, expected_revision="project:1:r3")
-    values = db.statements[0].compile().params
-    assert values["row_revision"] == 4
+def test_a_guarded_write_bumps_the_counter(db, proj_counted):
+    # The counter must move in the database, not just in memory.
+    rg.compare_and_set(db, proj_counted, {"name": "New"},
+                       expected_revision=f"project:{proj_counted.id}:r3")
+    db.refresh(proj_counted)
+    assert proj_counted.row_revision == 4
 
 
-def test_a_timestamp_guarded_write_still_adopts_the_counter():
+def test_a_timestamp_guarded_write_still_adopts_the_counter(db, proj_legacy):
     # This is how a pre-0013 row stops being uncounted without a backfill
-    # pass: the first guarded write writes 1.
-    db = FakeDb(rowcount=1)
-    legacy = Legacy()
-    out = rg.compare_and_set(db, legacy, {"name": "New"},
-                             expected_revision=f"project:9:{STAMP.isoformat()}")
+    # pass: the first guarded write writes row_revision = 1.
+    token = f"project:{proj_legacy.id}:{STAMP.isoformat()}"
+    out = rg.compare_and_set(db, proj_legacy, {"name": "New"}, expected_revision=token)
     assert out["guard_mode"] == rev.TIMESTAMP_MODE
     assert out["exact"] is False
-    assert db.statements[0].compile().params["row_revision"] == 1
+    db.refresh(proj_legacy)
+    assert proj_legacy.row_revision == 1  # adopted from NULL
 
 
-def test_timestamp_guard_reports_itself_as_inexact():
-    db = FakeDb(rowcount=1)
-    out = rg.compare_and_set(db, Legacy(), {"name": "N"},
-                             expected_revision=f"project:9:{STAMP.isoformat()}")
+def test_timestamp_guard_reports_itself_as_inexact(db, proj_legacy):
+    token = f"project:{proj_legacy.id}:{STAMP.isoformat()}"
+    out = rg.compare_and_set(db, proj_legacy, {"name": "N"}, expected_revision=token)
     assert out["exact"] is False
 
 
@@ -227,22 +298,30 @@ def test_counter_token_on_an_entity_without_a_counter_is_refused():
                            expected_revision="agent:3:r1")
 
 
-def test_lost_race_on_the_counter_rolls_back_and_raises_409():
-    db = FakeDb(rowcount=0)
+def test_lost_race_on_the_counter_rolls_back_and_raises_409(db, proj_counted):
+    # Race: another writer has already incremented row_revision to 4.
+    from sqlalchemy import text
+    db.execute(text("UPDATE guard_projects SET row_revision = 4 WHERE id = :i"),
+               {"i": proj_counted.id})
+    db.commit()
+    # Stale token expects r3; WHERE row_revision=3 finds nothing → rowcount=0.
     with pytest.raises(HTTPException) as exc:
-        rg.compare_and_set(db, FakeProject(counter=3), {"name": "N"},
-                           expected_revision="project:1:r3")
+        rg.compare_and_set(db, proj_counted, {"name": "N"},
+                           expected_revision=f"project:{proj_counted.id}:r3")
     assert exc.value.status_code == 409
-    assert db.rolled_back == 1
-    assert db.committed == 0
+    # The database, not the guard, caught this: rowcount=0 from the real
+    # SQLite engine proves the write was never applied.
+    db.refresh(proj_counted)
+    assert proj_counted.name != "N"
 
 
-def test_conflict_reports_the_preferred_token_not_the_legacy_one():
-    db = FakeDb(rowcount=0)
+def test_conflict_reports_the_preferred_token_not_the_legacy_one(db, proj_r9):
+    # proj_r9 has row_revision=9. Token expects r3 → WHERE row_revision=3
+    # matches nothing → 409. The response carries the current token (r9).
     with pytest.raises(HTTPException) as exc:
-        rg.compare_and_set(db, FakeProject(counter=9), {"name": "N"},
-                           expected_revision="project:1:r3")
-    assert exc.value.detail["current_revision"] == "project:1:r9"
+        rg.compare_and_set(db, proj_r9, {"name": "N"},
+                           expected_revision=f"project:{proj_r9.id}:r3")
+    assert exc.value.detail["current_revision"] == f"project:{proj_r9.id}:r9"
 
 
 def test_token_for_another_row_is_still_refused():
@@ -280,10 +359,15 @@ class AuditDb:
         self.last_limit = None
 
     def execute(self, stmt):
-        # The fake honours only the limit; filtering is asserted through the
-        # rows the test feeds in, not by re-implementing SQL here.
-        self.last_limit = getattr(stmt, "_limit", None)
-        return FakeResult(rows=list(self.events))
+        # Honour the SQL LIMIT so cursor semantics match a real database:
+        # the cursor must advance past everything scanned, not just returned.
+        # SQLAlchemy 2 stores the limit on _limit_clause with a .value attr.
+        limit_clause = getattr(stmt, "_limit_clause", None)
+        self.last_limit = getattr(limit_clause, "value", None)
+        events = self.events
+        if self.last_limit is not None:
+            events = events[: self.last_limit]
+        return FakeResult(rows=list(events))
 
 
 @pytest.fixture(autouse=True)
@@ -320,7 +404,11 @@ def test_cursor_advances_past_filtered_out_events():
     db = AuditDb(events)
     out = wa.feed(db, 1, limit=1, categories=("conflict",))
     assert out["returned"] == 1
-    assert out["next_cursor"] == 30
+    # next_cursor must advance past the last SCANNED event (id=27, the 4th
+    # of the fetch window of limit*4=4), NOT past the last returned row
+    # (id=30).  Asserting 30 would enshrine the exact bug the cursor exists
+    # to prevent: the next page would re-fetch every event the filter dropped.
+    assert out["next_cursor"] == 27
 
 
 def test_a_broken_cursor_returns_the_first_page_instead_of_an_error():
@@ -456,7 +544,14 @@ def test_restoring_a_board_does_not_claim_the_company_came_back(monkeypatch):
 
 
 def test_batch_restore_is_company_scoped(monkeypatch):
+    # entity_archive.kind_of checks __entity_kind__ first (documented test
+    # seam: "Real rows never carry this attribute").  "department" is in
+    # KINDS but is not "company", so preview raises 400 without needing
+    # isinstance checks against real ORM models.
+    class _NotACompany:
+        __entity_kind__ = "department"
+        id = 1; name = "X"; status = "active"
     db = plant(monkeypatch, event=None, projects=[])
     with pytest.raises(HTTPException) as exc:
-        cr.preview(db, FakeProject(), 1)
+        cr.preview(db, _NotACompany(), 1)
     assert exc.value.status_code == 400

@@ -10,6 +10,10 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from sqlalchemy import create_engine, Integer, String, DateTime, Text
+from sqlalchemy.orm import DeclarativeBase, Session, mapped_column, Mapped
+from sqlalchemy.pool import StaticPool
+
 from app.services import board_restore as br
 from app.services import row_guard as rg
 from fastapi import HTTPException
@@ -70,6 +74,64 @@ class FakeDb:
         return self.get_map.get(key)
 
 
+# ---------------------------------------------------------------------------
+# Real-ORM harness for tests that must exercise the actual conditional UPDATE
+# ---------------------------------------------------------------------------
+
+_FIXED_STAMP = datetime(2026, 1, 1, 0, 0, 0)  # far in the past → always != utcnow()
+
+
+class _GuardBase(DeclarativeBase):
+    pass
+
+
+class _GuardProject(_GuardBase):
+    """Throwaway project model on in-memory SQLite.
+
+    Mirrors every column compare_and_set touches.  __entity_kind__ = "project"
+    makes row_revision.kind_of() return "project", matching WRITABLE and
+    COUNTED_KINDS.  Production code is not touched.
+    """
+    __tablename__ = "guard_projects"
+    __entity_kind__ = "project"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(200), default="P")
+    description: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(32), default="active")
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    owner_member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    company_id: Mapped[int] = mapped_column(Integer, default=7)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    row_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+@pytest.fixture
+def _guard_session():
+    """Fresh in-memory SQLite per test.  StaticPool shares one connection so
+    out-of-band UPDATEs (the race simulation) are visible within the same
+    session object."""
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    _GuardBase.metadata.create_all(engine)
+    with Session(engine) as session:
+        yield session
+    engine.dispose()
+
+
+@pytest.fixture
+def _guard_proj(_guard_session):
+    """A project row at a fixed past timestamp; row_revision starts NULL."""
+    p = _GuardProject(name="P", status="active", updated_at=_FIXED_STAMP, row_revision=None)
+    _guard_session.add(p)
+    _guard_session.commit()
+    _guard_session.refresh(p)
+    return p
+
+
 @pytest.fixture(autouse=True)
 def no_events(monkeypatch):
     monkeypatch.setattr(rg, "emit_event", lambda *a, **k: None)
@@ -112,37 +174,54 @@ def test_missing_revision_is_refused_rather_than_degrading_to_plain_update():
     assert db.committed == 0
 
 
-def test_lost_race_is_reported_by_the_database_not_guessed():
-    project = FakeProject()
-    db = FakeDb(rowcount=0)
+def test_lost_race_is_reported_by_the_database_not_guessed(_guard_session, _guard_proj):
+    # Token reflects the row BEFORE another writer advances updated_at.
+    token = f"project:{_guard_proj.id}:{_FIXED_STAMP.isoformat()}"
+    # Race: a concurrent write moves the row's timestamp.
+    from sqlalchemy import text
+    _guard_session.execute(
+        text("UPDATE guard_projects SET updated_at = :s WHERE id = :i"),
+        {"s": (_FIXED_STAMP + timedelta(seconds=1)).isoformat(), "i": _guard_proj.id},
+    )
+    _guard_session.commit()
+    # compare_and_set issues WHERE updated_at = old_stamp; the database
+    # returns rowcount=0 because the row moved.  This is the binding guard.
     with pytest.raises(HTTPException) as err:
-        rg.compare_and_set(db, project, {"name": "new"},
-                           expected_revision=f"fakeproject:1:{project.updated_at.isoformat()}")
+        rg.compare_and_set(_guard_session, _guard_proj, {"name": "new"},
+                           expected_revision=token)
     assert err.value.status_code == 409
     assert err.value.detail["applied"] is False
     assert err.value.detail["binding"] is True
-    assert db.rolled_back == 1 and db.committed == 0
+    # rowcount=0 came from the database, not a fake.  Prove the write never
+    # landed: after rollback the name is unchanged.
+    _guard_session.refresh(_guard_proj)
+    assert _guard_proj.name != "new"
 
 
-def test_winning_write_commits_and_reports_both_revisions():
-    project = FakeProject()
-    token = f"fakeproject:1:{project.updated_at.isoformat()}"
-    out = rg.compare_and_set(FakeDb(rowcount=1), project, {"name": "new"},
+def test_winning_write_commits_and_reports_both_revisions(_guard_session, _guard_proj):
+    token = f"project:{_guard_proj.id}:{_FIXED_STAMP.isoformat()}"
+    out = rg.compare_and_set(_guard_session, _guard_proj, {"name": "new"},
                              expected_revision=token)
     assert out["applied"] is True
     assert out["previous_revision"] == token
     assert out["fields"] == ["name"]
 
 
-def test_conflict_event_failure_does_not_mask_the_409(monkeypatch):
+def test_conflict_event_failure_does_not_mask_the_409(monkeypatch, _guard_session, _guard_proj):
     def boom(*_a, **_k):
         raise RuntimeError("event bus down")
     monkeypatch.setattr(rg, "emit_event", boom)
-    project = FakeProject()
+    token = f"project:{_guard_proj.id}:{_FIXED_STAMP.isoformat()}"
+    # Advance the row so the guard sees rowcount=0.
+    from sqlalchemy import text
+    _guard_session.execute(
+        text("UPDATE guard_projects SET updated_at = :s WHERE id = :i"),
+        {"s": (_FIXED_STAMP + timedelta(seconds=1)).isoformat(), "i": _guard_proj.id},
+    )
+    _guard_session.commit()
     with pytest.raises(HTTPException) as err:
-        rg.compare_and_set(FakeDb(rowcount=0), project, {"name": "x"},
-                           expected_revision=f"fakeproject:1:{project.updated_at.isoformat()}",
-                           organization_id=3)
+        rg.compare_and_set(_guard_session, _guard_proj, {"name": "x"},
+                           expected_revision=token, organization_id=3)
     assert err.value.status_code == 409
 
 
@@ -282,6 +361,14 @@ def test_stale_window_is_documented_as_closed_by_the_database():
     assert "rowcount" in source
 
 
-def test_guarded_update_sets_updated_at_explicitly():
-    import inspect
-    assert "updated_at=now" in inspect.getsource(rg.compare_and_set)
+def test_guarded_update_sets_updated_at_explicitly(_guard_session, _guard_proj):
+    # Behavioral check: compare_and_set issues a Core UPDATE, not an ORM
+    # flush, so 'onupdate' hooks do not fire.  updated_at must be set
+    # explicitly in the VALUES clause; otherwise the revision never moves and
+    # the next guarded write passes a WHERE it should fail.
+    original_stamp = _guard_proj.updated_at
+    token = f"project:{_guard_proj.id}:{original_stamp.isoformat()}"
+    rg.compare_and_set(_guard_session, _guard_proj, {"name": "Renamed"}, expected_revision=token)
+    # db.refresh() is called inside compare_and_set; updated_at here reflects
+    # what the database actually stored after the write.
+    assert _guard_proj.updated_at != original_stamp

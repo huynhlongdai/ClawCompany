@@ -114,7 +114,7 @@ npm install && npx next build
 
 | Hạng mục | Trạng thái | Bằng chứng |
 | --- | --- | --- |
-| Test suite | **624 passed · 12 failed · 1 skipped** | `_reports/pytest-after-repair.log` |
+| Test suite | **636 passed · 0 failed · 1 skipped** | `_reports/pytest-after-repair.log` |
 | Lần chạy đầu tiên | 582 passed · 37 failed | `_reports/pytest-first-run.log` |
 | Frontend build | **xanh**, 49 route prerender | `npx next build` |
 | Bridge contract | **192/192** khớp route thật | `tools/inventory.py` |
@@ -182,7 +182,10 @@ model), và kiểm chứng luồng approval đầu-cuối. Xem
   chúng chưa từng chạy;
 - fake không có cột mà code thật đọc (`departments.status`, `company_id`).
 
-Phân loại đầy đủ 37 failure: `_reports/test-triage.md`.
+Phân loại đầy đủ 37 failure: `_reports/test-triage.md`. Suite đã xanh hoàn
+toàn (636 passed), nhưng **xanh không đồng nghĩa với đã kiểm chứng**: phần lớn
+vẫn chạy trên double. Hai file v28/v30 là mẫu nên noi theo — model ORM thật,
+SQLite in-memory, assertion hành vi.
 
 ### P2 — hạ tầng chưa được chứng minh
 
@@ -197,8 +200,12 @@ Cần một lần chạy `docker compose up` + `alembic upgrade head` thật.
 - `services/tasks.py` là shim deprecate của `agent_dispatch.py`.
 - `company_events` không có chính sách retention (v31 đã ghi nhận).
 - Un-archive một member không phục hồi trạng thái runtime (v31 đã ghi nhận).
-- 12 test còn đỏ: v28 (4) + v30 (8) — cần harness ORM thật cho conditional
-  UPDATE, xem `_reports/test-triage.md` nhóm 1.1.
+- ~~12 test còn đỏ~~ — đã đóng: `test_v28_write_guards.py` và
+  `test_v30_exact_revisions.py` giờ dùng model SQLAlchemy thật trên SQLite
+  in-memory, nên `compare_and_set` được kiểm qua conditional UPDATE thật. Test
+  lost-race tạo race bằng một UPDATE ngoài luồng và nhận `rowcount = 0` thật —
+  lần đầu mệnh đề v28 "guard có hiệu lực, không phải khuyến nghị" được chứng
+  minh.
 
 ## 7. Nguyên tắc khi làm việc trên repo này
 
@@ -221,8 +228,6 @@ Cần một lần chạy `docker compose up` + `alembic upgrade head` thật.
 1. Chạy thật bằng Docker: `docker compose up` + `alembic upgrade head` +
    `seed.py`, ghi lại kết quả. (Sandbox tiếp nhận không có Docker; dự kiến làm
    trên một máy ảo boxd.sh.)
-2. Đóng 12 test còn đỏ bằng harness ORM thật cho `compare_and_set` — đây cũng
-   là lần đầu mệnh đề "guard có hiệu lực" của v28 được chứng minh.
 3. Chạy trọn một task OpenClaw tới trạng thái kết thúc trên một gateway có
    credential model, xác nhận `runtime_stream` ghi đúng event và task chuyển
    trạng thái (`complete → review`, `error → blocked`).
