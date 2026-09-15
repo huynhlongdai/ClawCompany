@@ -6,7 +6,7 @@ Nguồn sự thật về hiện trạng dự án. README kể lịch sử v4→v
 - Ngày tiếp nhận: **2026-09-15**
 - Nguồn: `clawcompany_v35_spend_push.zip` (459 file, không có `.git`)
 - Repo: `https://github.com/huynhlongdai/ClawCompany`
-- Service version: `1.25.0` · Migration head: `0015_v32_department_status_not_null`
+- Service version: `1.26.0` · Migration head: `0016_v36_metrics_calendar`
 
 ---
 
@@ -49,6 +49,7 @@ Phân lớp theo version (đọc `_reports/inventory.md` để có bảng đầy
 | Giao hàng phần mềm | v11–v15 | repo, CI/CD, sandbox, release, runner PKI, telemetry, SRE |
 | Đa agent | v16–v18 | team, phòng họp có luật lượt, delegation, knowledge mesh, cockpit ghi |
 | Nhân OpenClaw | v19–v26 | giao thức thật, live run, lease, takeover, reconcile, Redis fabric |
+| Dữ liệu cho UI | v36 | chuỗi thời gian chỉ số, lịch, số theo ngày của agent, hạn chót dự án, hỏi Nina qua model |
 | Tính đúng của bảng | v27–v32 | progress dẫn xuất, guard ghi, lưu trữ dây chuyền, kiểm toán field |
 | Vận hành | v33–v35 | khôi phục, replay, đối chiếu chi phí delegation, kênh SSE |
 
@@ -135,7 +136,7 @@ npm install && npx next build
 | Lần chạy đầu tiên | 582 passed · 37 failed | `_reports/pytest-first-run.log` |
 | Frontend build | **xanh**, 49 route prerender | `npx next build` |
 | Bridge contract | **192/192** khớp route thật | `tools/inventory.py` |
-| Migration | **đã chạy trên Postgres 16 thật**, 160 bảng | `_reports/local-runtime.md` |
+| Migration | **đã chạy trên Postgres 16 thật**, 163 bảng, head `0016` | `_reports/local-runtime.md` |
 | OpenClaw native | **đã kết nối được gateway thật** (2026.9.4) | `_reports/native-probe-after-fix.log` |
 | Postgres + pgvector | **đã chạy thật** (pgserver) | `_reports/local-runtime.md` |
 | Redis (lease/registry v21–v26) | **đã chạy thật**, báo `cluster_wide: true` | `_reports/local-runtime.md` |
@@ -203,9 +204,24 @@ Nay: `hello-ok` protocol 4, role `operator`, `sessions.create` trả `sessionId`
 thật, `chat.send` đi qua tầng giao thức. 16 test hồi quy trong
 `tests/test_v35_1_protocol_frames.py` pin hình dạng frame **không cần gateway**.
 
-Còn lại: chạy trọn một task tới trạng thái kết thúc (cần gateway có credential
-model), và kiểm chứng luồng approval đầu-cuối. Xem
-`_reports/openclaw-protocol-audit.md` mục cuối.
+**Đã đóng luôn phần còn lại** (2026-09-15, vòng bốn): gateway nay có provider
+model thật (CometAPI, key đọc từ file ngoài config qua SecretRef). Đo được:
+`agent model cometapi/gpt-4o-mini`; dispatch company task #5 cho ra câu trả lời
+thật **kèm tool use**; `POST /api/v36/nina/ask` trả `answered: true` trong 6,2
+giây. Khởi động gateway bằng `tools/run_gateway.sh`.
+
+Hai lỗi chặn phát hiện nhờ chạy trọn luồng, đã sửa:
+- `POST /api/v20/tasks/{id}/follow` **luôn 500**: endpoint khai `def` mà
+  `supervisor.follow()` gọi `asyncio.create_task()`, nên FastAPI chạy nó trong
+  threadpool không có event loop. Cả tính năng "theo dõi phiên" mà v20→v26
+  dựng lên không gọi được qua API của chính nó.
+- `idempotencyKey` khoá theo task nên **chặn lượt gửi thứ hai** cho cùng task
+  (`chat-request-conflict`). Nay khoá gồm vân tay nội dung.
+
+Còn lại: **agent chưa có tool đọc dữ liệu ClawCompany**. 192 tool contract
+trong `openclaw-company-bridge/` chưa được đăng ký với agent trên gateway, nên
+Nina trả lời bằng kiến thức chung thay vì đọc số của công ty. Đây là việc kế
+tiếp rõ ràng nhất.
 
 ### P1 — cách đo đang cho tín hiệu sai
 
