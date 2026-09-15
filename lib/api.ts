@@ -567,3 +567,28 @@ export const apiV35 = {
       {withCredentials: true});
   },
 }
+
+/* v36: bốn khối mà bản thiết kế UI cần và hệ thống cũ không có nguồn —
+   lịch sử chỉ số (chuỗi thời gian), lịch, số theo ngày của agent, hạn chót
+   dự án. Mọi endpoint đọc đều trả kèm lời thừa nhận về nguồn dữ liệu. */
+export const apiV36 = {
+  coverage: () => request<any>(`/v36/coverage`),
+  metricHistory: (metricKey?: string) =>
+    request<any>(`/v36/metrics/history${metricKey ? `?metric_key=${encodeURIComponent(metricKey)}` : ""}`),
+  snapshotMetrics: (grain: "month" | "day" = "month") =>
+    request<any>(`/v36/metrics/snapshot?grain=${grain}`, {method: "POST"}),
+  calendar: (days = 1) => request<any>(`/v36/calendar?days=${days}`),
+  createCalendarEvent: (body: Record<string, unknown>) =>
+    request<any>(`/v36/calendar`, {method: "POST", body: JSON.stringify(body)}),
+  agentStats: (days = 30, agentId?: number) =>
+    request<any>(`/v36/agent-stats?days=${days}${agentId ? `&agent_id=${agentId}` : ""}`),
+  deriveAgentStats: (days = 30) =>
+    request<any>(`/v36/agent-stats/derive?days=${days}`, {method: "POST"}),
+  deadlines: (days = 30) => request<any>(`/v36/deadlines?days=${days}`),
+  askNina: (message: string, timeoutSeconds = 60) =>
+    request<any>(`/v36/nina/ask`,
+      {method: "POST", body: JSON.stringify({message, timeout_seconds: timeoutSeconds})}),
+  setDueDate: (projectId: number, dueDate: string | null) =>
+    request<any>(`/v36/projects/${projectId}/due-date`,
+      {method: "POST", body: JSON.stringify({due_date: dueDate})}),
+};

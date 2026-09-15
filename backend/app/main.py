@@ -49,11 +49,12 @@ from app.api.v32 import router as v32_router
 from app.api.v33 import router as v33_router
 from app.api.v34 import router as v34_router
 from app.api.v35 import router as v35_router
+from app.api.v36 import router as v36_router
 from app.core.middleware import RequestContextMiddleware
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title=settings.app_name, version="1.25.0")
+app = FastAPI(title=settings.app_name, version="1.26.0")
 app.add_middleware(RequestContextMiddleware)
 app.add_middleware(
     CORSMiddleware,
@@ -65,7 +66,7 @@ app.add_middleware(
 
 @app.get("/health")
 def health():
-    return {"status":"ok","service":"clawcompany-api","version":"1.25.0"}
+    return {"status":"ok","service":"clawcompany-api","version":"1.26.0"}
 
 app.include_router(organizations_router, prefix="/api")
 app.include_router(companies_router, prefix="/api")
@@ -117,6 +118,7 @@ app.include_router(v32_router, prefix="/api")
 app.include_router(v33_router, prefix="/api")
 app.include_router(v34_router, prefix="/api")
 app.include_router(v35_router, prefix="/api")
+app.include_router(v36_router, prefix="/api")
 
 
 @app.on_event("startup")

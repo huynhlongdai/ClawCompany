@@ -1,16 +1,17 @@
 "use client";
 import {useEffect, useState} from "react";
-import {api} from "../lib/api";
+import {api, apiV36} from "../lib/api";
 import {Icon} from "./Icon";
 
 /* Báo cáo — màn hình có trong mẫu nhưng app chưa có route.
    Dữ liệu thật: /api/analytics (chỉ số có trị hiện tại, trị trước và mục
    tiêu) và /api/reports (báo cáo đã sinh).
 
-   Mẫu có biểu đồ đường "Doanh thu 6 tháng qua". Bảng analytics_metrics chỉ
-   lưu HAI mốc (hiện tại, kỳ trước) nên vẽ đường 6 tháng là bịa. Ở đây là cột
-   so sánh hai mốc thật, cộng vạch mục tiêu — cùng thông tin, không thêm số
-   nào không có. */
+   v36 thêm bảng ``metric_samples``, nên biểu đồ đường của bản thiết kế nay
+   vẽ được từ số thật. Nhưng số điểm đúng bằng số lần đã chốt số: sau
+   migration là hai điểm (backfill từ trị hiện tại và trị kỳ trước), và dài ra
+   mỗi lần gọi POST /api/v36/metrics/snapshot. Biểu đồ nói rõ điều đó thay vì
+   trông như một chuỗi đo liên tục sáu tháng. */
 
 type Row = Record<string, any>;
 
@@ -23,49 +24,66 @@ function fmt(value: number, unit: string) {
   return `${value.toLocaleString("vi-VN")}${unit === "%" ? "%" : unit ? ` ${unit}` : ""}`;
 }
 
-/* Cột so sánh: kỳ trước vs hiện tại, kèm vạch mục tiêu. Vẽ bằng SVG thuần —
-   không thêm thư viện chart cho hai cột. */
-function CompareBars({current, previous, target, unit}: {
-  current: number; previous: number; target: number; unit: string;
-}) {
-  const max = Math.max(current, previous, target) || 1;
-  const h = (v: number) => Math.max(3, Math.round((v / max) * 92));
-  return <svg viewBox="0 0 160 120" style={{width: "100%", maxWidth: 190, height: 120}}>
-    {[["Kỳ trước", previous, 26, "#c9cbe8"], ["Hiện tại", current, 86, "url(#g)"]].map(
-      ([label, value, x, fill]) => <g key={String(label)}>
-        <defs>
-          <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#7c5cff"/><stop offset="1" stopColor="#5b5be6"/>
-          </linearGradient>
-        </defs>
-        <rect x={Number(x)} y={104 - h(Number(value))} width="44" rx="7"
-              height={h(Number(value))} fill={String(fill)}/>
-        <text x={Number(x) + 22} y="117" textAnchor="middle" fontSize="9" fill="#79809a">{label}</text>
-      </g>)}
-    {!!target && <>
-      <line x1="10" x2="150" y1={104 - h(target)} y2={104 - h(target)}
-            stroke="#e11d48" strokeWidth="1" strokeDasharray="3 3"/>
-      <text x="150" y={100 - h(target)} textAnchor="end" fontSize="8" fill="#e11d48">
-        mục tiêu {fmt(target, unit)}
+/* Đường lịch sử chỉ số, vẽ bằng SVG thuần từ metric_samples. Không thêm thư
+   viện chart: một đường và vài điểm không đáng 40KB JavaScript.
+
+   Một điểm thì không vẽ đường được — hiện đúng một dấu, và nói ra. */
+function HistoryLine({points, unit}: {points: {period: string; value: number}[]; unit: string}) {
+  if (!points.length) return <div className="v8Empty">Chưa có mẫu nào.</div>;
+
+  const width = 260, height = 110, pad = 26;
+  const values = points.map(p => p.value);
+  const min = Math.min(...values), max = Math.max(...values);
+  const span = max - min || Math.abs(max) || 1;
+  const x = (i: number) => points.length === 1
+    ? width / 2
+    : pad + (i * (width - pad * 2)) / (points.length - 1);
+  const y = (v: number) => height - 18 - ((v - min) / span) * (height - 42);
+
+  const path = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ");
+
+  return <svg viewBox={`0 0 ${width} ${height}`} style={{width: "100%", height: 120}}>
+    <defs>
+      <linearGradient id="hl" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stopColor="#7c5cff"/><stop offset="1" stopColor="#5b5be6"/>
+      </linearGradient>
+    </defs>
+    {points.length > 1 && <path d={path} fill="none" stroke="url(#hl)" strokeWidth="2"
+                                strokeLinejoin="round" strokeLinecap="round"/>}
+    {points.map((p, i) => <g key={p.period}>
+      <circle cx={x(i)} cy={y(p.value)} r="3.5" fill="#5b5be6"/>
+      <text x={x(i)} y={height - 4} textAnchor="middle" fontSize="8.5" fill="#79809a">
+        {p.period}
       </text>
-    </>}
+    </g>)}
+    <text x={pad} y="12" fontSize="8.5" fill="#79809a">{fmt(max, unit)}</text>
+    <text x={pad} y={height - 22} fontSize="8.5" fill="#79809a">{fmt(min, unit)}</text>
   </svg>;
 }
 
 export function ReportsConsole() {
   const [metrics, setMetrics] = useState<Row[]>([]);
   const [reports, setReports] = useState<Row[]>([]);
+  const [history, setHistory] = useState<Row | null>(null);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [m, r] = await Promise.all([api.analytics(), api.reports()]);
-        setMetrics((m as Row[]) || []);
-        setReports((r as Row[]) || []);
-      } catch (e: any) { setError(e?.message || "Không tải được báo cáo"); }
-    })();
-  }, []);
+  async function load() {
+    try {
+      const [m, r] = await Promise.all([api.analytics(), api.reports()]);
+      setMetrics((m as Row[]) || []);
+      setReports((r as Row[]) || []);
+    } catch (e: any) { setError(e?.message || "Không tải được báo cáo"); }
+    try { setHistory(await apiV36.metricHistory()); } catch { setHistory(null); }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function snapshot() {
+    setBusy(true);
+    try { await apiV36.snapshotMetrics("month"); await load(); }
+    catch (e: any) { setError(String(e?.message || e).slice(0, 200)); }
+    finally { setBusy(false); }
+  }
 
   return <div>
     {error && <div className="v8Error" style={{marginBottom: 14}}>{error}</div>}
@@ -108,18 +126,31 @@ export function ReportsConsole() {
       </div>
 
       <div className="panel">
-        <div className="panelHead"><div><b>So sánh kỳ</b></div><small>hai mốc thật</small></div>
-        <div style={{display: "grid", gap: 16}}>
-          {metrics.map(m => <div key={m.id}>
-            <b style={{fontSize: 12.5}}>{m.metric_key}</b>
-            <CompareBars current={m.current_value} previous={m.previous_value}
-                         target={m.target_value} unit={m.unit}/>
-          </div>)}
+        <div className="panelHead">
+          <div><b>Lịch sử chỉ số</b></div>
+          <button className="v8Ghost" onClick={snapshot} disabled={busy}>
+            {busy ? "Đang chốt…" : "Chốt số kỳ này"}
+          </button>
         </div>
-        <small style={{display: "block", marginTop: 8}}>
-          analytics_metrics chỉ lưu hai mốc (hiện tại và kỳ trước), nên không có
-          đường 6 tháng như bản thiết kế — vẽ ra sẽ là số bịa.
-        </small>
+        <div style={{display: "grid", gap: 18}}>
+          {(history?.series || []).map((s: Row) => {
+            const unit = s.points?.[0]?.unit || "";
+            return <div key={s.metric_key}>
+              <b style={{fontSize: 12.5}}>{s.metric_key}</b>
+              <HistoryLine points={s.points || []} unit={unit}/>
+            </div>;
+          })}
+          {!history?.series?.length && <div className="v8Empty">
+            Chưa có mẫu nào trong metric_samples.
+          </div>}
+        </div>
+        {!!history && <small style={{display: "block", marginTop: 8}}>
+          {history.sample_count} mẫu · nguồn: {(history.sources || []).join(", ") || "—"}.
+          {history.points_are_measurements
+            ? " Mỗi điểm là một lần chốt số."
+            : " Hai điểm đầu là backfill từ trị hiện tại và trị kỳ trước của analytics_metrics"
+              + " — chuỗi dài ra mỗi lần chốt số, nên đừng đọc nó như một chuỗi đo liên tục."}
+        </small>}
       </div>
     </section>
   </div>;

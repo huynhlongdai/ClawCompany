@@ -21,6 +21,7 @@ Design choices worth stating:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import uuid
 from typing import Any, AsyncIterator
@@ -227,10 +228,19 @@ class NativeOpenClawRuntime(AgentRuntime):
         # nhiên mỗi lần, vì mục đích của nó là để retry transport không sinh
         # hai lượt chạy. Có task id thì khoá theo task; không thì đành dùng
         # uuid và nói thẳng là lượt này không dedupe được.
+        # Khoá idempotency phải ổn định theo MỘT LẦN GỬI LOGIC, không theo
+        # task. Bản v35.1 khoá theo task id, nên lượt gửi thứ hai cho cùng
+        # task — một chỉ thị khác hẳn — bị gateway chặn:
+        #   INVALID_REQUEST: This message ID was already used for different
+        #   input (reason: chat-request-conflict)
+        # Đo được khi gửi lượt thứ hai vào task #5. Nay khoá gồm cả vân tay
+        # nội dung: gửi lại đúng chữ đó thì dedupe (đúng mục đích của
+        # idempotency), còn chỉ thị mới là một lần gửi mới.
         task_ref = str(meta.get("company_task_id") or "")
+        fingerprint = hashlib.sha256(input_text.encode("utf-8")).hexdigest()[:12]
         idempotency_key = (
-            f"clawcompany:{key}:task-{task_ref}" if task_ref
-            else f"clawcompany:{key}:{uuid.uuid4()}"
+            f"clawcompany:{key}:task-{task_ref}:{fingerprint}" if task_ref
+            else f"clawcompany:{key}:{fingerprint}:{uuid.uuid4().hex[:8]}"
         )
         result = await self._rpc(
             ocp.M_CHAT_SEND,

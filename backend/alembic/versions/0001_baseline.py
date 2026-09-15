@@ -83,7 +83,7 @@ BASELINE_TABLES = [
 COLUMNS_OWNED_BY_LATER_MIGRATIONS = {
     "companies": ["row_revision"],                  # 0013_v30_row_revision_counter
     "members": ["row_revision"],                    # 0013
-    "projects": ["row_revision"],                   # 0013
+    "projects": ["row_revision", "due_date"],       # 0013, 0016
     "tasks": ["row_revision"],                      # 0013
     "departments": ["row_revision", "status"],      # 0013, 0014
 }

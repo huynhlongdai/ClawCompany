@@ -1,7 +1,7 @@
 "use client";
 import {Suspense, useEffect, useMemo, useState} from "react";
 import {useRouter, useSearchParams} from "next/navigation";
-import {api, apiV10, apiV17} from "../lib/api";
+import {api, apiV10, apiV17, apiV36} from "../lib/api";
 import {Icon, IconName} from "./Icon";
 import {NINA_PORTRAIT} from "./ninaPortrait";
 
@@ -73,6 +73,16 @@ function percent(value?: number | null) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "—";
   return `${Math.round(n <= 1 ? n * 100 : n)}%`;
+}
+
+/* Còn bao nhiêu ngày tới hạn. Quá hạn thì nói quá hạn, không nói số âm. */
+function daysLeftLabel(due: string) {
+  const target = new Date(due + "T00:00:00").getTime();
+  if (Number.isNaN(target)) return "";
+  const days = Math.round((target - Date.now()) / 86_400_000);
+  if (days < 0) return `quá hạn ${Math.abs(days)} ngày`;
+  if (days === 0) return "hạn hôm nay";
+  return `còn ${days} ngày`;
 }
 
 function timeOf(iso?: string) {
@@ -481,16 +491,41 @@ function WorkspaceCockpitInner() {
     </section>}
 
     {tab === "projects" && <section className="panel">
-      <div className="panelHead"><div><b>Dự án</b></div><small>{projects.length} bản ghi</small></div>
+      <div className="panelHead">
+        <div><b>Dự án</b></div>
+        <small>{projects.length} bản ghi · hạn chót từ projects.due_date (v36)</small>
+      </div>
       <table className="dataTable">
-        <thead><tr><th>Dự án</th><th>Công ty</th><th>Tiến độ</th><th>Nhiệm vụ</th><th>Trạng thái</th></tr></thead>
+        <thead><tr>
+          <th>Dự án</th><th>Công ty</th><th>Tiến độ</th><th>Nhiệm vụ</th>
+          <th>Hạn chót</th><th>Trạng thái</th>
+        </tr></thead>
         <tbody>{projects.map(p =>
           <tr key={p.id}>
             <td>{p.name}</td><td>{p.company_name || "—"}</td>
             <td><Bar value={p.progress || 0}/><small style={{display: "block", marginTop: 3}}>{p.progress || 0}%</small></td>
-            <td>{p.tasks_done}/{p.tasks_total}</td><td><Tag value={p.status}/></td>
+            <td>{p.tasks_done}/{p.tasks_total}</td>
+            <td>
+              {/* Ô ngày sửa được tại chỗ: v36 mở cột due_date, và "chưa đặt
+                  hạn" là trạng thái hợp lệ nên input để trống là hợp lệ. */}
+              <input type="date" value={p.due_date || ""} style={{height: 32, fontSize: 12}}
+                     onChange={async e => {
+                       const value = e.target.value || null;
+                       try {
+                         await apiV36.setDueDate(p.id, value);
+                         setProjects(rows => rows.map(r =>
+                           r.id === p.id ? {...r, due_date: value} : r));
+                       } catch (err: any) {
+                         setError(String(err?.message || err).slice(0, 200));
+                       }
+                     }}/>
+              {p.due_date && <small style={{display: "block", marginTop: 2}}>
+                {daysLeftLabel(p.due_date)}
+              </small>}
+            </td>
+            <td><Tag value={p.status}/></td>
           </tr>)}
-          {!projects.length && <tr><td colSpan={5}><div className="v8Empty">Chưa có dự án.</div></td></tr>}
+          {!projects.length && <tr><td colSpan={6}><div className="v8Empty">Chưa có dự án.</div></td></tr>}
         </tbody>
       </table>
     </section>}

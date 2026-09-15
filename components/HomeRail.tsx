@@ -1,6 +1,6 @@
 "use client";
 import {useEffect, useState} from "react";
-import {api, apiV10} from "../lib/api";
+import {api, apiV10, apiV36} from "../lib/api";
 import {Icon, IconName} from "./Icon";
 
 /* Cột phải của Trang chủ — theo mockup: "Nhiệm vụ của bạn" với ba pill tab,
@@ -12,10 +12,11 @@ import {Icon, IconName} from "./Icon";
    - "Hôm nay"     -> GET /api/inbox       (tạo trong 24h)
    - Hoạt động     -> GET /api/v10/events  (company event bus)
 
-   Mockup còn có "Lịch hôm nay" với các buổi họp. Hệ thống KHÔNG có thực thể
-   lịch nào, nên thay vì bịa vài dòng cho đẹp, chỗ đó là dòng hoạt động thật
-   từ event bus. Ô chat Nina cũng vậy: gateway dev không có credential model
-   nên ô nhập bị khoá kèm lý do, thay vì giả vờ chat được. */
+   - "Lịch hôm nay"  -> GET /api/v36/calendar (bảng calendar_events, v36)
+
+   v36 đã thêm thực thể lịch, nên khối "Lịch hôm nay" của bản thiết kế nay là
+   dữ liệu thật. Lịch trống nghĩa là chưa ai tạo mục nào — không phải lỗi tải,
+   và cũng không đồng bộ từ Google/Outlook (chưa có tích hợp nào). */
 
 type Row = Record<string, any>;
 type Tab = "approvals" | "important" | "today";
@@ -58,6 +59,7 @@ export function HomeRail() {
   const [approvals, setApprovals] = useState<Row[]>([]);
   const [inbox, setInbox] = useState<Row[]>([]);
   const [events, setEvents] = useState<Row[]>([]);
+  const [agenda, setAgenda] = useState<Row[]>([]);
   const [failed, setFailed] = useState<string[]>([]);
 
   useEffect(() => {
@@ -66,7 +68,8 @@ export function HomeRail() {
       const miss: string[] = [];
       try { setApprovals((await api.approvals() as Row[]) || []); } catch { miss.push("phê duyệt"); }
       try { setInbox((await api.inbox() as Row[]) || []); } catch { miss.push("hộp thư"); }
-      try { setEvents(((await apiV10.events() as Row[]) || []).slice(0, 6)); } catch { miss.push("event bus"); }
+      try { setEvents(((await apiV10.events() as Row[]) || []).slice(0, 5)); } catch { miss.push("event bus"); }
+      try { setAgenda(((await apiV36.calendar(1))?.events as Row[]) || []); } catch { miss.push("lịch"); }
       setFailed(miss);
     })();
   }, []);
@@ -142,10 +145,36 @@ export function HomeRail() {
       </div>
     </div>
 
-    {/* ---------- hoạt động (thay cho "lịch hôm nay" của mockup) ---------- */}
+    {/* ---------- lịch hôm nay (v36) ---------- */}
     <div className="panel">
       <div className="panelHead">
-        <div><b>Diễn biến hôm nay</b></div>
+        <div><b>Lịch hôm nay</b></div>
+        <small>calendar_events</small>
+      </div>
+      <div className="timeline">
+        {agenda.map(e =>
+          <div key={e.id} className="timeRow">
+            <span>{String(e.starts_at || "").slice(11, 16) || "—"}</span>
+            <div>
+              <i/>
+              <b>{e.title}</b>
+              <small>
+                {e.event_type}
+                {e.owner_name ? ` · ${e.owner_name}` : ""}
+                {e.location ? ` · ${e.location}` : ""}
+              </small>
+            </div>
+          </div>)}
+        {!agenda.length && <div className="v8Empty">
+          Hôm nay chưa có mục lịch nào.
+        </div>}
+      </div>
+    </div>
+
+    {/* ---------- diễn biến từ event bus ---------- */}
+    <div className="panel">
+      <div className="panelHead">
+        <div><b>Diễn biến hệ thống</b></div>
         <small>từ event bus</small>
       </div>
       <div className="timeline">
@@ -161,45 +190,92 @@ export function HomeRail() {
           </div>)}
         {!events.length && <div className="v8Empty">Chưa có diễn biến nào.</div>}
       </div>
-      {/* Nói thẳng vì sao đây không phải lịch họp như mockup. */}
-      <small style={{display: "block", marginTop: 10}}>
-        Hệ thống chưa có thực thể lịch; chỗ này là event bus thật thay vì dữ liệu dựng sẵn.
-      </small>
+
     </div>
 
     {/* ---------- Nina ---------- */}
-    <div className="ninaPanel">
-      <div className="ninaTop">
-        <span className="avatarSm">N</span>
-        <div style={{flex: 1, minWidth: 0}}>
-          <b>Nina</b>
-          <small style={{display: "block"}}>AI Chief of Staff</small>
-        </div>
-        <span className="statusPill off">chưa nối model</span>
-      </div>
-
-      <div className="ninaBubble">
-        Chào bạn 👋 Tôi đọc được toàn bộ số liệu công ty, nhưng chưa trả lời được:
-        gateway OpenClaw đang chạy mà <b>không có credential model</b>.
-      </div>
-
-      <div className="ninaChips">
-        <a href="/app/os?tab=agents">Đội agent</a>
-        <a href="/app/openclaw">Lõi OpenClaw</a>
-        <a href="/app/live-runs">Phiên đang chạy</a>
-        <a href="/app/sre-control">Nina SRE</a>
-      </div>
-
-      <div className="ninaCompose">
-        <input placeholder="Cần credential model để chat…" disabled/>
-        <button disabled title="Đặt credential model cho gateway OpenClaw để bật chat">
-          <Icon name="arrow-right" size={16}/>
-        </button>
-      </div>
-    </div>
+    <NinaPanel/>
 
     {!!failed.length && <div className="v8Error">
       Không tải được: {failed.join(", ")}. Các phần còn lại vẫn là dữ liệu thật.
     </div>}
   </>;
+}
+
+/* Panel chat Nina. Gửi câu hỏi qua /api/v36/nina/ask -> chat.send -> gateway
+   -> nhà cung cấp model. Không phải bộ trả lời theo luật: câu tự do cũng trả
+   lời được, và cũng tốn tiền model thật, nên nút bị khoá khi đang chờ. */
+function NinaPanel() {
+  const [question, setQuestion] = useState("");
+  const [log, setLog] = useState<{role: "me" | "nina"; text: string; meta?: string}[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  async function send(text: string) {
+    const message = text.trim();
+    if (!message || busy) return;
+    setQuestion("");
+    setLog(prev => [...prev, {role: "me", text: message}]);
+    setBusy(true);
+    try {
+      const out = await apiV36.askNina(message, 90);
+      if (out?.answered) {
+        setLog(prev => [...prev, {
+          role: "nina", text: out.reply,
+          meta: `${out.agent} · ${out.runtime_agent_id} · ${out.elapsed_seconds}s`,
+        }]);
+      } else {
+        // Không trả lời được thì nói đúng lý do, không hiện câu chung chung.
+        setLog(prev => [...prev, {
+          role: "nina",
+          text: out?.reason || out?.note || "Chưa nhận được trả lời.",
+          meta: out?.timed_out ? "hết thời gian chờ — lượt chạy vẫn tiếp tục trong phiên" : "",
+        }]);
+      }
+    } catch (e: any) {
+      setLog(prev => [...prev, {role: "nina", text: String(e?.message || e).slice(0, 300)}]);
+    } finally { setBusy(false); }
+  }
+
+  return <div className="ninaPanel">
+    <div className="ninaTop">
+      <span className="avatarSm">N</span>
+      <div style={{flex: 1, minWidth: 0}}>
+        <b>Nina</b>
+        <small style={{display: "block"}}>AI Chief of Staff</small>
+      </div>
+      <span className={`statusPill${busy ? " busy" : ""}`}>{busy ? "đang nghĩ" : "sẵn sàng"}</span>
+    </div>
+
+    {!log.length && <div className="ninaBubble">
+      Chào bạn ✦ Tôi đọc được số liệu công ty và trả lời qua gateway OpenClaw.
+      Hỏi tự do cũng được — câu trả lời do model sinh ra, không phải câu mẫu.
+    </div>}
+
+    {log.map((line, i) =>
+      <div key={i} className="ninaBubble"
+           style={line.role === "me"
+             ? {background: "var(--accent-soft)", borderColor: "#dcd9fb"}
+             : undefined}>
+        {line.text}
+        {line.meta && <small style={{display: "block", marginTop: 6}}>{line.meta}</small>}
+      </div>)}
+
+    <div className="ninaChips">
+      {["Công ty đang có mấy dự án đang chạy?",
+        "Việc nào đang chờ phê duyệt?",
+        "Tóm tắt tình hình hôm nay trong ba câu."].map(q =>
+        <button key={q} onClick={() => send(q)} disabled={busy}>{q}</button>)}
+    </div>
+
+    <div className="ninaCompose">
+      <input value={question} placeholder="Hỏi Nina bất cứ điều gì…"
+             onChange={e => setQuestion(e.target.value)}
+             onKeyDown={e => e.key === "Enter" && send(question)}
+             disabled={busy}/>
+      <button onClick={() => send(question)} disabled={busy || !question.trim()}
+              title="Gửi câu hỏi tới model qua gateway">
+        <Icon name="arrow-right" size={16}/>
+      </button>
+    </div>
+  </div>;
 }

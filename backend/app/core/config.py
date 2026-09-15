@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     # http://127.0.0.1:3000 là KHÁC nhau, nên chỉ khai một cái thì mở UI bằng
     # địa chỉ còn lại sẽ bị chặn CORS mà không có thông báo nào ở phía server.
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
-    app_version: str = "1.25.0"
+    app_version: str = "1.26.0"
     openclaw_mode: str = "mock"  # mock | native | gateway (legacy guessed contract)
     openclaw_gateway_ws: str = "ws://127.0.0.1:18789"
     openclaw_gateway_http: str = ""  # defaults to the ws url with an http scheme

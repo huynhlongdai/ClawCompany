@@ -171,16 +171,41 @@ def test_chat_send_carries_idempotency_key_and_no_metadata():
     assert '"metadata": meta' not in src
 
 
-def test_idempotency_key_is_stable_for_the_same_task():
-    """Retry transport không được sinh hai lượt chạy cho cùng một task."""
+def test_idempotency_key_is_stable_per_send_not_per_task():
+    """Khoá idempotency phải ổn định theo NỘI DUNG, không theo task.
+
+    Bản đầu khoá theo task id (``clawcompany:{key}:task-{id}``). Nghe hợp lý,
+    nhưng đo với gateway thật thì lượt gửi THỨ HAI cho cùng task -- một chỉ
+    thị khác hẳn -- bị chặn:
+
+        INVALID_REQUEST: This message ID was already used for different input
+        (reason: chat-request-conflict)
+
+    Tức một agent chỉ nhận được đúng một tin nhắn trong cả đời task. Khoá đúng
+    phải dedupe *cùng một lần gửi* (retry transport) mà vẫn cho phép chỉ thị
+    mới, nên nó gồm vân tay nội dung.
+    """
+    import inspect
     import re
 
-    import inspect
-
     src = inspect.getsource(NativeOpenClawRuntime.run_agent)
-    # Khoá theo task id khi có; chỉ rơi về uuid khi không có task.
-    assert re.search(r'f"clawcompany:\{key\}:task-\{task_ref\}"', src)
-    assert "uuid.uuid4()" in src
+    assert "hashlib.sha256(input_text" in src, "khoá phải gồm vân tay nội dung"
+    assert re.search(r'task-\{task_ref\}:\{fingerprint\}', src)
+    # Và không được quay về dạng chỉ-theo-task.
+    assert not re.search(r'f"clawcompany:\{key\}:task-\{task_ref\}"\s*$', src, re.M)
+
+
+def test_idempotency_key_dedupes_identical_text():
+    """Cùng chữ -> cùng khoá; khác chữ -> khác khoá. Kiểm bằng cách tính lại."""
+    import hashlib
+
+    key = "agent:dev:company-task-5"
+    def build(text: str) -> str:
+        fp = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+        return f"clawcompany:{key}:task-5:{fp}"
+
+    assert build("Làm A") == build("Làm A")
+    assert build("Làm A") != build("Làm B")
 
 
 def test_approval_resolve_params_stay_closed():

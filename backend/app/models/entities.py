@@ -1,5 +1,5 @@
-from datetime import datetime
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Text, Float, Boolean
+from datetime import date, datetime
+from sqlalchemy import String, Integer, DateTime, Date, ForeignKey, Text, Float, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
@@ -72,6 +72,9 @@ class Project(Base, TimestampMixin, RevisionMixin):
     owner_member_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="planning")
     progress: Mapped[int] = mapped_column(Integer, default=0)
+    # v36: hạn chót. Nullable vì phần lớn dự án cũ không có hạn, và "chưa đặt
+    # hạn" là một câu trả lời hợp lệ — khác hẳn với một ngày mặc định nào đó.
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
 class Task(Base, TimestampMixin, RevisionMixin):
     __tablename__ = "tasks"

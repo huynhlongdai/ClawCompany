@@ -183,3 +183,82 @@ của 159 bảng.
 
 Bốn món đầu là **một migration v36** (4 bảng/cột + endpoint). Món cuối chỉ cần
 một API key. Không có món nào là vấn đề giao diện.
+
+---
+
+# Vòng bốn: v36 — bốn bảng, và Nina trả lời thật
+
+## Nối model cho gateway
+
+Provider tuỳ chỉnh CometAPI (OpenAI-compatible) khai trong
+`~/.openclaw/openclaw.json`; **key không nằm trong config file mà đọc từ
+`/agent/.cometapi_key` qua SecretRef `{source: "file"}`** — config vẫn là một
+file phẳng trên đĩa, còn key thì ở chỗ khác với quyền 600.
+
+Điều đo được:
+
+| Phép thử | Kết quả |
+| --- | --- |
+| `agent model` lúc gateway khởi động | `cometapi/gpt-4o-mini` |
+| Chat đơn giản qua `chat.send` | model trả lời "OK." |
+| Dispatch company task #5 qua API | agent trả lời về đúng task, **có tool use** (tạo goal với ID) |
+| `POST /api/v36/nina/ask` | `answered: true`, Nina, 6,2 giây, trả lời tiếng Việt |
+
+Một chi tiết đáng ghi: model `claude-haiku-4-5` qua endpoint OpenAI-compat của
+CometAPI trả **400 "Operation not allowed"** khi payload có tool schema, còn
+`gpt-4o-mini` thì chạy. Câu chat trần thì cả hai đều được — nên nếu chỉ thử
+chat, ai cũng tưởng cấu hình đã xong.
+
+## Hai lỗi thật phát hiện nhờ chạy trọn luồng
+
+1. **`POST /api/v20/tasks/{id}/follow` luôn 500.** `supervisor.follow()` gọi
+   `asyncio.create_task()`, nhưng endpoint khai `def` nên FastAPI chạy nó
+   trong threadpool — không có event loop. Cả tính năng "theo dõi phiên" mà
+   v20→v26 dựng lên (lease, takeover, reconcile, gap) không gọi được qua API
+   của chính nó. 16 test của v20 không thấy vì chúng gọi thẳng service trong
+   test asyncio. Sau khi sửa: `lease_backend: redis`, follower ghi event thật.
+2. **idempotencyKey khoá theo task nên chặn lượt gửi thứ hai.** Bản v35.1 dùng
+   `clawcompany:{key}:task-{id}`, cố định theo task, nên một chỉ thị KHÁC cho
+   cùng task bị gateway từ chối `chat-request-conflict` — agent chỉ nhận được
+   đúng một tin nhắn trong cả đời task. Nay khoá gồm vân tay sha256 nội dung.
+
+Cộng một lỗi trong chính code v36 tôi vừa viết: `ask_nina` scope agent bằng
+join qua `companies`, mà **Nina là ghế cấp holding nên `company_id` là NULL** —
+inner join lặng lẽ loại đúng cái ghế quan trọng nhất, rồi báo "không ghế nào
+khớp roster" trong khi ghế có thật. Cùng lớp lỗi với `live_channel` và
+`progress_autosync`, chỉ khác chiều: ở đó thiếu join, ở đây join quá nhiều.
+
+## Migration v36 (head `0016_v36_metrics_calendar`)
+
+| Thêm gì | Cho khối nào của mẫu | Nguồn dữ liệu |
+| --- | --- | --- |
+| `metric_samples` | biểu đồ "Doanh thu 6 tháng qua" | chốt số từ `analytics_metrics`; migration backfill đúng hai mốc |
+| `calendar_events` | "Lịch hôm nay" | người và agent tạo qua API |
+| `agent_daily_stats` | sparkline mỗi agent | **dẫn xuất** từ `usage_events` + `company_events`, không cho ghi tay |
+| `projects.due_date` | cột "Hạn chót" | người đặt, nullable |
+
+Chín endpoint `/api/v36/*`, mỗi endpoint đọc đều trả kèm lời thừa nhận về
+nguồn. Ví dụ `metric_history` trả `points_are_measurements: false` khi chuỗi
+còn là backfill — để không ai nhìn đường hai điểm mà tưởng là chuỗi đo liên
+tục sáu tháng.
+
+**14 test v36** kiểm bằng hành vi trên SQLite thật: snapshot hai lần trong
+cùng kỳ phải ghi đè (không nhân điểm), `success_rate` là NULL khi không có
+việc nào kết thúc ("không đo được" khác "0%"), event không mang
+`runtime_agent_id` thì không tính cho ai, dự án chưa đặt hạn không xuất hiện
+trong danh sách deadline, và không rò rỉ chéo tenant.
+
+Cũng sửa lỗi ghim version lần thứ ba (`test_v35_spend_push`) — cùng khuôn với
+v33 và v34.
+
+## UI đã nối
+
+- Rail: **"Lịch hôm nay" là lịch thật** từ `calendar_events`; khối event bus
+  đổi tên thành "Diễn biến hệ thống" cho đúng nội dung.
+- Panel Nina: **chat thật** qua `/api/v36/nina/ask`, có chip câu hỏi mẫu, hiện
+  agent/runtime/thời gian trả lời; không trả lời được thì nói đúng lý do.
+- Bảng dự án: cột **Hạn chót** sửa được tại chỗ, kèm "còn N ngày" / "quá hạn".
+- Báo cáo: **đường lịch sử chỉ số** vẽ từ `metric_samples`, nút "Chốt số kỳ
+  này", và dòng ghi rõ số mẫu cùng nguồn.
+
+655 test passed · `next build` xanh · 0 lỗi console.

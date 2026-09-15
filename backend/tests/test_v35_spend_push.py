@@ -580,8 +580,20 @@ def test_v35_is_wired_into_main():
 
 
 def test_service_version_bumped():
-    assert 'app_version: str = "1.25.0"' in _source("app/core/config.py")
-    assert '"1.25.0"' in _source("app/main.py")
+    """v35 cần service >= 1.25.0, và main.py phải nói cùng con số với config.
+
+    Không ghim đúng "1.25.0": mọi lần bump version sau đó sẽ làm test này đỏ,
+    và một test đỏ vì lý do đó thì chưa từng được chạy. Đây là lần thứ ba cùng
+    khuôn lỗi trong repo này (v33, v34, rồi v35).
+    """
+    import re
+
+    src = _source("app/core/config.py")
+    match = re.search(r'app_version:\s*str\s*=\s*"([0-9]+(?:\.[0-9]+)*)"', src)
+    assert match, "không tìm thấy app_version trong app/core/config.py"
+    version = tuple(int(x) for x in match.group(1).split("."))
+    assert version >= (1, 25, 0), f"v35 cần service >= 1.25.0, đang là {version}"
+    assert f'"{match.group(1)}"' in _source("app/main.py")
 
 
 def test_bridge_contracts_cover_every_v35_endpoint():

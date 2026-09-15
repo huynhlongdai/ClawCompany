@@ -65,8 +65,21 @@ def list_streams(principal: Principal = Depends(require_scope(READ))):
 
 
 @router.post("/tasks/{task_id}/follow")
-def follow_task(task_id: int, payload: FollowIn, principal: Principal = Depends(writer("member")),
-                db: Session = Depends(get_db)):
+async def follow_task(task_id: int, payload: FollowIn, principal: Principal = Depends(writer("member")),
+                      db: Session = Depends(get_db)):
+    """Bắt đầu theo dõi một phiên.
+
+    Phải là ``async def``: ``supervisor.follow()`` gọi
+    ``asyncio.create_task()``, và FastAPI chạy endpoint ĐỒNG BỘ trong
+    threadpool — nơi không có event loop nào đang chạy. Bản trước là ``def``,
+    nên endpoint này LUÔN trả 500 ``RuntimeError: no running event loop``, tức
+    cả tính năng "theo dõi phiên" mà v20 đến v26 dựng lên không thể gọi được
+    qua API của chính nó. 16 test của v20 không thấy vì chúng gọi thẳng
+    service bên trong một test asyncio, không đi qua endpoint.
+
+    Cùng file, ``move_task`` vốn đã là ``async def`` nên đường auto-dispatch
+    không bị lỗi này — đó là lý do lỗi sống sót lâu.
+    """
     task = ensure_task(db, task_id, principal)
     session_key = payload.session_key or task.runtime_session_key
     if not session_key:
