@@ -128,3 +128,58 @@ vừa mất một lượt tiếp nhận chỉ để tìm ra những chỗ tài l
 
 `next build` xanh 51 route · `tsc` sạch · 0 lỗi console trên 7 trang · ảnh
 chụp ở `_reports/ui/new-*.png`.
+
+---
+
+# Vòng ba: đi sát mẫu hơn nữa, và chốt lại chỗ nào không thể 100%
+
+Người dùng hỏi thẳng: sao không làm đúng mẫu 100%. Câu trả lời sau khi rà lại
+toàn bộ 159 bảng — **tôi đã sai một chỗ quan trọng ở vòng hai**.
+
+## Tôi đã sai: doanh thu CÓ THẬT
+
+Vòng hai tôi bỏ ô "Doanh thu (tháng) $42,380 +12%" vì nghĩ không có thực thể
+doanh thu. Rà lại thì có: bảng `analytics_metrics` lưu `metric_key`,
+`current_value`, `previous_value`, `target_value`, `unit` — tức **đúng mẫu
+"KPI kèm delta"** mà bản thiết kế vẽ. Dữ liệu seed đang có:
+
+| metric_key | hiện tại | kỳ trước | mục tiêu |
+| --- | --- | --- | --- |
+| `revenue` | 1.240.000 USD | 1.070.000 | 1.300.000 |
+| `task_success` | 94,7% | 92,6 | 95,0 |
+
+Nên delta **+15,9%** trên Trang chủ là số tính từ dữ liệu, không phải chữ
+trang trí. Bài học: đừng tuyên bố "hệ thống không có X" khi mới đọc một phần
+của 159 bảng.
+
+## Đã bổ sung trong vòng này
+
+- **Sidebar đúng mẫu**: danh sách phẳng (Trang chủ → Vận hành tổ chức), số đếm
+  thật, khối người dùng ở chân (tên lấy từ `/api/auth/me`, nút đăng xuất), ba
+  icon chân trang. 40 console hạ tầng dồn vào nhóm "Hệ thống" thu gọn — bỏ
+  hẳn thì giống ảnh nhưng mất đường vào những trang đang chạy được.
+- **Dải 5 KPI một hàng** có delta, ô đầu là doanh thu thật.
+- **Ba trang mẫu có mà app chưa có**, tất cả nối API thật:
+  - `/app/customers` — khách hàng, ghế đã bán, chi phí AI theo khách
+    (`/api/customers`, `/api/usage/customers/{id}/summary`).
+  - `/app/reports` — chỉ số có trị hiện tại/kỳ trước/mục tiêu và báo cáo đã
+    sinh (`/api/analytics`, `/api/reports`).
+  - `/app/marketplace` — mẫu công ty/nhân sự, nút "Cài đặt" gọi thật
+    `/api/company-factory/install`; template không phải loại `company` thì v8
+    chưa có luồng cài nên nút bị khoá thay vì bấm vào không có gì xảy ra.
+- **`/app/agents/[id]`** — trang chi tiết agent: hồ sơ, nhiệm vụ đang giữ, chi
+  phí 30 ngày, kỹ năng, và **trạng thái runtime từ v33** (hiện đúng phiên mồ
+  côi: "1 — không worker nào theo dõi", kèm session key và lease).
+
+## Còn đúng bốn chỗ không thể 100% — và lý do là backend, không phải CSS
+
+| Mẫu vẽ | Bảng cần | Hiện trạng |
+| --- | --- | --- |
+| Biểu đồ "Doanh thu 6 tháng qua" | chuỗi thời gian theo tháng | `analytics_metrics` chỉ lưu **hai** mốc → vẽ 6 điểm là bịa 4 điểm. Đang hiện cột so sánh hai mốc + vạch mục tiêu. |
+| Cột "Hạn chót" trên bảng dự án | `projects.due_date` | không có cột này. Cần migration. |
+| "Lịch hôm nay" với các buổi họp | thực thể lịch/cuộc họp | không có bảng nào. Cần migration. |
+| Sparkline "tỉ lệ thành công 30 ngày" mỗi agent | lịch sử success_rate | chỉ có một con số hiện tại. Cần bảng lịch sử. |
+| Chat Nina trả lời được | credential model cho gateway | gateway chạy thật nhưng chưa có key. |
+
+Bốn món đầu là **một migration v36** (4 bảng/cột + endpoint). Món cuối chỉ cần
+một API key. Không có món nào là vấn đề giao diện.

@@ -4,46 +4,69 @@ import {usePathname, useSearchParams} from "next/navigation";
 import {ReactNode, Suspense, useEffect, useState} from "react";
 import {Icon, IconName} from "./Icon";
 import {LogoLockup} from "./Logo";
-import {apiV17} from "../lib/api";
+import {api, apiV17} from "../lib/api";
+import {logout} from "../lib/auth";
 
 /* Vỏ ứng dụng — dựng theo mockup người dùng gửi.
-   Khác bản trước: topbar có ô tìm kiếm ⌘K + nút "Tạo mới" + chuông + đồng hồ,
-   và có thể nhận thêm một cột phải (rail) cho "Nhiệm vụ của bạn" / Nina.
-   Trang nào không truyền rail thì vẫn là hai cột như cũ. */
+
+   Sidebar là danh sách phẳng đúng như mẫu (Trang chủ → Cài đặt), có số đếm
+   thật, rồi tới khối người dùng và ba icon chân trang.
+
+   Một chỗ cố tình khác mẫu: mẫu không có nhóm "Hệ thống", nhưng dự án này có
+   40 console hạ tầng thật (OpenClaw, live runs, SRE, trust, telemetry...).
+   Bỏ chúng khỏi nav để giống mẫu 100% thì đúng ảnh nhưng mất đường vào những
+   trang đang chạy được. Nên chúng nằm trong một nhóm thu gọn ở dưới. */
 
 type NavItem = {icon: IconName; label: string; href: string; countKey?: string};
 
-const GROUPS: [string, NavItem[]][] = [
-  ["Tổ chức", [
-    {icon: "home", label: "Trang chủ", href: "/app/os"},
-    {icon: "building", label: "Công ty", href: "/app/os?tab=companies", countKey: "companies"},
-    {icon: "users", label: "Nhân sự", href: "/app/os?tab=people", countKey: "members"},
-    {icon: "sparkle", label: "AI Agents", href: "/app/os?tab=agents", countKey: "agents"},
-  ]],
-  ["Vận hành", [
-    {icon: "board", label: "Dự án", href: "/app/os?tab=projects"},
-    {icon: "check", label: "Nhiệm vụ", href: "/app/os?tab=tasks"},
-    {icon: "book", label: "Kiến thức", href: "/app/os?tab=knowledge"},
-    {icon: "pencil", label: "Vận hành tổ chức", href: "/app/workspace-ops"},
-  ]],
-  ["Phối hợp agent", [
-    {icon: "room", label: "Collaboration Fabric", href: "/app/collaboration"},
-    {icon: "mesh", label: "Knowledge Mesh", href: "/app/knowledge-mesh"},
-    {icon: "crown", label: "Nina SRE Control", href: "/app/sre-control"},
-    {icon: "gear", label: "Lõi OpenClaw", href: "/app/openclaw"},
-    {icon: "pulse", label: "Phiên đang chạy", href: "/app/live-runs"},
-  ]],
+/* Danh sách chính — đúng thứ tự trong mẫu. */
+const MAIN: NavItem[] = [
+  {icon: "home", label: "Trang chủ", href: "/app/os"},
+  {icon: "building", label: "Công ty", href: "/app/os?tab=companies", countKey: "companies"},
+  {icon: "sparkle", label: "AI Agents", href: "/app/os?tab=agents", countKey: "agents"},
+  {icon: "users", label: "Nhân sự", href: "/app/os?tab=people", countKey: "members"},
+  {icon: "board", label: "Dự án", href: "/app/os?tab=projects"},
+  {icon: "check", label: "Nhiệm vụ", href: "/app/os?tab=tasks"},
+  {icon: "book", label: "Kiến thức", href: "/app/os?tab=knowledge"},
+  {icon: "users", label: "Khách hàng", href: "/app/customers"},
+  {icon: "chart", label: "Báo cáo", href: "/app/reports"},
+  {icon: "gear", label: "Tự động hoá", href: "/app/workflows"},
+  {icon: "doc", label: "Marketplace", href: "/app/marketplace"},
+  {icon: "pencil", label: "Vận hành tổ chức", href: "/app/workspace-ops"},
 ];
 
-/* useSearchParams buộc Next bỏ prerender tĩnh nếu thiếu ranh giới Suspense
-   ("useSearchParams() should be wrapped in a suspense boundary" khi build),
-   nên phần đọc query param nằm riêng. */
-function NavGroups({currentTab}: {currentTab: string}) {
+/* Các console hạ tầng: có thật, đang chạy, nhưng không có trong mẫu. */
+const SYSTEM: NavItem[] = [
+  {icon: "room", label: "Collaboration Fabric", href: "/app/collaboration"},
+  {icon: "mesh", label: "Knowledge Mesh", href: "/app/knowledge-mesh"},
+  {icon: "crown", label: "Nina SRE Control", href: "/app/sre-control"},
+  {icon: "gear", label: "Lõi OpenClaw", href: "/app/openclaw"},
+  {icon: "pulse", label: "Phiên đang chạy", href: "/app/live-runs"},
+];
+
+function NavList({items, currentTab, counts}: {
+  items: NavItem[]; currentTab: string; counts: Record<string, number>;
+}) {
   const pathname = usePathname();
-  /* Mockup có số đếm cạnh Nhân sự (128) và AI Agents (86). Lấy số THẬT từ
-     /api/v17/workspace/overview thay vì ghim hằng số — một con số sai còn tệ
-     hơn không có số. Lỗi thì đơn giản là không hiện. */
+  return <nav>
+    {items.map(item => {
+      const [base, query = ""] = item.href.split("?");
+      const itemTab = query.startsWith("tab=") ? query.slice(4) : "";
+      const active = pathname === base && (base !== "/app/os" || itemTab === currentTab);
+      return <Link key={item.href} href={item.href} className={`v8Nav${active ? " active" : ""}`}>
+        <i><Icon name={item.icon}/></i>
+        <span>{item.label}</span>
+        {item.countKey && counts[item.countKey] !== undefined && <em>{counts[item.countKey]}</em>}
+      </Link>;
+    })}
+  </nav>;
+}
+
+function SideNav({currentTab}: {currentTab: string}) {
+  /* Số đếm trong mẫu (128, 86) lấy số THẬT từ overview. Một con số ghim cứng
+     sai còn tệ hơn không có số; lỗi thì đơn giản là không hiện. */
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [openSystem, setOpenSystem] = useState(false);
   useEffect(() => {
     let alive = true;
     apiV17.overview()
@@ -53,31 +76,27 @@ function NavGroups({currentTab}: {currentTab: string}) {
   }, []);
 
   return <>
-    {GROUPS.map(([label, items]) => <div key={label}>
-      <div className="v8NavLabel">{label}</div>
-      <nav>
-        {items.map(item => {
-          const [base, query = ""] = item.href.split("?");
-          const itemTab = query.startsWith("tab=") ? query.slice(4) : "";
-          const active = pathname === base && itemTab === currentTab;
-          return <Link key={item.href} href={item.href} className={`v8Nav${active ? " active" : ""}`}>
-            <i><Icon name={item.icon}/></i>
-            <span>{item.label}</span>
-            {item.countKey && counts[item.countKey] !== undefined && <em>{counts[item.countKey]}</em>}
-          </Link>;
-        })}
-      </nav>
-    </div>)}
+    <NavList items={MAIN} currentTab={currentTab} counts={counts}/>
+    <div>
+      <button className="v8Nav" onClick={() => setOpenSystem(v => !v)}
+              style={{justifyContent: "space-between"}}>
+        <span style={{display: "flex", alignItems: "center", gap: 10}}>
+          <i><Icon name="shield"/></i>
+          <span>Hệ thống</span>
+        </span>
+        <span style={{opacity: .6, fontSize: 11}}>{openSystem ? "−" : "+"}</span>
+      </button>
+      {openSystem && <NavList items={SYSTEM} currentTab={currentTab} counts={counts}/>}
+    </div>
   </>;
 }
 
-function NavGroupsWithTab() {
+function SideNavWithTab() {
   const params = useSearchParams();
-  return <NavGroups currentTab={params.get("tab") || ""}/>;
+  return <SideNav currentTab={params.get("tab") || ""}/>;
 }
 
-/* Đồng hồ trong mockup là ngày + giờ thật. Render phía client sau khi mount
-   để tránh lệch giữa HTML tĩnh và trình duyệt (hydration mismatch). */
+/* Ngày + giờ thật, render phía client sau mount để không lệch hydration. */
 function Clock() {
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
@@ -85,10 +104,30 @@ function Clock() {
     const timer = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(timer);
   }, []);
-  if (!now) return <div className="clockBox" style={{minWidth: 128}}/>;
+  if (!now) return <div className="clockBox" style={{minWidth: 150}}/>;
   return <div className="clockBox">
     <b>{now.toLocaleDateString("vi-VN", {weekday: "long", day: "numeric", month: "long", year: "numeric"})}</b>
     <span className="clockTime">{now.toLocaleTimeString("vi-VN", {hour: "2-digit", minute: "2-digit"})}</span>
+  </div>;
+}
+
+/* Khối người dùng ở chân sidebar, như mẫu: avatar, tên, vai trò, nút thoát. */
+function UserBlock() {
+  const [me, setMe] = useState<{display_name?: string; email?: string} | null>(null);
+  useEffect(() => {
+    let alive = true;
+    api.me().then((u: any) => { if (alive) setMe(u); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const name = me?.display_name || me?.email?.split("@")[0] || "—";
+  return <div className="userBlock">
+    <span className="avatarSm">{name.slice(0, 1).toUpperCase()}</span>
+    <div style={{minWidth: 0, flex: 1}}>
+      <b>{name}</b>
+      <small>Founder &amp; CEO</small>
+    </div>
+    <button className="userMore" title="Đăng xuất"
+            onClick={() => { logout(); location.reload(); }}>⋯</button>
   </div>;
 }
 
@@ -101,15 +140,16 @@ export function V17AppShell({title, subtitle, action, rail, children}: {
         <LogoLockup hole="#161a2b"/>
       </Link>
 
-      <Suspense fallback={<NavGroups currentTab=""/>}>
-        <NavGroupsWithTab/>
+      <Suspense fallback={<SideNav currentTab=""/>}>
+        <SideNavWithTab/>
       </Suspense>
 
-      <div className="v8SideFoot">
-        <span className="crown"><Icon name="crown" size={16}/></span>
-        <div>
-          <b>Nova Holding</b>
-          <small>Nina · AI Chief of Staff</small>
+      <div style={{marginTop: "auto", display: "grid", gap: 8}}>
+        <UserBlock/>
+        <div className="sideIcons">
+          <button title="Tìm kiếm"><Icon name="search" size={16}/></button>
+          <button title="Thông báo"><Icon name="bell" size={16}/></button>
+          <Link href="/app/workspace-ops" title="Cài đặt"><Icon name="gear" size={16}/></Link>
         </div>
       </div>
     </aside>
@@ -130,8 +170,6 @@ export function V17AppShell({title, subtitle, action, rail, children}: {
       </header>
 
       <div className="v8Content">
-        {/* Trang chủ dùng hero làm tiêu đề (như mockup), nên truyền title=""
-            để không có hai tiêu đề chồng nhau. */}
         {!!title && <div className="pageHeader">
           <div style={{minWidth: 0}}>
             <h2>{title}</h2>

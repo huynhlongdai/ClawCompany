@@ -1,7 +1,7 @@
 "use client";
 import {Suspense, useEffect, useMemo, useState} from "react";
 import {useRouter, useSearchParams} from "next/navigation";
-import {apiV10, apiV17} from "../lib/api";
+import {api, apiV10, apiV17} from "../lib/api";
 import {Icon, IconName} from "./Icon";
 import {NINA_PORTRAIT} from "./ninaPortrait";
 
@@ -17,18 +17,33 @@ const TABS: [Tab, string][] = [
   ["projects", "Dự án"], ["tasks", "Nhiệm vụ"], ["knowledge", "Kiến thức"],
 ];
 
-/* Số liệu chính đứng riêng thành dải 4 ô; phần còn lại là hàng phụ, vì một
-   dải 8 ô bằng nhau thì không nói được cái nào quan trọng. */
+/* Dải 5 ô một hàng, đúng như mẫu. Ô đầu là số tiền kèm phần trăm thay đổi —
+   và nó là THẬT: bảng analytics_metrics lưu current_value cùng
+   previous_value, nên delta tính được chứ không phải chữ trang trí. Bốn ô sau
+   là số đếm từ /api/v17/workspace/overview. */
 const PRIMARY: [string, string, IconName][] = [
-  ["companies", "Công ty", "building"],
   ["members", "Nhân sự", "users"],
   ["agents", "AI Agents", "sparkle"],
   ["projects_active", "Dự án đang chạy", "board"],
+  ["customers", "Khách hàng", "building"],
 ];
 const SECONDARY: [string, string][] = [
-  ["humans", "Người"], ["customers", "Khách hàng"],
+  ["companies", "Công ty"], ["humans", "Người"],
   ["approvals_pending", "Chờ phê duyệt"], ["knowledge_documents", "Tài liệu"],
 ];
+
+/* Định dạng tiền gọn: 1.240.000 USD -> $1.24M */
+function money(value: number, unit = "USD") {
+  const sign = unit === "USD" ? "$" : "";
+  if (Math.abs(value) >= 1_000_000) return `${sign}${(value / 1_000_000).toFixed(2)}M`;
+  if (Math.abs(value) >= 1_000) return `${sign}${(value / 1_000).toFixed(1)}K`;
+  return `${sign}${value.toLocaleString("vi-VN")}`;
+}
+
+function deltaOf(current: number, previous: number) {
+  if (!previous) return null;
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
 
 const COMPANY_HUES = ["pink", "blue", "violet", "green"];
 
@@ -127,6 +142,7 @@ function WorkspaceCockpitInner() {
   const [tasks, setTasks] = useState<Row[]>([]);
   const [docs, setDocs] = useState<Row[]>([]);
   const [events, setEvents] = useState<Row[]>([]);
+  const [metrics, setMetrics] = useState<Row[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -141,6 +157,9 @@ function WorkspaceCockpitInner() {
       setProjects(p || []); setTasks(t || []); setDocs(k || []);
       // Feed hoạt động là phụ: event bus lỗi thì trang vẫn phải dùng được.
       try { setEvents((await apiV10.events() as Row[] || []).slice(0, 8)); } catch { setEvents([]); }
+      // analytics_metrics: nguồn duy nhất có cả trị hiện tại và trị trước,
+      // tức nguồn duy nhất cho phép hiện delta mà không phải đoán.
+      try { setMetrics((await api.analytics() as Row[]) || []); } catch { setMetrics([]); }
     } catch (e: any) {
       setError(e?.message || "Không tải được dữ liệu workspace");
     } finally { setBusy(false); }
@@ -157,6 +176,10 @@ function WorkspaceCockpitInner() {
     const fromDepts = (company.departments || []).flatMap((d: Row) => d.members || []);
     return [...fromDepts, ...(company.unassigned_members || [])];
   }
+
+  const revenue = useMemo(
+    () => (metrics || []).find(m => m.metric_key === "revenue") || null, [metrics]);
+  const revenueDelta = revenue ? deltaOf(revenue.current_value, revenue.previous_value) : null;
 
   const totalMembers = useMemo(
     () => companies.reduce((sum, c) => sum + (c.members || 0) + (c.agents || 0), 0),
@@ -207,7 +230,15 @@ function WorkspaceCockpitInner() {
     </nav>
 
     {tab === "home" && <>
-      <section className="v14Metrics" style={{gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))"}}>
+      <section className="v14Metrics" style={{gridTemplateColumns: "repeat(auto-fit,minmax(178px,1fr))"}}>
+        {revenue && <div className="metric">
+          <div className="metricIcon"><Icon name="chart" size={16}/></div>
+          <label>Doanh thu{revenue.unit ? ` (${revenue.unit})` : ""}</label>
+          <strong>{money(revenue.current_value, revenue.unit)}</strong>
+          {revenueDelta !== null && <span className={`delta${revenueDelta < 0 ? " down" : ""}`}>
+            {revenueDelta >= 0 ? "▲" : "▼"} {Math.abs(revenueDelta).toFixed(1)}% so với kỳ trước
+          </span>}
+        </div>}
         {PRIMARY.map(([key, label, icon]) =>
           <div key={key} className="metric">
             <div className="metricIcon"><Icon name={icon} size={16}/></div>
@@ -337,7 +368,7 @@ function WorkspaceCockpitInner() {
               return <div key={m.id} className="agentLine">
                 <span className="avatarSm">{initials(m.name)}</span>
                 <div style={{minWidth: 0}}>
-                  <b>{m.name}</b>
+                  <b><a href={`/app/agents/${m.id}`}>{m.name}</a></b>
                   <small>{m.role || "—"}{m.agent?.model ? ` · ${m.agent.model}` : ""}</small>
                 </div>
                 <span className={`statusPill ${cls}`}>{label}</span>
@@ -408,7 +439,14 @@ function WorkspaceCockpitInner() {
               <td>
                 <div className="person">
                   <span className="avatarSm">{initials(m.name)}</span>
-                  <div><b>{m.name}</b><small>{m.member_type === "agent" ? "agent" : "người"}</small></div>
+                  <div>
+                    {/* Agent có trang chi tiết; người thì chưa, nên chỉ agent
+                        mới là liên kết — không tạo link dẫn tới trang trống. */}
+                    {m.member_type === "agent"
+                      ? <b><a href={`/app/agents/${m.id}`}>{m.name}</a></b>
+                      : <b>{m.name}</b>}
+                    <small>{m.member_type === "agent" ? "agent" : "người"}</small>
+                  </div>
                 </div>
               </td>
               <td>{m.role || "—"}</td>
