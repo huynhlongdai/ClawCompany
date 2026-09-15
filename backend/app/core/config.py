@@ -23,6 +23,27 @@ class Settings(BaseSettings):
     # v21: ask the gateway for operator.approvals so approvals can be answered
     # from ClawCompany. Off by default: it widens what this backend may do.
     openclaw_request_approvals_scope: bool = False
+    # WP-1.2: ask for operator.admin so the configuration screens can write.
+    # Off by default, and deliberately separate from the approvals flag: admin
+    # lets this backend reconfigure the operator's gateway (create/delete agent
+    # seats, patch openclaw.json). A deployment that only dispatches work must
+    # never hold it. Reads (config.get, config.schema, agents.list) need no
+    # admin scope, so the read-only half of the UI works without this.
+    openclaw_request_admin_scope: bool = False
+    # WP-1.2, đo được chứ không phỏng đoán: `config.schema` của một gateway
+    # 2026.9.4 vượt 1 MiB — mặc định `max_size` của thư viện websockets — nên
+    # lời gọi bị đóng với 1009 "message too big" và toàn bộ ý tưởng "sinh form
+    # từ schema sống" sập ngay bước đầu. Xem _reports/native-probe-agents.log.
+    # 16 MiB khớp với checkpoint tối đa mà upstream tự đặt cho compaction.
+    openclaw_max_frame_bytes: int = 16 * 1024 * 1024
+    # Múi giờ để tính những thứ theo **ngày lịch**: hạn chót dự án, lịch họp,
+    # "hôm nay có gì". Rỗng nghĩa là dùng giờ hệ thống của máy chạy API.
+    #
+    # Có field này vì một lỗi thật: `upcoming_deadlines` tính `days_left` theo
+    # `datetime.utcnow().date()`, nên trong 7 giờ mỗi ngày (00:00-07:00 giờ Việt
+    # Nam) nó lệch đúng một ngày — người dùng thấy "còn 15 ngày" khi thực tế còn
+    # 14. OpenClaw có `agents.defaults.userTimezone` cho cùng lý do.
+    app_timezone: str = ""
     # v23: verified against the upstream gateway docs ("Operator clients resolve
     # by calling exec.approval.resolve, requires operator.approvals"). This is
     # no longer a guess, so it ships with a default. Override it if your gateway

@@ -25,6 +25,31 @@ from app.models.extended import AnalyticsMetric
 from app.models.v7 import UsageEvent
 from app.models.v10 import CompanyEvent
 from app.models.v36 import AgentDailyStat, CalendarEvent, MetricSample
+from app.core.config import settings
+
+
+def local_today() -> date:
+    """Ngày lịch **theo múi giờ của người dùng**, không phải theo UTC.
+
+    Sửa một lỗi off-by-one thật, phát hiện lúc 06:00 giờ Việt Nam (WP-1.2):
+    ``upcoming_deadlines`` tính ``days_left`` bằng ``datetime.utcnow().date()``,
+    nên trong khoảng 00:00-07:00 giờ VN, UTC vẫn là **hôm qua**. Một dự án quá
+    hạn 3 ngày được báo là quá hạn 2 ngày. Lỗi chỉ xuất hiện 7 giờ mỗi ngày, tức
+    loại lỗi mà chạy test vào buổi chiều sẽ không bao giờ thấy.
+
+    ``settings.app_timezone`` rỗng thì dùng giờ hệ thống của máy chạy API —
+    đúng trong triển khai một vùng, và nói rõ giả định thay vì ẩn nó.
+    """
+    name = (settings.app_timezone or "").strip()
+    if not name:
+        return date.today()
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo(name)).date()
+    except Exception:
+        # Múi giờ cấu hình sai không được làm sập cả trang chủ; quay về giờ máy.
+        return date.today()
+
 
 # Quét có trần: một tổ chức nhiều năm dữ liệu không được làm sập một request.
 MAX_SAMPLES = 500
@@ -127,8 +152,21 @@ def calendar(db: Session, organization_id: int, *, day: date | None = None,
     Không có tích hợp Google/Outlook nào, nên ``synced_from_provider`` luôn là
     ``false``. Lịch trống nghĩa là chưa ai tạo mục nào — đó là sự thật, không
     phải lỗi tải dữ liệu.
+
+    **Quy ước thời gian, viết ra vì nó là chỗ dễ sai nhất.** Cột
+    ``calendar_events.starts_at`` là ``DateTime`` không mang múi giờ, và nó lưu
+    **giờ treo tường theo múi giờ của tổ chức**: người tạo mục "họp 9 giờ" thì
+    trong cột là 09:00. Vì vậy mốc đầu/cuối ngày ở đây cũng tính theo giờ treo
+    tường (:func:`local_today`), không phải theo UTC — trộn hai hệ là cách sinh
+    ra lỗi lệch một ngày.
+
+    Giới hạn còn lại, chưa sửa trong WP-1.2: ``snapshot_metrics`` vẫn đóng dấu
+    ``recorded_at`` theo UTC, nên với ``grain="day"`` khoá kỳ là ngày UTC. Đó là
+    *thời điểm đo*, không phải *ngày lịch của người dùng*, nên chấp nhận được —
+    nhưng nếu sau này có báo cáo "theo ngày" cho người đọc thì phải quy về cùng
+    một hệ trước khi so sánh hai con số.
     """
-    start_day = day or datetime.utcnow().date()
+    start_day = day or local_today()
     span = max(1, min(int(days or 1), 31))
     start = datetime.combine(start_day, datetime.min.time())
     end = start + timedelta(days=span)
@@ -344,7 +382,7 @@ def set_project_due_date(db: Session, project: Project, due: date | None) -> Pro
 def upcoming_deadlines(db: Session, organization_id: int, *, days: int = 30) -> dict:
     """Dự án có hạn trong khoảng tới, cộng dự án đã quá hạn."""
     span = max(1, min(int(days or 30), 365))
-    today = datetime.utcnow().date()
+    today = local_today()
     horizon = today + timedelta(days=span)
 
     rows = list(db.execute(

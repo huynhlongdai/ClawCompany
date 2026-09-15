@@ -66,9 +66,30 @@ def test_session_keys_follow_upstream_shape():
 def test_legacy_contract_map_covers_every_invented_method():
     invented = {"agents.create", "agents.run", "runs.cancel", "gateway.status", "runs.subscribe"}
     assert invented == set(ocp.LEGACY_CONTRACT_MAP)
-    # agents.create has no upstream equivalent; everything else must map to one.
-    assert ocp.LEGACY_CONTRACT_MAP["agents.create"]["upstream"] is None
     assert ocp.LEGACY_CONTRACT_MAP["agents.run"]["upstream"].endswith(ocp.M_CHAT_SEND)
+
+
+def test_agents_create_is_a_real_upstream_method():
+    """WP-1.1: sửa một assertion đang ghim đúng niềm tin sai.
+
+    Assertion cũ ở đây là ``LEGACY_CONTRACT_MAP["agents.create"]["upstream"] is
+    None``, tức nó *canh giữ* mệnh đề "OpenClaw không có RPC tạo agent". Mệnh đề
+    đó sai với 2026.9.4: ``docs/gateway/protocol/rpc-talk-config-and-agents.md``
+    ghi "agents.create, agents.update, and agents.delete manage agent records and
+    workspace wiring".
+
+    Đây là **lỗi code, không phải lỗi test** — nhưng test cũ khiến việc sửa code
+    làm suite đỏ, nên nó đã góp phần giữ lỗi sống sót. Cùng dạng với lỗi
+    ``live_channel`` mà lượt tiếp nhận đã gặp: test grep/ghim niềm tin thay vì
+    kiểm hành vi thì nó bảo tồn lỗi.
+    """
+    entry = ocp.LEGACY_CONTRACT_MAP["agents.create"]
+    assert entry["upstream"] == ocp.M_AGENTS_CREATE == "agents.create"
+    # Vết sửa phải đọc được, để người sau biết niềm tin nào vừa bị thay.
+    assert entry["previous_claim"] == "no upstream equivalent"
+    assert entry["corrected_on"] == "2026-09-16"
+    # Còn agents.run thì vẫn không có thật — đừng "sửa" quá tay.
+    assert not any(m == "agents.run" for m in ocp.METHOD_SCOPES)
 
 
 def test_company_scopes_stay_narrow():

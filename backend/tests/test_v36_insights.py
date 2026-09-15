@@ -115,7 +115,12 @@ def test_history_is_scoped_to_one_organization(db, org):
 
 def test_calendar_returns_only_the_requested_day(db, org):
     organization, company = org
-    today = datetime.utcnow().replace(hour=9, minute=0, second=0, microsecond=0)
+    # WP-1.2: dùng giờ **địa phương**, không phải utcnow(). `starts_at` lưu giờ
+    # treo tường của tổ chức (người tạo "họp 9 giờ" thì cột là 09:00), nên một
+    # test lấy utcnow() làm "bây giờ" sẽ hỏng đúng 7 giờ mỗi ngày ở UTC+7 —
+    # utcnow() lúc đó vẫn là hôm qua. Bản cũ chạy xanh chỉ vì chưa ai chạy nó
+    # vào sáng sớm.
+    today = datetime.now().replace(hour=9, minute=0, second=0, microsecond=0)
     v36.create_calendar_event(db, organization.id, title="Họp hôm nay",
                               starts_at=today, company_id=company.id)
     v36.create_calendar_event(db, organization.id, title="Họp tuần sau",
@@ -134,6 +139,51 @@ def test_calendar_rejects_end_before_start(db, org):
     with pytest.raises(ValueError):
         v36.create_calendar_event(db, organization.id, title="Sai giờ",
                                   starts_at=start, ends_at=start - timedelta(hours=1))
+
+
+def test_local_today_follows_the_configured_timezone(monkeypatch):
+    """Chứng minh chốt múi giờ có hiệu lực, không phụ thuộc giờ chạy test.
+
+    Lấy hai múi giờ cách nhau 26 tiếng: ở bất kỳ thời điểm nào trong năm, ngày
+    lịch của chúng cũng khác nhau. Nếu ``local_today`` bỏ qua cấu hình thì hai
+    lời gọi trả về cùng một ngày và test đỏ.
+    """
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "app_timezone", "Pacific/Kiritimati")   # UTC+14
+    east = v36.local_today()
+    monkeypatch.setattr(settings, "app_timezone", "Etc/GMT+12")           # UTC-12
+    west = v36.local_today()
+    assert east != west, "local_today phải đổi theo app_timezone"
+    assert (east - west).days == 1
+
+    # Múi giờ sai chính tả không được làm sập trang chủ.
+    monkeypatch.setattr(settings, "app_timezone", "Mars/Olympus_Mons")
+    assert v36.local_today() == date.today()
+
+
+def test_deadline_days_left_is_not_off_by_one_in_utc_plus_seven(db, org, monkeypatch):
+    """Chốt hồi quy cho đúng lỗi đã gặp lúc 06:00 giờ Việt Nam.
+
+    Trước WP-1.2, ``days_left`` tính theo ``utcnow().date()``. Với UTC+7 thì
+    trong 00:00-07:00 giờ địa phương, UTC còn là hôm qua, nên một dự án quá hạn
+    3 ngày được báo là 2. Test đặt thẳng múi giờ Việt Nam và so với ngày lịch
+    Việt Nam, nên nó đỏ nếu ai đó đổi lại về UTC.
+    """
+    from zoneinfo import ZoneInfo
+
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "app_timezone", "Asia/Ho_Chi_Minh")
+
+    organization, company = org
+    vn_today = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()
+    db.add(Project(company_id=company.id, name="Quá hạn ba ngày", status="active",
+                   progress=0, due_date=vn_today - timedelta(days=3)))
+    db.commit()
+
+    out = v36.upcoming_deadlines(db, organization.id, days=30)
+    assert out["projects"][0]["days_left"] == -3
+    assert out["projects"][0]["overdue"] is True
 
 
 def test_empty_calendar_is_an_answer_not_an_error(db, org):

@@ -19,7 +19,7 @@
 
 Không có phase này thì mọi màn hình cấu hình ở Phase 2 đều phải sửa file bằng tay.
 
-### WP-1.1 Sửa mệnh đề sai về `agents.*` và mở rộng danh mục RPC
+### WP-1.1 Sửa mệnh đề sai về `agents.*` và mở rộng danh mục RPC — ✅ XONG 2026-09-16
 
 - **Việc:** cập nhật `backend/app/runtime/openclaw_protocol.py`: bỏ khẳng định "There is no
   `agents.create`", thêm hằng số cho `agents.{list,create,update,delete}`,
@@ -31,8 +31,17 @@ Không có phase này thì mọi màn hình cấu hình ở Phase 2 đều phả
   lưu log vào `_reports/native-probe-agents.log`.
 - **Rủi ro:** scope. `agents.workspace.*` cần `operator.read`, `config.patch` cần
   `operator.admin` — nếu token hiện tại thiếu thì phát hiện ngay ở bước này.
+- **Kết quả đo được** (`_reports/native-probe-agents.log`): 8/8 method chỉ đọc
+  gọi được trên gateway 2026.9.4 thật, gồm `agents.list`, `config.get`,
+  `config.schema`, `models.list`, `tools.catalog`, `skills.status`,
+  `usage.cost`, `agent.identity.get`. Mệnh đề *"There is no agents.create"* đã
+  được thay, kèm `previous_claim` để đọc lại được vết sửa.
+- **Lỗi phát sinh, đã sửa:** `config.schema` trả **2.213.528 byte**, vượt hạn
+  mức frame mặc định 1 MiB của thư viện `websockets`, nên lời gọi chết với
+  `1009 message too big`. Thêm `settings.openclaw_max_frame_bytes` = 16 MiB.
+  Đây là loại lỗi chỉ lộ khi gọi thật.
 
-### WP-1.2 Config Registry service
+### WP-1.2 Config Registry service — ✅ XONG 2026-09-16
 
 - **Việc:** `backend/app/services/openclaw_config.py`: cache `config.schema`, đọc
   `reloadKind` theo path, ghi qua `config.patch` với `baseHash`, và **bắt buộc khai
@@ -44,6 +53,21 @@ Không có phase này thì mọi màn hình cấu hình ở Phase 2 đều phả
   chặn trước khi gửi.
 - **Bẫy đã biết:** rate limit `config.patch` là `30 per 60s`. Service phải gộp thay đổi, UI
   không gọi theo từng lần gõ.
+- **Kết quả đo được:** ghi thật `agents.entries.dev.identity.theme` →
+  `changedPaths: ["agents.entries.dev.identity.theme"]`, đọc lại `config.get`
+  khớp, rồi hoàn nguyên. Ghi lần hai bằng `baseHash` cũ bị gateway từ chối:
+  `INVALID_REQUEST — config changed since last load; re-run config.get and
+  retry`. **Optimistic concurrency có thật**, không phải lời hứa trong docs.
+- **Tin tốt cho Phase 2:** cả 8 path mà màn hình hồ sơ seat cần
+  (`agents.defaults.model`, `thinkingDefault`, `agents.entries`,
+  `sandbox.mode`, `heartbeat.every`, `compaction.enabled`, `tools.exec.mode`,
+  `mcp.servers`) đều là `reloadKind: "hot"` — sửa hồ sơ nhân sự AI **không cần
+  khởi động lại gateway**.
+- **Chốt đã dựng:** `replacePaths` bắt buộc khi patch làm mất phần tử mảng (chặn
+  tại chỗ, trước khi gửi); wildcard bị từ chối theo bản docs nghiêm hơn;
+  `allow_restart=False` mặc định; hạn mức ghi đếm theo từng method; `dry_run`
+  cho màn hình xem trước. 37 test hành vi, và ba chốt chính đã được kiểm bằng
+  mutation — bỏ chốt thì test đỏ.
 
 ### WP-1.3 Đóng cầu phê duyệt đầu-cuối
 

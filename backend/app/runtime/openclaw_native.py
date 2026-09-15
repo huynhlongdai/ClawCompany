@@ -57,11 +57,28 @@ class NativeOpenClawRuntime(AgentRuntime):
         return {"Authorization": f"Bearer {self.token}"} if self.token else None
 
     def scopes(self) -> list[str]:
-        """Narrow by default; approvals only when the operator opts in (v21)."""
+        """Narrow by default; approvals and admin only when the operator opts in.
+
+        v21 added the approvals opt-in. WP-1.2 adds the admin opt-in, kept as a
+        separate flag on purpose: answering an approval prompt and rewriting the
+        operator's ``openclaw.json`` are different powers, and a deployment that
+        only needs the first must not silently get the second.
+        """
         scopes = list(ocp.COMPANY_SCOPES)
         if settings.openclaw_request_approvals_scope and ocp.SCOPE_APPROVALS not in scopes:
             scopes.append(ocp.SCOPE_APPROVALS)
+        if settings.openclaw_request_admin_scope and ocp.SCOPE_ADMIN not in scopes:
+            scopes.append(ocp.SCOPE_ADMIN)
         return scopes
+
+    async def rpc(self, method: str, params: dict | None = None) -> dict[str, Any]:
+        """Public passthrough for methods outside the AgentRuntime interface.
+
+        WP-1.2 needs ``config.*`` and ``agents.*``, which are control-plane
+        calls rather than "run an agent" calls, so they do not belong on the
+        ``AgentRuntime`` ABC. This keeps callers out of ``_rpc``.
+        """
+        return await self._rpc(method, params)
 
     def _request_frame(self, method: str, params: dict | None = None,
                        request_id: str | None = None) -> dict[str, Any]:
@@ -171,7 +188,8 @@ class NativeOpenClawRuntime(AgentRuntime):
 
     async def _rpc(self, method: str, params: dict | None = None) -> dict[str, Any]:
         request_id = str(uuid.uuid4())
-        async with websockets.connect(self.url, additional_headers=self._headers()) as ws:
+        async with websockets.connect(self.url, additional_headers=self._headers(),
+                                      max_size=settings.openclaw_max_frame_bytes) as ws:
             await self._handshake(ws)
             await ws.send(json.dumps(self._request_frame(method, params, request_id)))
             while True:
@@ -286,7 +304,8 @@ class NativeOpenClawRuntime(AgentRuntime):
                 "stream_run needs a session key; OpenClaw subscriptions are per session, not per run"
             )
         request_id = str(uuid.uuid4())
-        async with websockets.connect(self.url, additional_headers=self._headers()) as ws:
+        async with websockets.connect(self.url, additional_headers=self._headers(),
+                                      max_size=settings.openclaw_max_frame_bytes) as ws:
             await self._handshake(ws)
             await ws.send(
                 # v35.1: tham số là ``key``, không phải ``sessionKey``.

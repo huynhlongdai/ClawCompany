@@ -8,6 +8,9 @@ python-multipart==0.0.20
 httpx==0.28.1
 websockets==14.1
 pytest==8.3.4
+# WP-1.2: thiếu gói này thì pytest **bỏ qua im lặng** mọi test async
+# (22 test của Config Registry), và suite vẫn báo xanh.
+pytest-asyncio==0.25.3
 python-jose[cryptography]==3.3.0
 bcrypt==4.2.1
 alembic==1.14.0

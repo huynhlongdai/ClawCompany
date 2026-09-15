@@ -7,6 +7,8 @@ Nguồn sự thật về hiện trạng dự án. README kể lịch sử v4→v
 - Nguồn: `clawcompany_v35_spend_push.zip` (459 file, không có `.git`)
 - Repo: `https://github.com/huynhlongdai/ClawCompany`
 - Service version: `1.26.0` · Migration head: `0016_v36_metrics_calendar`
+- Lượt gần nhất: **WP-1.1 + WP-1.2 đã xong** (2026-09-16) — bề mặt điều khiển
+  OpenClaw đã mở, xem `docs/BUILD_PLAN.md`
 
 ---
 
@@ -130,7 +132,9 @@ npm install && npx next build
 
 | Hạng mục | Trạng thái | Bằng chứng |
 | --- | --- | --- |
-| Test suite | **640 passed · 0 failed · 1 skipped** | `_reports/pytest-after-repair.log` |
+| Test suite | **695 passed · 0 failed · 1 skipped** | `pytest -q`, 2026-09-16 |
+| Bề mặt điều khiển gateway | **8/8 method đọc gọi được**, ghi config thật OK | `_reports/native-probe-agents.log` |
+| Optimistic concurrency của config | **gateway từ chối baseHash cũ** | cùng log trên |
 | Smoke 236 endpoint trên bản chạy thật | **236/236 OK** | `_reports/smoke.txt` |
 | Đường dây OpenClaw đầu-cuối qua API | **15/15 bước OK** | `_reports/e2e-openclaw.txt` |
 | Lần chạy đầu tiên | 582 passed · 37 failed | `_reports/pytest-first-run.log` |
@@ -293,7 +297,10 @@ chứng minh file compose đúng.
   nghĩa xong và cách kiểm chứng. Đường tới hạn:
   `WP-1.1 → WP-1.2 → WP-2.1/2.2 → WP-3.1 → WP-4.1`.
 
-Một mệnh đề sai đã được phát hiện và cần sửa trong code (gói WP-1.1):
+**Đã làm xong WP-1.1 + WP-1.2** (2026-09-16), nên đoạn dưới đây giữ lại làm
+lịch sử của quyết định:
+
+Một mệnh đề sai đã được phát hiện và **đã sửa** (gói WP-1.1):
 `runtime/openclaw_protocol.py` khẳng định *"There is no `agents.create`"*, nhưng
 2026.9.4 có thật `agents.create/update/delete`, `agents.files.get/set` (kèm
 `expectedHash` CAS), `agents.workspace.get`, và `config.patch/schema.lookup`.

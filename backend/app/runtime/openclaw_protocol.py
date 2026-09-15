@@ -9,15 +9,34 @@ The most important upstream facts, because they shape the adapter:
 
 * The Gateway is a WebSocket control plane on port 18789 by default. Clients
   declare a **role** and **scopes** in a connect frame during handshake.
-* There is no ``agents.create`` / ``agents.run`` RPC pair. Agents are config
-  entries (``agents.entries.<id>``) created by the operator via
-  ``openclaw agents add``. Work is driven through **sessions**:
+* There is no ``agents.run`` RPC. Work is driven through **sessions**:
   ``sessions.create`` then ``chat.send``, aborted with ``chat.abort`` /
   ``sessions.abort``, observed with ``sessions.messages.subscribe``.
+* ``agents.create`` **does exist** (see WP-1.1 below). Until 2026-09-16 this
+  module claimed the opposite, which is why every ClawCompany provisioning
+  path assumed a human had to run ``openclaw agents add`` by hand.
 * The canonical main session key for an agent is ``agent:<agentId>:main``.
 * The same port also serves ``POST /tools/invoke`` for invoking a single tool
   without a full agent turn. Bearer auth there is **full operator access**,
   and a hard deny list blocks the RCE-shaped tools.
+
+WP-1.1 (2026-09-16) — correcting a false claim that shaped the whole backend
+-----------------------------------------------------------------------------
+
+This module used to state: *"There is no ``agents.create`` / ``agents.run`` RPC
+pair."* The second half is right; the first half is **wrong** for OpenClaw
+2026.9.4, and it cost the project a feature. Verified against the docs shipped
+inside the package (``openclaw@2026.9.4``, ``docs/gateway/protocol/
+rpc-talk-config-and-agents.md``, section "Agent and workspace helpers"):
+
+    "``agents.create``, ``agents.update``, and ``agents.delete`` manage agent
+    records and workspace wiring."
+
+So a seat can be created, reconfigured and retired **over the wire**. Combined
+with ``config.patch`` and ``agents.files.set``, everything an operator would
+otherwise hand-edit in ``openclaw.json`` is reachable from a ClawCompany
+screen. Each constant below names the doc file that proves it exists; the probe
+log in ``_reports/native-probe-agents.log`` shows the ones we called for real.
 """
 
 from __future__ import annotations
@@ -56,6 +75,16 @@ COMPANY_SCOPES = ("operator.read", "operator.write")
 # this backend answer approval prompts on their behalf.
 SCOPE_APPROVALS = "operator.approvals"
 
+SCOPE_READ = "operator.read"
+SCOPE_WRITE = "operator.write"
+# WP-1.1: config writes and agent lifecycle need admin. COMPANY_SCOPES stays
+# narrow on purpose, so a deployment that wants the configuration screens has
+# to opt in — see CONFIG_SCOPES and settings.openclaw_admin_scope.
+SCOPE_ADMIN = "operator.admin"
+
+# Scopes required by the configuration/provisioning surface (WP-1.2).
+CONFIG_SCOPES = (SCOPE_READ, SCOPE_WRITE, SCOPE_ADMIN)
+
 
 # --- RPC methods we actually call ----------------------------------------
 
@@ -69,6 +98,94 @@ M_SESSIONS_MESSAGES_UNSUBSCRIBE = "sessions.messages.unsubscribe"
 M_CHAT_SEND = "chat.send"
 M_CHAT_ABORT = "chat.abort"
 M_CHAT_HISTORY = "chat.history"
+
+
+# --- WP-1.1: the control surface we had never opened ----------------------
+#
+# Source for this whole block: docs/gateway/protocol/rpc-talk-config-and-agents.md
+# ("Agent and workspace helpers" + the config bullets),
+# docs/gateway/configuration/config-rpc.md,
+# docs/gateway/protocol/operator-methods.md,
+# docs/gateway/protocol/rpc-system-and-channels.md.
+
+# Agent records. "agents.create, agents.update, and agents.delete manage agent
+# records and workspace wiring."
+M_AGENTS_LIST = "agents.list"
+M_AGENTS_CREATE = "agents.create"
+M_AGENTS_UPDATE = "agents.update"
+M_AGENTS_DELETE = "agents.delete"
+
+# Bootstrap workspace files — IDENTITY.md / SOUL.md / AGENTS.md / USER.md /
+# MEMORY.md. get/set return the content `hash` (SHA-256 hex of the on-disk
+# bytes); set takes an optional `expectedHash` for compare-and-set.
+M_AGENTS_FILES_LIST = "agents.files.list"
+M_AGENTS_FILES_GET = "agents.files.get"
+M_AGENTS_FILES_SET = "agents.files.set"
+
+# Read-only, paginated workspace browsing (operator.read). Workspace-relative
+# paths only; symlink/hardlink escapes rejected; no write methods exist here.
+# This is how ClawCompany reads DREAMS.md and memory/YYYY-MM-DD.md.
+M_AGENTS_WORKSPACE_LIST = "agents.workspace.list"
+M_AGENTS_WORKSPACE_GET = "agents.workspace.get"
+
+M_AGENT_IDENTITY_GET = "agent.identity.get"
+M_AGENT_WAIT = "agent.wait"
+
+# Config plane.
+M_CONFIG_GET = "config.get"
+M_CONFIG_SET = "config.set"
+M_CONFIG_PATCH = "config.patch"
+M_CONFIG_APPLY = "config.apply"
+M_CONFIG_SCHEMA = "config.schema"
+M_CONFIG_SCHEMA_LOOKUP = "config.schema.lookup"
+
+# Catalogues and money.
+M_MODELS_LIST = "models.list"
+M_USAGE_COST = "usage.cost"
+M_SESSIONS_USAGE = "sessions.usage"
+M_TOOLS_CATALOG = "tools.catalog"
+M_TOOLS_EFFECTIVE = "tools.effective"
+M_SKILLS_STATUS = "skills.status"
+
+# Scope needed per method, so a caller can fail fast with a real reason instead
+# of reading a bare authorization error. Only methods whose scope the docs state
+# explicitly are listed; absence here means "not documented", not "no scope".
+METHOD_SCOPES = {
+    M_AGENTS_WORKSPACE_LIST: SCOPE_READ,
+    M_AGENTS_WORKSPACE_GET: SCOPE_READ,
+    M_TOOLS_CATALOG: SCOPE_READ,
+    M_TOOLS_EFFECTIVE: SCOPE_READ,
+    M_SKILLS_STATUS: SCOPE_READ,
+}
+# exec.approval.resolve is added below, where its constant is defined.
+
+# Control-plane writes are rate limited: "30 requests per 60 seconds, per
+# method, per deviceId+clientIp" (config-rpc.md). A UI that patches on every
+# keystroke will be throttled, so the service coalesces instead.
+CONTROL_PLANE_WRITE_METHODS = frozenset({M_CONFIG_PATCH, M_CONFIG_APPLY, "update.run"})
+CONTROL_PLANE_RATE_LIMIT = (30, 60)   # (requests, seconds)
+
+# config.schema.lookup returns this for the requested path. "reloadKind is one
+# of restart, hot, or none (src/config/schema.ts)".
+RELOAD_RESTART = "restart"
+RELOAD_HOT = "hot"
+RELOAD_NONE = "none"
+RELOAD_KINDS = frozenset({RELOAD_RESTART, RELOAD_HOT, RELOAD_NONE})
+
+# agents.files.set refuses a stale write with INVALID_REQUEST whose
+# details.type is this, carrying details.currentHash to rebase against.
+ERR_AGENT_FILE_CONFLICT = "agent_file_conflict"
+
+# The bootstrap files an agent's identity is made of, in the order a reviewer
+# should read them.
+AGENT_BOOTSTRAP_FILES = ("IDENTITY.md", "SOUL.md", "AGENTS.md", "USER.md", "MEMORY.md")
+
+# Budgets from docs/gateway/config-agents/workspace-and-bootstrap.md. Exceeding
+# them truncates the file **silently** inside the prompt, so the UI must count
+# characters rather than discover the loss later.
+BOOTSTRAP_MAX_CHARS = 20_000          # agents.defaults.bootstrapMaxChars
+BOOTSTRAP_TOTAL_MAX_CHARS = 60_000    # agents.defaults.bootstrapTotalMaxChars
+USER_MD_MAX_CHARS = 4_000             # USER.md has its own, smaller budget
 
 
 # --- Event families we consume -------------------------------------------
@@ -91,6 +208,8 @@ APPROVAL_EVENTS = frozenset({E_SESSION_APPROVAL, E_EXEC_APPROVAL_REQUESTED, E_EX
 # to backfill requests that predate the connection.
 M_EXEC_APPROVAL_RESOLVE = "exec.approval.resolve"
 M_EXEC_APPROVAL_LIST = "exec.approval.list"
+
+METHOD_SCOPES[M_EXEC_APPROVAL_RESOLVE] = SCOPE_APPROVALS
 
 # The upstream decision vocabulary is three-valued, not a boolean.
 # allow-always mints a standing grant tied to the command's exact argv and cwd,
@@ -163,9 +282,15 @@ def agent_id_from_session_key(session_key: str) -> str | None:
 # so an operator can see exactly where ClawCompany's older assumptions were
 # wrong, instead of discovering it at runtime against a live gateway.
 LEGACY_CONTRACT_MAP = {
+    # WP-1.1 correction. This entry used to say upstream=None ("there is no
+    # create-agent RPC"), which was wrong and made seat provisioning a manual
+    # CLI step for the operator. The method exists; what does not exist is
+    # `agents.run`.
     "agents.create": {
-        "upstream": None,
-        "note": "OpenClaw agents are config entries (agents.entries.<id>), created by the operator with `openclaw agents add`. There is no create-agent RPC, so ClawCompany registers an agent seat by binding to an existing agentId.",
+        "upstream": M_AGENTS_CREATE,
+        "note": "Exists upstream: agents.create/update/delete 'manage agent records and workspace wiring' (docs/gateway/protocol/rpc-talk-config-and-agents.md). Creating a seat still writes a config entry (agents.entries.<id>) — the difference is that the Gateway does the write, so ClawCompany no longer needs an operator to run `openclaw agents add` by hand.",
+        "corrected_on": "2026-09-16",
+        "previous_claim": "no upstream equivalent",
     },
     "agents.run": {
         "upstream": f"{M_SESSIONS_CREATE} + {M_CHAT_SEND}",
@@ -192,4 +317,18 @@ PROTOCOL_NOTES = (
     "Session keys are agent-qualified: agent:<agentId>:main is the canonical main session.",
     "Multi-agent isolation is per agentId: separate workspace, agentDir and session store.",
     "Cross-agent delegation is governed upstream by tools.agentToAgent and agents.<id>.subagents.allowAgents.",
+    "Agent records, bootstrap files and config are writable over the wire: agents.create/update/delete, agents.files.set (expectedHash compare-and-set), config.patch (baseHash + replacePaths). No file editing on the host is required.",
+    "config.schema.lookup reports reloadKind (restart|hot|none) per path, so a UI can warn about a restart before the operator saves rather than after.",
+    "Control-plane writes (config.patch, config.apply, update.run) are rate limited to 30 per 60s per method per deviceId+clientIp.",
+)
+
+# Where the docs disagree with each other. Recording it here because picking the
+# wrong one silently destroys data.
+DOC_CONFLICTS = (
+    {
+        "topic": "replacePaths wildcards",
+        "a": "rpc-talk-config-and-agents.md: 'nested arrays under array entries use [] paths such as agents.entries.*.skills'",
+        "b": "config-rpc.md: 'Use exact record keys, such as agents.entries.main.skills. ... Parent paths and * wildcards do not authorize descendant arrays.'",
+        "resolution": "Follow (b), the stricter and more specific text: emit exact record keys. A wildcard that the gateway does not honour means the write is rejected — which is the safe failure — but believing (a) would make a UI promise an update it cannot perform.",
+    },
 )
