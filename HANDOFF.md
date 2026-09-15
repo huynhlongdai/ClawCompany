@@ -283,15 +283,37 @@ chứng minh file compose đúng.
 
 ## 8. Việc tiếp theo
 
+**Kế hoạch build đầy đủ nay nằm ở hai file, đọc chúng trước danh sách dưới đây:**
+
+- `docs/ARCHITECTURE_TREE.md` — cây module bốn tầng (L0 lõi runtime → L1 nhân sự
+  AI → L2 phòng ban → L3 công ty), chức năng và logic từng module, đối chiếu
+  ranh giới "OpenClaw lo gì / ClawCompany lo gì" dựa trên docs upstream
+  2026.9.4, kèm nhãn hiện trạng và mười góp ý kiến trúc.
+- `docs/BUILD_PLAN.md` — 6 phase, ~24 gói việc cỡ 1–3 buổi, mỗi gói có định
+  nghĩa xong và cách kiểm chứng. Đường tới hạn:
+  `WP-1.1 → WP-1.2 → WP-2.1/2.2 → WP-3.1 → WP-4.1`.
+
+Một mệnh đề sai đã được phát hiện và cần sửa trong code (gói WP-1.1):
+`runtime/openclaw_protocol.py` khẳng định *"There is no `agents.create`"*, nhưng
+2026.9.4 có thật `agents.create/update/delete`, `agents.files.get/set` (kèm
+`expectedHash` CAS), `agents.workspace.get`, và `config.patch/schema.lookup`.
+Nghĩa là **cấu hình agent làm được hoàn toàn từ UI qua gateway**, không phải sửa
+`openclaw.json` bằng tay — đây là nền cho toàn bộ màn hình hồ sơ nhân sự AI.
+
+Các việc còn nợ từ lượt trước, đã được gộp vào kế hoạch trên:
+
 1. Chạy thật bằng Docker: `docker compose up` + `alembic upgrade head` +
    `seed.py`, ghi lại kết quả. (Sandbox tiếp nhận không có Docker; dự kiến làm
-   trên một máy ảo boxd.sh.)
-3. Chạy trọn một task OpenClaw tới trạng thái kết thúc trên một gateway có
-   credential model, xác nhận `runtime_stream` ghi đúng event và task chuyển
-   trạng thái (`complete → review`, `error → blocked`).
-4. Thêm CI tối thiểu: pytest + `next build` trên mỗi push.
-5. Chỉ sau đó mới bàn tới v36 và luồng "nhập sơ đồ tổ chức thật → ánh xạ sang
-   seat agent".
+   trên một máy ảo boxd.sh.) → WP-6.3
+2. Chạy trọn một task OpenClaw tới trạng thái kết thúc, xác nhận
+   `runtime_stream` ghi đúng event và task chuyển trạng thái
+   (`complete → review`, `error → blocked`). → WP-4.3
+3. Thêm CI tối thiểu: pytest + `next build` trên mỗi push. → WP-5.3
+4. Đăng ký tool cho agent đọc dữ liệu công ty — nhưng **24 tool qua MCP
+   server**, không phải 192 tool: schema tool tính vào context window và
+   `skills.limits.maxSkillsPromptChars` mặc định là 18 000. → WP-3.1
+5. Luồng "nhập sơ đồ tổ chức thật → ánh xạ sang seat agent" đặt cuối vì nó cần
+   hồ sơ seat (Phase 2) và cầu tool (Phase 3) xong trước. → WP-6.4
 
 ## 9. Bản đồ tài liệu
 
@@ -299,6 +321,8 @@ chứng minh file compose đúng.
 | --- | --- |
 | `README.md` | lịch sử v4→v35, mỗi version tự khai giới hạn |
 | `HANDOFF.md` | file này — hiện trạng và việc tiếp theo |
+| `docs/ARCHITECTURE_TREE.md` | cây module 4 tầng, logic, ranh giới OpenClaw/ClawCompany |
+| `docs/BUILD_PLAN.md` | 6 phase, ~24 gói việc, định nghĩa xong và cách kiểm chứng |
 | `_reports/inventory.md` | kiểm kê endpoint/bảng/service/test/bridge (sinh tự động) |
 | `_reports/test-triage.md` | phân loại 37 failure của lần chạy đầu |
 | `_reports/openclaw-protocol-audit.md` | đối chiếu giao thức với upstream + kết quả đo |
