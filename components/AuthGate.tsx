@@ -2,6 +2,7 @@
 import {useEffect, useState} from "react";
 import {login, token} from "../lib/auth";
 import {Icon} from "./Icon";
+import {LogoLockup} from "./Logo";
 
 /* Cửa đăng nhập — màn hình đầu tiên ai cũng thấy, nên nó phải nói cùng ngôn
    ngữ với phần còn lại. Bản trước dùng inline style với gradient tím, không
@@ -34,13 +35,7 @@ export function AuthGate({children}: {children: React.ReactNode}) {
 
   return <div className="portalLogin">
     <div className="portalLoginCard">
-      <div className="portalBrand">
-        <span className="brandMark"/>
-        <div>
-          <b>ClawCompany</b>
-          <span>AI Organization OS</span>
-        </div>
-      </div>
+      <LogoLockup hole="#ffffff" dark={false}/>
 
       <h1>Đăng nhập</h1>
       <p>Công ty của bạn, vận hành cùng đội agent.</p>

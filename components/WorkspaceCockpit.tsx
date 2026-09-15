@@ -149,6 +149,14 @@ function WorkspaceCockpitInner() {
   const k = overview?.kpis || {};
   const companies: Row[] = overview?.companies || [];
   const orgName = overview?.organization?.name || "Workspace";
+  /* Thành viên theo công ty, lấy từ org-chart để vẽ chồng avatar. */
+  function membersOf(companyId: number): Row[] {
+    const company = (chart?.companies || []).find((c: Row) => c.id === companyId);
+    if (!company) return [];
+    const fromDepts = (company.departments || []).flatMap((d: Row) => d.members || []);
+    return [...fromDepts, ...(company.unassigned_members || [])];
+  }
+
   const totalMembers = useMemo(
     () => companies.reduce((sum, c) => sum + (c.members || 0) + (c.agents || 0), 0),
     [companies],
@@ -178,10 +186,14 @@ function WorkspaceCockpitInner() {
         </div>
       </div>
       <div className="heroArt" style={{textAlign: "center"}}>
-        <div className="portrait" style={{width: 168, height: 168}}/>
+        {/* Chân dung Nina: ảnh thật trong public/, không phải vòng gradient.
+            Mockup dùng một ảnh nhân vật lớn làm điểm nhìn của hero. */}
+        <img src="/nina.jpg" alt="Nina — AI Chief of Staff"
+             className="portrait" width={168} height={168}
+             style={{width: 168, height: 168}}/>
         <div style={{marginTop: 12}}>
           <b style={{display: "block", fontSize: 14}}>Nina</b>
-          <small>AI Chief of Staff</small>
+          <small>AI Chief of Staff · luôn ở cạnh bạn</small>
         </div>
       </div>
     </section>
@@ -238,7 +250,15 @@ function WorkspaceCockpitInner() {
                   </div>
                 </div>
                 <div className="companyMeta">
-                  <span>{c.members || 0} người · {c.agents || 0} agent</span>
+                  {/* Chồng avatar như mockup. Số trong vòng tròn là chữ đầu
+                      tên thành viên thật của công ty đó, lấy từ org-chart;
+                      không có thì hiện tổng số ghế. */}
+                  <span className="stack">
+                    {(membersOf(c.id).slice(0, 3)).map((m: Row) =>
+                      <i key={m.id} title={m.name}>{initials(m.name)}</i>)}
+                    {!membersOf(c.id).length && <i>·</i>}
+                    <em>{(c.members || 0) + (c.agents || 0)} ghế</em>
+                  </span>
                   <span>{c.projects || 0} dự án</span>
                 </div>
               </div>)}
@@ -299,23 +319,29 @@ function WorkspaceCockpitInner() {
 
         <div className="panel">
           <div className="panelHead">
-            <div><b>Hoạt động hôm nay</b></div>
-            <small>từ event bus</small>
+            <div><b>AI Agents</b></div>
+            <button className="v8Ghost" onClick={() => setTab("agents")}>Xem tất cả →</button>
           </div>
-          <div className="timeline">
-            {events.map(e =>
-              <div key={e.id} className="timeRow">
-                <span>{timeOf(e.occurred_at)}</span>
-                <div>
-                  <i/>
-                  <b>{EVENT_LABELS[e.event_type] || e.event_type}</b>
-                  <small>
-                    {e.source || "hệ thống"}
-                    {e.aggregate_type ? ` · ${e.aggregate_type}#${e.aggregate_id}` : ""}
-                  </small>
+          <div>
+            {agents.slice(0, 6).map(m => {
+              /* Trạng thái lấy từ lifecycle thật của runtime: active = đã bind
+                 và khớp gateway, detached = ghế mồ côi (v19 reconcile phát
+                 hiện). Mockup gọi là Online/Đang chạy/Bận — ở đây gọi đúng
+                 tên trạng thái mà hệ thống biết, không bịa "online". */
+              const life = m.agent?.lifecycle || "";
+              const cls = life === "active" ? "" : life === "detached" ? "busy" : "off";
+              const label = life === "active" ? "đã bind"
+                : life === "detached" ? "rời gateway" : "chưa bind";
+              return <div key={m.id} className="agentLine">
+                <span className="avatarSm">{initials(m.name)}</span>
+                <div style={{minWidth: 0}}>
+                  <b>{m.name}</b>
+                  <small>{m.role || "—"}{m.agent?.model ? ` · ${m.agent.model}` : ""}</small>
                 </div>
-              </div>)}
-            {!events.length && <div className="v8Empty">Chưa có hoạt động nào được ghi.</div>}
+                <span className={`statusPill ${cls}`}>{label}</span>
+              </div>;
+            })}
+            {!agents.length && <div className="v8Empty">Chưa có agent nào.</div>}
           </div>
         </div>
       </section>

@@ -72,3 +72,59 @@ không nói.
 - Command palette (`.overlay/.command`) đã có style nhưng chưa nối vào phím tắt.
 - Canvas còn Screen 03/04 (Collaboration Room, Knowledge Mesh) với bố cục ba
   cột riêng; hai trang đó hiện chỉ thừa hưởng style chung.
+
+---
+
+# Vòng hai: chuyển sang mockup indigo/pastel của người dùng
+
+Người dùng gửi một ảnh mockup dashboard và nói: thích **logo** trên đó, và
+muốn tham khảo UI. Ảnh đó khác canvas v17 ở hai điểm nền tảng:
+
+| | Canvas v17 | Mockup người dùng |
+| --- | --- | --- |
+| Bảng màu | giấy kem, mực ấm, terracotta | nền lavender nhạt, indigo `#5b5be6`, men pastel |
+| Bố cục | hai cột | **ba cột** — sidebar, nội dung, rail phải |
+| Chrome | header đơn giản | topbar có ô tìm kiếm ⌘K, nút "Tạo mới", chuông, đồng hồ |
+| Sidebar | nhãn nhóm | có **số đếm** cạnh mục |
+
+Người dùng xem cả hai và chọn hướng này, nên palette đổi theo. Việc đổi nằm
+gọn trong khối token + vài rule nền, nên 49 route vẫn đổi theo cùng lúc.
+
+## Logo
+
+`components/Logo.tsx` — dựng lại bằng **SVG**: khối "gem" bốn cạnh với hai góc
+đối diện vê mạnh, gradient xanh dương → tím, khoét lỗ lục giác giữa. Tham số
+`hole` nhận màu nền chỗ đặt logo, vì đây là lỗ thật chứ không phải hình tròn
+màu — nhờ vậy logo dùng được cả trên sidebar tối và thẻ trắng.
+
+## Đã dựng theo mockup
+
+- **Vỏ ba cột** (`.shell3`), rail 360px dính theo cuộn.
+- **Topbar**: ô tìm kiếm rộng có `⌘K`, nút "Tạo mới" gradient indigo, chuông
+  có dấu đỏ, ngày + giờ thật (render phía client để không lệch hydration).
+- **Rail phải** (`components/HomeRail.tsx`): "Nhiệm vụ của bạn" với ba pill tab
+  và nhãn ưu tiên Cao/Trung bình/Thấp, dòng diễn biến, panel Nina.
+- **Hero**: ảnh chân dung Nina thật (`public/nina.jpg`, sinh bằng
+  GenerateImage), tiêu đề sans đậm (mockup không dùng serif cho dòng này),
+  câu trích dẫn giữ serif để hero có nhịp biên tập.
+- **Ô icon pastel** cho KPI và từng dòng trong rail, phân biệt bằng men màu.
+- **Chồng avatar** trên thẻ công ty, chữ đầu tên thành viên thật từ org-chart.
+- **Danh sách AI Agents** có nhãn trạng thái runtime.
+- **Số đếm sidebar** lấy từ `/api/v17/workspace/overview`.
+
+## Ba chỗ mockup có mà hệ thống không có — xử lý bằng sự thật, không bịa
+
+| Mockup | Hệ thống | Cách làm |
+| --- | --- | --- |
+| "Doanh thu (tháng) $42,380 +12%" | không có thực thể doanh thu | bỏ ô này; KPI chỉ hiện số đo được |
+| "Lịch hôm nay" với 5 buổi họp | không có thực thể lịch | thay bằng **event bus thật**, kèm một dòng nói rõ vì sao |
+| Chat Nina trả lời được | gateway dev không có credential model | panel giữ nguyên, ô nhập **bị khoá kèm lý do**, chips điều hướng vẫn dùng được |
+| "Hạn chót 30/09/2026" trên bảng dự án | `projects` không có cột hạn | cột đó không tồn tại; thay bằng số việc done/total |
+
+Một dashboard bịa số thì đẹp ảnh nhưng vô dụng khi vận hành — và dự án này
+vừa mất một lượt tiếp nhận chỉ để tìm ra những chỗ tài liệu tự tin hơn thực tế.
+
+## Kiểm chứng vòng hai
+
+`next build` xanh 51 route · `tsc` sạch · 0 lỗi console trên 7 trang · ảnh
+chụp ở `_reports/ui/new-*.png`.
