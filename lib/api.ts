@@ -592,3 +592,31 @@ export const apiV36 = {
     request<any>(`/v36/projects/${projectId}/due-date`,
       {method: "POST", body: JSON.stringify({due_date: dueDate})}),
 };
+
+/* WP-2.1 + WP-2.2: hồ sơ nhân sự AI.
+
+   Một seat là ba nguồn phải khớp nhau — hàng trong Postgres, entry
+   `agents.entries.<id>` trong openclaw.json, và 5 file bootstrap trong
+   workspace. `seatProfile` gộp cả ba và nói rõ mỗi phần đến từ đâu.
+
+   Ghi thì tách hai đường, đúng như bản chất của dữ liệu:
+   - tab Hồ sơ/Tính cách/Công việc  -> writeSeatFile  (agents.files.set)
+   - tab Năng lực/Quyền/Hạn mức     -> writeSeatConfig (config.patch)
+
+   `expectedHash` là bắt buộc khi ghi file: thiếu nó thì server từ chối, và
+   nếu hash đã cũ thì trả 409 kèm `current_hash` để tải lại. */
+export const apiSeat = {
+  profile: (agentId: number) => request<any>(`/agents/${agentId}/profile`),
+  writeFile: (agentId: number, name: string, content: string,
+              expectedHash: string | null, force = false) =>
+    request<any>(`/agents/${agentId}/files/${encodeURIComponent(name)}`,
+      {method: "PUT",
+       body: JSON.stringify({content, expected_hash: expectedHash, force})}),
+  writeConfig: (agentId: number, tab: string, values: Record<string, unknown>,
+                opts: {baseHash?: string; allowRestart?: boolean; dryRun?: boolean} = {}) =>
+    request<any>(`/agents/${agentId}/config`,
+      {method: "PATCH",
+       body: JSON.stringify({tab, values, base_hash: opts.baseHash ?? null,
+                             allow_restart: !!opts.allowRestart,
+                             dry_run: !!opts.dryRun})}),
+};

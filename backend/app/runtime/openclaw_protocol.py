@@ -177,8 +177,30 @@ RELOAD_KINDS = frozenset({RELOAD_RESTART, RELOAD_HOT, RELOAD_NONE})
 ERR_AGENT_FILE_CONFLICT = "agent_file_conflict"
 
 # The bootstrap files an agent's identity is made of, in the order a reviewer
-# should read them.
+# should read them. Đo được trên gateway 2026.9.4 (WP-2.1), không chỉ đọc docs.
 AGENT_BOOTSTRAP_FILES = ("IDENTITY.md", "SOUL.md", "AGENTS.md", "USER.md", "MEMORY.md")
+
+# WP-2.1: `agents.files.list` và tập file `agents.files.get` đọc được **không
+# trùng nhau** trên cùng một gateway. Đã đo:
+#
+# * list trả 5 mục: AGENTS.md, SOUL.md, USER.md, BOOTSTRAP.md, MEMORY.md
+# * nhưng `get` với IDENTITY.md vẫn trả nội dung thật (1722 byte)
+# * còn DREAMS.md bị từ chối: `unsupported file "DREAMS.md"`
+#
+# Nên: đừng lấy `files.list` làm danh sách file có thể sửa — nó bỏ sót
+# IDENTITY.md. Và đừng mong đọc DREAMS.md qua namespace này; nó thuộc
+# `agents.workspace.get` (WP-2.4).
+AGENT_FILES_LIST_OMITS = ("IDENTITY.md",)
+AGENT_FILES_UNSUPPORTED = ("DREAMS.md",)
+
+# Đường dẫn vượt ra ngoài workspace bị chặn: `agents.files.get` với
+# "../../etc/passwd" trả `unsupported file`. Tức namespace này là allowlist
+# theo tên, không phải resolve đường dẫn — một chốt thật, đã kiểm.
+AGENT_FILES_PATH_ESCAPE_BLOCKED = True
+
+# Giới hạn của `expectedHash`: đúng 64 ký tự hex (SHA-256), theo
+# AgentsFilesSetParamsSchema đọc từ dist của package.
+AGENT_FILE_HASH_LENGTH = 64
 
 # Budgets from docs/gateway/config-agents/workspace-and-bootstrap.md. Exceeding
 # them truncates the file **silently** inside the prompt, so the UI must count

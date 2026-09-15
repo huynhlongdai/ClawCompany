@@ -46,9 +46,13 @@ PATH_DEFAULTS = {
 # Tham số query bắt buộc của một số endpoint: smoke không thể đoán, và bỏ
 # trống thì 422 -- đó là hành vi ĐÚNG của API, không phải lỗi. Khai ở đây để
 # báo cáo phản ánh chất lượng hệ thống chứ không phản ánh chất lượng script.
+# ``runtime_agent_id`` để rỗng ở đây và được điền lúc chạy bằng seat THẬT đầu
+# tiên đọc từ /api/agents. Bản cũ ghim cứng "nina", nhưng seed đã đổi seat sang
+# "dev" để khớp agent trên gateway, nên hai endpoint company-tools báo 404
+# "Agent binding not found" — một fixture cũ bị đọc thành lỗi hệ thống.
 REQUIRED_QUERY = {
-    "/api/company-tools/context": {"runtime_agent_id": "nina"},
-    "/api/company-tools/tasks": {"runtime_agent_id": "nina"},
+    "/api/company-tools/context": {"runtime_agent_id": ""},
+    "/api/company-tools/tasks": {"runtime_agent_id": ""},
     "/api/knowledge/search": {"q": "chiến lược"},
     "/api/v14/runner-jobs/next": {"node_id": 1},  # node_id là int
 }
@@ -121,6 +125,20 @@ class Smoke:
         payload = response.json()
         self.token = payload.get("access_token") or payload.get("token") or ""
         return bool(self.token)
+
+    def discover_seat(self) -> str:
+        """Seat thật đầu tiên trong tổ chức, để không ghim cứng id trong fixture."""
+        try:
+            response = self.client.get("/api/agents", headers=self.headers())
+            rows = response.json() if response.status_code < 400 else []
+        except Exception:                                  # noqa: BLE001
+            rows = []
+        seat = next((str(r.get("runtime_agent_id") or "") for r in rows
+                     if r.get("runtime_agent_id")), "")
+        if seat:
+            for path in ("/api/company-tools/context", "/api/company-tools/tasks"):
+                REQUIRED_QUERY[path]["runtime_agent_id"] = seat
+        return seat
 
     def discover_gets(self) -> list[str]:
         spec = self.client.get("/openapi.json").json()
@@ -261,6 +279,8 @@ def main() -> int:
         print("không đăng nhập được; đã seed chưa?", file=sys.stderr)
         smoke.report()
         return 1
+    seat = smoke.discover_seat()
+    print(f"seat dùng cho company-tools: {seat or '(không tìm được seat nào)'}")
     smoke.sweep_gets()
     smoke.write_flow()
     summary = smoke.report()

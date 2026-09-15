@@ -35,7 +35,36 @@ from app.runtime.base import AgentRuntime, RuntimeRun
 
 
 class OpenClawProtocolError(RuntimeError):
-    pass
+    """Lỗi từ gateway, **giữ nguyên payload lỗi** chứ không chỉ chuỗi hoá nó.
+
+    WP-2.2 cần điều này. Upstream trả lỗi có cấu trúc, ví dụ khi ghi file với
+    ``expectedHash`` đã cũ::
+
+        {"code": "INVALID_REQUEST",
+         "details": {"type": "agent_file_conflict", "currentHash": "…"}}
+
+    ``details.currentHash`` là hash để đọc lại và rebase. Bản cũ làm
+    ``str(msg["error"])`` nên thông tin đó chỉ còn trong một chuỗi, và tầng trên
+    phải parse chuỗi Python repr để lấy lại — cách đó vừa mong manh vừa im lặng
+    khi upstream đổi hình dạng lỗi.
+    """
+
+    def __init__(self, message: str, error: dict | None = None) -> None:
+        super().__init__(message)
+        self.error = error or {}
+
+    @property
+    def code(self) -> str:
+        return str(self.error.get("code", ""))
+
+    @property
+    def details(self) -> dict:
+        details = self.error.get("details")
+        return details if isinstance(details, dict) else {}
+
+    @property
+    def detail_type(self) -> str:
+        return str(self.details.get("type", ""))
 
 
 class OpenClawToolDenied(RuntimeError):
@@ -180,7 +209,8 @@ class NativeOpenClawRuntime(AgentRuntime):
         đọc thành thành công.
         """
         if msg.get("error"):
-            raise OpenClawProtocolError(str(msg["error"]))
+            error = msg["error"] if isinstance(msg["error"], dict) else {"message": msg["error"]}
+            raise OpenClawProtocolError(str(msg["error"]), error)
         if msg.get("ok") is False:
             raise OpenClawProtocolError(f"gateway returned ok=false: {msg}")
         payload = msg.get("payload", msg.get("result"))

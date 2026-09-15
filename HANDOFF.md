@@ -7,8 +7,9 @@ Nguồn sự thật về hiện trạng dự án. README kể lịch sử v4→v
 - Nguồn: `clawcompany_v35_spend_push.zip` (459 file, không có `.git`)
 - Repo: `https://github.com/huynhlongdai/ClawCompany`
 - Service version: `1.26.0` · Migration head: `0016_v36_metrics_calendar`
-- Lượt gần nhất: **WP-1.1 + WP-1.2 đã xong** (2026-09-16) — bề mặt điều khiển
-  OpenClaw đã mở, xem `docs/BUILD_PLAN.md`
+- Lượt gần nhất: **WP-1.1, WP-1.2, WP-2.1, WP-2.2 đã xong** (2026-09-16) —
+  bề mặt điều khiển OpenClaw đã mở và màn hình hồ sơ nhân sự AI đọc/ghi được;
+  xem `docs/BUILD_PLAN.md`
 
 ---
 
@@ -132,10 +133,14 @@ npm install && npx next build
 
 | Hạng mục | Trạng thái | Bằng chứng |
 | --- | --- | --- |
-| Test suite | **695 passed · 0 failed · 1 skipped** | `pytest -q`, 2026-09-16 |
+| Test suite | **723 passed · 0 failed · 1 skipped** | `pytest -q`, 2026-09-16 |
 | Bề mặt điều khiển gateway | **8/8 method đọc gọi được**, ghi config thật OK | `_reports/native-probe-agents.log` |
 | Optimistic concurrency của config | **gateway từ chối baseHash cũ** | cùng log trên |
-| Smoke 236 endpoint trên bản chạy thật | **236/236 OK** | `_reports/smoke.txt` |
+| Hồ sơ nhân sự AI (đọc) | **gộp 3 nguồn OK**, phát hiện lệch model DB↔gateway | `GET /api/agents/1/profile` trên bản chạy thật |
+| Ghi SOUL.md rồi hỏi lại agent | **giọng đổi theo file, 4/4 dấu hiệu** | `_reports/seat-soul-e2e.md` |
+| Xung đột ghi file | **gateway trả `agent_file_conflict`, API trả 409** | cùng log trên + `_reports/seat-soul-e2e.md` |
+| UI hồ sơ seat, 6 tab | **0 lỗi console**, chốt hạn mức ký tự có hiệu lực | `_reports/ui/seat-*.png` |
+| Smoke endpoint trên bản chạy thật | **242/242 OK** | `_reports/smoke.json` |
 | Đường dây OpenClaw đầu-cuối qua API | **15/15 bước OK** | `_reports/e2e-openclaw.txt` |
 | Lần chạy đầu tiên | 582 passed · 37 failed | `_reports/pytest-first-run.log` |
 | Frontend build | **xanh**, 49 route prerender | `npx next build` |

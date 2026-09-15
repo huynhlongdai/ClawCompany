@@ -93,15 +93,34 @@ Không có phase này thì mọi màn hình cấu hình ở Phase 2 đều phả
 Đây là màn hình quan trọng nhất của sản phẩm: biến "cấu hình agent" thành "tuyển và huấn
 luyện nhân viên".
 
-### WP-2.1 Đọc hồ sơ seat
+### WP-2.1 Đọc hồ sơ seat — ✅ XONG 2026-09-16
 
 - **Việc:** endpoint gộp trả về: hàng `agents`/`members`, entry từ `agents.list`, 5 file
   workspace qua `agents.files.get` (kèm `hash`), và `agent.identity.get`.
 - **Xong khi:** một seat hiện đủ 7 bộ phận, và mỗi trường ghi rõ nguồn (`db` hay `gateway`).
 - **Kiểm chứng:** test hành vi + ảnh màn hình trong `_reports/ui/`.
 - **Chú ý:** trả luôn `hash` ra frontend — Phase 2.2 cần nó để ghi có điều kiện.
+- **Đã làm:** `services/seat_profile.py` + `GET /api/agents/{id}/profile` (đặt ở
+  router `agents`, không mở `/v37`). Mỗi khối mang `sources` nói rõ `db` hay
+  `gateway`; `warnings` nói cái gì không đọc được.
+- **Đo được trên bản chạy thật** (Postgres + gateway 2026.9.4): seat Nina trả
+  đủ 5 file kèm hash, `roster_match: true`, `config.inherited_keys` phân biệt
+  giá trị riêng với giá trị thừa hưởng, tổng hồ sơ 9 722/60 000 ký tự.
+- **Ba phát hiện chỉ có khi gọi thật:**
+  1. `agents.files.list` **bỏ sót `IDENTITY.md`** — nhưng `agents.files.get`
+     vẫn đọc được file đó (1 722 byte). Đừng lấy `files.list` làm danh sách
+     file sửa được.
+  2. `DREAMS.md` bị từ chối (`unsupported file`) — nó thuộc
+     `agents.workspace.get`, tức WP-2.4, không thuộc namespace này. Đường dẫn
+     vượt workspace (`../../etc/passwd`) cũng bị chặn: allowlist theo tên.
+  3. **Cả 4 file của seat Nina vẫn là bản mẫu xuất xưởng của OpenClaw**
+     (nội dung "C-3PO"), tức tính cách/JD của seat chưa từng được cấu hình.
+     Hồ sơ nay gắn cờ `looks_like_shipped_sample` để UI nói ra.
+- **Thêm một lệch nguồn đã phát hiện:** `agents.model` trong database ghi
+  `GPT-4.1` còn gateway đang chạy `cometapi/gpt-4o-mini`. Hồ sơ trả
+  `model_drift` và cảnh báo thay vì âm thầm chọn một bên.
 
-### WP-2.2 Ghi hồ sơ seat (6 tab)
+### WP-2.2 Ghi hồ sơ seat (6 tab) — ✅ XONG 2026-09-16
 
 - **Việc:** tab Hồ sơ / Tính cách / Công việc / Năng lực / Quyền / Hạn mức. Tab 1–3 ghi file
   bằng `agents.files.set` + `expectedHash`; tab 4–6 ghi config bằng WP-1.2.
@@ -111,6 +130,26 @@ luyện nhân viên".
   tải lại".
 - **Bắt buộc:** đếm ký tự trên UI theo `bootstrapMaxChars` (20 000/file) và
   `bootstrapTotalMaxChars` (60 000). Vượt thì OpenClaw **cắt âm thầm**.
+- **Đã làm:** `PUT /api/agents/{id}/files/{name}` (tab 1-3, `expectedHash` bắt
+  buộc; `force` là lựa chọn phải nói ra) và
+  `PATCH /api/agents/{id}/config` (tab 4-6, đi qua ConfigRegistry của WP-1.2).
+  Khoá ghi được giới hạn **theo tab ở tầng server** — frontend không đáng tin.
+  UI: `components/SeatProfile.tsx`, sáu tab, đếm ký tự, khoá nút Lưu khi vượt.
+- **Nghiệm thu "giọng có đổi" — đạt 4/4** (`_reports/seat-soul-e2e.md`):
+  - trước: *"Tôi là C-3PO, một trợ lý ảo được tạo ra để giúp bạn trong quá
+    trình phát triển phần mềm…"*
+  - sau khi ghi SOUL.md mới: *"Báo cáo: Tôi là Nina, trưởng phòng chính của
+    Nova Holding… — Nina, Nova Holding."*
+  - Lưu ý cách đo: phải hỏi trong một **phiên mới**; file bootstrap chỉ được
+    nạp lúc dựng prompt, nên hỏi lại trong phiên đang chạy sẽ thấy tính cách cũ
+    và dẫn tới kết luận sai.
+- **Xung đột hash — đã chứng minh hai tầng:** gateway trả
+  `details.type = agent_file_conflict` + `details.currentHash`; API trả **409**
+  kèm `current_hash` để client rebase. `OpenClawProtocolError` nay giữ nguyên
+  payload lỗi thay vì chuỗi hoá nó (trước đây `details` bị mất).
+- **Kiểm chứng UI:** `tools/shot_seat.py` mở trang thật, chụp 6 tab, xác nhận
+  0 lỗi console và **chốt hạn mức có hiệu lực trên UI** (vượt 20 050/20 000 thì
+  hiện cảnh báo và nút Lưu bị khoá). Ảnh trong `_reports/ui/seat-*.png`.
 
 ### WP-2.3 Tuyển & cho thôi việc, có đối chiếu
 
