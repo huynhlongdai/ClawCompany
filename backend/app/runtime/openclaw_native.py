@@ -62,39 +62,123 @@ class NativeOpenClawRuntime(AgentRuntime):
             scopes.append(ocp.SCOPE_APPROVALS)
         return scopes
 
-    def _connect_frame(self) -> dict[str, Any]:
-        """Handshake frame: declare role and the narrow scope set we need."""
+    def _request_frame(self, method: str, params: dict | None = None,
+                       request_id: str | None = None) -> dict[str, Any]:
+        """Một request frame hợp lệ theo ``RequestFrameSchema``.
+
+        v35.1 -- sửa lỗi chặn toàn bộ. Upstream
+        ``packages/gateway-protocol/src/schema/frames.ts``:
+
+            RequestFrameSchema = closedObject({
+              type: Type.Literal("req"), id, method, params?, ...
+            })
+
+        ``type`` là literal BẮT BUỘC. v19-v35 gửi frame không có ``type``, nên
+        gateway đóng kết nối với 1008 (policy violation, "invalid request
+        frame") ngay ở frame đầu tiên. Đo được bằng một gateway
+        OpenClaw 2026.9.4 thật: xem ``_reports/native-probe-before-fix.log``.
+        """
         return {
-            "type": "connect",
-            "role": ocp.ROLE_OPERATOR,
-            "scopes": self.scopes(),
-            "protocolVersion": self.protocol_version,
-            "client": {"name": self.client_name, "version": settings.app_version},
-            **({"token": self.token} if self.token else {}),
+            "type": "req",
+            "id": request_id or str(uuid.uuid4()),
+            "method": method,
+            "params": params or {},
         }
 
+    def _connect_params(self) -> dict[str, Any]:
+        """Params của ``connect`` theo ``ConnectParamsSchema`` (closedObject).
+
+        Những chỗ bản cũ sai:
+
+        * ``connect`` là một METHOD trong request frame, không phải một frame
+          riêng có ``type: "connect"``.
+        * phiên bản giao thức khai bằng ``minProtocol``/``maxProtocol``, không
+          phải ``protocolVersion``.
+        * ``client`` yêu cầu ``id``, ``version``, ``platform``, ``mode`` --
+          không có ``name``. Và ``id`` là ENUM ĐÓNG
+          (``GATEWAY_CLIENT_IDS`` trong ``packages/gateway-protocol/src/client-info.ts``),
+          nên chuỗi tự đặt như "clawcompany" bị từ chối. Một control plane
+          backend đúng nghĩa là ``gateway-client`` + mode ``backend``; tên
+          riêng của ClawCompany đi vào ``displayName``, trường chỉ dùng để
+          chẩn đoán.
+        * token nằm trong ``auth.token``, không ở cấp cao nhất. Header
+          ``Authorization`` lúc upgrade HTTP không thay được field này.
+        """
+        params: dict[str, Any] = {
+            "minProtocol": self.protocol_version,
+            "maxProtocol": self.protocol_version,
+            "client": {
+                "id": ocp.CLIENT_ID,
+                "displayName": self.client_name,
+                "version": settings.app_version,
+                "platform": "linux",
+                "mode": ocp.CLIENT_MODE,
+            },
+            "role": ocp.ROLE_OPERATOR,
+            "scopes": self.scopes(),
+        }
+        if self.token:
+            params["auth"] = {"token": self.token}
+        return params
+
     async def _handshake(self, ws) -> dict[str, Any]:
-        await ws.send(json.dumps(self._connect_frame()))
-        raw = await asyncio.wait_for(ws.recv(), timeout=self.timeout)
-        hello = json.loads(raw)
-        if hello.get("error"):
-            raise OpenClawProtocolError(str(hello["error"]))
-        return hello
+        """Gửi ``connect`` và đọc ``hello-ok``.
+
+        Upstream trả về một frame ``{"type": "hello-ok", ...}`` (xem
+        ``HelloOkSchema``), không phải một response frame thường, nên ở đây
+        chấp nhận cả hai hình dạng thay vì ghim một cái.
+        """
+        request_id = str(uuid.uuid4())
+        await ws.send(json.dumps(self._request_frame("connect", self._connect_params(), request_id)))
+        # Không đọc đúng một frame rồi tin đó là hello-ok: gateway thật có thể
+        # chen event/tick vào trước. Đọc tới khi thấy frame mang đúng id của
+        # lời gọi connect (đo được với OpenClaw 2026.9.4).
+        while True:
+            raw = await asyncio.wait_for(ws.recv(), timeout=self.timeout)
+            hello = json.loads(raw)
+            if hello.get("id") is not None and str(hello.get("id")) != request_id:
+                continue
+            if hello.get("error"):
+                raise OpenClawProtocolError(str(hello["error"]))
+            if hello.get("ok") is False:
+                raise OpenClawProtocolError(f"gateway refused the handshake: {hello}")
+            if hello.get("id") is None and hello.get("type") not in ("hello-ok", "res"):
+                continue  # event frame, chưa phải trả lời handshake
+            return hello
+
+    @staticmethod
+    def _read_response(msg: dict[str, Any]) -> dict[str, Any]:
+        """Bóc một ``ResponseFrameSchema``.
+
+            ResponseFrameSchema = closedObject({
+              type: "res", id, ok: boolean, payload?, error?
+            })
+
+        Kết quả nằm ở ``payload`` kèm cờ ``ok``. Bản cũ đọc ``result`` -- một
+        khoá không tồn tại trong giao thức -- nên kể cả khi frame được chấp
+        nhận thì mọi lời gọi cũng trả về rỗng, và ``run_agent`` sẽ bịa ra
+        ``status="running"`` với ``run_id=""``. Cũng vậy, bản cũ chỉ kiểm
+        ``error`` nên một lỗi có ``ok: false`` mà không kèm ``error`` sẽ bị
+        đọc thành thành công.
+        """
+        if msg.get("error"):
+            raise OpenClawProtocolError(str(msg["error"]))
+        if msg.get("ok") is False:
+            raise OpenClawProtocolError(f"gateway returned ok=false: {msg}")
+        payload = msg.get("payload", msg.get("result"))
+        return payload if isinstance(payload, dict) else {"payload": payload}
 
     async def _rpc(self, method: str, params: dict | None = None) -> dict[str, Any]:
         request_id = str(uuid.uuid4())
         async with websockets.connect(self.url, additional_headers=self._headers()) as ws:
             await self._handshake(ws)
-            await ws.send(json.dumps({"id": request_id, "method": method, "params": params or {}}))
+            await ws.send(json.dumps(self._request_frame(method, params, request_id)))
             while True:
                 raw = await asyncio.wait_for(ws.recv(), timeout=self.timeout)
                 msg = json.loads(raw)
                 if str(msg.get("id")) != request_id:
                     continue  # broadcast event arriving on the same socket
-                if msg.get("error"):
-                    raise OpenClawProtocolError(str(msg["error"]))
-                result = msg.get("result")
-                return result if isinstance(result, dict) else {"result": result}
+                return self._read_response(msg)
 
     # -- AgentRuntime ------------------------------------------------------
 
@@ -130,13 +214,31 @@ class NativeOpenClawRuntime(AgentRuntime):
             )
         except OpenClawProtocolError:
             pass
+        # v35.1: ChatSendParamsSchema là closedObject,
+        # required = ["sessionKey", "message", "idempotencyKey"], và KHÔNG có
+        # thuộc tính "metadata". Bản cũ gửi metadata và thiếu idempotencyKey,
+        # nên gateway thật trả:
+        #   INVALID_REQUEST: must have required property 'idempotencyKey';
+        #   at root: unexpected property 'metadata'
+        # Tức đường gửi việc chính của cả sản phẩm chưa từng chạy được.
+        # Đo với OpenClaw 2026.9.4 -- xem _reports/native-probe-after-fix.log.
+        #
+        # idempotencyKey nên ổn định theo *lần gửi logic*, không phải ngẫu
+        # nhiên mỗi lần, vì mục đích của nó là để retry transport không sinh
+        # hai lượt chạy. Có task id thì khoá theo task; không thì đành dùng
+        # uuid và nói thẳng là lượt này không dedupe được.
+        task_ref = str(meta.get("company_task_id") or "")
+        idempotency_key = (
+            f"clawcompany:{key}:task-{task_ref}" if task_ref
+            else f"clawcompany:{key}:{uuid.uuid4()}"
+        )
         result = await self._rpc(
             ocp.M_CHAT_SEND,
             {
                 "sessionKey": key,
                 "agentId": runtime_agent_id,
                 "message": input_text,
-                "metadata": meta,
+                "idempotencyKey": idempotency_key,
             },
         )
         run_id = str(result.get("runId") or result.get("run_id") or "")
@@ -177,20 +279,27 @@ class NativeOpenClawRuntime(AgentRuntime):
         async with websockets.connect(self.url, additional_headers=self._headers()) as ws:
             await self._handshake(ws)
             await ws.send(
+                # v35.1: tham số là ``key``, không phải ``sessionKey``.
+                # Upstream dùng ``{ key: ... }`` nhất quán ở
+                # src/gateway/session-message-events.test.ts,
+                # packages/gateway-client, client Android/Swift và bench script.
+                # Schema đóng ⇒ bản cũ bị từ chối, nên /app/live-runs và toàn
+                # bộ v20-v26 (follower, lease, takeover, reconcile) chưa từng
+                # nhận được một event nào từ gateway thật.
+                # Nghịch lý phải nhớ: ``chat.send`` thì ĐÚNG là ``sessionKey``.
                 json.dumps(
-                    {
-                        "id": request_id,
-                        "method": ocp.M_SESSIONS_MESSAGES_SUBSCRIBE,
-                        "params": {"sessionKey": session_key},
-                    }
+                    self._request_frame(
+                        ocp.M_SESSIONS_MESSAGES_SUBSCRIBE,
+                        {"key": session_key},
+                        request_id,
+                    )
                 )
             )
             while True:
                 raw = await asyncio.wait_for(ws.recv(), timeout=max(self.timeout, 60))
                 msg = json.loads(raw)
                 if str(msg.get("id")) == request_id:
-                    if msg.get("error"):
-                        raise OpenClawProtocolError(str(msg["error"]))
+                    self._read_response(msg)  # raises on error / ok=false
                     continue  # subscription acknowledgement
                 event = normalize_event(msg)
                 if not event:

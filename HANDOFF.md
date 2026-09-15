@@ -65,6 +65,34 @@ docker compose exec api python seed.py
 
 `docker-compose.yml` dựng: Postgres (pgvector), Redis, api, worker, beat, web.
 
+### Dựng gateway OpenClaw thật để kiểm chứng (không cần Docker)
+
+Đây là cách mệnh đề "nói được giao thức OpenClaw" được đóng dấu, và là cách
+duy nhất phát hiện ra lớp lỗi wire-format mà 89 test không thấy.
+
+```bash
+# OpenClaw 2026.9.4 cần Node >= 24.16
+curl -fsSL https://nodejs.org/dist/v24.16.0/node-v24.16.0-linux-x64.tar.xz | tar -xJ -C /tmp/nodejs --strip-components=1
+export PATH=/tmp/nodejs/bin:$PATH
+npm install --prefix /tmp/oc openclaw@2026.9.4
+/tmp/oc/node_modules/.bin/openclaw gateway --dev --auth none --bind loopback --port 18789 --allow-unconfigured &
+
+# rồi dò từ phía ClawCompany
+cd backend && OPENCLAW_MODE=native OPENCLAW_GATEWAY_WS=ws://127.0.0.1:18789 \
+  ../.venv/bin/python ../tools/probe_e2e.py
+```
+
+Schema upstream đọc được ngay từ gateway đã cài — dùng nó thay vì suy đoán:
+
+```bash
+node -e 'const m=require("/tmp/oc/node_modules/openclaw/dist/gateway/protocol/index.js");
+  const s=m.ChatSendParamsSchema; console.log(s.required, s.additionalProperties, Object.keys(s.properties))'
+```
+
+Gateway dev không có credential model, nên một lượt chạy sẽ dừng ở
+`no authentication source configured for openai`. Đó là giới hạn cấu hình,
+không phải giao thức.
+
 ### Không có Docker (như sandbox tiếp nhận)
 
 **Bắt buộc Python 3.12.** Code dùng `int | None` trong annotation mà
@@ -86,12 +114,12 @@ npm install && npx next build
 
 | Hạng mục | Trạng thái | Bằng chứng |
 | --- | --- | --- |
-| Test suite | **608 passed · 12 failed · 1 skipped** | `_reports/pytest-after-repair.log` |
+| Test suite | **624 passed · 12 failed · 1 skipped** | `_reports/pytest-after-repair.log` |
 | Lần chạy đầu tiên | 582 passed · 37 failed | `_reports/pytest-first-run.log` |
 | Frontend build | **xanh**, 49 route prerender | `npx next build` |
 | Bridge contract | **192/192** khớp route thật | `tools/inventory.py` |
 | Migration | chưa chạy thật (không có Postgres) | — |
-| OpenClaw native | **không thể kết nối gateway thật** | `_reports/openclaw-protocol-audit.md` |
+| OpenClaw native | **đã kết nối được gateway thật** (2026.9.4) | `_reports/native-probe-after-fix.log` |
 | Postgres/pgvector/Redis/mTLS/cosign/OTLP | **chưa từng kiểm chứng** | không có test nào chạm tới |
 
 Trước lượt tiếp nhận này, **chưa một test nào từng được thực thi** — docs
@@ -99,36 +127,49 @@ v20→v35 đều ghi "tests written but not executed".
 
 ## 5. Đã sửa trong lượt tiếp nhận
 
-Ba lỗi code thật, mỗi lỗi kèm test hành vi canh giữ:
+Các lỗi code thật đã sửa, mỗi lỗi kèm test canh giữ:
 
-1. **`live_channel` scope tenant qua cột không tồn tại** (`353c074`).
+1. **Adapter OpenClaw không nói đúng giao thức** (`26e5a4d`) — năm lỗi
+   wire-format, chi tiết ở P0 bên dưới. Đây là lỗi nghiêm trọng nhất: nó phủ
+   định mệnh đề "xây trên nền cốt lõi OpenClaw", và không một test nào trong 89
+   test của v19→v35 thấy nó.
+2. **`live_channel` scope tenant qua cột không tồn tại** (`353c074`).
    `_run_ids()` và `live_tasks()` lọc `Task.organization_id`; bảng `tasks`
    không có cột đó. Mọi lời gọi kênh SSE của v35 nổ `AttributeError` — tính
    năng mới nhất chưa từng chạy được. Sửa bằng join
    `task → project → company`. Test cũ *grep source tìm đúng dòng lỗi*, tức
    nó bảo tồn lỗi thay vì phát hiện; đã thay bằng test hai tenant trên SQLite.
-2. **`row_guard` có hai định nghĩa "kind"** (`5bdf642`). `row_guard.kind()`
+3. **`row_guard` có hai định nghĩa "kind"** (`5bdf642`). `row_guard.kind()`
    dùng tên class, `row_revision.kind_of()` ưu tiên `__entity_kind__`, và
    `compare_and_set` dùng cả hai. Với 5 ORM entity hiện tại chúng trùng nhau
    nên lỗi còn tiềm ẩn — nhưng đây đúng là module v28 dựng lên để guard "có
    hiệu lực". Đã hợp nhất.
-3. **Payload approval vi phạm schema đóng của upstream** (`657262a`).
+4. **Payload approval vi phạm schema đóng của upstream** (`657262a`).
    `exec.approval.resolve` gửi kèm `sessionKey`, không nằm trong
    `ExecApprovalResolveParamsSchema` (`closedObject`), nên bị gateway từ chối.
    Cũng bỏ bộ lọc `sessionKey` mà v24 suy đoán cho `exec.approval.list`.
-4. **Frontend chưa từng build được** (`2414256`). `tsconfig.json` không khai
+5. **Frontend chưa từng build được** (`2414256`). `tsconfig.json` không khai
    `baseUrl`/`paths` trong khi 29 file import qua `@/`; `lib/api.ts` khai
    `request<T>` không có default nên 288 lời gọi trả `Promise<unknown>`.
 
 ## 6. Nợ kỹ thuật, theo mức ưu tiên
 
-### P0 — phủ định mệnh đề cốt lõi của sản phẩm
+### P0 — ĐÃ ĐÓNG: adapter OpenClaw giờ nói đúng giao thức
 
-**Adapter OpenClaw native không nói đúng giao thức.** Mọi request frame thiếu
-`type: "req"`; response đọc `result` thay cho `ok`/`payload`; handshake sai
-hình dạng so với `ConnectParamsSchema`; subscribe dùng `sessionKey` thay vì
-`key`. Chi tiết, dẫn nguồn upstream và các bước sửa: `_reports/openclaw-protocol-audit.md`.
-Chưa sửa vì đây là một khối thay đổi cần kiểm chứng với gateway thật.
+Đã sửa và **kiểm chứng với gateway OpenClaw 2026.9.4 thật** (commit `26e5a4d`).
+Trước đó: `1008 policy violation — invalid request frame`, không một RPC nào đi
+qua nổi. Năm lỗi chặn toàn bộ: frame thiếu `type: "req"`; đọc `result` thay cho
+`ok`/`payload`; handshake sai `ConnectParamsSchema` (kể cả `client.id` phải
+thuộc enum đóng `GATEWAY_CLIENT_IDS`); subscribe dùng `sessionKey` thay vì
+`key`; `chat.send` gửi `metadata` và thiếu `idempotencyKey`.
+
+Nay: `hello-ok` protocol 4, role `operator`, `sessions.create` trả `sessionId`
+thật, `chat.send` đi qua tầng giao thức. 16 test hồi quy trong
+`tests/test_v35_1_protocol_frames.py` pin hình dạng frame **không cần gateway**.
+
+Còn lại: chạy trọn một task tới trạng thái kết thúc (cần gateway có credential
+model), và kiểm chứng luồng approval đầu-cuối. Xem
+`_reports/openclaw-protocol-audit.md` mục cuối.
 
 ### P1 — cách đo đang cho tín hiệu sai
 
@@ -182,8 +223,9 @@ Cần một lần chạy `docker compose up` + `alembic upgrade head` thật.
    trên một máy ảo boxd.sh.)
 2. Đóng 12 test còn đỏ bằng harness ORM thật cho `compare_and_set` — đây cũng
    là lần đầu mệnh đề "guard có hiệu lực" của v28 được chứng minh.
-3. Quyết định P0: sửa adapter giao thức OpenClaw theo
-   `_reports/openclaw-protocol-audit.md`, rồi kiểm chứng với một gateway thật.
+3. Chạy trọn một task OpenClaw tới trạng thái kết thúc trên một gateway có
+   credential model, xác nhận `runtime_stream` ghi đúng event và task chuyển
+   trạng thái (`complete → review`, `error → blocked`).
 4. Thêm CI tối thiểu: pytest + `next build` trên mỗi push.
 5. Chỉ sau đó mới bàn tới v36 và luồng "nhập sơ đồ tổ chức thật → ánh xạ sang
    seat agent".
@@ -196,7 +238,10 @@ Cần một lần chạy `docker compose up` + `alembic upgrade head` thật.
 | `HANDOFF.md` | file này — hiện trạng và việc tiếp theo |
 | `_reports/inventory.md` | kiểm kê endpoint/bảng/service/test/bridge (sinh tự động) |
 | `_reports/test-triage.md` | phân loại 37 failure của lần chạy đầu |
-| `_reports/openclaw-protocol-audit.md` | đối chiếu giao thức với upstream |
+| `_reports/openclaw-protocol-audit.md` | đối chiếu giao thức với upstream + kết quả đo |
+| `_reports/native-probe-before-fix.log` | bằng chứng 1008 trước khi sửa |
+| `_reports/native-probe-after-fix.log` | bằng chứng kết nối được sau khi sửa |
+| `tools/probe_*.py` | script dò adapter với gateway thật |
 | `_reports/pytest-first-run.log` | log chạy test lần đầu tiên |
 | `_reports/pytest-after-repair.log` | log sau khi sửa |
 | `docs/architecture-v*.md` | thiết kế từng version (25 file) |

@@ -1,0 +1,24 @@
+2026-09-15T20:03:26.832+07:00 Config (/agent/.openclaw/openclaw.json): Removed retired agents.entries.*.default markers.
+2026-09-15T20:03:26.842+07:00 Dev config ready: ~/.openclaw/openclaw.json
+2026-09-15T20:03:26.843+07:00 Dev workspace ready: ~/.openclaw/workspace-dev
+2026-09-15T20:03:26.846+07:00 [gateway] loading configuration…
+2026-09-15T20:03:26.860+07:00 [gateway] resolving authentication…
+2026-09-15T20:03:26.864+07:00 [gateway] auth mode=none explicitly configured; all gateway connections are unauthenticated.
+2026-09-15T20:03:26.865+07:00 [gateway] starting...
+2026-09-15T20:03:28.017+07:00 [gateway] starting HTTP server...
+2026-09-15T20:03:28.383+07:00 [health-monitor] started (interval: 300s, startup-grace: 60s, channel-connect-grace: 120s)
+2026-09-15T20:03:28.864+07:00 [gateway] starting channels and sidecars...
+2026-09-15T20:03:28.886+07:00 [gateway] agent model: openai/gpt-5.6-sol (thinking=medium, fast=off)
+2026-09-15T20:03:28.886+07:00 [gateway] http server listening (13 plugins: anthropic, browser, canvas, cua-computer, device-pair, file-transfer, geolocation, linux-node, memory-core, ollama, openai, talk-voice, xai; 2.0s)
+2026-09-15T20:03:28.887+07:00 [gateway] log file: /tmp/openclaw/openclaw-2026-09-15.log
+2026-09-15T20:03:29.232+07:00 [plugins] memory-core: created managed dreaming cron job.
+2026-09-15T20:03:29.235+07:00 [gateway] startup outcomes: internal-hooks=skipped (not-configured); internal-startup-hook=skipped (no-handlers-loaded); gateway-start-hooks=scheduled; gmail-watcher=skipped (hooks-disabled); gmail-model=skipped (not-configured)
+2026-09-15T20:03:29.245+07:00 [gateway] ready
+2026-09-15T20:03:29.296+07:00 [heartbeat] started
+2026-09-15T20:03:29.844+07:00 [security] blocked URL fetch (remote-model-catalog) targetOrigin=https://catalog.openclaw.ai reason=Blocked: resolves to private/internal/special-use IP address
+2026-09-15T20:03:29.845+07:00 [gateway] remote model catalog refresh failed
+2026-09-15T20:03:30.379+07:00 [security] blocked URL fetch (official-external-plugin-catalog-feed) targetOrigin=https://clawhub.ai reason=Blocked: resolves to private/internal/special-use IP address
+2026-09-15T20:03:58.548+07:00 [ws] invalid handshake conn=b39c60c5-9713-43f8-9e36-17e00f4226fb peer=127.0.0.1:36412->127.0.0.1:18789 remote=127.0.0.1 fwd=n/a origin=n/a host=127.0.0.1:18789 ua=Python/3.12 websockets/14.1
+2026-09-15T20:03:58.553+07:00 [ws] closed before connect conn=b39c60c5-9713-43f8-9e36-17e00f4226fb peer=127.0.0.1:36412->127.0.0.1:18789 remote=127.0.0.1 fwd=n/a origin=n/a host=127.0.0.1:18789 ua=Python/3.12 websockets/14.1 code=1008 reason=invalid request frame phase=ws_upgrade_started
+2026-09-15T20:03:58.558+07:00 [ws] invalid handshake conn=7c50cf35-b117-45ba-96d1-b7a066688e6a peer=127.0.0.1:36414->127.0.0.1:18789 remote=127.0.0.1 fwd=n/a origin=n/a host=127.0.0.1:18789 ua=Python/3.12 websockets/14.1
+2026-09-15T20:03:58.560+07:00 [ws] closed before connect conn=7c50cf35-b117-45ba-96d1-b7a066688e6a peer=127.0.0.1:36414->127.0.0.1:18789 remote=127.0.0.1 fwd=n/a origin=n/a host=127.0.0.1:18789 ua=Python/3.12 websockets/14.1 code=1008 reason=invalid request frame phase=ws_upgrade_started

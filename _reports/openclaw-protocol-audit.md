@@ -1,4 +1,12 @@
-# Đối chiếu tầng OpenClaw với upstream (kiểm chứng bằng source, không bằng suy đoán)
+# Đối chiếu tầng OpenClaw với upstream
+
+> **Cập nhật 2026-09-15, sau khi sửa.** Báo cáo này ban đầu là suy luận từ
+> schema. Sau đó đã dựng **OpenClaw 2026.9.4 thật** ở `localhost:18789` và đo:
+> mọi dự đoán dưới đây đều đúng, cộng thêm một lỗi thứ năm mà chỉ chạy thật
+> mới lộ ra (`chat.send` thiếu `idempotencyKey` và gửi `metadata` ngoài
+> schema). **Cả năm đã được sửa và kiểm chứng lại** — xem mục "Kết quả sau khi
+> sửa" ở cuối. Bằng chứng: `native-probe-before-fix.log`,
+> `native-probe-after-fix.log`, `openclaw-gateway-boot.log`.
 
 Ngày: 2026-09-15. Đối chiếu `backend/app/runtime/openclaw_native.py` +
 `openclaw_protocol.py` với repo upstream `openclaw/openclaw`
@@ -159,10 +167,58 @@ nhưng hằng số đang tự nhận là "tập đóng" thì nên đúng.
 
 ---
 
-## Việc cần làm (đề xuất v36, chưa thực hiện)
+## Lỗi thứ năm — chỉ chạy thật mới lộ: `chat.send`
 
-Nhóm 1–4 là một khối: sửa lẻ không kiểm chứng được gì, vì frame sai chặn ở
-bước đầu tiên.
+Suy luận từ schema không bắt được lỗi này vì nó nằm ở một schema khác
+(`schema/logs-chat.ts`). Gateway thật trả về:
+
+```
+INVALID_REQUEST: invalid chat.send params:
+  must have required property 'idempotencyKey';
+  at root: unexpected property 'metadata'
+```
+
+```js
+ChatSendParamsSchema  // đọc từ chính gateway đã cài
+required: ["sessionKey", "message", "idempotencyKey"]
+additionalProperties: false   // không có thuộc tính "metadata"
+```
+
+`run_agent` gửi `metadata` (chứa `company_task_id`, `label`) và không gửi
+`idempotencyKey`. Đây là **đường gửi việc chính của cả sản phẩm** — mỗi lần
+ClawCompany dispatch một task cho agent đều đi qua đây.
+
+Đã sửa: metadata ở lại phía ClawCompany; `idempotencyKey` khoá theo task
+(`clawcompany:<session-key>:task-<id>`) để retry transport không sinh hai lượt
+chạy, chỉ rơi về uuid khi không có task id.
+
+---
+
+## Kết quả sau khi sửa (đo với gateway thật)
+
+| Phép thử | Trước | Sau |
+| --- | --- | --- |
+| `health()` | 1008 policy violation | `healthy`, `runtimeVersion 2026.9.4` |
+| handshake | kết nối bị đóng | `hello-ok`, protocol 4, role `operator`, scopes `[operator.read, operator.write]` |
+| `sessions.create` | không tới được | `ok: true` + `sessionId` thật |
+| `sessions.list` | không tới được | thấy session vừa tạo |
+| `list_agents()` | không tới được | nhận ra agent `dev` |
+| `subscribe {"key"}` | — | `ok: true` |
+| `subscribe {"sessionKey"}` (bản cũ) | — | `ok: false`, `INVALID_REQUEST: must have required property 'key'` |
+| `chat.send` | `INVALID_REQUEST` | đi qua tầng giao thức, dừng ở `no authentication source configured for openai` |
+
+Lời dừng cuối cùng là **cấu hình model**, không phải giao thức: gateway dev
+không có credential OpenAI. Nghĩa là hợp đồng đã đúng tới tận tầng chạy model.
+
+Vẫn chưa kiểm chứng: một lượt chạy hoàn chỉnh tới `terminal state`, và luồng
+approval thật (cần một lệnh bị gate bởi exec approval).
+
+---
+
+## Việc đã làm và việc còn lại
+
+**Đã làm** (commit `26e5a4d`), theo đúng thứ tự này vì frame sai chặn ở bước
+đầu tiên nên sửa lẻ không kiểm chứng được gì:
 
 1. Viết lại `_connect_frame()` theo `ConnectParamsSchema`, bọc trong request
    frame với `method: "connect"`.
@@ -173,10 +229,22 @@ bước đầu tiên.
 5. Thêm một lớp test đối chiếu hình dạng frame với schema upstream đã dẫn ở
    trên, để lần sau upstream đổi thì test đỏ chứ không phải người dùng phát
    hiện.
-6. Chỉ sau đó mới nói được câu "ClawCompany nói được giao thức OpenClaw" —
-   và vẫn cần một gateway thật để đóng dấu.
+6. Thêm `chat.send`: `idempotencyKey` bắt buộc, bỏ `metadata`.
 
-**Cảnh báo về cách đo**: 89 test hiện tại của v19→v35 đều xanh với các lỗi
-trên, vì chúng kiểm *nội dung params* bằng double và grep source, không kiểm
-*hình dạng frame* gửi lên dây. Một test suite xanh ở đây không phải bằng chứng
-về khả năng kết nối.
+**Còn lại cho v36:**
+
+- Chạy trọn một task tới trạng thái kết thúc, với một gateway có credential
+  model, và xác nhận `runtime_stream` ghi đúng các event.
+- Kiểm chứng luồng approval thật: cần một lệnh bị `exec approval` gate để thấy
+  `exec.approval.list` / `resolve` hoạt động đầu-cuối.
+- Cân nhắc dùng `reviewer` và `grantExpiresInDays` — hai field upstream có mà
+  ClawCompany đang bỏ trống.
+- Một lượt chạy hoàn chỉnh vẫn cần `sessions.create` với `idempotencyKey`
+  (schema có, hiện chưa dùng).
+
+**Cảnh báo về cách đo**: 89 test của v19→v35 đều xanh với cả năm lỗi trên, vì
+chúng kiểm *nội dung params* bằng double và grep source, không kiểm *hình dạng
+frame* gửi lên dây. Một test suite xanh ở đây không phải bằng chứng về khả
+năng kết nối. `tests/test_v35_1_protocol_frames.py` (16 test) đóng đúng khoảng
+trống đó, và cố tình **không** cần gateway — một test cần gateway sẽ bị bỏ qua
+trong CI và lỗi quay lại.

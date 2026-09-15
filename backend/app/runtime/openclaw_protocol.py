@@ -24,6 +24,15 @@ from __future__ import annotations
 
 # --- Roles and scopes declared at handshake -------------------------------
 
+# --- Client identity at handshake ----------------------------------------
+
+# ``client.id`` là enum đóng: GATEWAY_CLIENT_IDS trong
+# packages/gateway-protocol/src/client-info.ts. Một chuỗi tự đặt bị từ chối ở
+# tầng validate, nên ClawCompany khai mình là "gateway-client" -- lớp client
+# dành cho backend điều khiển -- và để tên riêng ở client.displayName.
+CLIENT_ID = "gateway-client"
+CLIENT_MODE = "backend"   # GATEWAY_CLIENT_MODES.BACKEND
+
 ROLE_OPERATOR = "operator"
 ROLE_NODE = "node"
 
@@ -31,7 +40,9 @@ OPERATOR_SCOPES = (
     "operator.admin",
     "operator.approvals",
     "operator.pairing",
+    "operator.questions",   # v35.1: có trong upstream, hằng số cũ bỏ sót
     "operator.read",
+    "operator.talk",        # v35.1: có trong upstream, hằng số cũ bỏ sót
     "operator.talk.secrets",
     "operator.write",
 )

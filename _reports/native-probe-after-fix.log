@@ -1,0 +1,18 @@
+url: ws://127.0.0.1:18789
+--- health() ---
+{"provider": "openclaw", "mode": "native", "status": "healthy", "result": {"runtimeVersion": "2026.9.4", "hostDesktop": {"enabled": false, "state": "disabled", "port": 5900}, "heartbeat": {"defaultAgentId": "dev", "agents": [{"agentId": "dev", "enabled": true, "every": "30m", "everyMs": 1800000, "waitingForRoute": true}]}, "channelSummary": [], "queuedSystemEvents": [], "degradedSecretOwners": [], "degradedPlugins": [], "tasks": {"total": 0, "active": 0, "terminal": 0, "failures": 0, "byStatus": {"queued": 0, "running": 0, "succeeded": 0, "failed": 0, "timed_out": 0, "cancelled": 0, "lost": 0}
+--- list_agents() ---
+[{"id": "dev", "sessions": 2, "active": false}]
+1) status: 2026.9.4
+2) session key: agent:dev:company-task-4242
+   sessions.create -> {"ok": true, "key": "agent:dev:company-task-4242", "sessionId": "d9b274b9-235b-4a49-9df1-3d94b79baefa", "entry": {"sessionId": "d9b274b9-235b-4a49-9df1-3d94b79baefa", "lifecycleRevision": "8837a75a-b3
+3) sessions.list:
+   rows: 2 ['agent:dev:company-task-4242', 'agent:dev:main']
+4) list_agents(): [{'id': 'dev', 'sessions': 2, 'active': False}]
+5) sessions.messages.subscribe (tham số 'key'):
+   ok= True payload= {"subscribed": true, "key": "agent:dev:company-task-4242"}
+   với 'sessionKey' (bản cũ): ok= False err= {'code': 'INVALID_REQUEST', 'message': "invalid sessions.messages.subscribe params: must have required property 'key'; at root: unexpected property 'sessionKey'
+handshake: hello-ok protocol 4 | role operator | scopes ['operator.read', 'operator.write']
+subscribe {key}: ok=True code=- msg=
+subscribe {sessionKey}: ok=False code=INVALID_REQUEST msg=invalid sessions.messages.subscribe params: must have required property 'key'; at root: un
+run_agent FAIL: OpenClawProtocolError {'code': 'UNAVAILABLE', 'message': '⚠️ Agent failed before reply: No route-compatible authentication source is configured for openai.\nTo view logs, run `openclaw logs --follow` in a terminal.'}
