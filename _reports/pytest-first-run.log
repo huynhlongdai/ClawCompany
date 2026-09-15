@@ -1,0 +1,1279 @@
+.............F.......................................................... [ 11%]
+....................................................................FFF. [ 23%]
+F.FF...............................................F.................... [ 34%]
+...........F.F.......FFF.................F............FF...............F [ 46%]
+............FFFF.FF.....F............F..FF..FFF......................... [ 58%]
+........................................................................ [ 69%]
+.................................F.........F...F........................ [ 81%]
+....................F.F.....................................F........... [ 92%]
+...................F.............s..........                             [100%]
+=================================== FAILURES ===================================
+_________________ test_delivery_test_review_merge_and_rollback _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-vercel-sandbox/pytest-1/test_delivery_test_review_merg0')
+
+    def test_delivery_test_review_merge_and_rollback(tmp_path):
+        db = session(); org, company, coder, reviewer, agent, repo = seed(db, tmp_path)
+        register_artifact(
+            db, organization_id=org.id, company_id=company.id, created_by_member_id=coder.id,
+            created_by_agent_id=agent.id, name="feature.py", bundle_key="release-11", logical_path="src/feature.py",
+            artifact_type="source_code", mime_type="text/x-python", content_text="def add(a,b):\n    return a+b\n",
+        )
+        profile = RepositoryTestProfile(
+            organization_id=org.id, repository_id=repo.id, name="compile",
+            commands_json=json.dumps(["python -m compileall src"]), timeout_seconds=30,
+        )
+        db.add(profile); db.commit(); db.refresh(profile)
+        pipeline = DeliveryPipeline(
+            organization_id=org.id, repository_id=repo.id, name="Safe merge", target_branch="main",
+            test_profile_id=profile.id, require_tests=True, require_review=True, required_approvals=1,
+            merge_strategy="merge",
+        )
+        db.add(pipeline); db.commit(); db.refresh(pipeline)
+        run = DeliveryRun(
+            organization_id=org.id, pipeline_id=pipeline.id, repository_id=repo.id,
+            artifact_bundle_key="release-11", target_branch="main", initiated_by_member_id=coder.id,
+            initiated_by_agent_id=agent.id,
+        )
+        db.add(run); db.commit(); db.refresh(run)
+        prepare_delivery(db, run)
+>       test_run = run_tests(db, run, profile)
+
+tests/test_v11_repository_delivery.py:110: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/repository_delivery.py:263: in run_tests
+    proc = _run(argv, cwd=wt, timeout=profile.timeout_seconds, check=False, env={"CI": "1"})
+app/services/repository_delivery.py:59: in _run
+    proc = subprocess.run(
+/agent/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+/agent/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Popen: returncode: 255 args: ['python', '-m', 'compileall', 'src']>
+args = ['python', '-m', 'compileall', 'src'], executable = b'python'
+preexec_fn = None, close_fds = True, pass_fds = ()
+cwd = '/tmp/pytest-of-vercel-sandbox/pytest-1/test_delivery_test_review_merg0/repos-root/1/worktrees/delivery-1'
+env = {'AI_AGENT': 'claude-code_2-1-260_agent', 'ANTHROPIC_API_KEY': 'not_a_real_api_key_st_209a3ec48f86467f960f54a8bad4c7d1...ec48f86467f960f54a8bad4c7d1', 'ANTHROPIC_BASE_URL': 'https://hyperagent.com/api/f2add871be6b19ac/inference-proxy', ...}
+startupinfo = None, creationflags = 0, shell = False, p2cread = -1
+p2cwrite = -1, c2pread = 12, c2pwrite = 13, errread = 14, errwrite = 15
+restore_signals = True, gid = None, gids = None, uid = None, umask = -1
+start_new_session = False, process_group = -1
+
+    def _execute_child(self, args, executable, preexec_fn, close_fds,
+                       pass_fds, cwd, env,
+                       startupinfo, creationflags, shell,
+                       p2cread, p2cwrite,
+                       c2pread, c2pwrite,
+                       errread, errwrite,
+                       restore_signals,
+                       gid, gids, uid, umask,
+                       start_new_session, process_group):
+        """Execute program (POSIX version)"""
+    
+        if isinstance(args, (str, bytes)):
+            args = [args]
+        elif isinstance(args, os.PathLike):
+            if shell:
+                raise TypeError('path-like args is not allowed when '
+                                'shell is true')
+            args = [args]
+        else:
+            args = list(args)
+    
+        if shell:
+            # On Android the default shell is at '/system/bin/sh'.
+            unix_shell = ('/system/bin/sh' if
+                      hasattr(sys, 'getandroidapilevel') else '/bin/sh')
+            args = [unix_shell, "-c"] + args
+            if executable:
+                args[0] = executable
+    
+        if executable is None:
+            executable = args[0]
+    
+        sys.audit("subprocess.Popen", executable, args, cwd, env)
+    
+        if (_USE_POSIX_SPAWN
+                and os.path.dirname(executable)
+                and preexec_fn is None
+                and not close_fds
+                and not pass_fds
+                and cwd is None
+                and (p2cread == -1 or p2cread > 2)
+                and (c2pwrite == -1 or c2pwrite > 2)
+                and (errwrite == -1 or errwrite > 2)
+                and not start_new_session
+                and process_group == -1
+                and gid is None
+                and gids is None
+                and uid is None
+                and umask < 0):
+            self._posix_spawn(args, executable, env, restore_signals,
+                              p2cread, p2cwrite,
+                              c2pread, c2pwrite,
+                              errread, errwrite)
+            return
+    
+        orig_executable = executable
+    
+        # For transferring possible exec failure from child to parent.
+        # Data format: "exception name:hex errno:description"
+        # Pickle is not used; it is complex and involves memory allocation.
+        errpipe_read, errpipe_write = os.pipe()
+        # errpipe_write must not be in the standard io 0, 1, or 2 fd range.
+        low_fds_to_close = []
+        while errpipe_write < 3:
+            low_fds_to_close.append(errpipe_write)
+            errpipe_write = os.dup(errpipe_write)
+        for low_fd in low_fds_to_close:
+            os.close(low_fd)
+        try:
+            try:
+                # We must avoid complex work that could involve
+                # malloc or free in the child process to avoid
+                # potential deadlocks, thus we do all this here.
+                # and pass it to fork_exec()
+    
+                if env is not None:
+                    env_list = []
+                    for k, v in env.items():
+                        k = os.fsencode(k)
+                        if b'=' in k:
+                            raise ValueError("illegal environment variable name")
+                        env_list.append(k + b'=' + os.fsencode(v))
+                else:
+                    env_list = None  # Use execv instead of execve.
+                executable = os.fsencode(executable)
+                if os.path.dirname(executable):
+                    executable_list = (executable,)
+                else:
+                    # This matches the behavior of os._execvpe().
+                    executable_list = tuple(
+                        os.path.join(os.fsencode(dir), executable)
+                        for dir in os.get_exec_path(env))
+                fds_to_keep = set(pass_fds)
+                fds_to_keep.add(errpipe_write)
+                self.pid = _fork_exec(
+                        args, executable_list,
+                        close_fds, tuple(sorted(map(int, fds_to_keep))),
+                        cwd, env_list,
+                        p2cread, p2cwrite, c2pread, c2pwrite,
+                        errread, errwrite,
+                        errpipe_read, errpipe_write,
+                        restore_signals, start_new_session,
+                        process_group, gid, gids, uid, umask,
+                        preexec_fn, _USE_VFORK)
+                self._child_created = True
+            finally:
+                # be sure the FD is closed no matter what
+                os.close(errpipe_write)
+    
+            self._close_pipe_fds(p2cread, p2cwrite,
+                                 c2pread, c2pwrite,
+                                 errread, errwrite)
+    
+            # Wait for exec to fail or succeed; possibly raising an
+            # exception (limited in size)
+            errpipe_data = bytearray()
+            while True:
+                part = os.read(errpipe_read, 50000)
+                errpipe_data += part
+                if not part or len(errpipe_data) > 50000:
+                    break
+        finally:
+            # be sure the FD is closed no matter what
+            os.close(errpipe_read)
+    
+        if errpipe_data:
+            try:
+                pid, sts = os.waitpid(self.pid, 0)
+                if pid == self.pid:
+                    self._handle_exitstatus(sts)
+                else:
+                    self.returncode = sys.maxsize
+            except ChildProcessError:
+                pass
+    
+            try:
+                exception_name, hex_errno, err_msg = (
+                        errpipe_data.split(b':', 2))
+                # The encoding here should match the encoding
+                # written in by the subprocess implementations
+                # like _posixsubprocess
+                err_msg = err_msg.decode()
+            except ValueError:
+                exception_name = b'SubprocessError'
+                hex_errno = b'0'
+                err_msg = 'Bad exception data from child: {!r}'.format(
+                              bytes(errpipe_data))
+            child_exception_type = getattr(
+                    builtins, exception_name.decode('ascii'),
+                    SubprocessError)
+            if issubclass(child_exception_type, OSError) and hex_errno:
+                errno_num = int(hex_errno, 16)
+                if err_msg == "noexec:chdir":
+                    err_msg = ""
+                    # The error must be from chdir(cwd).
+                    err_filename = cwd
+                elif err_msg == "noexec":
+                    err_msg = ""
+                    err_filename = None
+                else:
+                    err_filename = orig_executable
+                if errno_num != 0:
+                    err_msg = os.strerror(errno_num)
+                if err_filename is not None:
+>                   raise child_exception_type(errno_num, err_msg, err_filename)
+E                   FileNotFoundError: [Errno 2] No such file or directory: 'python'
+
+/agent/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/subprocess.py:1955: FileNotFoundError
+____________________ test_shared_registry_round_trips_a_row ____________________
+
+shared_registry = <app.services.stream_registry.StreamRegistry object at 0x7ff821387e90>
+
+    def test_shared_registry_round_trips_a_row(shared_registry):
+>       assert shared_registry.publish(
+            {"session_key": "agent:nina:main", "organization_id": 1, "started_at": "2026-01-01"}
+        ) is True
+E       AssertionError: assert False is True
+E        +  where False = publish({'organization_id': 1, 'session_key': 'agent:nina:main', 'started_at': '2026-01-01'})
+E        +    where publish = <app.services.stream_registry.StreamRegistry object at 0x7ff821387e90>.publish
+
+tests/test_v22_cluster_runtime.py:120: AssertionError
+________________ test_registry_snapshot_filters_by_organization ________________
+
+shared_registry = <app.services.stream_registry.StreamRegistry object at 0x7ff8211271d0>
+
+    def test_registry_snapshot_filters_by_organization(shared_registry):
+        shared_registry.publish({"session_key": "a", "organization_id": 1, "started_at": "1"})
+        shared_registry.publish({"session_key": "b", "organization_id": 2, "started_at": "2"})
+>       assert [r["session_key"] for r in shared_registry.snapshot(organization_id=2)] == ["b"]
+E       AssertionError: assert [] == ['b']
+E         
+E         Right contains one more item: 'b'
+E         Use -v to get more diff
+
+tests/test_v22_cluster_runtime.py:131: AssertionError
+_____________ test_registry_will_not_withdraw_another_workers_row ______________
+
+shared_registry = <app.services.stream_registry.StreamRegistry object at 0x7ff8213867b0>
+
+    def test_registry_will_not_withdraw_another_workers_row(shared_registry):
+        shared_registry.publish({"session_key": "a", "organization_id": 1, "started_at": "1"})
+        theirs = StreamRegistry()
+        theirs._redis = shared_registry._redis
+        assert theirs.withdraw("a") is False
+>       assert shared_registry.withdraw("a") is True
+E       AssertionError: assert False is True
+E        +  where False = withdraw('a')
+E        +    where withdraw = <app.services.stream_registry.StreamRegistry object at 0x7ff8213867b0>.withdraw
+
+tests/test_v22_cluster_runtime.py:139: AssertionError
+_________ test_cluster_snapshot_prefers_local_state_over_published_row _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ff820eb4bf0>
+shared_registry = <app.services.stream_registry.StreamRegistry object at 0x7ff820eb4f50>
+
+    def test_cluster_snapshot_prefers_local_state_over_published_row(monkeypatch, shared_registry):
+        monkeypatch.setattr(rs, "registry", shared_registry)
+        shared_registry.publish({"session_key": "agent:nina:main", "organization_id": 7,
+                                 "started_at": "2026-01-01", "events": 1})
+        state = rs.ConsumerState(session_key="agent:nina:main", task_id=5, organization_id=7)
+        state.events = 42
+        monkeypatch.setitem(rs.supervisor._state, "agent:nina:main", state)
+        snap = rs.cluster_snapshot(7)
+>       assert snap["process_local"] is False
+E       assert True is False
+
+tests/test_v22_cluster_runtime.py:157: AssertionError
+___________________ test_lease_scan_strips_the_redis_prefix ____________________
+
+    def test_lease_scan_strips_the_redis_prefix():
+        store = LeaseStore(ttl=30)
+        store._redis = FakeRedis()
+        store.acquire("agent:nina:company-task-4")
+        assert list(store.scan()) == ["agent:nina:company-task-4"]
+>       assert KEY_PREFIX + "agent:nina:company-task-4" in store._redis.data
+E       AssertionError: assert ('clawcompany:stream-lease:' + 'agent:nina:company-task-4') in {}
+E        +  where {} = <test_v22_cluster_runtime.FakeRedis object at 0x7ff821012f90>.data
+E        +    where <test_v22_cluster_runtime.FakeRedis object at 0x7ff821012f90> = <app.services.runtime_leases.LeaseStore object at 0x7ff821217d70>._redis
+
+tests/test_v22_cluster_runtime.py:175: AssertionError
+____________ test_claimable_excludes_sessions_another_worker_holds _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ff821013b60>
+db = <sqlalchemy.orm.session.Session object at 0x7ff8210121e0>
+world = {'done': <app.models.entities.Task object at 0x7ff821adb230>, 'nina': <app.models.entities.Member object at 0x7ff821ad...ties.Organization object at 0x7ff8213fa8a0>, 'other': <app.models.entities.Organization object at 0x7ff8207c10d0>, ...}
+
+    def test_claimable_excludes_sessions_another_worker_holds(monkeypatch, db, world):
+        store = LeaseStore(ttl=30)
+        store._redis = FakeRedis()
+        monkeypatch.setattr(rs, "lease_store", store)
+        held = world["running"].runtime_session_key
+        store._redis.data[KEY_PREFIX + held] = "other-host:99:abcd"
+        keys = [t.runtime_session_key for t in rs.claimable_sessions(db)]
+>       assert held not in keys
+E       AssertionError: assert 'agent:nina:company-task-1' not in ['agent:nina:company-task-2', 'agent:nina:company-task-1']
+
+tests/test_v22_cluster_runtime.py:187: AssertionError
+_____________ test_lease_and_registry_cannot_disagree_about_redis ______________
+
+fake = (<test_v26_shared_fabric.FakeRedis object at 0x7ff8206dbf80>, <app.services.redis_pool.RedisPool object at 0x7ff8206dbd70>)
+
+    def test_lease_and_registry_cannot_disagree_about_redis(fake):
+        """The v26 bug in one line: two stores, two private clients, two answers."""
+        client, pool = fake
+        store = rl.LeaseStore()
+        registry = sr.StreamRegistry()
+        assert store.status()["backend"] == "redis"
+>       assert registry.status()["cluster_wide"] is True
+E       assert False is True
+
+tests/test_v26_shared_fabric.py:101: AssertionError
+______________ test_in_progress_without_a_session_does_not_block _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ff821b4e3f0>
+
+    def test_in_progress_without_a_session_does_not_block(monkeypatch):
+        monkeypatch.setattr(bt.lease_store, "holder", lambda key: "")
+        db = FakeDb([FakeTask(1, "in_progress")])
+>       out = bt.archive_project(db, FakeProject(), 1)
+
+tests/test_v27_board_truth.py:208: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v27_board_truth.FakeDb object at 0x7ff821b4fc80>
+project = <test_v27_board_truth.FakeProject object at 0x7ff821b4d190>
+organization_id = 1
+
+    def archive_project(db: Session, project: Project, organization_id: int, *,
+                        force: bool = False, expected_revision: str | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Archive a project and cancel the work it still owed.
+    
+        Nothing is deleted. ``cancelled`` is a status the whole system already
+        understands, so an archived project stays readable, auditable and
+        reversible instead of becoming a hole in every historical report.
+    
+        Live runtime sessions block the archive unless ``force`` is passed, and
+        forcing reports which sessions were left running rather than pretending
+        it stopped them. We cannot abort an agent from here -- that is
+        ``/api/v19/tasks/{id}/abort`` -- and silently implying otherwise would be
+        worse than refusing.
+        """
+        check_revision(db, project, expected_revision, organization_id=organization_id)
+        preview = archive_preview(db, project)
+        if preview["blocked"] and not force:
+>           raise HTTPException(409, detail={
+                "error": "Project has tasks attached to live OpenClaw sessions",
+                "live_runtime_sessions": preview["live_runtime_sessions"],
+                "hint": "Abort them via /api/v19/tasks/{id}/abort, or pass force=true "
+                        "to archive and leave those sessions running",
+            })
+E           fastapi.exceptions.HTTPException: 409: {'error': 'Project has tasks attached to live OpenClaw sessions', 'live_runtime_sessions': [{'task_id': 1, 'title': 't', 'session_key': '', 'followed_by': ''}], 'hint': 'Abort them via /api/v19/tasks/{id}/abort, or pass force=true to archive and leave those sessions running'}
+
+app/services/board_truth.py:241: HTTPException
+________________ test_archive_never_deletes_and_keeps_done_work ________________
+
+    def test_archive_never_deletes_and_keeps_done_work():
+        tasks = [FakeTask(1, "todo"), FakeTask(2, "done")]
+        db = FakeDb(tasks)
+        project = FakeProject()
+>       out = bt.archive_project(db, project, 1)
+
+tests/test_v27_board_truth.py:224: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v27_board_truth.FakeDb object at 0x7ff821c38950>
+project = <test_v27_board_truth.FakeProject object at 0x7ff821c38410>
+organization_id = 1
+
+    def archive_project(db: Session, project: Project, organization_id: int, *,
+                        force: bool = False, expected_revision: str | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Archive a project and cancel the work it still owed.
+    
+        Nothing is deleted. ``cancelled`` is a status the whole system already
+        understands, so an archived project stays readable, auditable and
+        reversible instead of becoming a hole in every historical report.
+    
+        Live runtime sessions block the archive unless ``force`` is passed, and
+        forcing reports which sessions were left running rather than pretending
+        it stopped them. We cannot abort an agent from here -- that is
+        ``/api/v19/tasks/{id}/abort`` -- and silently implying otherwise would be
+        worse than refusing.
+        """
+        check_revision(db, project, expected_revision, organization_id=organization_id)
+        preview = archive_preview(db, project)
+        if preview["blocked"] and not force:
+>           raise HTTPException(409, detail={
+                "error": "Project has tasks attached to live OpenClaw sessions",
+                "live_runtime_sessions": preview["live_runtime_sessions"],
+                "hint": "Abort them via /api/v19/tasks/{id}/abort, or pass force=true "
+                        "to archive and leave those sessions running",
+            })
+E           fastapi.exceptions.HTTPException: 409: {'error': 'Project has tasks attached to live OpenClaw sessions', 'live_runtime_sessions': [{'task_id': 1, 'title': 't', 'session_key': '', 'followed_by': ''}, {'task_id': 2, 'title': 't', 'session_key': '', 'followed_by': ''}], 'hint': 'Abort them via /api/v19/tasks/{id}/abort, or pass force=true to archive and leave those sessions running'}
+
+app/services/board_truth.py:241: HTTPException
+____________ test_lost_race_is_reported_by_the_database_not_guessed ____________
+
+    def test_lost_race_is_reported_by_the_database_not_guessed():
+        project = FakeProject()
+        db = FakeDb(rowcount=0)
+        with pytest.raises(HTTPException) as err:
+>           rg.compare_and_set(db, project, {"name": "new"},
+                               expected_revision=f"fakeproject:1:{project.updated_at.isoformat()}")
+
+tests/test_v28_write_guards.py:119: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v28_write_guards.FakeDb object at 0x7ff821858b90>
+entity = <test_v28_write_guards.FakeProject object at 0x7ff821858d70>
+values = {'name': 'new'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+            raise GuardError("Revision token belongs to a different row")
+        if mode == rev.COUNTER_MODE and not rev.supports_counter(entity):
+            raise GuardError("This row has no revision counter; use a timestamp token")
+    
+        fields = allowed_fields(entity)
+        if not fields:
+>           raise GuardError(f"No guarded fields defined for {kind(entity)}")
+E           app.services.row_guard.GuardError: No guarded fields defined for fakeproject
+
+app/services/row_guard.py:144: GuardError
+____________ test_winning_write_commits_and_reports_both_revisions _____________
+
+    def test_winning_write_commits_and_reports_both_revisions():
+        project = FakeProject()
+        token = f"fakeproject:1:{project.updated_at.isoformat()}"
+>       out = rg.compare_and_set(FakeDb(rowcount=1), project, {"name": "new"},
+                                 expected_revision=token)
+
+tests/test_v28_write_guards.py:130: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v28_write_guards.FakeDb object at 0x7ff821b4cb90>
+entity = <test_v28_write_guards.FakeProject object at 0x7ff821b4de80>
+values = {'name': 'new'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+            raise GuardError("Revision token belongs to a different row")
+        if mode == rev.COUNTER_MODE and not rev.supports_counter(entity):
+            raise GuardError("This row has no revision counter; use a timestamp token")
+    
+        fields = allowed_fields(entity)
+        if not fields:
+>           raise GuardError(f"No guarded fields defined for {kind(entity)}")
+E           app.services.row_guard.GuardError: No guarded fields defined for fakeproject
+
+app/services/row_guard.py:144: GuardError
+______________ test_conflict_event_failure_does_not_mask_the_409 _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ff821c398b0>
+
+    def test_conflict_event_failure_does_not_mask_the_409(monkeypatch):
+        def boom(*_a, **_k):
+            raise RuntimeError("event bus down")
+        monkeypatch.setattr(rg, "emit_event", boom)
+        project = FakeProject()
+        with pytest.raises(HTTPException) as err:
+>           rg.compare_and_set(FakeDb(rowcount=0), project, {"name": "x"},
+                               expected_revision=f"fakeproject:1:{project.updated_at.isoformat()}",
+                               organization_id=3)
+
+tests/test_v28_write_guards.py:143: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v28_write_guards.FakeDb object at 0x7ff821c3a990>
+entity = <test_v28_write_guards.FakeProject object at 0x7ff821c38b60>
+values = {'name': 'x'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+            raise GuardError("Revision token belongs to a different row")
+        if mode == rev.COUNTER_MODE and not rev.supports_counter(entity):
+            raise GuardError("This row has no revision counter; use a timestamp token")
+    
+        fields = allowed_fields(entity)
+        if not fields:
+>           raise GuardError(f"No guarded fields defined for {kind(entity)}")
+E           app.services.row_guard.GuardError: No guarded fields defined for fakeproject
+
+app/services/row_guard.py:144: GuardError
+________________ test_guarded_update_sets_updated_at_explicitly ________________
+
+    def test_guarded_update_sets_updated_at_explicitly():
+        import inspect
+>       assert "updated_at=now" in inspect.getsource(rg.compare_and_set)
+E       assert 'updated_at=now' in 'def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,\n                    organization_i...: mode,\n            "exact": mode == rev.COUNTER_MODE,\n            "legacy_revision": rev.timestamp_token(entity)}\n'
+E        +  where 'def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,\n                    organization_i...: mode,\n            "exact": mode == rev.COUNTER_MODE,\n            "legacy_revision": rev.timestamp_token(entity)}\n' = <function getsource at 0x7ff8309ce980>(<function compare_and_set at 0x7ff824070040>)
+E        +    where <function getsource at 0x7ff8309ce980> = <module 'inspect' from '/agent/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/inspect.py'>.getsource
+E        +    and   <function compare_and_set at 0x7ff824070040> = rg.compare_and_set
+
+tests/test_v28_write_guards.py:287: AssertionError
+__________________ test_department_archive_locks_access_level __________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ff820397410>
+
+    def test_department_archive_locks_access_level(monkeypatch):
+        db = FakeDb()
+        dept = FakeDepartment(access_level="org_public")
+        plant(monkeypatch, members=[FakeMember()])
+>       out = ea.archive_entity(db, dept, 1)
+
+tests/test_v29_cascade_archive.py:196: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/entity_archive.py:291: in archive_entity
+    applied = _apply_archive(db, kind, entity, tree, organization_id,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v29_cascade_archive.FakeDb object at 0x7ff8206dbd70>
+kind = 'department'
+entity = <test_v29_cascade_archive.FakeDepartment object at 0x7ff8206d8710>
+tree = {'agents': [], 'departments': [], 'kind': 'department', 'members': [<test_v29_cascade_archive.FakeMember object at 0x7ff8206d9280>], ...}
+organization_id = 1
+
+    def _apply_archive(db: Session, kind: str, entity, tree: dict, organization_id: int,
+                       *, force: bool, actor_member_id: int | None) -> dict:
+        previous: dict = {"self": None, "members": {}, "departments": {}}
+        archived_projects: list[dict] = []
+    
+        if kind == "company":
+            for project in tree["projects"]:
+                if project.status == PROJECT_ARCHIVE_STATUS:
+                    continue
+                result = archive_project(db, project, organization_id, force=True,
+                                         actor_member_id=actor_member_id)
+                archived_projects.append({"project_id": project.id, "previous_status": result["previous_status"],
+                                          "cancelled_task_ids": result["cancelled_task_ids"]})
+            for dept in tree["departments"]:
+                previous["departments"][str(dept.id)] = dept.status
+                dept.status = DEPARTMENT_ARCHIVED
+                db.add(dept)
+        elif kind == "department":
+>           previous["self"] = entity.status
+E           AttributeError: 'FakeDepartment' object has no attribute 'status'
+
+app/services/entity_archive.py:248: AttributeError
+______ test_company_archive_cascades_to_departments_members_and_projects _______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ff820702660>
+
+    def test_company_archive_cascades_to_departments_members_and_projects(monkeypatch):
+        db = FakeDb()
+        company, dept = FakeCompany(), FakeDepartment()
+        member, project = FakeMember(), FakeProject()
+        plant(monkeypatch, departments=[dept], members=[member], projects=[project])
+        calls = []
+    
+        def fake_archive_project(db_, p, org, **kw):
+            calls.append((p.id, kw.get("force")))
+            return {"previous_status": p.status, "cancelled_task_ids": [1, 2]}
+    
+        monkeypatch.setattr(ea, "archive_project", fake_archive_project)
+>       out = ea.archive_entity(db, company, 1)
+
+tests/test_v29_cascade_archive.py:213: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/entity_archive.py:291: in archive_entity
+    applied = _apply_archive(db, kind, entity, tree, organization_id,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v29_cascade_archive.FakeDb object at 0x7ff820702ba0>
+kind = 'company'
+entity = <test_v29_cascade_archive.FakeCompany object at 0x7ff820703710>
+tree = {'agents': [], 'departments': [<test_v29_cascade_archive.FakeDepartment object at 0x7ff820702570>], 'kind': 'company', 'members': [<test_v29_cascade_archive.FakeMember object at 0x7ff820702b10>], ...}
+organization_id = 1
+
+    def _apply_archive(db: Session, kind: str, entity, tree: dict, organization_id: int,
+                       *, force: bool, actor_member_id: int | None) -> dict:
+        previous: dict = {"self": None, "members": {}, "departments": {}}
+        archived_projects: list[dict] = []
+    
+        if kind == "company":
+            for project in tree["projects"]:
+                if project.status == PROJECT_ARCHIVE_STATUS:
+                    continue
+                result = archive_project(db, project, organization_id, force=True,
+                                         actor_member_id=actor_member_id)
+                archived_projects.append({"project_id": project.id, "previous_status": result["previous_status"],
+                                          "cancelled_task_ids": result["cancelled_task_ids"]})
+            for dept in tree["departments"]:
+>               previous["departments"][str(dept.id)] = dept.status
+E               AttributeError: 'FakeDepartment' object has no attribute 'status'
+
+app/services/entity_archive.py:244: AttributeError
+____________________ test_feed_limit_is_clamped_not_trusted ____________________
+
+    def test_feed_limit_is_clamped_not_trusted():
+        db = AuditDb([])
+        assert wa.feed(db, 1, limit=10_000)["limit"] == wa.MAX_LIMIT
+>       assert wa.feed(db, 1, limit=0)["limit"] == 1
+E       assert 50 == 1
+
+tests/test_v29_cascade_archive.py:407: AssertionError
+_______________ test_counter_token_guards_on_the_counter_column ________________
+
+    def test_counter_token_guards_on_the_counter_column():
+        db = FakeDb(rowcount=1)
+        project = FakeProject(counter=3)
+>       out = rg.compare_and_set(db, project, {"name": "New"},
+                                 expected_revision="project:1:r3")
+
+tests/test_v30_exact_revisions.py:190: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v30_exact_revisions.FakeDb object at 0x7ff8208f2ed0>
+entity = <test_v30_exact_revisions.FakeProject object at 0x7ff8208f1160>
+values = {'name': 'New'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+>           raise GuardError("Revision token belongs to a different row")
+E           app.services.row_guard.GuardError: Revision token belongs to a different row
+
+app/services/row_guard.py:138: GuardError
+____________________ test_a_guarded_write_bumps_the_counter ____________________
+
+    def test_a_guarded_write_bumps_the_counter():
+        db = FakeDb(rowcount=1)
+        project = FakeProject(counter=3)
+>       rg.compare_and_set(db, project, {"name": "New"}, expected_revision="project:1:r3")
+
+tests/test_v30_exact_revisions.py:200: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v30_exact_revisions.FakeDb object at 0x7ff8208f15e0>
+entity = <test_v30_exact_revisions.FakeProject object at 0x7ff8208f24e0>
+values = {'name': 'New'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+>           raise GuardError("Revision token belongs to a different row")
+E           app.services.row_guard.GuardError: Revision token belongs to a different row
+
+app/services/row_guard.py:138: GuardError
+___________ test_a_timestamp_guarded_write_still_adopts_the_counter ____________
+
+    def test_a_timestamp_guarded_write_still_adopts_the_counter():
+        # This is how a pre-0013 row stops being uncounted without a backfill
+        # pass: the first guarded write writes 1.
+        db = FakeDb(rowcount=1)
+        legacy = Legacy()
+>       out = rg.compare_and_set(db, legacy, {"name": "New"},
+                                 expected_revision=f"project:9:{STAMP.isoformat()}")
+
+tests/test_v30_exact_revisions.py:210: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v30_exact_revisions.FakeDb object at 0x7ff8212147d0>
+entity = <test_v30_exact_revisions.Legacy object at 0x7ff821214b00>
+values = {'name': 'New'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+>           raise GuardError("Revision token belongs to a different row")
+E           app.services.row_guard.GuardError: Revision token belongs to a different row
+
+app/services/row_guard.py:138: GuardError
+________________ test_timestamp_guard_reports_itself_as_inexact ________________
+
+    def test_timestamp_guard_reports_itself_as_inexact():
+        db = FakeDb(rowcount=1)
+>       out = rg.compare_and_set(db, Legacy(), {"name": "N"},
+                                 expected_revision=f"project:9:{STAMP.isoformat()}")
+
+tests/test_v30_exact_revisions.py:219: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v30_exact_revisions.FakeDb object at 0x7ff8206d8bc0>
+entity = <test_v30_exact_revisions.Legacy object at 0x7ff8206dbd70>
+values = {'name': 'N'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+>           raise GuardError("Revision token belongs to a different row")
+E           app.services.row_guard.GuardError: Revision token belongs to a different row
+
+app/services/row_guard.py:138: GuardError
+___________ test_lost_race_on_the_counter_rolls_back_and_raises_409 ____________
+
+    def test_lost_race_on_the_counter_rolls_back_and_raises_409():
+        db = FakeDb(rowcount=0)
+        with pytest.raises(HTTPException) as exc:
+>           rg.compare_and_set(db, FakeProject(counter=3), {"name": "N"},
+                               expected_revision="project:1:r3")
+
+tests/test_v30_exact_revisions.py:233: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v30_exact_revisions.FakeDb object at 0x7ff821c3a990>
+entity = <test_v30_exact_revisions.FakeProject object at 0x7ff82370a720>
+values = {'name': 'N'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+>           raise GuardError("Revision token belongs to a different row")
+E           app.services.row_guard.GuardError: Revision token belongs to a different row
+
+app/services/row_guard.py:138: GuardError
+_________ test_conflict_reports_the_preferred_token_not_the_legacy_one _________
+
+    def test_conflict_reports_the_preferred_token_not_the_legacy_one():
+        db = FakeDb(rowcount=0)
+        with pytest.raises(HTTPException) as exc:
+>           rg.compare_and_set(db, FakeProject(counter=9), {"name": "N"},
+                               expected_revision="project:1:r3")
+
+tests/test_v30_exact_revisions.py:243: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v30_exact_revisions.FakeDb object at 0x7ff821b4c140>
+entity = <test_v30_exact_revisions.FakeProject object at 0x7ff821b4d8e0>
+values = {'name': 'N'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+>           raise GuardError("Revision token belongs to a different row")
+E           app.services.row_guard.GuardError: Revision token belongs to a different row
+
+app/services/row_guard.py:138: GuardError
+________________ test_cursor_advances_past_filtered_out_events _________________
+
+    def test_cursor_advances_past_filtered_out_events():
+        # Category filtering happens in Python. Paging on the last *returned*
+        # row would re-serve every event the filter dropped at the tail.
+        events = [AuditEvent(30, "board.write.conflict")]
+        events += [AuditEvent(i) for i in range(29, 19, -1)]
+        db = AuditDb(events)
+        out = wa.feed(db, 1, limit=1, categories=("conflict",))
+        assert out["returned"] == 1
+>       assert out["next_cursor"] == 30
+E       assert 20 == 30
+
+tests/test_v30_exact_revisions.py:323: AssertionError
+_____________________ test_batch_restore_is_company_scoped _____________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ff821859100>
+
+    def test_batch_restore_is_company_scoped(monkeypatch):
+        db = plant(monkeypatch, event=None, projects=[])
+        with pytest.raises(HTTPException) as exc:
+>           cr.preview(db, FakeProject(), 1)
+
+tests/test_v30_exact_revisions.py:461: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/cascade_restore.py:54: in preview
+    if kind_of(company) != "company":
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+entity = <test_v30_exact_revisions.FakeProject object at 0x7ff82185b740>
+
+    def kind_of(entity) -> str:
+        # Test seam: stand-in rows declare their kind, so the decision logic can
+        # be pinned without a live ORM. Real rows never carry this attribute.
+        declared = getattr(entity, "__entity_kind__", None)
+        if declared in KINDS:
+            return declared
+        if isinstance(entity, Company):
+            return "company"
+        if isinstance(entity, Department):
+            return "department"
+        if isinstance(entity, Member):
+            return "member"
+>       raise CascadeError(f"entity_archive does not handle {type(entity).__name__}")
+E       app.services.entity_archive.CascadeError: entity_archive does not handle FakeProject
+
+app/services/entity_archive.py:114: CascadeError
+_______________ test_create_project_signature_has_no_clear_owner _______________
+
+    def test_create_project_signature_has_no_clear_owner():
+        """``clear_owner`` is an update concept; creation has nothing to clear."""
+        params = inspect.signature(workspace_ops.create_project).parameters
+        assert "clear_owner" not in params
+>       assert "clear_owner" not in inspect.getsource(workspace_ops.create_project).split('"""')[-1]
+E       AssertionError: assert 'clear_owner' not in 'def create_...rn project\n'
+E         
+E         'clear_owner' is contained here:
+E           gfix: the clear_owner flag belongs to update_project only. The
+E         ?           +++++++++++
+E               # patch that added it also landed this condition here, where the name
+E               # does not exist, so creating a project with an owner raised NameError
+E               # -> 500 on the most ordinary call in the module....
+E         
+E         ...Full output truncated (11 lines hidden), use '-vv' to show
+
+tests/test_v31_bugfixes.py:62: AssertionError
+____________ test_create_project_body_references_only_its_own_names ____________
+
+    def test_create_project_body_references_only_its_own_names():
+        """Compile the function body against its own parameter names.
+    
+        This is what would have caught the NameError without a database: the
+        body may only read names it declares, imports, or that exist at module
+        scope.
+        """
+        import ast
+    
+        tree = ast.parse(inspect.getsource(workspace_ops.create_project).lstrip())
+        fn = tree.body[0]
+        declared = {a.arg for a in fn.args.args + fn.args.kwonlyargs}
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+                declared.add(node.id)
+        module_scope = set(vars(workspace_ops)) | set(dir(__builtins__)) | set(dir(""))
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+>               assert node.id in declared or node.id in module_scope or hasattr(
+                    __builtins__, node.id
+                ), f"create_project reads undefined name {node.id!r}"
+E               AssertionError: create_project reads undefined name 'str'
+E               assert ('str' in {'actor_member_id', 'company', 'db', 'description', 'name', 'owner', ...} or 'str' in {'ACCESS_LEVELS', 'Agent', 'COMPANY_STATUSES', 'Company', 'DEPARTMENT_STATUSES', 'Department', ...} or False)
+E                +  where 'str' = <ast.Name object at 0x7ff81b664c10>.id
+E                +  and   'str' = <ast.Name object at 0x7ff81b664c10>.id
+E                +  and   False = hasattr({'ArithmeticError': <class 'ArithmeticError'>, 'AssertionError': <class 'AssertionError'>, 'AttributeError': <class 'AttributeError'>, 'BaseException': <class 'BaseException'>, ...}, 'str')
+E                +    where 'str' = <ast.Name object at 0x7ff81b664c10>.id
+
+tests/test_v31_bugfixes.py:83: AssertionError
+_____________ test_empty_changes_is_not_reported_as_having_values ______________
+
+    def test_empty_changes_is_not_reported_as_having_values():
+>       row = _row({"fields": ["status"], "changes": {}})
+
+tests/test_v31_bugfixes.py:129: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_v31_bugfixes.py:125: in _row
+    return write_audit.row_of(_Event(payload))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+event = <test_v31_bugfixes._Event object at 0x7ff820680e00>
+
+    def row_of(event: CompanyEvent) -> dict:
+        payload = payload_of(event)
+        if not isinstance(payload, dict):
+            payload = {}
+        return {
+            "id": event.id,
+            "event_type": event.event_type,
+            "category": CATEGORIES.get(event.event_type, "other"),
+            "source": event.source or "",
+            "entity_type": event.aggregate_type or (payload.get("entity") or payload.get("kind") or ""),
+            "entity_id": event.aggregate_id or "",
+>           "company_id": event.company_id,
+            "actor_member_id": event.actor_member_id or payload.get("actor_member_id"),
+            "fields": _fields(payload),
+            # v31: present only for guarded writes made after the diff landed.
+            # Absent is meaningful and is not the same as "nothing changed".
+            "changes": payload.get("changes") if isinstance(payload.get("changes"), dict) else None,
+            # v31 bugfix: an empty ``changes`` dict is a write whose values did
+            # not move, not a write with recoverable before-values. Reporting it
+            # as has_values made the reader show an empty history and claim it
+            # was complete.
+            "has_values": bool(isinstance(payload.get("changes"), dict) and payload.get("changes")),
+            "applied": payload.get("applied", True) is not False,
+            "revision": payload.get("revision") or "",
+            "previous_revision": payload.get("previous_revision") or payload.get("current_revision") or "",
+            "summary": _summary(event.event_type, payload),
+            "occurred_at": event.occurred_at.isoformat() if event.occurred_at else "",
+            "correlation_id": event.correlation_id or "",
+        }
+E       AttributeError: '_Event' object has no attribute 'company_id'
+
+app/services/write_audit.py:137: AttributeError
+_______________ test_real_changes_are_reported_as_having_values ________________
+
+    def test_real_changes_are_reported_as_having_values():
+>       row = _row({"fields": ["status"],
+                    "changes": {"status": {"from": "planning", "to": "active"}}})
+
+tests/test_v31_bugfixes.py:134: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_v31_bugfixes.py:125: in _row
+    return write_audit.row_of(_Event(payload))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+event = <test_v31_bugfixes._Event object at 0x7ff820ce5340>
+
+    def row_of(event: CompanyEvent) -> dict:
+        payload = payload_of(event)
+        if not isinstance(payload, dict):
+            payload = {}
+        return {
+            "id": event.id,
+            "event_type": event.event_type,
+            "category": CATEGORIES.get(event.event_type, "other"),
+            "source": event.source or "",
+            "entity_type": event.aggregate_type or (payload.get("entity") or payload.get("kind") or ""),
+            "entity_id": event.aggregate_id or "",
+>           "company_id": event.company_id,
+            "actor_member_id": event.actor_member_id or payload.get("actor_member_id"),
+            "fields": _fields(payload),
+            # v31: present only for guarded writes made after the diff landed.
+            # Absent is meaningful and is not the same as "nothing changed".
+            "changes": payload.get("changes") if isinstance(payload.get("changes"), dict) else None,
+            # v31 bugfix: an empty ``changes`` dict is a write whose values did
+            # not move, not a write with recoverable before-values. Reporting it
+            # as has_values made the reader show an empty history and claim it
+            # was complete.
+            "has_values": bool(isinstance(payload.get("changes"), dict) and payload.get("changes")),
+            "applied": payload.get("applied", True) is not False,
+            "revision": payload.get("revision") or "",
+            "previous_revision": payload.get("previous_revision") or payload.get("current_revision") or "",
+            "summary": _summary(event.event_type, payload),
+            "occurred_at": event.occurred_at.isoformat() if event.occurred_at else "",
+            "correlation_id": event.correlation_id or "",
+        }
+E       AttributeError: '_Event' object has no attribute 'company_id'
+
+app/services/write_audit.py:137: AttributeError
+_________________ test_missing_changes_stays_absent_not_empty __________________
+
+    def test_missing_changes_stays_absent_not_empty():
+        """Pre-v31 events must read as "unknown", never as "nothing changed"."""
+>       row = _row({"fields": ["status"]})
+
+tests/test_v31_bugfixes.py:142: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_v31_bugfixes.py:125: in _row
+    return write_audit.row_of(_Event(payload))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+event = <test_v31_bugfixes._Event object at 0x7ff82359f500>
+
+    def row_of(event: CompanyEvent) -> dict:
+        payload = payload_of(event)
+        if not isinstance(payload, dict):
+            payload = {}
+        return {
+            "id": event.id,
+            "event_type": event.event_type,
+            "category": CATEGORIES.get(event.event_type, "other"),
+            "source": event.source or "",
+            "entity_type": event.aggregate_type or (payload.get("entity") or payload.get("kind") or ""),
+            "entity_id": event.aggregate_id or "",
+>           "company_id": event.company_id,
+            "actor_member_id": event.actor_member_id or payload.get("actor_member_id"),
+            "fields": _fields(payload),
+            # v31: present only for guarded writes made after the diff landed.
+            # Absent is meaningful and is not the same as "nothing changed".
+            "changes": payload.get("changes") if isinstance(payload.get("changes"), dict) else None,
+            # v31 bugfix: an empty ``changes`` dict is a write whose values did
+            # not move, not a write with recoverable before-values. Reporting it
+            # as has_values made the reader show an empty history and claim it
+            # was complete.
+            "has_values": bool(isinstance(payload.get("changes"), dict) and payload.get("changes")),
+            "applied": payload.get("applied", True) is not False,
+            "revision": payload.get("revision") or "",
+            "previous_revision": payload.get("previous_revision") or payload.get("current_revision") or "",
+            "summary": _summary(event.event_type, payload),
+            "occurred_at": event.occurred_at.isoformat() if event.occurred_at else "",
+            "correlation_id": event.correlation_id or "",
+        }
+E       AttributeError: '_Event' object has no attribute 'company_id'
+
+app/services/write_audit.py:137: AttributeError
+________________ test_the_service_version_moved_with_the_router ________________
+
+    def test_the_service_version_moved_with_the_router():
+>       assert '"1.23.0"' in _source("app/core/config.py")
+E       assert '"1.23.0"' in 'from pydantic_settings import BaseSettings, SettingsConfigDict\n\nclass Settings(BaseSettings):\n    app_name: str = ..."control-plane-v15"\n\n    model_config = SettingsConfigDict(env_file=".env", extra="ignore")\n\nsettings = Settings()'
+E        +  where 'from pydantic_settings import BaseSettings, SettingsConfigDict\n\nclass Settings(BaseSettings):\n    app_name: str = ..."control-plane-v15"\n\n    model_config = SettingsConfigDict(env_file=".env", extra="ignore")\n\nsettings = Settings()' = _source('app/core/config.py')
+
+tests/test_v33_recovery.py:414: AssertionError
+________________________ test_event_json_wraps_non_dict ________________________
+
+    def test_event_json_wraps_non_dict():
+        class Row:
+            event_json = json.dumps([1, 2])
+    
+>       assert event_replay._event_json(Row) == {}
+E       AssertionError: assert {'value': [1, 2]} == {}
+E         
+E         Left contains 1 more item:
+E         {'value': [1, 2]}
+E         Use -v to get more diff
+
+tests/test_v34_replay.py:113: AssertionError
+____________________ test_replay_does_not_call_record_usage ____________________
+
+    def test_replay_does_not_call_record_usage():
+        src = _source("app/services/event_replay.py")
+>       assert "record_usage" not in src
+E       assert 'record_usage' not in '"""v34: rep...urn detail\n'
+E         
+E         'record_usage' is contained here:
+E           ver calls record_usage again",
+E         ?           ++++++++++++
+E                       "does not re-deliver webhooks: that outbox has its own retry",
+E                       "does not reorder events; replay follows occurred_at ascending",
+E                       "does not undo a half-finished trigger action from the first attempt",...
+E         
+E         ...Full output truncated (270 lines hidden), use '-vv' to show
+
+tests/test_v34_replay.py:135: AssertionError
+_________________________ test_service_version_bumped __________________________
+
+    def test_service_version_bumped():
+>       assert 'app_version: str = "1.24.0"' in _source("app/core/config.py")
+E       assert 'app_version: str = "1.24.0"' in 'from pydantic_settings import BaseSettings, SettingsConfigDict\n\nclass Settings(BaseSettings):\n    app_name: str = ..."control-plane-v15"\n\n    model_config = SettingsConfigDict(env_file=".env", extra="ignore")\n\nsettings = Settings()'
+E        +  where 'from pydantic_settings import BaseSettings, SettingsConfigDict\n\nclass Settings(BaseSettings):\n    app_name: str = ..."control-plane-v15"\n\n    model_config = SettingsConfigDict(env_file=".env", extra="ignore")\n\nsettings = Settings()' = _source('app/core/config.py')
+
+tests/test_v34_replay.py:449: AssertionError
+______________________ test_bridge_contract_count_is_181 _______________________
+
+    def test_bridge_contract_count_is_181():
+        path = os.path.join(os.path.dirname(ROOT), "openclaw-company-bridge", "tool-contracts.json")
+        data = json.load(io.open(path, encoding="utf-8"))
+        tools = data["tools"] if isinstance(data, dict) and "tools" in data else data
+>       assert len(tools) == 181
+E       AssertionError: assert 192 == 181
+E        +  where 192 = len([{'description': 'Return organization/company/department/manager context for the current OpenClaw agent.', 'method': '...wner inbox.', 'method': 'POST', 'name': 'company.message.owner', 'path': '/api/company-tools/message/owner', ...}, ...])
+
+tests/test_v34_replay.py:472: AssertionError
+__________________ test_spend_module_never_writes_usage_rows ___________________
+
+    def test_spend_module_never_writes_usage_rows():
+        src = _source("app/services/delegation_spend.py")
+>       assert "record_usage" not in src
+E       assert 'record_usage' not in '"""v35 dele...ibution()}\n'
+E         
+E         'record_usage' is contained here:
+E           tering (``record_usage``), not from a spend
+E         ?           ++++++++++++
+E             report returned by the OpenClaw runner. If metering under-records, this
+E             module under-reports with it.
+E           - Nothing here blocks work. Exceeding the ceiling raises a flag for a human;...
+E         
+E         ...Full output truncated (207 lines hidden), use '-vv' to show
+
+tests/test_v35_spend_push.py:237: AssertionError
+______________ test_stream_frames_terminates_and_yields_in_order _______________
+
+    def test_stream_frames_terminates_and_yields_in_order():
+        class _Session:
+            def close(self):
+                pass
+    
+        ticks = {"value": 0.0}
+    
+        def clock():
+            ticks["value"] += 1.0
+            return ticks["value"]
+    
+        async def drive():
+            out = []
+            gen = live_channel.stream_frames(_Session, 1, cursor=0, max_duration_seconds=2,
+                                             poll_seconds=0, clock=clock)
+            async for item in gen:
+                out.append(item)
+                if len(out) > 8:
+                    break
+            return out
+    
+>       frames = asyncio.run(drive())
+
+tests/test_v35_spend_push.py:435: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/agent/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/asyncio/runners.py:195: in run
+    return runner.run(main)
+/agent/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+/agent/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/asyncio/base_events.py:691: in run_until_complete
+    return future.result()
+tests/test_v35_spend_push.py:429: in drive
+    async for item in gen:
+app/services/live_channel.py:160: in stream_frames
+    first = snapshot(session, organization_id, cursor=position)
+app/services/live_channel.py:127: in snapshot
+    batch = events_since(db, organization_id, cursor=cursor)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v35_spend_push.test_stream_frames_terminates_and_yields_in_order.<locals>._Session object at 0x7ff8218bdca0>
+organization_id = 1
+
+    def events_since(db: Session, organization_id: int, *, cursor: int = 0,
+                     limit: int = MAX_BATCH, run_id: str | None = None) -> dict:
+        capped = max(1, min(int(limit or MAX_BATCH), MAX_BATCH))
+>       query = db.query(RuntimeEvent).filter(RuntimeEvent.id > int(cursor or 0))
+E       AttributeError: '_Session' object has no attribute 'query'
+
+app/services/live_channel.py:97: AttributeError
+=========================== short test summary info ============================
+FAILED tests/test_v11_repository_delivery.py::test_delivery_test_review_merge_and_rollback
+FAILED tests/test_v22_cluster_runtime.py::test_shared_registry_round_trips_a_row
+FAILED tests/test_v22_cluster_runtime.py::test_registry_snapshot_filters_by_organization
+FAILED tests/test_v22_cluster_runtime.py::test_registry_will_not_withdraw_another_workers_row
+FAILED tests/test_v22_cluster_runtime.py::test_cluster_snapshot_prefers_local_state_over_published_row
+FAILED tests/test_v22_cluster_runtime.py::test_lease_scan_strips_the_redis_prefix
+FAILED tests/test_v22_cluster_runtime.py::test_claimable_excludes_sessions_another_worker_holds
+FAILED tests/test_v26_shared_fabric.py::test_lease_and_registry_cannot_disagree_about_redis
+FAILED tests/test_v27_board_truth.py::test_in_progress_without_a_session_does_not_block
+FAILED tests/test_v27_board_truth.py::test_archive_never_deletes_and_keeps_done_work
+FAILED tests/test_v28_write_guards.py::test_lost_race_is_reported_by_the_database_not_guessed
+FAILED tests/test_v28_write_guards.py::test_winning_write_commits_and_reports_both_revisions
+FAILED tests/test_v28_write_guards.py::test_conflict_event_failure_does_not_mask_the_409
+FAILED tests/test_v28_write_guards.py::test_guarded_update_sets_updated_at_explicitly
+FAILED tests/test_v29_cascade_archive.py::test_department_archive_locks_access_level
+FAILED tests/test_v29_cascade_archive.py::test_company_archive_cascades_to_departments_members_and_projects
+FAILED tests/test_v29_cascade_archive.py::test_feed_limit_is_clamped_not_trusted
+FAILED tests/test_v30_exact_revisions.py::test_counter_token_guards_on_the_counter_column
+FAILED tests/test_v30_exact_revisions.py::test_a_guarded_write_bumps_the_counter
+FAILED tests/test_v30_exact_revisions.py::test_a_timestamp_guarded_write_still_adopts_the_counter
+FAILED tests/test_v30_exact_revisions.py::test_timestamp_guard_reports_itself_as_inexact
+FAILED tests/test_v30_exact_revisions.py::test_lost_race_on_the_counter_rolls_back_and_raises_409
+FAILED tests/test_v30_exact_revisions.py::test_conflict_reports_the_preferred_token_not_the_legacy_one
+FAILED tests/test_v30_exact_revisions.py::test_cursor_advances_past_filtered_out_events
+FAILED tests/test_v30_exact_revisions.py::test_batch_restore_is_company_scoped
+FAILED tests/test_v31_bugfixes.py::test_create_project_signature_has_no_clear_owner
+FAILED tests/test_v31_bugfixes.py::test_create_project_body_references_only_its_own_names
+FAILED tests/test_v31_bugfixes.py::test_empty_changes_is_not_reported_as_having_values
+FAILED tests/test_v31_bugfixes.py::test_real_changes_are_reported_as_having_values
+FAILED tests/test_v31_bugfixes.py::test_missing_changes_stays_absent_not_empty
+FAILED tests/test_v33_recovery.py::test_the_service_version_moved_with_the_router
+FAILED tests/test_v34_replay.py::test_event_json_wraps_non_dict - AssertionEr...
+FAILED tests/test_v34_replay.py::test_replay_does_not_call_record_usage - ass...
+FAILED tests/test_v34_replay.py::test_service_version_bumped - assert 'app_ve...
+FAILED tests/test_v34_replay.py::test_bridge_contract_count_is_181 - Assertio...
+FAILED tests/test_v35_spend_push.py::test_spend_module_never_writes_usage_rows
+FAILED tests/test_v35_spend_push.py::test_stream_frames_terminates_and_yields_in_order
+37 failed, 582 passed, 1 skipped in 24.38s

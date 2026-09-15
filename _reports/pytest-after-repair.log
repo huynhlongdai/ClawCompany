@@ -1,0 +1,945 @@
+.............F.......................................................... [ 11%]
+........................................................................ [ 23%]
+........................................................................ [ 34%]
+.....................FFF.................F.............................. [ 46%]
+............FFFF.FF.....F............F.................................. [ 58%]
+........................................................................ [ 69%]
+........................................................................ [ 81%]
+........................................................................ [ 92%]
+.................................s..........                             [100%]
+=================================== FAILURES ===================================
+_________________ test_delivery_test_review_merge_and_rollback _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-vercel-sandbox/pytest-2/test_delivery_test_review_merg0')
+
+    def test_delivery_test_review_merge_and_rollback(tmp_path):
+        db = session(); org, company, coder, reviewer, agent, repo = seed(db, tmp_path)
+        register_artifact(
+            db, organization_id=org.id, company_id=company.id, created_by_member_id=coder.id,
+            created_by_agent_id=agent.id, name="feature.py", bundle_key="release-11", logical_path="src/feature.py",
+            artifact_type="source_code", mime_type="text/x-python", content_text="def add(a,b):\n    return a+b\n",
+        )
+        profile = RepositoryTestProfile(
+            organization_id=org.id, repository_id=repo.id, name="compile",
+            commands_json=json.dumps(["python -m compileall src"]), timeout_seconds=30,
+        )
+        db.add(profile); db.commit(); db.refresh(profile)
+        pipeline = DeliveryPipeline(
+            organization_id=org.id, repository_id=repo.id, name="Safe merge", target_branch="main",
+            test_profile_id=profile.id, require_tests=True, require_review=True, required_approvals=1,
+            merge_strategy="merge",
+        )
+        db.add(pipeline); db.commit(); db.refresh(pipeline)
+        run = DeliveryRun(
+            organization_id=org.id, pipeline_id=pipeline.id, repository_id=repo.id,
+            artifact_bundle_key="release-11", target_branch="main", initiated_by_member_id=coder.id,
+            initiated_by_agent_id=agent.id,
+        )
+        db.add(run); db.commit(); db.refresh(run)
+        prepare_delivery(db, run)
+>       test_run = run_tests(db, run, profile)
+
+tests/test_v11_repository_delivery.py:110: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/repository_delivery.py:263: in run_tests
+    proc = _run(argv, cwd=wt, timeout=profile.timeout_seconds, check=False, env={"CI": "1"})
+app/services/repository_delivery.py:59: in _run
+    proc = subprocess.run(
+/agent/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+/agent/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Popen: returncode: 255 args: ['python', '-m', 'compileall', 'src']>
+args = ['python', '-m', 'compileall', 'src'], executable = b'python'
+preexec_fn = None, close_fds = True, pass_fds = ()
+cwd = '/tmp/pytest-of-vercel-sandbox/pytest-2/test_delivery_test_review_merg0/repos-root/1/worktrees/delivery-1'
+env = {'AI_AGENT': 'claude-code_2-1-260_agent', 'ANTHROPIC_API_KEY': 'not_a_real_api_key_st_9304e7bad775495694a724db74a8e9ed...7bad775495694a724db74a8e9ed', 'ANTHROPIC_BASE_URL': 'https://hyperagent.com/api/f2add871be6b19ac/inference-proxy', ...}
+startupinfo = None, creationflags = 0, shell = False, p2cread = -1
+p2cwrite = -1, c2pread = 12, c2pwrite = 13, errread = 14, errwrite = 15
+restore_signals = True, gid = None, gids = None, uid = None, umask = -1
+start_new_session = False, process_group = -1
+
+    def _execute_child(self, args, executable, preexec_fn, close_fds,
+                       pass_fds, cwd, env,
+                       startupinfo, creationflags, shell,
+                       p2cread, p2cwrite,
+                       c2pread, c2pwrite,
+                       errread, errwrite,
+                       restore_signals,
+                       gid, gids, uid, umask,
+                       start_new_session, process_group):
+        """Execute program (POSIX version)"""
+    
+        if isinstance(args, (str, bytes)):
+            args = [args]
+        elif isinstance(args, os.PathLike):
+            if shell:
+                raise TypeError('path-like args is not allowed when '
+                                'shell is true')
+            args = [args]
+        else:
+            args = list(args)
+    
+        if shell:
+            # On Android the default shell is at '/system/bin/sh'.
+            unix_shell = ('/system/bin/sh' if
+                      hasattr(sys, 'getandroidapilevel') else '/bin/sh')
+            args = [unix_shell, "-c"] + args
+            if executable:
+                args[0] = executable
+    
+        if executable is None:
+            executable = args[0]
+    
+        sys.audit("subprocess.Popen", executable, args, cwd, env)
+    
+        if (_USE_POSIX_SPAWN
+                and os.path.dirname(executable)
+                and preexec_fn is None
+                and not close_fds
+                and not pass_fds
+                and cwd is None
+                and (p2cread == -1 or p2cread > 2)
+                and (c2pwrite == -1 or c2pwrite > 2)
+                and (errwrite == -1 or errwrite > 2)
+                and not start_new_session
+                and process_group == -1
+                and gid is None
+                and gids is None
+                and uid is None
+                and umask < 0):
+            self._posix_spawn(args, executable, env, restore_signals,
+                              p2cread, p2cwrite,
+                              c2pread, c2pwrite,
+                              errread, errwrite)
+            return
+    
+        orig_executable = executable
+    
+        # For transferring possible exec failure from child to parent.
+        # Data format: "exception name:hex errno:description"
+        # Pickle is not used; it is complex and involves memory allocation.
+        errpipe_read, errpipe_write = os.pipe()
+        # errpipe_write must not be in the standard io 0, 1, or 2 fd range.
+        low_fds_to_close = []
+        while errpipe_write < 3:
+            low_fds_to_close.append(errpipe_write)
+            errpipe_write = os.dup(errpipe_write)
+        for low_fd in low_fds_to_close:
+            os.close(low_fd)
+        try:
+            try:
+                # We must avoid complex work that could involve
+                # malloc or free in the child process to avoid
+                # potential deadlocks, thus we do all this here.
+                # and pass it to fork_exec()
+    
+                if env is not None:
+                    env_list = []
+                    for k, v in env.items():
+                        k = os.fsencode(k)
+                        if b'=' in k:
+                            raise ValueError("illegal environment variable name")
+                        env_list.append(k + b'=' + os.fsencode(v))
+                else:
+                    env_list = None  # Use execv instead of execve.
+                executable = os.fsencode(executable)
+                if os.path.dirname(executable):
+                    executable_list = (executable,)
+                else:
+                    # This matches the behavior of os._execvpe().
+                    executable_list = tuple(
+                        os.path.join(os.fsencode(dir), executable)
+                        for dir in os.get_exec_path(env))
+                fds_to_keep = set(pass_fds)
+                fds_to_keep.add(errpipe_write)
+                self.pid = _fork_exec(
+                        args, executable_list,
+                        close_fds, tuple(sorted(map(int, fds_to_keep))),
+                        cwd, env_list,
+                        p2cread, p2cwrite, c2pread, c2pwrite,
+                        errread, errwrite,
+                        errpipe_read, errpipe_write,
+                        restore_signals, start_new_session,
+                        process_group, gid, gids, uid, umask,
+                        preexec_fn, _USE_VFORK)
+                self._child_created = True
+            finally:
+                # be sure the FD is closed no matter what
+                os.close(errpipe_write)
+    
+            self._close_pipe_fds(p2cread, p2cwrite,
+                                 c2pread, c2pwrite,
+                                 errread, errwrite)
+    
+            # Wait for exec to fail or succeed; possibly raising an
+            # exception (limited in size)
+            errpipe_data = bytearray()
+            while True:
+                part = os.read(errpipe_read, 50000)
+                errpipe_data += part
+                if not part or len(errpipe_data) > 50000:
+                    break
+        finally:
+            # be sure the FD is closed no matter what
+            os.close(errpipe_read)
+    
+        if errpipe_data:
+            try:
+                pid, sts = os.waitpid(self.pid, 0)
+                if pid == self.pid:
+                    self._handle_exitstatus(sts)
+                else:
+                    self.returncode = sys.maxsize
+            except ChildProcessError:
+                pass
+    
+            try:
+                exception_name, hex_errno, err_msg = (
+                        errpipe_data.split(b':', 2))
+                # The encoding here should match the encoding
+                # written in by the subprocess implementations
+                # like _posixsubprocess
+                err_msg = err_msg.decode()
+            except ValueError:
+                exception_name = b'SubprocessError'
+                hex_errno = b'0'
+                err_msg = 'Bad exception data from child: {!r}'.format(
+                              bytes(errpipe_data))
+            child_exception_type = getattr(
+                    builtins, exception_name.decode('ascii'),
+                    SubprocessError)
+            if issubclass(child_exception_type, OSError) and hex_errno:
+                errno_num = int(hex_errno, 16)
+                if err_msg == "noexec:chdir":
+                    err_msg = ""
+                    # The error must be from chdir(cwd).
+                    err_filename = cwd
+                elif err_msg == "noexec":
+                    err_msg = ""
+                    err_filename = None
+                else:
+                    err_filename = orig_executable
+                if errno_num != 0:
+                    err_msg = os.strerror(errno_num)
+                if err_filename is not None:
+>                   raise child_exception_type(errno_num, err_msg, err_filename)
+E                   FileNotFoundError: [Errno 2] No such file or directory: 'python'
+
+/agent/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/subprocess.py:1955: FileNotFoundError
+____________ test_lost_race_is_reported_by_the_database_not_guessed ____________
+
+    def test_lost_race_is_reported_by_the_database_not_guessed():
+        project = FakeProject()
+        db = FakeDb(rowcount=0)
+        with pytest.raises(HTTPException) as err:
+>           rg.compare_and_set(db, project, {"name": "new"},
+                               expected_revision=f"fakeproject:1:{project.updated_at.isoformat()}")
+
+tests/test_v28_write_guards.py:119: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v28_write_guards.FakeDb object at 0x7fd4ddbdcf50>
+entity = <test_v28_write_guards.FakeProject object at 0x7fd4ddbdef60>
+values = {'name': 'new'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+            raise GuardError("Revision token belongs to a different row")
+        if mode == rev.COUNTER_MODE and not rev.supports_counter(entity):
+            raise GuardError("This row has no revision counter; use a timestamp token")
+    
+        fields = allowed_fields(entity)
+        if not fields:
+>           raise GuardError(f"No guarded fields defined for {kind(entity)}")
+E           app.services.row_guard.GuardError: No guarded fields defined for fakeproject
+
+app/services/row_guard.py:155: GuardError
+____________ test_winning_write_commits_and_reports_both_revisions _____________
+
+    def test_winning_write_commits_and_reports_both_revisions():
+        project = FakeProject()
+        token = f"fakeproject:1:{project.updated_at.isoformat()}"
+>       out = rg.compare_and_set(FakeDb(rowcount=1), project, {"name": "new"},
+                                 expected_revision=token)
+
+tests/test_v28_write_guards.py:130: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v28_write_guards.FakeDb object at 0x7fd4ddbdf0b0>
+entity = <test_v28_write_guards.FakeProject object at 0x7fd4ddbdf920>
+values = {'name': 'new'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+            raise GuardError("Revision token belongs to a different row")
+        if mode == rev.COUNTER_MODE and not rev.supports_counter(entity):
+            raise GuardError("This row has no revision counter; use a timestamp token")
+    
+        fields = allowed_fields(entity)
+        if not fields:
+>           raise GuardError(f"No guarded fields defined for {kind(entity)}")
+E           app.services.row_guard.GuardError: No guarded fields defined for fakeproject
+
+app/services/row_guard.py:155: GuardError
+______________ test_conflict_event_failure_does_not_mask_the_409 _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd4ddbde990>
+
+    def test_conflict_event_failure_does_not_mask_the_409(monkeypatch):
+        def boom(*_a, **_k):
+            raise RuntimeError("event bus down")
+        monkeypatch.setattr(rg, "emit_event", boom)
+        project = FakeProject()
+        with pytest.raises(HTTPException) as err:
+>           rg.compare_and_set(FakeDb(rowcount=0), project, {"name": "x"},
+                               expected_revision=f"fakeproject:1:{project.updated_at.isoformat()}",
+                               organization_id=3)
+
+tests/test_v28_write_guards.py:143: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v28_write_guards.FakeDb object at 0x7fd4ddbde6c0>
+entity = <test_v28_write_guards.FakeProject object at 0x7fd4ddbde780>
+values = {'name': 'x'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+            raise GuardError("Revision token belongs to a different row")
+        if mode == rev.COUNTER_MODE and not rev.supports_counter(entity):
+            raise GuardError("This row has no revision counter; use a timestamp token")
+    
+        fields = allowed_fields(entity)
+        if not fields:
+>           raise GuardError(f"No guarded fields defined for {kind(entity)}")
+E           app.services.row_guard.GuardError: No guarded fields defined for fakeproject
+
+app/services/row_guard.py:155: GuardError
+________________ test_guarded_update_sets_updated_at_explicitly ________________
+
+    def test_guarded_update_sets_updated_at_explicitly():
+        import inspect
+>       assert "updated_at=now" in inspect.getsource(rg.compare_and_set)
+E       assert 'updated_at=now' in 'def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,\n                    organization_i...: mode,\n            "exact": mode == rev.COUNTER_MODE,\n            "legacy_revision": rev.timestamp_token(entity)}\n'
+E        +  where 'def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,\n                    organization_i...: mode,\n            "exact": mode == rev.COUNTER_MODE,\n            "legacy_revision": rev.timestamp_token(entity)}\n' = <function getsource at 0x7fd4f3116980>(<function compare_and_set at 0x7fd4e6778040>)
+E        +    where <function getsource at 0x7fd4f3116980> = <module 'inspect' from '/agent/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/inspect.py'>.getsource
+E        +    and   <function compare_and_set at 0x7fd4e6778040> = rg.compare_and_set
+
+tests/test_v28_write_guards.py:287: AssertionError
+_______________ test_counter_token_guards_on_the_counter_column ________________
+
+    def test_counter_token_guards_on_the_counter_column():
+        db = FakeDb(rowcount=1)
+        project = FakeProject(counter=3)
+>       out = rg.compare_and_set(db, project, {"name": "New"},
+                                 expected_revision="project:1:r3")
+
+tests/test_v30_exact_revisions.py:190: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v30_exact_revisions.FakeDb object at 0x7fd4e5b14a70>
+entity = <test_v30_exact_revisions.FakeProject object at 0x7fd4e5b149e0>
+values = {'name': 'New'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+            raise GuardError("Revision token belongs to a different row")
+        if mode == rev.COUNTER_MODE and not rev.supports_counter(entity):
+            raise GuardError("This row has no revision counter; use a timestamp token")
+    
+        fields = allowed_fields(entity)
+        if not fields:
+            raise GuardError(f"No guarded fields defined for {kind(entity)}")
+        unknown = sorted(set(values) - set(fields))
+        if unknown:
+            raise GuardError(f"Fields not writable through a guarded update: {', '.join(unknown)}")
+        # v31: JSON null still means "leave this column alone" -- that is what
+        # every client shipped since v28 assumes. Clearing is a separate,
+        # explicit request via the CLEAR sentinel, which is why section 20.6
+        # could not clear owner_member_id without this.
+        changes: dict = {}
+        # v31 bugfix: this loop must not bind a name the guard condition below
+        # still needs. An earlier draft called the loop variable ``value``,
+        # which shadowed the parsed expected revision and made the conditional
+        # UPDATE compare the row against the last value being written -- a
+        # guard that could never match, and the whole point of v28.
+        for field, incoming in values.items():
+            if fd.is_clear(incoming):
+                if field not in clearable_fields(entity):
+                    raise GuardError(f"Field cannot be cleared: {field}")
+                changes[field] = None
+            elif incoming is not None:
+                changes[field] = incoming
+        if not changes:
+            raise GuardError("No values to write")
+    
+        # Snapshot before the UPDATE, from the row the guard is about to
+        # compare against. Re-reading afterwards would race with the writer
+        # the guard exists to catch.
+        before = fd.snapshot(entity, list(changes))
+    
+        model = type(entity)
+        now = datetime.utcnow()
+        # updated_at is set explicitly: onupdate fires for ORM flushes, and this
+        # is a Core UPDATE. Without it the revision would not move and the next
+        # writer would pass a guard it should have failed.
+        written = dict(changes)
+        written["updated_at"] = now
+        if rev.supports_counter(entity):
+            # v30: the counter moves on every guarded write, including writes
+            # guarded by an old timestamp token. That is how a row stops being
+            # uncounted without a separate backfill pass.
+            written["row_revision"] = rev.next_counter(entity)
+        if mode == rev.COUNTER_MODE:
+>           condition = model.row_revision == expected_value
+E           AttributeError: type object 'FakeProject' has no attribute 'row_revision'
+
+app/services/row_guard.py:197: AttributeError
+____________________ test_a_guarded_write_bumps_the_counter ____________________
+
+    def test_a_guarded_write_bumps_the_counter():
+        db = FakeDb(rowcount=1)
+        project = FakeProject(counter=3)
+>       rg.compare_and_set(db, project, {"name": "New"}, expected_revision="project:1:r3")
+
+tests/test_v30_exact_revisions.py:200: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v30_exact_revisions.FakeDb object at 0x7fd4ddbd5010>
+entity = <test_v30_exact_revisions.FakeProject object at 0x7fd4ddbd6b10>
+values = {'name': 'New'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+            raise GuardError("Revision token belongs to a different row")
+        if mode == rev.COUNTER_MODE and not rev.supports_counter(entity):
+            raise GuardError("This row has no revision counter; use a timestamp token")
+    
+        fields = allowed_fields(entity)
+        if not fields:
+            raise GuardError(f"No guarded fields defined for {kind(entity)}")
+        unknown = sorted(set(values) - set(fields))
+        if unknown:
+            raise GuardError(f"Fields not writable through a guarded update: {', '.join(unknown)}")
+        # v31: JSON null still means "leave this column alone" -- that is what
+        # every client shipped since v28 assumes. Clearing is a separate,
+        # explicit request via the CLEAR sentinel, which is why section 20.6
+        # could not clear owner_member_id without this.
+        changes: dict = {}
+        # v31 bugfix: this loop must not bind a name the guard condition below
+        # still needs. An earlier draft called the loop variable ``value``,
+        # which shadowed the parsed expected revision and made the conditional
+        # UPDATE compare the row against the last value being written -- a
+        # guard that could never match, and the whole point of v28.
+        for field, incoming in values.items():
+            if fd.is_clear(incoming):
+                if field not in clearable_fields(entity):
+                    raise GuardError(f"Field cannot be cleared: {field}")
+                changes[field] = None
+            elif incoming is not None:
+                changes[field] = incoming
+        if not changes:
+            raise GuardError("No values to write")
+    
+        # Snapshot before the UPDATE, from the row the guard is about to
+        # compare against. Re-reading afterwards would race with the writer
+        # the guard exists to catch.
+        before = fd.snapshot(entity, list(changes))
+    
+        model = type(entity)
+        now = datetime.utcnow()
+        # updated_at is set explicitly: onupdate fires for ORM flushes, and this
+        # is a Core UPDATE. Without it the revision would not move and the next
+        # writer would pass a guard it should have failed.
+        written = dict(changes)
+        written["updated_at"] = now
+        if rev.supports_counter(entity):
+            # v30: the counter moves on every guarded write, including writes
+            # guarded by an old timestamp token. That is how a row stops being
+            # uncounted without a separate backfill pass.
+            written["row_revision"] = rev.next_counter(entity)
+        if mode == rev.COUNTER_MODE:
+>           condition = model.row_revision == expected_value
+E           AttributeError: type object 'FakeProject' has no attribute 'row_revision'
+
+app/services/row_guard.py:197: AttributeError
+___________ test_a_timestamp_guarded_write_still_adopts_the_counter ____________
+
+    def test_a_timestamp_guarded_write_still_adopts_the_counter():
+        # This is how a pre-0013 row stops being uncounted without a backfill
+        # pass: the first guarded write writes 1.
+        db = FakeDb(rowcount=1)
+        legacy = Legacy()
+>       out = rg.compare_and_set(db, legacy, {"name": "New"},
+                                 expected_revision=f"project:9:{STAMP.isoformat()}")
+
+tests/test_v30_exact_revisions.py:210: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v30_exact_revisions.FakeDb object at 0x7fd4df32c3e0>
+entity = <test_v30_exact_revisions.Legacy object at 0x7fd4df32cb30>
+values = {'name': 'New'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+            raise GuardError("Revision token belongs to a different row")
+        if mode == rev.COUNTER_MODE and not rev.supports_counter(entity):
+            raise GuardError("This row has no revision counter; use a timestamp token")
+    
+        fields = allowed_fields(entity)
+        if not fields:
+            raise GuardError(f"No guarded fields defined for {kind(entity)}")
+        unknown = sorted(set(values) - set(fields))
+        if unknown:
+            raise GuardError(f"Fields not writable through a guarded update: {', '.join(unknown)}")
+        # v31: JSON null still means "leave this column alone" -- that is what
+        # every client shipped since v28 assumes. Clearing is a separate,
+        # explicit request via the CLEAR sentinel, which is why section 20.6
+        # could not clear owner_member_id without this.
+        changes: dict = {}
+        # v31 bugfix: this loop must not bind a name the guard condition below
+        # still needs. An earlier draft called the loop variable ``value``,
+        # which shadowed the parsed expected revision and made the conditional
+        # UPDATE compare the row against the last value being written -- a
+        # guard that could never match, and the whole point of v28.
+        for field, incoming in values.items():
+            if fd.is_clear(incoming):
+                if field not in clearable_fields(entity):
+                    raise GuardError(f"Field cannot be cleared: {field}")
+                changes[field] = None
+            elif incoming is not None:
+                changes[field] = incoming
+        if not changes:
+            raise GuardError("No values to write")
+    
+        # Snapshot before the UPDATE, from the row the guard is about to
+        # compare against. Re-reading afterwards would race with the writer
+        # the guard exists to catch.
+        before = fd.snapshot(entity, list(changes))
+    
+        model = type(entity)
+        now = datetime.utcnow()
+        # updated_at is set explicitly: onupdate fires for ORM flushes, and this
+        # is a Core UPDATE. Without it the revision would not move and the next
+        # writer would pass a guard it should have failed.
+        written = dict(changes)
+        written["updated_at"] = now
+        if rev.supports_counter(entity):
+            # v30: the counter moves on every guarded write, including writes
+            # guarded by an old timestamp token. That is how a row stops being
+            # uncounted without a separate backfill pass.
+            written["row_revision"] = rev.next_counter(entity)
+        if mode == rev.COUNTER_MODE:
+            condition = model.row_revision == expected_value
+        else:
+>           condition = model.updated_at == expected_value
+E           AttributeError: type object 'Legacy' has no attribute 'updated_at'
+
+app/services/row_guard.py:199: AttributeError
+________________ test_timestamp_guard_reports_itself_as_inexact ________________
+
+    def test_timestamp_guard_reports_itself_as_inexact():
+        db = FakeDb(rowcount=1)
+>       out = rg.compare_and_set(db, Legacy(), {"name": "N"},
+                                 expected_revision=f"project:9:{STAMP.isoformat()}")
+
+tests/test_v30_exact_revisions.py:219: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v30_exact_revisions.FakeDb object at 0x7fd4ddbdc350>
+entity = <test_v30_exact_revisions.Legacy object at 0x7fd4ddbdea20>
+values = {'name': 'N'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+            raise GuardError("Revision token belongs to a different row")
+        if mode == rev.COUNTER_MODE and not rev.supports_counter(entity):
+            raise GuardError("This row has no revision counter; use a timestamp token")
+    
+        fields = allowed_fields(entity)
+        if not fields:
+            raise GuardError(f"No guarded fields defined for {kind(entity)}")
+        unknown = sorted(set(values) - set(fields))
+        if unknown:
+            raise GuardError(f"Fields not writable through a guarded update: {', '.join(unknown)}")
+        # v31: JSON null still means "leave this column alone" -- that is what
+        # every client shipped since v28 assumes. Clearing is a separate,
+        # explicit request via the CLEAR sentinel, which is why section 20.6
+        # could not clear owner_member_id without this.
+        changes: dict = {}
+        # v31 bugfix: this loop must not bind a name the guard condition below
+        # still needs. An earlier draft called the loop variable ``value``,
+        # which shadowed the parsed expected revision and made the conditional
+        # UPDATE compare the row against the last value being written -- a
+        # guard that could never match, and the whole point of v28.
+        for field, incoming in values.items():
+            if fd.is_clear(incoming):
+                if field not in clearable_fields(entity):
+                    raise GuardError(f"Field cannot be cleared: {field}")
+                changes[field] = None
+            elif incoming is not None:
+                changes[field] = incoming
+        if not changes:
+            raise GuardError("No values to write")
+    
+        # Snapshot before the UPDATE, from the row the guard is about to
+        # compare against. Re-reading afterwards would race with the writer
+        # the guard exists to catch.
+        before = fd.snapshot(entity, list(changes))
+    
+        model = type(entity)
+        now = datetime.utcnow()
+        # updated_at is set explicitly: onupdate fires for ORM flushes, and this
+        # is a Core UPDATE. Without it the revision would not move and the next
+        # writer would pass a guard it should have failed.
+        written = dict(changes)
+        written["updated_at"] = now
+        if rev.supports_counter(entity):
+            # v30: the counter moves on every guarded write, including writes
+            # guarded by an old timestamp token. That is how a row stops being
+            # uncounted without a separate backfill pass.
+            written["row_revision"] = rev.next_counter(entity)
+        if mode == rev.COUNTER_MODE:
+            condition = model.row_revision == expected_value
+        else:
+>           condition = model.updated_at == expected_value
+E           AttributeError: type object 'Legacy' has no attribute 'updated_at'
+
+app/services/row_guard.py:199: AttributeError
+___________ test_lost_race_on_the_counter_rolls_back_and_raises_409 ____________
+
+    def test_lost_race_on_the_counter_rolls_back_and_raises_409():
+        db = FakeDb(rowcount=0)
+        with pytest.raises(HTTPException) as exc:
+>           rg.compare_and_set(db, FakeProject(counter=3), {"name": "N"},
+                               expected_revision="project:1:r3")
+
+tests/test_v30_exact_revisions.py:233: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v30_exact_revisions.FakeDb object at 0x7fd4ddbdd790>
+entity = <test_v30_exact_revisions.FakeProject object at 0x7fd4ddbdf6b0>
+values = {'name': 'N'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+            raise GuardError("Revision token belongs to a different row")
+        if mode == rev.COUNTER_MODE and not rev.supports_counter(entity):
+            raise GuardError("This row has no revision counter; use a timestamp token")
+    
+        fields = allowed_fields(entity)
+        if not fields:
+            raise GuardError(f"No guarded fields defined for {kind(entity)}")
+        unknown = sorted(set(values) - set(fields))
+        if unknown:
+            raise GuardError(f"Fields not writable through a guarded update: {', '.join(unknown)}")
+        # v31: JSON null still means "leave this column alone" -- that is what
+        # every client shipped since v28 assumes. Clearing is a separate,
+        # explicit request via the CLEAR sentinel, which is why section 20.6
+        # could not clear owner_member_id without this.
+        changes: dict = {}
+        # v31 bugfix: this loop must not bind a name the guard condition below
+        # still needs. An earlier draft called the loop variable ``value``,
+        # which shadowed the parsed expected revision and made the conditional
+        # UPDATE compare the row against the last value being written -- a
+        # guard that could never match, and the whole point of v28.
+        for field, incoming in values.items():
+            if fd.is_clear(incoming):
+                if field not in clearable_fields(entity):
+                    raise GuardError(f"Field cannot be cleared: {field}")
+                changes[field] = None
+            elif incoming is not None:
+                changes[field] = incoming
+        if not changes:
+            raise GuardError("No values to write")
+    
+        # Snapshot before the UPDATE, from the row the guard is about to
+        # compare against. Re-reading afterwards would race with the writer
+        # the guard exists to catch.
+        before = fd.snapshot(entity, list(changes))
+    
+        model = type(entity)
+        now = datetime.utcnow()
+        # updated_at is set explicitly: onupdate fires for ORM flushes, and this
+        # is a Core UPDATE. Without it the revision would not move and the next
+        # writer would pass a guard it should have failed.
+        written = dict(changes)
+        written["updated_at"] = now
+        if rev.supports_counter(entity):
+            # v30: the counter moves on every guarded write, including writes
+            # guarded by an old timestamp token. That is how a row stops being
+            # uncounted without a separate backfill pass.
+            written["row_revision"] = rev.next_counter(entity)
+        if mode == rev.COUNTER_MODE:
+>           condition = model.row_revision == expected_value
+E           AttributeError: type object 'FakeProject' has no attribute 'row_revision'
+
+app/services/row_guard.py:197: AttributeError
+_________ test_conflict_reports_the_preferred_token_not_the_legacy_one _________
+
+    def test_conflict_reports_the_preferred_token_not_the_legacy_one():
+        db = FakeDb(rowcount=0)
+        with pytest.raises(HTTPException) as exc:
+>           rg.compare_and_set(db, FakeProject(counter=9), {"name": "N"},
+                               expected_revision="project:1:r3")
+
+tests/test_v30_exact_revisions.py:243: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <test_v30_exact_revisions.FakeDb object at 0x7fd4ddbd4b30>
+entity = <test_v30_exact_revisions.FakeProject object at 0x7fd4ddbd6510>
+values = {'name': 'N'}
+
+    def compare_and_set(db: Session, entity, values: dict, *, expected_revision: str,
+                        organization_id: int | None = None,
+                        actor_member_id: int | None = None) -> dict:
+        """Apply ``values`` only if the row still matches ``expected_revision``.
+    
+        Unlike v27's advisory check, ``expected_revision`` is **required** here:
+        a compare-and-set with nothing to compare against is just an UPDATE, and
+        an endpoint that silently degrades to an unguarded write is worse than
+        one that refuses.
+        """
+        if not expected_revision:
+            raise GuardError("expected_revision is required for a guarded write")
+        try:
+            name, row_id, mode, expected_value = rev.parse(expected_revision)
+        except rev.RevisionError as exc:
+            raise GuardError(str(exc)) from exc
+        if name != kind(entity) or row_id != entity.id:
+            raise GuardError("Revision token belongs to a different row")
+        if mode == rev.COUNTER_MODE and not rev.supports_counter(entity):
+            raise GuardError("This row has no revision counter; use a timestamp token")
+    
+        fields = allowed_fields(entity)
+        if not fields:
+            raise GuardError(f"No guarded fields defined for {kind(entity)}")
+        unknown = sorted(set(values) - set(fields))
+        if unknown:
+            raise GuardError(f"Fields not writable through a guarded update: {', '.join(unknown)}")
+        # v31: JSON null still means "leave this column alone" -- that is what
+        # every client shipped since v28 assumes. Clearing is a separate,
+        # explicit request via the CLEAR sentinel, which is why section 20.6
+        # could not clear owner_member_id without this.
+        changes: dict = {}
+        # v31 bugfix: this loop must not bind a name the guard condition below
+        # still needs. An earlier draft called the loop variable ``value``,
+        # which shadowed the parsed expected revision and made the conditional
+        # UPDATE compare the row against the last value being written -- a
+        # guard that could never match, and the whole point of v28.
+        for field, incoming in values.items():
+            if fd.is_clear(incoming):
+                if field not in clearable_fields(entity):
+                    raise GuardError(f"Field cannot be cleared: {field}")
+                changes[field] = None
+            elif incoming is not None:
+                changes[field] = incoming
+        if not changes:
+            raise GuardError("No values to write")
+    
+        # Snapshot before the UPDATE, from the row the guard is about to
+        # compare against. Re-reading afterwards would race with the writer
+        # the guard exists to catch.
+        before = fd.snapshot(entity, list(changes))
+    
+        model = type(entity)
+        now = datetime.utcnow()
+        # updated_at is set explicitly: onupdate fires for ORM flushes, and this
+        # is a Core UPDATE. Without it the revision would not move and the next
+        # writer would pass a guard it should have failed.
+        written = dict(changes)
+        written["updated_at"] = now
+        if rev.supports_counter(entity):
+            # v30: the counter moves on every guarded write, including writes
+            # guarded by an old timestamp token. That is how a row stops being
+            # uncounted without a separate backfill pass.
+            written["row_revision"] = rev.next_counter(entity)
+        if mode == rev.COUNTER_MODE:
+>           condition = model.row_revision == expected_value
+E           AttributeError: type object 'FakeProject' has no attribute 'row_revision'
+
+app/services/row_guard.py:197: AttributeError
+________________ test_cursor_advances_past_filtered_out_events _________________
+
+    def test_cursor_advances_past_filtered_out_events():
+        # Category filtering happens in Python. Paging on the last *returned*
+        # row would re-serve every event the filter dropped at the tail.
+        events = [AuditEvent(30, "board.write.conflict")]
+        events += [AuditEvent(i) for i in range(29, 19, -1)]
+        db = AuditDb(events)
+        out = wa.feed(db, 1, limit=1, categories=("conflict",))
+        assert out["returned"] == 1
+>       assert out["next_cursor"] == 30
+E       assert 20 == 30
+
+tests/test_v30_exact_revisions.py:323: AssertionError
+_____________________ test_batch_restore_is_company_scoped _____________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd4ddbad7f0>
+
+    def test_batch_restore_is_company_scoped(monkeypatch):
+        db = plant(monkeypatch, event=None, projects=[])
+        with pytest.raises(HTTPException) as exc:
+>           cr.preview(db, FakeProject(), 1)
+
+tests/test_v30_exact_revisions.py:461: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/cascade_restore.py:54: in preview
+    if kind_of(company) != "company":
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+entity = <test_v30_exact_revisions.FakeProject object at 0x7fd4ddbad1f0>
+
+    def kind_of(entity) -> str:
+        # Test seam: stand-in rows declare their kind, so the decision logic can
+        # be pinned without a live ORM. Real rows never carry this attribute.
+        declared = getattr(entity, "__entity_kind__", None)
+        if declared in KINDS:
+            return declared
+        if isinstance(entity, Company):
+            return "company"
+        if isinstance(entity, Department):
+            return "department"
+        if isinstance(entity, Member):
+            return "member"
+>       raise CascadeError(f"entity_archive does not handle {type(entity).__name__}")
+E       app.services.entity_archive.CascadeError: entity_archive does not handle FakeProject
+
+app/services/entity_archive.py:114: CascadeError
+=========================== short test summary info ============================
+FAILED tests/test_v11_repository_delivery.py::test_delivery_test_review_merge_and_rollback
+FAILED tests/test_v28_write_guards.py::test_lost_race_is_reported_by_the_database_not_guessed
+FAILED tests/test_v28_write_guards.py::test_winning_write_commits_and_reports_both_revisions
+FAILED tests/test_v28_write_guards.py::test_conflict_event_failure_does_not_mask_the_409
+FAILED tests/test_v28_write_guards.py::test_guarded_update_sets_updated_at_explicitly
+FAILED tests/test_v30_exact_revisions.py::test_counter_token_guards_on_the_counter_column
+FAILED tests/test_v30_exact_revisions.py::test_a_guarded_write_bumps_the_counter
+FAILED tests/test_v30_exact_revisions.py::test_a_timestamp_guarded_write_still_adopts_the_counter
+FAILED tests/test_v30_exact_revisions.py::test_timestamp_guard_reports_itself_as_inexact
+FAILED tests/test_v30_exact_revisions.py::test_lost_race_on_the_counter_rolls_back_and_raises_409
+FAILED tests/test_v30_exact_revisions.py::test_conflict_reports_the_preferred_token_not_the_legacy_one
+FAILED tests/test_v30_exact_revisions.py::test_cursor_advances_past_filtered_out_events
+FAILED tests/test_v30_exact_revisions.py::test_batch_restore_is_company_scoped
+13 failed, 606 passed, 1 skipped in 29.00s

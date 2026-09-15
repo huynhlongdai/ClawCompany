@@ -1,0 +1,1 @@
+import {AuthGate} from "../../../components/AuthGate";import {V15AppShell} from "../../../components/V15AppShell";import {NinaSREV15Console} from "../../../components/NinaSREV15Console";export default function Page(){return <AuthGate><V15AppShell title="Nina SRE Control" subtitle="Governed autonomous incident recovery and paging"><NinaSREV15Console/></V15AppShell></AuthGate>}

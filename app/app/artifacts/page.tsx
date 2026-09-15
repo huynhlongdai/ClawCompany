@@ -1,0 +1,2 @@
+import {AuthGate} from "../../../components/AuthGate";import {V10AppShell} from "../../../components/V10AppShell";import {ArtifactHandoffConsole} from "../../../components/ArtifactHandoffConsole";
+export default function Page(){return <AuthGate><V10AppShell title="Artifacts & Handoff" subtitle="Universal source/file/deliverable exchange between agents"><ArtifactHandoffConsole/></V10AppShell></AuthGate>}

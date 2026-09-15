@@ -1,0 +1,1 @@
+import {AuthGate} from "../../../components/AuthGate";import {V14AppShell} from "../../../components/V14AppShell";import {TrustConsole} from "../../../components/TrustConsole";export default function Page(){return <AuthGate><V14AppShell title="Trust & Supply Chain" subtitle="Signed evidence, scanner adapters and release trust"><TrustConsole/></V14AppShell></AuthGate>}
