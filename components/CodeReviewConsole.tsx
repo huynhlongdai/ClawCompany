@@ -1,0 +1,14 @@
+"use client";
+import {useEffect,useState} from "react";
+import {apiV11} from "../lib/api";
+type Any=Record<string,any>;
+export function CodeReviewConsole(){
+ const [runs,setRuns]=useState<Any[]>([]),[detail,setDetail]=useState<Any|null>(null),[reviewer,setReviewer]=useState(""),[error,setError]=useState("");
+ const load=async()=>{try{const d=await apiV11.deliveries() as Any[];setRuns(d);setError("")}catch(e:any){setError(e.message)}};useEffect(()=>{load()},[]);
+ const inspect=async(id:number)=>{try{setDetail(await apiV11.delivery(id) as Any)}catch(e:any){setError(e.message)}};
+ const request=async()=>{if(!detail||!reviewer)return;try{await apiV11.requestReview(detail.delivery.id,{reviewer_member_id:Number(reviewer)});await inspect(detail.delivery.id)}catch(e:any){setError(e.message)}};
+ const decide=async(id:number,verdict:string)=>{try{await apiV11.decideReview(id,{verdict,score:verdict==="approve"?95:60,summary:verdict==="approve"?"Ready to merge":"Changes required before merge",findings:[]});if(detail)await inspect(detail.delivery.id)}catch(e:any){setError(e.message)}};
+ return <><div className="v10Grid"><section className="v8Card"><div className="v8CardHead"><div><b>Review queue</b><small>Reviewer agents and humans use the exact delivery commit and patch artifact.</small></div></div><div className="v11ReviewQueue">{runs.map(x=><button key={x.id} onClick={()=>inspect(x.id)}><span>#{x.id}</span><div><b>{x.artifact_bundle_key}</b><small>{x.source_branch||"not prepared"}</small></div><em>{x.status}</em></button>)}</div></section><section className="v8Card"><div className="v8CardHead"><div><b>Assign reviewer</b><small>Reviewer identity is tenant-bound and decisions are immutable records.</small></div></div><div className="v10Compose"><input placeholder="Reviewer member ID" value={reviewer} onChange={e=>setReviewer(e.target.value)}/><button className="v8Primary" onClick={request}>Assign</button></div>{detail&&<div className="v11Patch"><span>PATCH ARTIFACT</span><b>#{detail.delivery.patch_artifact_id||"—"}</b><code>{detail.delivery.head_commit_sha||"Prepare the run first"}</code></div>}{error&&<div className="portalError">{error}</div>}</section></div>
+ {detail&&<section className="v8Card"><div className="v8CardHead"><div><b>Review decisions · Delivery #{detail.delivery.id}</b><small>{detail.gate.approvals}/{detail.gate.required_approvals} approvals · tests {detail.gate.latest_test_status||"pending"}</small></div></div><div className="v11Reviews">{(detail.reviews||[]).map((x:Any)=><article key={x.id}><div><span>Reviewer #{x.reviewer_member_id||x.reviewer_agent_id}</span><b>{x.verdict}</b></div><p>{x.summary||"Waiting for reviewer decision."}</p>{x.status==="pending"&&<footer><button onClick={()=>decide(x.id,"approve")}>Approve</button><button onClick={()=>decide(x.id,"changes_requested")}>Request changes</button></footer>}</article>)}</div></section>}
+ </>
+}
