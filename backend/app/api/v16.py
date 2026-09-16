@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.core.authz import Principal, enforce_org, require_role, require_scope
 from app.core.tenancy import active_org
-from app.models import (AgentTeam, AgentTeamMember, CollaborationRoom, RoomParticipant, RoomTurn,
+from app.models import (AgentTeam, AgentTeamMember, CollaborationRoom, Member, RoomParticipant, RoomTurn,
+                        RoomConductorRun,
                         DelegationContract, SharedKnowledgeSpace, KnowledgeGrant, SharedKnowledgeEntry,
                         KnowledgeAccessLog)
 from app.schemas.v16 import *
@@ -11,6 +13,8 @@ from app.services import agent_teams as teams_service
 from app.services import collaboration_rooms as rooms_service
 from app.services import delegation as delegation_service
 from app.services import knowledge_mesh as mesh_service
+from app.services import room_conductor as conductor
+from app.runtime.factory import get_runtime
 
 router = APIRouter(prefix="/v16", tags=["v16-agent-collaboration-mesh"])
 
@@ -75,9 +79,23 @@ def remove_team_member(team_id: int, member_id: int, principal: Principal = Depe
 # --------------------------------------------------------- collaboration rooms
 @router.post("/rooms")
 def open_room(payload: CollaborationRoomCreate, principal: Principal = Depends(require_scope("company.collaboration:write")), db: Session = Depends(get_db)):
+    """Mở một phòng cộng tác.
+
+    Lỗi đã sửa ở v37, phát hiện khi dùng endpoint này thật: nó trả về `{}`.
+    `open_room` gọi `db.refresh(room)` rồi ngay sau đó `emit_event` **commit**
+    lần nữa, nên instance bị expire và `jsonable_encoder` chỉ thấy `__dict__`
+    rỗng. Client tạo phòng xong không nhận được `id` — nghĩa là không ai từng
+    tạo phòng qua API rồi dùng kết quả, suốt từ v16.
+
+    `db.refresh` ở đây nạp lại thuộc tính sau lần commit cuối.
+    """
     enforce_org(payload.organization_id, principal)
-    try: return rooms_service.open_room(db, **payload.model_dump())
-    except rooms_service.CollaborationError as exc: raise HTTPException(409, str(exc))
+    try:
+        room = rooms_service.open_room(db, **payload.model_dump())
+    except rooms_service.CollaborationError as exc:
+        raise HTTPException(409, str(exc))
+    db.refresh(room)
+    return room
 
 
 @router.get("/rooms")
@@ -110,6 +128,94 @@ def post_turn(room_id: int, payload: RoomTurnCreate, principal: Principal = Depe
         raise HTTPException(403, "API key is bound to a different member identity")
     try: return rooms_service.post_turn(db, room, **payload.model_dump())
     except rooms_service.CollaborationError as exc: raise HTTPException(409, str(exc))
+
+
+# ------------------------------------------------- v37: bộ điều phối phòng họp
+#
+# Máy trạng thái phòng của v16 đã đủ chốt (thứ tự lượt, quyền chốt, trần lượt).
+# Cái nó thiếu là **người gọi agent**: trước v37, một lượt chỉ xuất hiện khi có
+# người POST vào /turns, nên phòng toàn agent thì không ai nói.
+#
+# `async def` là bắt buộc — bên trong await runtime.
+
+
+class RoomConductRequest(BaseModel):
+    # Số lượt tối đa cho LỜI GỌI NÀY, không phải cho cả phòng. Trần của phòng là
+    # `max_turns`; đây là "chạy thêm mấy lượt nữa rồi trả kết quả".
+    max_turns: int = Field(default=4, ge=1, le=20)
+    # Ước lượng chi phí mỗi lượt. Không tự đoán ở server: giá thật nằm ở
+    # `usage.cost` của gateway và hai nguồn tiền chưa được đối chiếu (WP-1.4).
+    cost_per_turn_usd: float = Field(default=0.01, ge=0, le=10)
+
+
+class RoomChairRequest(BaseModel):
+    chair_member_id: int | None = None
+    cost_budget_usd: float = Field(default=0.0, ge=0, le=1000)
+    max_turns: int | None = Field(default=None, ge=1, le=500)
+
+
+@router.post("/rooms/{room_id}/chair")
+def set_room_chair(room_id: int, payload: RoomChairRequest,
+                   principal: Principal = Depends(require_scope("company.collaboration:write")),
+                   db: Session = Depends(get_db)):
+    """Đặt chủ toạ và trần tiền cho phòng.
+
+    Chủ toạ có thể là người thật hoặc agent. Trần tiền là **bắt buộc** trước khi
+    chạy bộ điều phối: mỗi lượt là một lời gọi model có phí.
+    """
+    room = _room(db, room_id, principal)
+    if payload.chair_member_id is not None:
+        member = db.get(Member, payload.chair_member_id)
+        if not member:
+            raise HTTPException(404, "Chair member not found")
+        enforce_org(member.organization_id, principal)
+        room.chair_member_id = payload.chair_member_id
+    if payload.cost_budget_usd:
+        room.cost_budget_usd = payload.cost_budget_usd
+    if payload.max_turns:
+        room.max_turns = payload.max_turns
+    db.add(room); db.commit(); db.refresh(room)
+    chair = conductor.chair_of(db, room)
+    return {"room_id": room.id, "chair_member_id": room.chair_member_id,
+            "chair_resolved": chair.member_id if chair else None,
+            "cost_budget_usd": room.cost_budget_usd, "max_turns": room.max_turns}
+
+
+@router.post("/rooms/{room_id}/conduct")
+async def conduct_room(room_id: int, payload: RoomConductRequest,
+                       principal: Principal = Depends(require_scope("company.collaboration:write")),
+                       db: Session = Depends(get_db)):
+    """Chạy phiên họp: agent thật nói lần lượt, biên bản ghi vào room_turns.
+
+    Trả về lý do dừng trong bốn lý do có thể: hết lượt, hết tiền, phòng bị treo
+    (hai lượt liên tiếp không thêm thông tin), hoặc chủ toạ đã chốt.
+    """
+    room = _room(db, room_id, principal)
+    try:
+        return await conductor.conduct(db, room, get_runtime(),
+                                       max_turns=payload.max_turns,
+                                       cost_per_turn_usd=payload.cost_per_turn_usd)
+    except conductor.ConductorError as exc:
+        raise HTTPException(409, str(exc))
+
+
+@router.get("/rooms/{room_id}/conductor-runs")
+def room_conductor_runs(room_id: int,
+                        principal: Principal = Depends(require_scope("company.collaboration:read")),
+                        db: Session = Depends(get_db)):
+    """Vận hành của phiên họp: lượt nào gọi model nào, mất mấy giây, lỗi gì.
+
+    Tách khỏi biên bản có chủ ý: `GET /rooms/{id}` trả biên bản cho người đọc,
+    endpoint này trả dữ liệu kỹ thuật cho người vận hành.
+    """
+    room = _room(db, room_id, principal)
+    runs = db.query(RoomConductorRun).filter(RoomConductorRun.room_id == room.id) \
+             .order_by(RoomConductorRun.id).all()
+    return {"room_id": room.id, "runs": runs,
+            "stopped_reason": room.stopped_reason,
+            "cost_spent_usd": room.cost_spent_usd,
+            "cost_budget_usd": room.cost_budget_usd,
+            "stall_count": room.stall_count}
 
 
 @router.post("/rooms/{room_id}/close")

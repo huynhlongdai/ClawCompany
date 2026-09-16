@@ -212,41 +212,104 @@ luyện nhân viên".
 
 ## Phase 4 — Điều phối việc thật
 
-### WP-4.1 Service chọn seat
+> **Viết lại 2026-09-16** sau hai phép đo: `_reports/work-memory-gap.md` (agent
+> nhận prompt 358 ký tự, thiếu 10/12 dữ kiện công ty đã biết) và
+> `_reports/room-conductor-e2e.md` (phòng họp là bảng dữ liệu không ai gọi).
+> Bản cũ của phase này chỉ có "chọn seat", như thế là quá mỏng để gọi là điều
+> phối. Phân tích đầy đủ: `docs/AGENT_WORK_MEMORY.md` và `docs/AGENT_TEAMWORK.md`.
 
-- **Việc:** `services/dispatch_policy.py` thuần: (task, seats, tải, ngân sách) → (seat, lý do).
-  Lọc theo phòng ban → kỹ năng → `lifecycle='active'` → tải → hạn mức.
-- **Xong khi:** lý do chọn được lưu vào `company_events`, quản lý đọc được "vì sao việc này
-  giao cho seat đó".
-- **Kiểm chứng:** test hành vi cho 6 tình huống, gồm "không seat nào đủ điều kiện" (phải trả
-  lời rõ, không được chọn bừa).
+### WP-4.0 Tầng bộ nhớ công việc — ✅ XONG 2026-09-16
 
-### WP-4.2 Hàng đợi: hai việc một seat
+- **Việc:** gói ngữ cảnh bảy khối (`services/work_context.py`) + sổ ghi task
+  (`services/task_journal.py`, bảng `task_journal_entries`), nối vào
+  `agent_dispatch` thay cho `task_brief` bốn dòng.
+- **Ranh giới đã chốt:** kinh nghiệm cá nhân ở OpenClaw (`MEMORY.md`, dreaming),
+  sự thật về công việc ở ClawCompany. Lý do không phải sở thích: cả năm tầng bộ
+  nhớ của OpenClaw đều per-agent hoặc per-session, và tìm kiếm bộ nhớ chéo agent
+  **đã bị xoá** ở upstream v2026.8.1.
+- **Đo được:** brief cũ 358 ký tự → gói mới 1 310 ký tự trên cùng task. Hỏi lại
+  ba câu cần bối cảnh: trước là "không có thông tin" cả ba, sau trả lời được
+  "dự án Summer Dress Campaign, tiến độ 68%, còn 14 ngày, hạn 30/09/2026".
+- **Chốt thiết kế:** khi vượt ngân sách thì cắt khối 4 → 3 → 5 → 1; **khối 2
+  (việc) và 6 (luật) không bao giờ bị cắt** — thiếu bối cảnh thì agent làm kém,
+  thiếu luật thì agent làm sai.
+- **Một câu trả lời sai đã ghi lại trung thực:** phép đo gửi gói của Mia vào
+  seat của Nina nên agent nhầm vai. Bài học: gói phải tới đúng seat của người mà
+  khối 1 đang nói về.
 
-- **Việc:** thử hai `chat.send` song song vào cùng session; chọn `messages.queue.mode` phù
-  hợp cho ngữ cảnh công ty (tôi nghiêng về `followup`, không `steer`: chen ngang giữa một
-  việc đang chạy là sai về nghiệp vụ).
-- **Xong khi:** hành vi được ghi lại thành tài liệu, và ClawCompany hoặc xếp hàng chủ động
-  hoặc trả về "seat đang bận, hẹn lượt".
-- **Kiểm chứng:** `_reports/queue-behaviour.md` với log thật. **Đây là một trong ba chỗ
-  chưa kiểm chứng đã ghi ở mục 8** của `ARCHITECTURE_TREE.md`.
+### WP-4.1 Phòng họp có chủ toạ chạy thật — ✅ XONG 2026-09-16
 
-### WP-4.3 Vòng đời task đủ trạng thái
+- **Việc:** `services/room_conductor.py` — vòng lặp chín bước khiến agent thật
+  nói trong phòng của v16, cộng `POST /api/v16/rooms/{id}/chair` và
+  `/conduct`, cộng bảng `room_conductor_runs`.
+- **Không xây lại máy trạng thái phòng:** v16 đã có thứ tự lượt, quyền chốt, năm
+  loại lượt, trần lượt. Nó thiếu đúng một thứ — **không ai gọi agent**. Trong 93
+  service chỉ ba chỗ từng gọi `run_agent`.
+- **Năm điều kiện dừng:** `chair_closed`, `budget`, `stalled`, `max_turns`,
+  `waiting_for_human`. Bộ điều phối **từ chối chạy** nếu phòng chưa đặt
+  `cost_budget_usd` — phòng toàn agent không trần tiền là hoá đơn mở.
+- **Nghiệm thu thật** (`_reports/room-conductor-e2e.md`): ba lượt, Nina mở đầu →
+  Mia đề xuất 5 hook (`proposal`) → Nina chốt bằng `QUYẾT ĐỊNH:` (`decision`) →
+  phòng đóng vì `chair_closed`. Seat thứ hai được tạo **qua wire** bằng
+  `agents.create`. Mỗi agent dùng phiên riêng của phòng, không lượt nào chạm
+  `agent:<id>:main`.
+- **Ba lỗi chỉ lần chạy thật phát hiện, đã sửa, đều có test hồi quy:**
+  1. "chúng ta **sẽ quyết định**" bị đọc thành "tôi chốt" → nay chỉ dòng bắt đầu
+     bằng `QUYẾT ĐỊNH:` mới kết thúc họp. Nguyên tắc: *đừng suy diễn cái có thể
+     yêu cầu.*
+  2. Chốt chống treo so với lượt **liền trước**, nên vòng lặp luân phiên
+     `A B A B` không bao giờ bị bắt → nay so với lượt gần nhất của **chính người
+     nói**.
+  3. **Nguyên nhân gốc:** `_ask` đọc "message trợ lý cuối cùng" trong một session
+     dài, nên khi model chưa kịp trả lời thì nó đọc lại câu cũ. Bằng chứng nằm
+     trong số đo: lượt 1 mất 10,09s (hai nhịp poll), lượt 3 chỉ 5,06s và trả về
+     đúng từng ký tự câu của lượt 1 → nay chụp vân tay message **trước khi gửi**.
+- **Lỗi có sẵn của v16 đã sửa kèm:** `POST /api/v16/rooms` trả về `{}` vì
+  `emit_event` commit sau `db.refresh()` làm instance bị expire. Nghĩa là suốt
+  từ v16, chưa ai tạo phòng qua API rồi dùng kết quả.
+
+### WP-4.2 Chọn seat theo năng lực và tải
+
+- **Việc:** `services/dispatch_policy.py` **thuần**: `(task, seats, tải, ngân
+  sách) → (seat, lý do chọn)`. Lọc theo phòng ban → kỹ năng → `lifecycle='active'`
+  → tải → hạn mức còn lại.
+- **Xong khi:** lý do chọn được lưu vào `company_events`; quản lý đọc được "vì
+  sao việc này giao cho seat đó".
+- **Cảnh báo phạm vi:** OpenClaw không có metric hiệu suất per-agent.
+  `agent_daily_stats` của v36 trả `success_rate: null` khi chưa đo được, và một
+  thuật toán phân việc dựa trên `null` chỉ là phân việc theo thứ tự id. Làm
+  phần "theo tải" trước, phần "theo năng lực" sau khi có dữ liệu thật.
+- **Kiểm chứng:** test hành vi cho 6 tình huống, gồm "không seat nào đủ điều
+  kiện" — phải trả lời rõ, không được chọn bừa.
+
+### WP-4.3 Bàn giao gọi được agent
+
+- **Việc:** khi `artifact_handoffs` được tạo với `to_member_id` là agent đang
+  hoạt động → ghi mục `handoff` vào sổ ghi task rồi dispatch. Khối 5 của gói ngữ
+  cảnh đã đọc được bàn giao; chỉ thiếu dây gọi.
+- **Xong khi:** một bàn giao từ Nina tới Mia khiến Mia thật sự nhận việc, và gói
+  ngữ cảnh của Mia mang theo hướng dẫn bàn giao.
+
+### WP-4.4 Review hai vòng dùng lại bộ điều phối
+
+- **Việc:** một review là một phòng hai người, `max_turns` nhỏ, chủ toạ là người
+  duyệt. Dùng lại `room_conductor` thay vì viết vòng lặp thứ hai.
+- **Xong khi:** một artifact đi qua vòng review có agent reviewer thật phát biểu,
+  và kết quả vào `repository_reviews`.
+
+### WP-4.5 Vòng đời task đủ trạng thái
 
 - **Việc:** chạy một task có follower từ đầu để `runtime_stream` chuyển
   `complete → review` và `error → blocked`.
 - **Xong khi:** cả hai đường chuyển trạng thái được chứng minh bằng event thật.
-- **Kiểm chứng:** đây là việc số 3 trong mục "Việc tiếp theo" của `HANDOFF.md`, còn nợ.
 
-### WP-4.4 Ngân sách chặn được thật
+### WP-4.6 Ngân sách chặn được thật
 
-- **Việc:** nối `budget_envelopes` vào đúng lúc gửi lệnh: seat hết hạn mức thì `chat.send`
-  không được gửi, task chuyển `blocked` kèm lý do.
-- **Xong khi:** một seat bị chặn vì hết tiền, không phải bị chặn vì code lỗi.
-- **Kiểm chứng:** test hành vi + một vòng thật với hạn mức đặt thấp có chủ ý.
-- **Phụ thuộc:** WP-1.4 (phải biết số tiền nào là thật trước khi chặn theo nó).
-
----
+- **Việc:** nối `budget_envelopes` vào đúng lúc gửi lệnh; seat hết hạn mức thì
+  `chat.send` không được gửi, task chuyển `blocked` kèm lý do.
+- **Phụ thuộc:** WP-1.4 — phải biết số tiền nào là thật trước khi chặn theo nó.
+  Hiện `cost_per_turn_usd` của phòng họp là **ước lượng do caller đưa vào**, và
+  hai nguồn tiền chưa từng được đối chiếu.
 
 ## Phase 5 — Đóng nợ đo lường (P1 trong HANDOFF)
 

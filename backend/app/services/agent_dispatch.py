@@ -23,6 +23,10 @@ from app.models import Agent, CustomerProjectAssignment, Member, Task
 from app.realtime import broker
 from app.runtime.factory import get_runtime
 from app.services import openclaw_alignment as align
+from app.services import task_journal, work_context
+
+# Những lần không ghi được sổ, đọc được qua API để không ai tưởng sổ đầy đủ.
+LOG_JOURNAL_FAILURES: list[dict] = []
 from app.services.company_event_bus import emit_event
 from app.services.metering import record_usage
 
@@ -57,9 +61,20 @@ async def dispatch_task(db: Session, task: Task) -> Task:
     session_key = align.session_key_for_task(agent.runtime_agent_id, task.id)
     runtime = get_runtime()
 
+    # v37: gửi gói ngữ cảnh bảy khối thay cho `task_brief` bốn dòng.
+    #
+    # Đo được trước khi đổi (`_reports/work-memory-gap.md`): brief cũ dài 358 ký
+    # tự, trong đó 286 là văn bản cố định, và 10/12 dữ kiện công ty đã biết
+    # không đi vào prompt — agent trả lời "không có thông tin" cho cả ba câu về
+    # dự án, người giao việc và hạn chót.
+    #
+    # `task_brief` không bị xoá: nội dung của nó thành khối 7 (thoả thuận làm
+    # việc) trong gói, vì bốn dòng đó là một hợp đồng chứ không phải mô tả.
+    pack = work_context.build_pack(db, task, organization_id=member.organization_id)
+
     run = await runtime.run_agent(
         runtime_agent_id=agent.runtime_agent_id,
-        input_text=align.task_brief(db, task),
+        input_text=pack["text"],
         metadata={
             "company_task_id": task.id,
             "project_id": task.project_id,
@@ -72,6 +87,23 @@ async def dispatch_task(db: Session, task: Task) -> Task:
     task.runtime_task_id = run.task_id or str(task.id)
     task.runtime_run_id = run.run_id
     task.runtime_session_key = run.session_key or session_key
+
+    # Ghi vào sổ của task: lần chạy này đã bắt đầu, với gói ngữ cảnh cỡ nào.
+    # Đây là thứ khối 4 của lần dispatch KẾ TIẾP sẽ đọc — tầng bộ nhớ công việc
+    # chỉ hoạt động nếu mỗi lượt đều chịu ghi lại.
+    try:
+        task_journal.append(
+            db, task, kind="attempt", actor_member_id=member.id,
+            summary=f"Giao cho {member.name} qua seat {agent.runtime_agent_id}",
+            detail=f"Gói ngữ cảnh {pack['chars']} ký tự"
+                   + (f", đã lược: {', '.join(pack['trimmed'])}" if pack["trimmed"] else "")
+                   + f"\nSession: {task.runtime_session_key}",
+            runtime_run_id=run.run_id or "", runtime_session_key=task.runtime_session_key or "",
+        )
+    except task_journal.JournalError as exc:
+        # Không ghi được sổ thì việc vẫn phải chạy; nhưng phải để lại dấu vết,
+        # vì một sổ ghi có lỗ là một sổ ghi nói dối về lịch sử.
+        LOG_JOURNAL_FAILURES.append({"task_id": task.id, "error": str(exc)})
     # Stay inside the board vocabulary. A dispatched task is in_progress.
     if task.status not in ("in_progress", "review", "done"):
         task.status = "in_progress"
