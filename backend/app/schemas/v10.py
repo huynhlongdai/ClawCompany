@@ -64,6 +64,11 @@ class ArtifactHandoffCreate(BaseModel):
     task_id: int | None = None
     purpose: str = "continue_work"
     instructions: str = Field(default="", max_length=30000)
+    # WP-4.3: có giao việc cho người nhận luôn hay không.
+    # None = theo cấu hình `openclaw_auto_dispatch`; True/False = caller nói rõ,
+    # và lời nói rõ thắng cấu hình. Mỗi lượt dispatch là một lời gọi model có
+    # phí, nên mặc định không được là "luôn chạy".
+    dispatch: bool | None = None
 
 
 class ArtifactEvaluationCreate(BaseModel):

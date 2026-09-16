@@ -6,9 +6,10 @@ Nguồn sự thật về hiện trạng dự án. README kể lịch sử v4→v
 - Ngày tiếp nhận: **2026-09-15**
 - Nguồn: `clawcompany_v35_spend_push.zip` (459 file, không có `.git`)
 - Repo: `https://github.com/huynhlongdai/ClawCompany`
-- Lượt gần nhất: **WP-1.1, WP-1.2, WP-2.1, WP-2.2, WP-4.0, WP-4.1 đã xong**
+- Lượt gần nhất: **WP-1.1, WP-1.2, WP-2.1, WP-2.2, WP-4.0, WP-4.1, WP-4.3 đã xong**
   (2026-09-16) — bề mặt điều khiển OpenClaw đã mở, hồ sơ nhân sự AI đọc/ghi
-  được, **tầng bộ nhớ công việc** và **phòng họp có chủ toạ** đã chạy thật.
+  được, **tầng bộ nhớ công việc**, **phòng họp có chủ toạ** và **bàn giao gọi
+  được agent** đã chạy thật.
   Đọc `docs/AGENT_WORK_MEMORY.md` và `docs/AGENT_TEAMWORK.md` trước khi làm
   tiếp; kế hoạch ở `docs/BUILD_PLAN.md`.
 - Service version: `1.26.0` · Migration head: **`0017_v37_work_memory_rooms`**
@@ -135,7 +136,8 @@ npm install && npx next build
 
 | Hạng mục | Trạng thái | Bằng chứng |
 | --- | --- | --- |
-| Test suite | **759 passed · 0 failed · 1 skipped** | `pytest -q`, 2026-09-16 |
+| Test suite | **776 passed · 0 failed · 1 skipped** | `pytest -q`, 2026-09-16 |
+| Bàn giao gọi được agent | **Mia nhận việc và nhắc lại đúng chi tiết chỉ có trong hướng dẫn bàn giao** | `_reports/handoff-dispatch-e2e.md` |
 | Tầng bộ nhớ công việc | **prompt 358 → 1 310 ký tự**, agent trả lời được ba câu trước đó mù | `_reports/work-memory-gap.md` |
 | Phòng họp có chủ toạ | **hai agent thật họp 3 lượt, chủ toạ chốt, phòng đóng** | `_reports/room-conductor-e2e.md` |
 | `agents.create` qua wire | **tạo được seat `mia` trên gateway thật** | cùng log trên |

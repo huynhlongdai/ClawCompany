@@ -282,13 +282,38 @@ luyện nhân viên".
 - **Kiểm chứng:** test hành vi cho 6 tình huống, gồm "không seat nào đủ điều
   kiện" — phải trả lời rõ, không được chọn bừa.
 
-### WP-4.3 Bàn giao gọi được agent
+### WP-4.3 Bàn giao gọi được agent — ✅ XONG 2026-09-16
 
-- **Việc:** khi `artifact_handoffs` được tạo với `to_member_id` là agent đang
-  hoạt động → ghi mục `handoff` vào sổ ghi task rồi dispatch. Khối 5 của gói ngữ
-  cảnh đã đọc được bàn giao; chỉ thiếu dây gọi.
-- **Xong khi:** một bàn giao từ Nina tới Mia khiến Mia thật sự nhận việc, và gói
-  ngữ cảnh của Mia mang theo hướng dẫn bàn giao.
+- **Việc:** `services/handoff_dispatch.py` — khi `artifact_handoffs` được tạo với
+  `to_member_id` là agent đang hoạt động thì ghi mục `handoff` vào sổ ghi task,
+  chuyển chủ việc, tự nhận bàn giao, rồi dispatch.
+  `POST /api/v10/artifacts/{id}/handoff` thành `async def` và nhận thêm cờ
+  `dispatch`.
+- **Bốn câu hỏi mà "chỉ gọi dispatch" không trả lời được, và cách xử lý:**
+  1. **Ai là chủ việc sau bàn giao?** Phải gán lại `task.assignee_member_id`.
+     Khối 1 của gói ngữ cảnh mở đầu bằng "Bạn là <người được giao>", nên không
+     gán lại thì người nhận đọc hồ sơ của người khác — **đúng lỗi đã đo được** ở
+     `_reports/work-memory-gap.md`. Đây là chỗ thi hành bài học đó.
+  2. **Agent có cần bấm "accept"?** Không, nhưng trạng thái vẫn đi qua
+     `accept_handoff` của v10 thay vì tự đặt `status`, để không sinh định nghĩa
+     thứ hai của "đã nhận" (lớp lỗi `row_guard.kind` ở v28, `next_speaker` ở v37).
+  3. **Bàn giao nào cũng tự tiêu tiền?** Không: cờ của lời gọi → cấu hình
+     `openclaw_auto_dispatch` → không chạy. Mọi nhánh **đều trả về `reason`**.
+  4. **Không dispatch được thì bàn giao có mất?** Không. Ghi sổ xảy ra **trước**
+     khi gọi runtime, nên lịch sử công việc không phụ thuộc vào việc có tiêu
+     tiền hay không.
+- **Nghiệm thu thật** (`_reports/handoff-dispatch-e2e.md`): một lời gọi API →
+  sổ ghi seq 1 (`handoff` từ Nina) + seq 2 (`attempt` của Mia), chủ việc chuyển
+  2→4, tự nhận, dispatch vào `agent:mia:company-task-14`. Bốn kiểm tra gói ngữ
+  cảnh đều đạt. Rồi hỏi chính Mia: *"Hạn nội bộ là ngày **18/09**. Hook về
+  **giảm giá sốc** đã bị loại."* — hai chi tiết **chỉ tồn tại trong
+  `instructions` của bàn giao**, không ở tiêu đề task, mô tả hay dự án.
+- **Lỗi có sẵn sửa kèm:** `POST /api/v10/artifacts` (và `/messages`,
+  `/handoffs/{id}/accept`, `/evaluations`) trả về thiếu `id` — cùng lớp lỗi
+  expire-after-commit đã sửa ở `POST /api/v16/rooms`. Nghĩa là chưa ai tạo
+  artifact qua API rồi dùng id đó để bàn giao. Đã gộp thành helper `_fresh`.
+- 17 test hành vi; ba chốt chính (gán lại chủ việc, ghi sổ, kiểm `lifecycle`)
+  đều kiểm bằng mutation — bỏ chốt thì test đỏ.
 
 ### WP-4.4 Review hai vòng dùng lại bộ điều phối
 

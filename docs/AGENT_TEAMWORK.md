@@ -60,7 +60,7 @@ người nói cùng lúc thì không ai nghe được gì.
 | Kiểu | Đời thật | ClawCompany hiện có | Trạng thái |
 | --- | --- | --- | --- |
 | **A. Phòng họp có chủ toạ** | nhiều người bàn, một người chốt | `collaboration_rooms` + bộ điều phối v37 | **CHẠY ĐƯỢC** |
-| **B. Bàn giao có ngữ cảnh** | giao việc kèm hồ sơ và lời nhắn | `artifact_handoffs`, khối 5 của gói ngữ cảnh | đọc được, chưa có dây gọi agent |
+| **B. Bàn giao có ngữ cảnh** | giao việc kèm hồ sơ và lời nhắn | `artifact_handoffs` + `handoff_dispatch` (WP-4.3) | **CHẠY ĐƯỢC** |
 | **C. Giao việc theo năng lực** | trưởng phòng phân việc | chưa có service chọn seat | **CHƯA CÓ** |
 | **D. Review hai vòng** | làm xong, người khác soát | `repository_reviews`, `approvals` | có bảng, chưa nối runtime |
 | **E. Làm song song rồi hợp nhất** | ba người làm ba phần | `sessions_spawn` của OpenClaw | dùng được cho việc phụ ngắn |
@@ -173,16 +173,29 @@ không có trong tập đó.
 
 ## 4. Bốn kiểu còn lại — nên làm gì tiếp
 
-### B. Bàn giao có ngữ cảnh
+### B. Bàn giao có ngữ cảnh — đã chạy (WP-4.3)
 
-Đã có `artifact_handoffs` với `from_member_id`, `to_member_id`, `purpose`,
-`instructions`, và khối 5 của gói ngữ cảnh đã đọc nó — agent nhận việc thấy được
-"Nina bàn giao (review): Kiểm tông thương hiệu trước khi đăng".
+`services/handoff_dispatch.py`. Một lời gọi
+`POST /api/v10/artifacts/{id}/handoff` nay làm bốn việc thay vì một:
 
-Còn thiếu: **không ai gọi agent khi có bàn giao**. Một bàn giao nằm im tới khi
-có người dispatch task. Việc cần làm nhỏ: khi `artifact_handoffs` được tạo với
-`to_member_id` là một agent đang hoạt động, ghi một mục `handoff` vào sổ ghi task
-rồi dispatch. Nên gộp vào WP-4.1.
+1. **Ghi sổ** mục `handoff` vào `task_journal_entries` — xảy ra **trước** khi gọi
+   runtime, nên lịch sử không phụ thuộc việc có tiêu tiền hay không.
+2. **Chuyển chủ việc** sang người nhận. Bắt buộc: khối 1 của gói ngữ cảnh mở đầu
+   bằng "Bạn là <người được giao>", nên không gán lại thì người nhận đọc hồ sơ
+   của người khác.
+3. **Tự nhận bàn giao** qua `accept_handoff` của v10 — nhân viên AI không bấm
+   nút, nhưng trạng thái vẫn đi đúng đường và không có định nghĩa thứ hai của
+   "đã nhận".
+4. **Dispatch** tới seat của người nhận, nếu cờ lời gọi hoặc
+   `openclaw_auto_dispatch` cho phép.
+
+Năm lý do không chạy, mỗi cái đều được trả về: `no_task`, `target_is_human`,
+`target_has_no_active_seat`, `auto_dispatch_disabled`, `dispatch_error`.
+
+**Nghiệm thu** (`_reports/handoff-dispatch-e2e.md`): Nina bàn giao cho Mia kèm
+hướng dẫn chứa một chi tiết không tồn tại ở đâu khác trong hệ thống. Hỏi lại
+Mia: *"Hạn nội bộ là ngày **18/09**. Hook về **giảm giá sốc** đã bị loại."*
+Hướng dẫn bàn giao đã đi trọn đường sổ ghi → gói ngữ cảnh → model.
 
 ### C. Giao việc theo năng lực — chưa có, và đây là việc khó nhất
 

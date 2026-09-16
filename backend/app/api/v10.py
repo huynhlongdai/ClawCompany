@@ -18,6 +18,7 @@ from app.schemas.v10 import (
 )
 from app.services.agent_messaging import mark_read, send_message
 from app.services.artifacts import accept_handoff, handoff_artifact, materialize_artifact, register_artifact
+from app.services.handoff_dispatch import dispatch_on_handoff
 from app.services.company_event_bus import emit_event, payload_of
 from app.services.decision_loop import tick_decision_loop
 from app.services.quality import evaluate_artifact
@@ -99,7 +100,7 @@ def create_message(payload: AgentMessageCreate, principal: Principal = Depends(r
     enforce_org(payload.organization_id, principal)
     if payload.company_id is not None: ensure_company(db, payload.company_id, principal)
     try:
-        return send_message(db, **payload.model_dump())
+        return _fresh(db, send_message(db, **payload.model_dump()))
     except ValueError as exc:
         raise HTTPException(400, str(exc))
 
@@ -125,13 +126,31 @@ def read_message(message_id: int, principal: Principal = Depends(require_scope("
     return mark_read(db, item)
 
 
+def _fresh(db: Session, row):
+    """Nạp lại instance trước khi trả về, nếu không phản hồi sẽ thiếu trường.
+
+    Lỗi có sẵn, phát hiện khi dùng endpoint thật (WP-4.3): các service của v10
+    gọi ``db.refresh(row)`` rồi ngay sau đó ``emit_event`` **commit** lần nữa.
+    Commit làm instance expire, nên ``jsonable_encoder`` chỉ thấy ``__dict__``
+    rỗng và phản hồi mất cả ``id``. Client tạo artifact xong không biết id là
+    gì — nghĩa là chưa ai tạo artifact qua API rồi dùng kết quả để bàn giao.
+
+    Cùng lớp lỗi đã sửa ở ``POST /api/v16/rooms``.
+    """
+    try:
+        db.refresh(row)
+    except Exception:                                     # noqa: BLE001
+        pass
+    return row
+
+
 @router.post("/artifacts")
 def create_artifact(payload: ArtifactCreate, principal: Principal = Depends(require_scope("company.artifacts:write")), db: Session = Depends(get_db)):
     enforce_org(payload.organization_id, principal)
     if payload.company_id is not None: ensure_company(db, payload.company_id, principal)
     if payload.task_id is not None: ensure_task(db, payload.task_id, principal)
     try:
-        return register_artifact(db, **payload.model_dump())
+        return _fresh(db, register_artifact(db, **payload.model_dump()))
     except ValueError as exc:
         raise HTTPException(400, str(exc))
 
@@ -157,14 +176,32 @@ def artifact_detail(artifact_id: int, principal: Principal = Depends(require_sco
 
 
 @router.post("/artifacts/{artifact_id}/handoff")
-def artifact_handoff(artifact_id: int, payload: ArtifactHandoffCreate, principal: Principal = Depends(require_scope("company.artifacts:write")), db: Session = Depends(get_db)):
+async def artifact_handoff(artifact_id: int, payload: ArtifactHandoffCreate, principal: Principal = Depends(require_scope("company.artifacts:write")), db: Session = Depends(get_db)):
+    """Bàn giao một artifact, và nếu người nhận là agent thì giao việc luôn (WP-4.3).
+
+    Trước WP-4.3, endpoint này tạo hàng `artifact_handoffs`, gửi tin nhắn, phát
+    event — rồi hết. Người nhận, kể cả khi là agent, không nhận được việc gì cho
+    tới khi có người vào dispatch tay.
+
+    Nay phản hồi có thêm `dispatch`, và trường đó **luôn** mang `reason`: `ok`,
+    hoặc một trong các lý do không chạy (`target_is_human`,
+    `target_has_no_active_seat`, `auto_dispatch_disabled`, `no_task`,
+    `dispatch_error`). Ghi sổ thì luôn xảy ra — lịch sử công việc không phụ
+    thuộc vào việc có tiêu tiền hay không.
+
+    `async def` là bắt buộc: bên trong `await dispatch_task`.
+    """
     artifact = _artifact(db, artifact_id, principal)
     ensure_member(db, payload.to_member_id, principal)
     if payload.from_member_id is not None: ensure_member(db, payload.from_member_id, principal)
+    body = payload.model_dump()
+    dispatch_flag = body.pop("dispatch", None)
     try:
-        return handoff_artifact(db, artifact, **payload.model_dump())
+        item = handoff_artifact(db, artifact, **body)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+    outcome = await dispatch_on_handoff(db, item, dispatch=dispatch_flag)
+    return {"handoff": _fresh(db, item), "dispatch": outcome}
 
 
 @router.get("/handoffs")
@@ -183,7 +220,7 @@ def handoff_accept(handoff_id: int, member_id: int, principal: Principal = Depen
     item = db.get(ArtifactHandoff, handoff_id)
     if not item: raise HTTPException(404, "Handoff not found")
     enforce_org(item.organization_id, principal); ensure_member(db, member_id, principal)
-    try: return accept_handoff(db, item, member_id=member_id)
+    try: return _fresh(db, accept_handoff(db, item, member_id=member_id))
     except ValueError as exc: raise HTTPException(400, str(exc))
 
 
@@ -201,7 +238,7 @@ def materialize(artifact_id: int, principal: Principal = Depends(require_scope("
 def evaluate(artifact_id: int, payload: ArtifactEvaluationCreate, principal: Principal = Depends(require_scope("company.artifacts:write")), db: Session = Depends(get_db)):
     artifact = _artifact(db, artifact_id, principal)
     if payload.evaluator_member_id is not None: ensure_member(db, payload.evaluator_member_id, principal)
-    try: return evaluate_artifact(db, artifact, **payload.model_dump())
+    try: return _fresh(db, evaluate_artifact(db, artifact, **payload.model_dump()))
     except ValueError as exc: raise HTTPException(400, str(exc))
 
 
