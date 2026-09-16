@@ -136,8 +136,9 @@ npm install && npx next build
 
 | Hạng mục | Trạng thái | Bằng chứng |
 | --- | --- | --- |
-| Test suite | **776 passed · 0 failed · 1 skipped** | `pytest -q`, 2026-09-16 |
+| Test suite | **780 passed · 0 failed · 1 skipped** | `pytest -q`, 2026-09-16 |
 | Bàn giao gọi được agent | **Mia nhận việc và nhắc lại đúng chi tiết chỉ có trong hướng dẫn bàn giao** | `_reports/handoff-dispatch-e2e.md` |
+| UI chi tiết công việc | **bấm Bàn giao thật trên UI: sổ ghi 2→4 mục, gói ngữ cảnh 1622→1954 ký tự**, 0 lỗi console | `_reports/ui/task-*.png` |
 | Tầng bộ nhớ công việc | **prompt 358 → 1 310 ký tự**, agent trả lời được ba câu trước đó mù | `_reports/work-memory-gap.md` |
 | Phòng họp có chủ toạ | **hai agent thật họp 3 lượt, chủ toạ chốt, phòng đóng** | `_reports/room-conductor-e2e.md` |
 | `agents.create` qua wire | **tạo được seat `mia` trên gateway thật** | cùng log trên |
@@ -147,7 +148,7 @@ npm install && npx next build
 | Ghi SOUL.md rồi hỏi lại agent | **giọng đổi theo file, 4/4 dấu hiệu** | `_reports/seat-soul-e2e.md` |
 | Xung đột ghi file | **gateway trả `agent_file_conflict`, API trả 409** | cùng log trên + `_reports/seat-soul-e2e.md` |
 | UI hồ sơ seat, 6 tab | **0 lỗi console**, chốt hạn mức ký tự có hiệu lực | `_reports/ui/seat-*.png` |
-| Smoke endpoint trên bản chạy thật | **242/242 OK** | `_reports/smoke.json` |
+| Smoke endpoint trên bản chạy thật | **244/244 OK** | `_reports/smoke.json` |
 | Đường dây OpenClaw đầu-cuối qua API | **15/15 bước OK** | `_reports/e2e-openclaw.txt` |
 | Lần chạy đầu tiên | 582 passed · 37 failed | `_reports/pytest-first-run.log` |
 | Frontend build | **xanh**, 49 route prerender | `npx next build` |

@@ -315,6 +315,36 @@ luyện nhân viên".
 - 17 test hành vi; ba chốt chính (gán lại chủ việc, ghi sổ, kiểm `lifecycle`)
   đều kiểm bằng mutation — bỏ chốt thì test đỏ.
 
+### WP-4.3b UI chi tiết công việc — ✅ XONG 2026-09-16
+
+- **Việc:** `components/TaskDetail.tsx` + route `/app/tasks/[id]`, cộng ba
+  endpoint trên router `tasks` (không mở router mới):
+  `GET /{id}/journal`, `GET /{id}/context-pack`, `POST /{id}/handoff`.
+- **Ba câu mà bảng việc không trả lời được, nay màn hình này trả lời:** việc đã
+  đi tới đâu (sổ ghi), giao cho ai tiếp (bàn giao kèm hướng dẫn), agent sẽ nhận
+  được gì (gói ngữ cảnh bảy khối).
+- **Quyết định thiết kế:** thanh ngân sách bảy khối — mỗi đoạn rộng theo số ký
+  tự **thật** của khối, và khối 2/6/7 mang nhãn `không cắt`. Đây là thứ duy nhất
+  trên UI cho thấy quy tắc cắt bất đối xứng (4 → 3 → 5 → 1), tức nó mang thông
+  tin chứ không trang trí.
+- **Xem trước là thật:** endpoint gọi đúng `work_context.build_pack` mà
+  `agent_dispatch` gọi, và có test so từng ký tự giữa hai đường. Một màn hình
+  xem trước hiện khác cái agent nhận thì tệ hơn là không có.
+- **Logic riêng ở tầng endpoint:** bàn giao luôn gắn với một artifact, nhưng một
+  task đang làm có thể chưa có artifact nào. Thay vì bắt người dùng tạo artifact
+  trước, hệ thống tạo một **phiếu bàn giao** (`artifact_type: handoff_note`)
+  mang chính nội dung hướng dẫn — không sinh ra đường bàn giao thứ hai.
+- **Nghiệm thu trên bản chạy thật** (`tools/shot_task.py`, ảnh trong
+  `_reports/ui/task-*.png`): 0 lỗi console; bộ lọc theo loại mục lọc thật
+  (2 → 1 dòng); đúng 3 khối `không cắt`; xem nguyên văn gói hiện đủ bảy khối;
+  nút Bàn giao bị khoá khi chưa chọn người nhận. Rồi **bấm Bàn giao thật**:
+  sổ ghi 2 → 4 mục, chủ việc chuyển, lượt chạy vào
+  `agent:dev:company-task-14`, gói ngữ cảnh 1 622 → 1 954 ký tự (khối 4 và 5
+  lớn lên vì bàn giao mới).
+- **Hai khiếm khuyết hiển thị do ảnh chụp phát hiện, đã sửa:** nhãn `không cắt`
+  xuống dòng và chèn vào cột số ký tự (dùng flex thay vì grid cố định cột), và
+  khối kết quả bàn giao bị căn giữa do thừa hưởng `.v8Empty`.
+
 ### WP-4.4 Review hai vòng dùng lại bộ điều phối
 
 - **Việc:** một review là một phòng hai người, `max_turns` nhỏ, chủ toạ là người

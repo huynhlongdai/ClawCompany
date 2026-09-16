@@ -620,3 +620,26 @@ export const apiSeat = {
                              allow_restart: !!opts.allowRestart,
                              dry_run: !!opts.dryRun})}),
 };
+
+/* WP-4.3 UI: màn hình chi tiết một công việc.
+
+   Ba thứ mà màn hình này cần, và cả ba đều là dữ liệu thật:
+   - journal      -> GET  /api/tasks/{id}/journal       (task_journal_entries)
+   - contextPack  -> GET  /api/tasks/{id}/context-pack  (đúng hàm mà dispatch gọi)
+   - handoff      -> POST /api/tasks/{id}/handoff       (artifact_handoffs + dispatch)
+
+   `contextPack` cố ý gọi cùng `work_context.build_pack` mà `agent_dispatch` gọi:
+   nếu màn hình xem trước hiện một thứ mà agent nhận một thứ khác thì nó không
+   chỉ vô dụng, nó gây tin sai. */
+export const apiTask = {
+  get: (taskId: number) => request<any>(`/tasks`).then((rows: any) =>
+    (rows || []).find((t: any) => t.id === taskId) || null),
+  journal: (taskId: number) => request<any>(`/tasks/${taskId}/journal`),
+  contextPack: (taskId: number) => request<any>(`/tasks/${taskId}/context-pack`),
+  handoff: (taskId: number, body: {to_member_id: number; instructions: string;
+                                   purpose?: string; dispatch?: boolean | null}) =>
+    request<any>(`/tasks/${taskId}/handoff`,
+      {method: "POST", body: JSON.stringify(body)}),
+  dispatch: (taskId: number) =>
+    request<any>(`/tasks/${taskId}/dispatch`, {method: "POST"}),
+};
