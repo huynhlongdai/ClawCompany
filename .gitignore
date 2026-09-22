@@ -38,3 +38,7 @@ Thumbs.db
 .smoke/
 
 tsconfig.tsbuildinfo
+
+# Celery beat ghi file lich o thu muc lam viec khi chay qua docker compose.
+# La trang thai runtime, khong phai nguon.
+backend/celerybeat-schedule
