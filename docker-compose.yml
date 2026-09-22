@@ -31,6 +31,8 @@ services:
     working_dir: /app
     volumes:
       - ./backend:/app
+      - ./openclaw-company-bridge:/openclaw-company-bridge:ro
+      - ./docs:/docs:ro
       - clawcompany_artifacts:/workspace-artifacts
       - clawcompany_repositories:/workspace-repositories
       - clawcompany_dev_workspaces:/workspace-dev
@@ -80,6 +82,8 @@ services:
     working_dir: /app
     volumes:
       - ./backend:/app
+      - ./openclaw-company-bridge:/openclaw-company-bridge:ro
+      - ./docs:/docs:ro
       - clawcompany_artifacts:/workspace-artifacts
       - clawcompany_repositories:/workspace-repositories
       - clawcompany_dev_workspaces:/workspace-dev
@@ -127,6 +131,8 @@ services:
     working_dir: /app
     volumes:
       - ./backend:/app
+      - ./openclaw-company-bridge:/openclaw-company-bridge:ro
+      - ./docs:/docs:ro
     command: sh -c "celery -A app.worker.celery_app beat --loglevel=INFO"
     environment:
       DATABASE_URL: postgresql+psycopg://clawcompany:clawcompany@db:5432/clawcompany

@@ -34,11 +34,29 @@ def db():
 
 
 @pytest.fixture()
-def leases():
-    """A memory-backed store: no Redis in the test environment."""
-    store = LeaseStore(ttl=30)
-    store._redis = None
-    return store
+def leases(monkeypatch):
+    """A memory-backed store, with the degraded condition actually created.
+
+    The previous version set `store._redis = None`, which has been a no-op
+    since v26: LeaseStore no longer holds its own client, it reads through
+    `redis_pool.pool`. So these tests silently ran against whatever Redis the
+    host had -- memory on a laptop, a real shared store under docker compose,
+    where they then failed asserting 'memory' == 'redis'.
+
+    Inject a pool that has been dropped instead. drop() clears the handle AND
+    pushes _next_attempt into the future, so client() returns None without
+    dialling; assigning None alone would reconnect on the next call.
+    """
+    import app.services.redis_pool as rp
+    import app.services.runtime_leases as rl_mod
+    import app.services.stream_registry as sr_mod
+
+    down_pool = rp.RedisPool()
+    down_pool.drop("test: redis deliberately unavailable")
+    monkeypatch.setattr(rp, "pool", down_pool)
+    monkeypatch.setattr(rl_mod, "pool", down_pool)
+    monkeypatch.setattr(sr_mod, "pool", down_pool)
+    return LeaseStore(ttl=30)
 
 
 @pytest.fixture()
@@ -107,9 +125,12 @@ def test_memory_backend_admits_it_is_single_process(leases):
     assert status["single_process_only"] is True
 
 
-def test_follow_declines_when_lease_is_held(monkeypatch, world):
-    store = LeaseStore(ttl=30)
-    store._redis = None
+def test_follow_declines_when_lease_is_held(monkeypatch, world, leases):
+    # Uses the `leases` fixture rather than building a second LeaseStore
+    # here: the old inline version called `store._redis = None`, a no-op
+    # since v26, so with a real Redis around the store ignored `_memory`,
+    # won the lease itself, and reported this very process as the holder.
+    store = leases
     store._memory[world["running"].runtime_session_key] = ("other:1:z", time.time() + 60)
     monkeypatch.setattr(rs, "lease_store", store)
     state = rs.supervisor.follow(session_key=world["running"].runtime_session_key,
