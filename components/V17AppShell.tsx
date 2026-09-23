@@ -119,15 +119,21 @@ function UserBlock() {
     api.me().then((u: any) => { if (alive) setMe(u); }).catch(() => {});
     return () => { alive = false; };
   }, []);
-  const name = me?.display_name || me?.email?.split("@")[0] || "—";
-  return <div className="userBlock">
-    <span className="avatarSm">{name.slice(0, 1).toUpperCase()}</span>
-    <div style={{minWidth: 0, flex: 1}}>
-      <b>{name}</b>
-      <small>Founder &amp; CEO</small>
-    </div>
-    <button className="userMore" title="Đăng xuất"
-            onClick={() => { logout(); location.reload(); }}>⋯</button>
+  const [open, setOpen] = useState(false);
+  const name = me?.display_name || me?.email?.split("@")[0] || "Tài khoản";
+  return <div className="acctMenu">
+    <button className="acctBtn" onClick={() => setOpen(v => !v)} aria-expanded={open} title="Tài khoản">
+      <span className="acctAvatar">{name.slice(0, 1).toUpperCase()}</span>
+    </button>
+    {open && <div className="acctPop" onMouseLeave={() => setOpen(false)}>
+      <p>
+        <b>{name}</b>
+        <small>{me?.email || "Founder & CEO"}</small>
+      </p>
+      <Link href="/app/workspace-ops" onClick={() => setOpen(false)}>Cài đặt tổ chức</Link>
+      <Link href="/app/os" onClick={() => setOpen(false)}>Bảng điều khiển</Link>
+      <button className="danger" onClick={() => { logout(); location.reload(); }}>Đăng xuất</button>
+    </div>}
   </div>;
 }
 
@@ -145,7 +151,6 @@ export function V17AppShell({title, subtitle, action, rail, children}: {
       </Suspense>
 
       <div style={{marginTop: "auto", display: "grid", gap: 8}}>
-        <UserBlock/>
         <div className="sideIcons">
           <button title="Tìm kiếm"><Icon name="search" size={16}/></button>
           <button title="Thông báo"><Icon name="bell" size={16}/></button>
@@ -167,6 +172,7 @@ export function V17AppShell({title, subtitle, action, rail, children}: {
           <em/>
         </button>
         <Clock/>
+        <UserBlock/>
       </header>
 
       <div className="v8Content">
