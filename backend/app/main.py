@@ -22,6 +22,7 @@ from app.api.realtime import router as realtime_router
 from app.api.health import router as health_router
 from app.api.v7 import router as v7_router
 from app.api.company_tools import router as company_tools_router
+from app.api.mcp import router as mcp_router
 from app.api.v8 import router as v8_router
 from app.api.v9 import router as v9_router
 from app.api.v10 import router as v10_router
@@ -85,6 +86,7 @@ app.include_router(realtime_router, prefix="/api")
 app.include_router(health_router, prefix="/api")
 app.include_router(v7_router, prefix="/api")
 app.include_router(company_tools_router, prefix="/api")
+app.include_router(mcp_router, prefix="/api")
 app.include_router(v8_router, prefix="/api")
 app.include_router(v9_router, prefix="/api")
 
