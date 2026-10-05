@@ -88,6 +88,18 @@ class Task(Base, TimestampMixin, RevisionMixin):
     runtime_task_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
     runtime_run_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
     runtime_session_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # D1.3 (0018_task_graph): task biết nó phục vụ mục tiêu nào và nằm dưới
+    # task nào. Không có hai cột này thì agent không trả lời được "vì sao làm
+    # việc này" — gói ngữ cảnh chỉ có dự án.
+    parent_task_id: Mapped[int | None] = mapped_column(ForeignKey("tasks.id"), nullable=True, index=True)
+    goal_id: Mapped[int | None] = mapped_column(ForeignKey("executive_goals.id"), nullable=True, index=True)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    acceptance_criteria: Mapped[str] = mapped_column(Text, default="")
+    # D1.4 (0019_task_runs): lượt chạy đang giữ task. Chỉ đổi qua
+    # task_lifecycle.checkout/release bằng một UPDATE có điều kiện, nên hai
+    # agent không thể cùng nhận một việc. Không khai FK để tránh vòng
+    # tasks <-> task_runs khi create_all.
+    checkout_run_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
 
 class KnowledgeDocument(Base, TimestampMixin):
     __tablename__ = "knowledge_documents"
