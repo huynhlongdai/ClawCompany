@@ -2,7 +2,7 @@
 import Link from "next/link";
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {Icon} from "./Icon";
-import {apiV17, apiV18, apiV27} from "../lib/api";
+import {apiV17, apiV18, apiV27, errorText} from "../lib/api";
 import {refreshCounts} from "../lib/counts";
 
 /* Bảng việc v6.
@@ -171,7 +171,9 @@ export function WorkFlowBoard() {
     catch (e: any) {
       setTasks(before);
       const label = STATUSES.find(s => s.key === status)?.label;
-      setMoveError(`Không chuyển được “${t.title}” sang ${label}. ${String(e?.message || "").includes("409") ? "Nhiệm vụ vừa được người khác sửa — tải lại để xem bản mới." : "Thử lại."}`);
+      // D1.4: nói đúng lý do backend trả (bảng chuyển, thiếu người nhận, còn
+      // việc chặn, hay bị người khác sửa) thay vì đoán từ mã lỗi.
+      setMoveError(`Không chuyển được “${t.title}” sang ${label}: ${errorText(e, "thử lại.")}`);
     }
   };
 

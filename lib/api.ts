@@ -642,7 +642,35 @@ export const apiTask = {
       {method: "POST", body: JSON.stringify(body)}),
   dispatch: (taskId: number) =>
     request<any>(`/tasks/${taskId}/dispatch`, {method: "POST"}),
+  /* D1.3 — đồ thị: cha/con, mục tiêu, task đang chặn. */
+  graph: (taskId: number) => request<any>(`/tasks/${taskId}/graph`),
+  addBlocker: (taskId: number, blockedBy: number) =>
+    request<any>(`/tasks/${taskId}/dependencies`,
+      {method: "POST", body: JSON.stringify({blocked_by_task_id: blockedBy})}),
+  removeBlocker: (taskId: number, blockedBy: number) =>
+    request<any>(`/tasks/${taskId}/dependencies/${blockedBy}`, {method: "DELETE"}),
+  /* Chỉ trường có trong `links` bị đổi; `null` là gỡ liên kết. */
+  setLinks: (taskId: number, links: {parent_task_id?: number | null; goal_id?: number | null;
+                                     due_at?: string | null; acceptance_criteria?: string}) =>
+    request<any>(`/tasks/${taskId}/links`, {method: "PATCH", body: JSON.stringify(links)}),
+  byGoal: (goalId: number) => request<any>(`/tasks?goal_id=${goalId}`),
+  /* D1.4 — mỗi lượt agent làm việc này là một hàng task_runs. */
+  runs: (taskId: number) => request<any>(`/tasks/${taskId}/runs`),
 };
+
+/* Lỗi từ `request` là nguyên văn body. FastAPI trả {"detail": ...}, mà detail
+   có thể là chuỗi hoặc {message}. Rút ra câu người đọc được. */
+export function errorText(e: any, fallback = "Thao tác thất bại"): string {
+  const raw = e?.message || "";
+  try {
+    const body = JSON.parse(raw);
+    const d = body?.detail;
+    if (typeof d === "string") return d;
+    if (d?.message) return d.message;
+    if (Array.isArray(d)) return d.map((x: any) => x?.msg || "").filter(Boolean).join("; ");
+  } catch { /* không phải JSON */ }
+  return raw || fallback;
+}
 
 /* v6 — Hộp việc: hai thao tác ghi mà Hộp việc cần. Cả hai endpoint đã có từ
    lâu (approvals.py, extended.py) nhưng chưa có hàm nào ở frontend gọi tới. */

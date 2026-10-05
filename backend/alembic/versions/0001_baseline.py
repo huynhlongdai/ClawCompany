@@ -84,7 +84,10 @@ COLUMNS_OWNED_BY_LATER_MIGRATIONS = {
     "companies": ["row_revision"],                  # 0013_v30_row_revision_counter
     "members": ["row_revision"],                    # 0013
     "projects": ["row_revision", "due_date"],       # 0013, 0016
-    "tasks": ["row_revision"],                      # 0013
+    "tasks": ["row_revision",                       # 0013
+              "parent_task_id", "goal_id", "due_at",  # 0018_task_graph
+              "acceptance_criteria",
+              "checkout_run_id"],                    # 0019_task_runs
     "departments": ["row_revision", "status"],      # 0013, 0014
 }
 
@@ -95,6 +98,41 @@ INDEXES_OWNED_BY_LATER_MIGRATIONS = [("uq_departments_company_name", "department
 
 def _tables():
     return [Base.metadata.tables[name] for name in BASELINE_TABLES]
+
+
+def _baseline_tables():
+    """Bản sao các bảng baseline *không có* cột mà migration sau sở hữu.
+
+    Bóc cột sau khi tạo (``_strip_future_columns``) không đủ khi cột tương lai
+    mang khoá ngoại tới một bảng chưa có ở baseline: ``tasks.goal_id`` trỏ
+    ``executive_goals`` (0004). Postgres từ chối CREATE TABLE vì bảng đích
+    chưa tồn tại, còn SQLite vỡ ở bước batch phải phản chiếu bảng đích. Nên
+    dựng bảng từ một bản sao đã cắt những cột đó ngay từ đầu.
+    """
+    md = sa.MetaData()
+    out = []
+    for name in BASELINE_TABLES:
+        src = Base.metadata.tables[name]
+        skip = set(COLUMNS_OWNED_BY_LATER_MIGRATIONS.get(name, []))
+        cols = [c._copy() for c in src.columns if c.name not in skip]
+        extra = []
+        for con in src.constraints:
+            if isinstance(con, (sa.PrimaryKeyConstraint, sa.ForeignKeyConstraint)):
+                continue  # PK và FK đi theo cột
+            names = [c.name for c in con.columns]
+            if skip & set(names):
+                continue
+            if isinstance(con, sa.UniqueConstraint):
+                extra.append(sa.UniqueConstraint(*names, name=con.name))
+        table = sa.Table(name, md, *cols, *extra)
+        have = {i.name for i in table.indexes}
+        for idx in src.indexes:
+            names = [c.name for c in idx.columns]
+            if idx.name in have or skip & set(names):
+                continue
+            sa.Index(idx.name, *[table.c[n] for n in names], unique=idx.unique)
+        out.append(table)
+    return out
 
 
 def _strip_future_columns() -> None:
@@ -127,7 +165,8 @@ def _strip_future_columns() -> None:
 
 
 def upgrade():
-    Base.metadata.create_all(bind=op.get_bind(), tables=_tables(), checkfirst=True)
+    tables = _baseline_tables()
+    tables[0].metadata.create_all(bind=op.get_bind(), tables=tables, checkfirst=True)
     _strip_future_columns()
 
 

@@ -6,7 +6,7 @@ Writes require the `company.workspace:write` scope for API keys and at least the
 `member` human role; structural changes (company, department, seats) require
 `manager`.
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -217,9 +217,14 @@ def create_task(payload: TaskIn, principal: Principal = Depends(writer("member")
     return _task_out(task)
 
 
-@router.post("/workspace/tasks/{task_id}/move")
-def move_task(task_id: int, payload: TaskMove, principal: Principal = Depends(writer("member")),
+@router.post("/workspace/tasks/{task_id}/move", deprecated=True)
+def move_task(task_id: int, payload: TaskMove, response: Response,
+              principal: Principal = Depends(writer("member")),
               db: Session = Depends(get_db)):
+    # D1.4: ba đường move (v18, v20, v27) giờ cùng đi qua task_lifecycle; v27
+    # có thêm kiểm revision nên là đường nên dùng.
+    response.headers["Deprecation"] = "true"
+    response.headers["Link"] = '</api/v27/tasks/{id}/move>; rel="successor-version"'
     task = ensure_task(db, task_id, principal)
     project = ensure_project(db, task.project_id, principal)
     task = ops.move_task(db, task, project, active_org(principal), status=payload.status,

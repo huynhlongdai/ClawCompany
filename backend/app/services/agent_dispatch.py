@@ -16,6 +16,8 @@ task can be aborted or replayed later.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -23,7 +25,8 @@ from app.models import Agent, CustomerProjectAssignment, Member, Task
 from app.realtime import broker
 from app.runtime.factory import get_runtime
 from app.services import openclaw_alignment as align
-from app.services import task_journal, work_context
+from app.services import task_graph, task_journal, work_context
+from app.services import task_lifecycle as lifecycle
 
 # Những lần không ghi được sổ, đọc được qua API để không ai tưởng sổ đầy đủ.
 LOG_JOURNAL_FAILURES: list[dict] = []
@@ -35,6 +38,10 @@ SOURCE = "agent_dispatch"
 
 class DispatchError(ValueError):
     """Raised when a task cannot be handed to the runtime."""
+
+
+class DispatchConflict(DispatchError):
+    """D1.3/D1.4: việc đang bị chặn hoặc đang có lượt chạy khác giữ (HTTP 409)."""
 
 
 def resolve_seat(db: Session, task: Task) -> tuple[Member, Agent]:
@@ -56,8 +63,25 @@ def resolve_seat(db: Session, task: Task) -> tuple[Member, Agent]:
     return member, agent
 
 
-async def dispatch_task(db: Session, task: Task) -> Task:
+async def dispatch_task(db: Session, task: Task, *, trigger_kind: str = "manual",
+                        wakeup_id: int | None = None) -> Task:
     member, agent = resolve_seat(db, task)
+    # D1.3: việc mình chờ chưa xong thì agent làm gì cũng là làm trên giả định.
+    waiting = task_graph.open_blockers(db, task.id)
+    if waiting:
+        raise DispatchConflict("Task còn bị chặn bởi "
+                               + ", ".join(f"#{t.id}" for t in waiting) + " chưa xong")
+    # D1.4: mỗi lượt là một hàng task_runs, và lượt phải giữ được task trước
+    # khi chạy. Thua cuộc giữ chỗ thì dừng ngay, không thử lại.
+    run_row = lifecycle.open_run(db, task, organization_id=member.organization_id,
+                                 member_id=member.id, trigger_kind=trigger_kind,
+                                 wakeup_id=wakeup_id)
+    try:
+        lifecycle.checkout(db, task, run_row.id)
+    except lifecycle.CheckoutConflict as exc:
+        lifecycle.finish_run(db, run_row, "skipped",
+                             error_reason=f"checkout lost to run #{exc.holder}")
+        raise DispatchConflict(exc.detail["message"]) from exc
     session_key = align.session_key_for_task(agent.runtime_agent_id, task.id)
     runtime = get_runtime()
 
@@ -72,7 +96,25 @@ async def dispatch_task(db: Session, task: Task) -> Task:
     # việc) trong gói, vì bốn dòng đó là một hợp đồng chứ không phải mô tả.
     pack = work_context.build_pack(db, task, organization_id=member.organization_id)
 
-    run = await runtime.run_agent(
+    try:
+        run = await _run_agent(runtime, agent, task, member, pack, session_key)
+    except Exception as exc:
+        lifecycle.finish_run(db, run_row, "failed", error_reason=str(exc))
+        raise
+    run_row.status = "running"
+    run_row.started_at = datetime.utcnow()
+    run_row.runtime_run_id = run.run_id or ""
+    run_row.session_key = run.session_key or session_key
+    db.add(run_row)
+
+    task.runtime_task_id = run.task_id or str(task.id)
+    task.runtime_run_id = run.run_id
+    task.runtime_session_key = run.session_key or session_key
+    return await _after_run(db, task, member, agent, run, pack)
+
+
+async def _run_agent(runtime, agent, task, member, pack, session_key):
+    return await runtime.run_agent(
         runtime_agent_id=agent.runtime_agent_id,
         input_text=pack["text"],
         metadata={
@@ -84,9 +126,8 @@ async def dispatch_task(db: Session, task: Task) -> Task:
         session_key=session_key,
     )
 
-    task.runtime_task_id = run.task_id or str(task.id)
-    task.runtime_run_id = run.run_id
-    task.runtime_session_key = run.session_key or session_key
+
+async def _after_run(db: Session, task: Task, member: Member, agent: Agent, run, pack) -> Task:
 
     # Ghi vào sổ của task: lần chạy này đã bắt đầu, với gói ngữ cảnh cỡ nào.
     # Đây là thứ khối 4 của lần dispatch KẾ TIẾP sẽ đọc — tầng bộ nhớ công việc
@@ -106,7 +147,9 @@ async def dispatch_task(db: Session, task: Task) -> Task:
         LOG_JOURNAL_FAILURES.append({"task_id": task.id, "error": str(exc)})
     # Stay inside the board vocabulary. A dispatched task is in_progress.
     if task.status not in ("in_progress", "review", "done"):
-        task.status = "in_progress"
+        lifecycle.transition(db, task, "in_progress", system=True, via="dispatch",
+                             reason=f"dispatched to {agent.runtime_agent_id}",
+                             commit=False, emit=False)
     db.add(task)
     db.commit()
     db.refresh(task)
@@ -173,7 +216,12 @@ async def abort_task(db: Session, task: Task, *, back_to: str = "todo") -> dict:
 
     if back_to not in ("todo", "backlog", "review", "cancelled"):
         raise DispatchError(f"Unsupported status after abort: {back_to}")
-    task.status = back_to
+    holder = lifecycle.current_run(db, task)
+    if holder is not None:
+        lifecycle.finish_run(db, holder, "cancelled", error_reason="aborted by operator",
+                             commit=False)
+    lifecycle.transition(db, task, back_to, system=True, via="abort",
+                         reason="run aborted by operator", commit=False, emit=False)
     db.add(task)
     db.commit()
     db.refresh(task)

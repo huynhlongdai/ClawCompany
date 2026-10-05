@@ -36,6 +36,7 @@ from app.runtime import openclaw_protocol as ocp
 from app.runtime.factory import get_runtime
 from app.services.company_event_bus import emit_event
 from app.services import runtime_gap
+from app.services import task_lifecycle as lifecycle
 from app.services import stream_reconcile
 from app.services.runtime_events import persist_runtime_event
 from app.services.runtime_leases import store as lease_store
@@ -50,6 +51,9 @@ ORPHAN_STATUSES = ("stopped", "failed")
 # Company task status after a run ends, keyed by the upstream terminal state.
 # A completed run goes to review rather than done: the agent finishing is not
 # the same as the company accepting the work.
+# D1.4: kết cục của hàng task_runs theo trạng thái board mà run đưa task tới.
+RUN_OUTCOME = {"review": "completed", "blocked": "failed", "todo": "cancelled"}
+
 TERMINAL_STATUS = {
     "complete": "review",
     "completed": "review",
@@ -287,10 +291,12 @@ def apply_terminal_state(db: Session, task: Task, state: ConsumerState, event: d
     if new_status is None or task.status == new_status:
         return task
     previous = task.status
-    task.status = new_status
-    db.add(task)
-    db.commit()
-    db.refresh(task)
+    holder = lifecycle.current_run(db, task)
+    if holder is not None:
+        lifecycle.finish_run(db, holder, RUN_OUTCOME.get(new_status, "completed"),
+                             error_reason=str(event.get("errorMessage") or ""), commit=False)
+    lifecycle.transition(db, task, new_status, system=True, via="runtime",
+                         reason=f"run {upstream_state}", commit=True, emit=False)
     emit_event(
         db, organization_id=state.organization_id, event_type=f"openclaw.run.{upstream_state}",
         source=SOURCE, aggregate_type="task", aggregate_id=str(task.id),

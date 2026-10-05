@@ -5,6 +5,7 @@ from app.db.session import get_db
 from app.models import Agent, Member, Company, Department, Task, Project, Approval, InboxItem
 from app.services.vector_search import search_vectors
 from app.services.policy import authorize
+from app.services import task_lifecycle as lifecycle
 
 router = APIRouter(prefix="/company-tools", tags=["company-tools"])
 
@@ -48,8 +49,9 @@ def update_task_status(task_id: int, runtime_agent_id: str, payload: dict = Body
     task = db.get(Task, task_id)
     if not task or task.assignee_member_id != member.id:
         raise HTTPException(404, "Assigned task not found")
-    task.status = str(payload.get("status", task.status))
-    db.add(task); db.commit(); db.refresh(task)
+    # D1.4: trước đây nhận bất kỳ chuỗi nào; giờ agent đi cùng luật với người.
+    lifecycle.transition(db, task, str(payload.get("status", task.status)), via="agent_tool",
+                         actor_member_id=member.id, reason=str(payload.get("reason", "")))
     return {"id": task.id, "status": task.status}
 
 @router.post("/knowledge/search")

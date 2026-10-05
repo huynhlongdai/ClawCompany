@@ -1,12 +1,15 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.models import Artifact, Member, Task, Project, Company
+from app.models import Artifact, ExecutiveGoal, Member, Task, TaskRun, Project, Company
 from app.schemas import TaskCreate, TaskOut
 from app.services.tasks import dispatch_task
-from app.services import handoff_dispatch, task_journal, work_context
+from app.services import agent_dispatch, handoff_dispatch, task_graph, task_journal, work_context
+from app.services import task_lifecycle
 from app.services.artifacts import handoff_artifact, register_artifact
 from app.core.authz import Principal, get_principal, require_role, require_human
 from app.core.tenancy import active_org, ensure_project, ensure_member, ensure_task
@@ -14,17 +17,21 @@ from app.core.tenancy import active_org, ensure_project, ensure_member, ensure_t
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 @router.get("", response_model=list[TaskOut])
-def list_tasks(project_id: int | None = None, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+def list_tasks(project_id: int | None = None, goal_id: int | None = None, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
     org_id = active_org(principal)
     q = db.query(Task).join(Project, Project.id == Task.project_id).join(Company, Company.id == Project.company_id).filter(Company.organization_id == org_id)
     if project_id is not None:
         ensure_project(db, project_id, principal); q = q.filter(Task.project_id == project_id)
+    if goal_id is not None:
+        q = q.filter(Task.goal_id == goal_id)
     return q.order_by(Task.id.desc()).all()
 
 @router.post("", response_model=TaskOut)
 def create_task(payload: TaskCreate, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
     ensure_project(db, payload.project_id, principal)
     if payload.assignee_member_id is not None: ensure_member(db, payload.assignee_member_id, principal)
+    if payload.status not in task_lifecycle.TASK_STATUSES:
+        raise HTTPException(400, f"status must be one of: {', '.join(task_lifecycle.TASK_STATUSES)}")
     obj = Task(**payload.model_dump())
     db.add(obj); db.commit(); db.refresh(obj)
     return obj
@@ -32,7 +39,12 @@ def create_task(payload: TaskCreate, principal: Principal = Depends(require_role
 @router.post("/{task_id}/dispatch", response_model=TaskOut)
 async def dispatch(task_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
     task = ensure_task(db, task_id, principal)
-    return await dispatch_task(db, task)
+    try:
+        return await agent_dispatch.dispatch_task(db, task)
+    except agent_dispatch.DispatchConflict as exc:
+        raise HTTPException(409, str(exc))
+    except agent_dispatch.DispatchError as exc:
+        raise HTTPException(400, str(exc))
 
 
 # ------------------------------------------------------------------ WP-4.3 UI
@@ -151,4 +163,116 @@ async def task_handoff(task_id: int, payload: TaskHandoffIn,
         "created_handoff_note": created_note,
         "handoff_id": handoff.id,
         "dispatch": outcome,
+    }
+
+
+# ------------------------------------------------------------------ D1.3 đồ thị
+#
+# Task cha, mục tiêu, hạn, tiêu chí nghiệm thu và các task đang chặn. Ghi cạnh
+# đi qua task_graph (chặn vòng), không có endpoint nào ở đây ghi task.status.
+
+class DependencyIn(BaseModel):
+    blocked_by_task_id: int
+
+
+class TaskLinksIn(BaseModel):
+    parent_task_id: int | None = None
+    goal_id: int | None = None
+    due_at: datetime | None = None
+    acceptance_criteria: str | None = Field(default=None, max_length=20000)
+
+
+def _same_tenant_or_404(db: Session, task_id: int, principal: Principal) -> Task:
+    """Task của tenant khác trả 404, không 403: không xác nhận nó tồn tại."""
+    try:
+        return ensure_task(db, task_id, principal)
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            raise HTTPException(404, "Task not found") from exc
+        raise
+
+
+@router.get("/{task_id}/graph")
+def task_graph_read(task_id: int, principal: Principal = Depends(require_human()),
+                    db: Session = Depends(get_db)):
+    task = ensure_task(db, task_id, principal)
+    return task_graph.graph(db, task)
+
+
+@router.post("/{task_id}/dependencies", status_code=201)
+def task_dependency_add(task_id: int, payload: DependencyIn,
+                        principal: Principal = Depends(require_role("member")),
+                        db: Session = Depends(get_db)):
+    task = ensure_task(db, task_id, principal)
+    other = db.get(Task, payload.blocked_by_task_id)
+    if other is None:
+        raise HTTPException(404, "Task not found")
+    _same_tenant_or_404(db, other.id, principal)
+    dep = task_graph.add_dependency(db, task, other, actor_member_id=principal.member_id)
+    return {"id": dep.id, "task_id": dep.task_id, "blocked_by_task_id": dep.blocked_by_task_id,
+            "graph": task_graph.graph(db, task)}
+
+
+@router.delete("/{task_id}/dependencies/{blocked_by_task_id}")
+def task_dependency_remove(task_id: int, blocked_by_task_id: int,
+                           principal: Principal = Depends(require_role("member")),
+                           db: Session = Depends(get_db)):
+    task = ensure_task(db, task_id, principal)
+    if not task_graph.remove_dependency(db, task, blocked_by_task_id):
+        raise HTTPException(404, "Dependency not found")
+    return {"removed": True, "graph": task_graph.graph(db, task)}
+
+
+@router.patch("/{task_id}/links")
+def task_links_update(task_id: int, payload: TaskLinksIn,
+                      principal: Principal = Depends(require_role("member")),
+                      db: Session = Depends(get_db)):
+    """Chỉ đổi những trường có mặt trong body; gửi ``null`` để gỡ liên kết."""
+    task = ensure_task(db, task_id, principal)
+    sent = payload.model_fields_set
+    if "parent_task_id" in sent:
+        parent = None
+        if payload.parent_task_id is not None:
+            parent = db.get(Task, payload.parent_task_id)
+            if parent is None:
+                raise HTTPException(404, "Parent task not found")
+            _same_tenant_or_404(db, parent.id, principal)
+        task_graph.set_parent(db, task, parent)
+    if "goal_id" in sent:
+        if payload.goal_id is not None:
+            goal = db.get(ExecutiveGoal, payload.goal_id)
+            if goal is None or goal.organization_id != active_org(principal):
+                raise HTTPException(404, "Goal not found")
+        task.goal_id = payload.goal_id
+    if "due_at" in sent:
+        task.due_at = payload.due_at
+    if "acceptance_criteria" in sent:
+        task.acceptance_criteria = payload.acceptance_criteria or ""
+    db.add(task); db.commit(); db.refresh(task)
+    return task_graph.graph(db, task)
+
+
+# ------------------------------------------------------------------ D1.4 lượt chạy
+
+@router.get("/{task_id}/runs")
+def task_runs_read(task_id: int, limit: int = 50, principal: Principal = Depends(require_human()),
+                   db: Session = Depends(get_db)):
+    task = ensure_task(db, task_id, principal)
+    rows = db.execute(select(TaskRun).where(TaskRun.task_id == task.id)
+                      .order_by(TaskRun.id.desc()).limit(max(1, min(limit, 200)))).scalars().all()
+    members = {m.id: m.name for m in db.query(Member).filter(
+        Member.id.in_({r.member_id for r in rows if r.member_id})).all()} if rows else {}
+    return {
+        "task_id": task.id,
+        "checkout_run_id": task.checkout_run_id,
+        "runs": [{
+            "id": r.id, "status": r.status, "trigger_kind": r.trigger_kind,
+            "member_id": r.member_id, "member_name": members.get(r.member_id),
+            "session_key": r.session_key, "runtime_run_id": r.runtime_run_id,
+            "started_at": r.started_at.isoformat() if r.started_at else None,
+            "ended_at": r.ended_at.isoformat() if r.ended_at else None,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "cost_usd": r.cost_usd, "tokens_in": r.tokens_in, "tokens_out": r.tokens_out,
+            "error_reason": r.error_reason, "holds_task": r.id == task.checkout_run_id,
+        } for r in rows],
     }

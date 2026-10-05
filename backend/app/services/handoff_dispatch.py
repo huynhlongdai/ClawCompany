@@ -52,6 +52,7 @@ from app.core.config import settings
 from app.models import Agent, Artifact, ArtifactHandoff, Member, Task
 from app.services import task_journal
 from app.services.agent_dispatch import DispatchError, dispatch_task
+from app.services import task_lifecycle as lifecycle
 from app.services.artifacts import accept_handoff
 from app.services.company_event_bus import emit_event
 
@@ -137,6 +138,12 @@ def reassign_task(db: Session, task: Task, to_member_id: int) -> dict:
     if previous == to_member_id:
         return {"reassigned": False, "reason": "already_owner", "owner": to_member_id}
     task.assignee_member_id = to_member_id
+    # D1.4: lượt chạy của chủ cũ không còn giữ việc. Không ghi "completed" vì
+    # hệ thống không biết chặng đó xong thật hay chưa — chỉ biết nó bị thay.
+    holder = lifecycle.current_run(db, task)
+    if holder is not None and holder.member_id != to_member_id:
+        lifecycle.finish_run(db, holder, "cancelled", commit=False,
+                             error_reason=f"handed off to member #{to_member_id}")
     db.add(task); db.commit(); db.refresh(task)
     return {"reassigned": True, "from_member_id": previous, "to_member_id": to_member_id}
 

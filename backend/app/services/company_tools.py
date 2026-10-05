@@ -1,5 +1,8 @@
 from sqlalchemy.orm import Session
+from fastapi import HTTPException
+
 from app.models import InboxItem, Task
+from app.services import task_lifecycle as lifecycle
 
 def execute_company_tool(db: Session, name: str, args: dict):
     if name == "noop":
@@ -11,7 +14,10 @@ def execute_company_tool(db: Session, name: str, args: dict):
         task = db.get(Task, int(args["task_id"]))
         if not task:
             raise ValueError("Task not found")
-        task.status = args.get("status", "done")
-        db.add(task); db.commit(); db.refresh(task)
+        try:
+            lifecycle.transition(db, task, args.get("status", "done"), via="workflow_tool",
+                                 actor_member_id=args.get("actor_member_id"))
+        except HTTPException as exc:
+            raise ValueError(str(exc.detail)) from exc
         return {"ok": True, "task_id": task.id, "status": task.status}
     raise ValueError(f"Unknown company tool: {name}")

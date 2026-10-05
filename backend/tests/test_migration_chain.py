@@ -107,6 +107,15 @@ def test_baseline_registers_every_column_later_migrations_add():
                     if name in baseline_tables:
                         added.add((name, column))
 
+        # Dạng batch: with op.batch_alter_table("tasks") as batch:
+        #                 batch.add_column(sa.Column("goal_id", ...))
+        for block in re.split(r'op\.batch_alter_table\(', src)[1:]:
+            table = re.match(r'\s*["\'](\w+)["\']', block)
+            body = re.split(r'\n(?:def |    with )', block, maxsplit=1)[0]
+            if table and table.group(1) in baseline_tables:
+                for column in re.findall(r'batch\.add_column\(\s*sa\.Column\(\s*["\'](\w+)["\']', body):
+                    added.add((table.group(1), column))
+
     # Một migration có thể tự lo bằng cách kiểm tra cột đã tồn tại chưa
     # (0006 làm đúng như vậy). Trường hợp đó không cần khai ở baseline.
     guarded: set[tuple[str, str]] = set()

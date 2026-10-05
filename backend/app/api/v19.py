@@ -159,6 +159,8 @@ async def start_task(task_id: int, body: StartIn | None = None, db: Session = De
         db.refresh(task)
     try:
         task = await agent_dispatch.dispatch_task(db, task)
+    except agent_dispatch.DispatchConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     except agent_dispatch.DispatchError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:  # noqa: BLE001

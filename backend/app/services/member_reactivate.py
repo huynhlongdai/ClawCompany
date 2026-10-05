@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 from app.models.entities import Member, Task
 from app.services import entity_archive
 from app.services.company_event_bus import emit_event
+from app.services import task_lifecycle as lifecycle
 
 SOURCE = "member_reactivate"
 PARK_EVENT = "member.runtime.parked"
@@ -173,7 +174,9 @@ def park(db: Session, member: Member, organization_id: int, *, dry_run: bool = T
         if task is None:
             continue
         before = task.status
-        task.status = PARK_STATUS
+        lifecycle.transition(db, task, PARK_STATUS, system=True, via="reactivate",
+                             reason=f"member #{member.id} reactivated; orphan parked",
+                             commit=False, emit=False)
         task.runtime_session_key = None
         db.add(task)
         parked.append({"task_id": task.id, "from": before, "to": PARK_STATUS,

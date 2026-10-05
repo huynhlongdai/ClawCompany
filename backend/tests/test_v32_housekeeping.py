@@ -103,10 +103,15 @@ def test_trail_redacts_secret_columns_if_one_is_ever_tracked():
 def test_every_cockpit_write_path_starts_a_trail_and_merges_it():
     module = _tree("workspace_ops.py")
     for name in ("update_company", "update_department", "move_member",
-                 "update_project", "move_task", "assign_task"):
+                 "update_project", "assign_task"):
         body = ast.dump(_func(module, name))
         assert "write_trail" in body, f"{name} takes no before-snapshot"
         assert "finish" in body, f"{name} never merges its trail into the payload"
+    # D1.4: move_task giao việc ghi trạng thái cho task_lifecycle.transition,
+    # nên vết ghi phải nằm ở đó.
+    assert "transition" in ast.dump(_func(module, "move_task"))
+    body = ast.dump(_func(_tree("task_lifecycle.py"), "transition"))
+    assert "write_trail" in body and "finish" in body
 
 
 def test_create_paths_do_not_pretend_to_have_before_values():

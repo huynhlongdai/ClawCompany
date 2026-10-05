@@ -41,6 +41,7 @@ from app.models.entities import (Approval, Company, Department, Member, Project,
 from app.models.extended import SOP, Decision
 from app.models.v10 import ArtifactHandoff
 from app.models.v37 import TaskJournalEntry
+from app.services import task_graph
 from app.services.v36_insights import local_today
 
 # Ngân sách ký tự cho cả gói. Con số này không phải hạn mức của OpenClaw (20k
@@ -126,10 +127,21 @@ def _block1_identity(db: Session, assignee: Member | None) -> Block:
     return block
 
 
-def _block2_task(task: Task) -> Block:
+def _block2_task(task: Task, chain: str = "", waiting: list[Task] | None = None) -> Block:
     block = Block(2, "Việc cần làm")
     block.lines.append(f"- Task #{task.id}: **{task.title}**")
+    # D1.3: một dòng trả lời "vì sao làm việc này", ≤240 ký tự.
+    if chain:
+        block.lines.append(f"- Chuỗi mục tiêu: {chain}")
     block.lines.append(f"- Mức ưu tiên: {task.priority} · trạng thái hiện tại: {task.status}")
+    if getattr(task, "due_at", None):
+        block.lines.append(f"- Hạn của task: {task.due_at:%Y-%m-%d %H:%M} (UTC)")
+    if waiting:
+        block.lines.append("- Đang chờ: " + ", ".join(f"#{t.id} {t.title} [{t.status}]"
+                                                      for t in waiting))
+    criteria = (getattr(task, "acceptance_criteria", "") or "").strip()
+    if criteria:
+        block.lines.append(f"- Tiêu chí nghiệm thu: {criteria}")
     description = (task.description or "").strip()
     block.lines.append("")
     block.lines.append(description if description else "(Task không có mô tả. "
@@ -278,7 +290,7 @@ def build_pack(db: Session, task: Task, *, organization_id: int,
 
     blocks = [
         _block1_identity(db, assignee),
-        _block2_task(task),
+        _block2_task(task, task_graph.goal_line(db, task), task_graph.open_blockers(db, task.id)),
         _block3_project(project, company, siblings),
         _block4_journal(entries, actors),
         _block5_handoff(db, task, handoffs, actors),

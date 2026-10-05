@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel, Field
 from app.schemas.common import ORMModel
 
@@ -114,6 +115,12 @@ class TaskOut(ORMModel):
     runtime_task_id: str | None
     runtime_run_id: str | None
     runtime_session_key: str | None
+    # D1.3 / D1.4
+    parent_task_id: int | None = None
+    goal_id: int | None = None
+    due_at: datetime | None = None
+    acceptance_criteria: str = ""
+    checkout_run_id: int | None = None
 
 class KnowledgeCreate(BaseModel):
     organization_id: int

@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 from app.models import CompanyEvent, Project, Task
 from app.services.board_truth import ARCHIVE_EVENT, ARCHIVE_STATUS, OPEN_STATUSES, revision
 from app.services.company_event_bus import emit_event
+from app.services import task_lifecycle as lifecycle
 
 SOURCE = "board_restore"
 RESTORE_EVENT = "project.restored"
@@ -144,7 +145,9 @@ def restore_project(db: Session, project: Project, organization_id: int, *,
     for entry in preview["will_restore_tasks"]:
         task = db.get(Task, entry["task_id"])
         if task is not None and task.status == ARCHIVE_STATUS:
-            task.status = entry["restore_to"]
+            lifecycle.transition(db, task, entry["restore_to"], system=True, via="restore",
+                                 reason=f"project #{project.id} restored",
+                                 commit=False, emit=False)
             db.add(task)
             restored.append({"task_id": task.id, "status": task.status,
                              "prior_status_known": entry["prior_status_known"]})

@@ -3,6 +3,7 @@ import {useEffect, useState} from "react";
 import Link from "next/link";
 import {api, apiTask} from "../lib/api";
 import {Icon, IconName} from "./Icon";
+import {TaskLinksPanel, TaskRunsPanel} from "./TaskGraphPanels";
 
 /* WP-4.3 UI — Chi tiết một công việc: sổ ghi, bàn giao, và gói ngữ cảnh.
 
@@ -66,6 +67,7 @@ export function TaskDetail({taskId}: {taskId: number}) {
   const [members, setMembers] = useState<Row[]>([]);
   const [failed, setFailed] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0);
 
   async function load() {
     const miss: string[] = [];
@@ -76,6 +78,7 @@ export function TaskDetail({taskId}: {taskId: number}) {
     try { setMembers((await api.members() as Row[]) || []); } catch { miss.push("nhân sự"); }
     setFailed(miss);
     setLoading(false);
+    setTick(n => n + 1);
   }
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [taskId]);
@@ -154,8 +157,12 @@ export function TaskDetail({taskId}: {taskId: number}) {
         <JournalPanel entries={entries} kinds={journal?.kinds || []}/>
         <ContextPackPanel pack={pack}/>
       </div>
-      <HandoffPanel taskId={taskId} members={members} ownerId={task?.assignee_member_id}
-                    onDone={load}/>
+      <div style={{display: "grid", gap: 18}}>
+        <HandoffPanel taskId={taskId} members={members} ownerId={task?.assignee_member_id}
+                      onDone={load}/>
+        <TaskLinksPanel taskId={taskId} onChange={load}/>
+        <TaskRunsPanel taskId={taskId} refreshKey={tick}/>
+      </div>
     </div>
   </>;
 }
