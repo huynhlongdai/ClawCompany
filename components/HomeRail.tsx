@@ -247,7 +247,7 @@ function NinaPanel() {
     </div>
 
     {!log.length && <div className="ninaBubble">
-      Chào bạn ✦ Tôi đọc được số liệu công ty và trả lời qua gateway OpenClaw.
+      Chào bạn! Tôi đọc được số liệu công ty và trả lời qua gateway OpenClaw.
       Hỏi tự do cũng được — câu trả lời do model sinh ra, không phải câu mẫu.
     </div>}
 

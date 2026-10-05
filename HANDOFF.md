@@ -6,7 +6,13 @@ Nguồn sự thật về hiện trạng dự án. README kể lịch sử v4→v
 - Ngày tiếp nhận: **2026-09-15**
 - Nguồn: `clawcompany_v35_spend_push.zip` (459 file, không có `.git`)
 - Repo: `https://github.com/huynhlongdai/ClawCompany`
-- Service version: `1.26.0` · Migration head: `0016_v36_metrics_calendar`
+- Lượt gần nhất: **WP-1.1, WP-1.2, WP-2.1, WP-2.2, WP-4.0, WP-4.1, WP-4.3 đã xong**
+  (2026-09-16) — bề mặt điều khiển OpenClaw đã mở, hồ sơ nhân sự AI đọc/ghi
+  được, **tầng bộ nhớ công việc**, **phòng họp có chủ toạ** và **bàn giao gọi
+  được agent** đã chạy thật.
+  Đọc `docs/AGENT_WORK_MEMORY.md` và `docs/AGENT_TEAMWORK.md` trước khi làm
+  tiếp; kế hoạch ở `docs/BUILD_PLAN.md`.
+- Service version: `1.26.0` · Migration head: **`0017_v37_work_memory_rooms`**
 
 ---
 
@@ -130,13 +136,24 @@ npm install && npx next build
 
 | Hạng mục | Trạng thái | Bằng chứng |
 | --- | --- | --- |
-| Test suite | **640 passed · 0 failed · 1 skipped** | `_reports/pytest-after-repair.log` |
-| Smoke 236 endpoint trên bản chạy thật | **236/236 OK** | `_reports/smoke.txt` |
+| Test suite | **780 passed · 0 failed · 1 skipped** | `pytest -q`, 2026-09-16 |
+| Bàn giao gọi được agent | **Mia nhận việc và nhắc lại đúng chi tiết chỉ có trong hướng dẫn bàn giao** | `_reports/handoff-dispatch-e2e.md` |
+| UI chi tiết công việc | **bấm Bàn giao thật trên UI: sổ ghi 2→4 mục, gói ngữ cảnh 1622→1954 ký tự**, 0 lỗi console | `_reports/ui/task-*.png` |
+| Tầng bộ nhớ công việc | **prompt 358 → 1 310 ký tự**, agent trả lời được ba câu trước đó mù | `_reports/work-memory-gap.md` |
+| Phòng họp có chủ toạ | **hai agent thật họp 3 lượt, chủ toạ chốt, phòng đóng** | `_reports/room-conductor-e2e.md` |
+| `agents.create` qua wire | **tạo được seat `mia` trên gateway thật** | cùng log trên |
+| Bề mặt điều khiển gateway | **8/8 method đọc gọi được**, ghi config thật OK | `_reports/native-probe-agents.log` |
+| Optimistic concurrency của config | **gateway từ chối baseHash cũ** | cùng log trên |
+| Hồ sơ nhân sự AI (đọc) | **gộp 3 nguồn OK**, phát hiện lệch model DB↔gateway | `GET /api/agents/1/profile` trên bản chạy thật |
+| Ghi SOUL.md rồi hỏi lại agent | **giọng đổi theo file, 4/4 dấu hiệu** | `_reports/seat-soul-e2e.md` |
+| Xung đột ghi file | **gateway trả `agent_file_conflict`, API trả 409** | cùng log trên + `_reports/seat-soul-e2e.md` |
+| UI hồ sơ seat, 6 tab | **0 lỗi console**, chốt hạn mức ký tự có hiệu lực | `_reports/ui/seat-*.png` |
+| Smoke endpoint trên bản chạy thật | **244/244 OK** | `_reports/smoke.json` |
 | Đường dây OpenClaw đầu-cuối qua API | **15/15 bước OK** | `_reports/e2e-openclaw.txt` |
 | Lần chạy đầu tiên | 582 passed · 37 failed | `_reports/pytest-first-run.log` |
 | Frontend build | **xanh**, 49 route prerender | `npx next build` |
 | Bridge contract | **192/192** khớp route thật | `tools/inventory.py` |
-| Migration | **đã chạy trên Postgres 16 thật**, 163 bảng, head `0016` | `_reports/local-runtime.md` |
+| Migration | **đã chạy trên Postgres 16 thật**, 165 bảng, head `0017` | `_reports/local-runtime.md` |
 | OpenClaw native | **đã kết nối được gateway thật** (2026.9.4) | `_reports/native-probe-after-fix.log` |
 | Postgres + pgvector | **đã chạy thật** (pgserver) | `_reports/local-runtime.md` |
 | Redis (lease/registry v21–v26) | **đã chạy thật**, báo `cluster_wide: true` | `_reports/local-runtime.md` |
@@ -283,15 +300,40 @@ chứng minh file compose đúng.
 
 ## 8. Việc tiếp theo
 
+**Kế hoạch build đầy đủ nay nằm ở hai file, đọc chúng trước danh sách dưới đây:**
+
+- `docs/ARCHITECTURE_TREE.md` — cây module bốn tầng (L0 lõi runtime → L1 nhân sự
+  AI → L2 phòng ban → L3 công ty), chức năng và logic từng module, đối chiếu
+  ranh giới "OpenClaw lo gì / ClawCompany lo gì" dựa trên docs upstream
+  2026.9.4, kèm nhãn hiện trạng và mười góp ý kiến trúc.
+- `docs/BUILD_PLAN.md` — 6 phase, ~24 gói việc cỡ 1–3 buổi, mỗi gói có định
+  nghĩa xong và cách kiểm chứng. Đường tới hạn:
+  `WP-1.1 → WP-1.2 → WP-2.1/2.2 → WP-3.1 → WP-4.1`.
+
+**Đã làm xong WP-1.1 + WP-1.2** (2026-09-16), nên đoạn dưới đây giữ lại làm
+lịch sử của quyết định:
+
+Một mệnh đề sai đã được phát hiện và **đã sửa** (gói WP-1.1):
+`runtime/openclaw_protocol.py` khẳng định *"There is no `agents.create`"*, nhưng
+2026.9.4 có thật `agents.create/update/delete`, `agents.files.get/set` (kèm
+`expectedHash` CAS), `agents.workspace.get`, và `config.patch/schema.lookup`.
+Nghĩa là **cấu hình agent làm được hoàn toàn từ UI qua gateway**, không phải sửa
+`openclaw.json` bằng tay — đây là nền cho toàn bộ màn hình hồ sơ nhân sự AI.
+
+Các việc còn nợ từ lượt trước, đã được gộp vào kế hoạch trên:
+
 1. Chạy thật bằng Docker: `docker compose up` + `alembic upgrade head` +
    `seed.py`, ghi lại kết quả. (Sandbox tiếp nhận không có Docker; dự kiến làm
-   trên một máy ảo boxd.sh.)
-3. Chạy trọn một task OpenClaw tới trạng thái kết thúc trên một gateway có
-   credential model, xác nhận `runtime_stream` ghi đúng event và task chuyển
-   trạng thái (`complete → review`, `error → blocked`).
-4. Thêm CI tối thiểu: pytest + `next build` trên mỗi push.
-5. Chỉ sau đó mới bàn tới v36 và luồng "nhập sơ đồ tổ chức thật → ánh xạ sang
-   seat agent".
+   trên một máy ảo boxd.sh.) → WP-6.3
+2. Chạy trọn một task OpenClaw tới trạng thái kết thúc, xác nhận
+   `runtime_stream` ghi đúng event và task chuyển trạng thái
+   (`complete → review`, `error → blocked`). → WP-4.3
+3. Thêm CI tối thiểu: pytest + `next build` trên mỗi push. → WP-5.3
+4. Đăng ký tool cho agent đọc dữ liệu công ty — nhưng **24 tool qua MCP
+   server**, không phải 192 tool: schema tool tính vào context window và
+   `skills.limits.maxSkillsPromptChars` mặc định là 18 000. → WP-3.1
+5. Luồng "nhập sơ đồ tổ chức thật → ánh xạ sang seat agent" đặt cuối vì nó cần
+   hồ sơ seat (Phase 2) và cầu tool (Phase 3) xong trước. → WP-6.4
 
 ## 9. Bản đồ tài liệu
 
@@ -299,6 +341,10 @@ chứng minh file compose đúng.
 | --- | --- |
 | `README.md` | lịch sử v4→v35, mỗi version tự khai giới hạn |
 | `HANDOFF.md` | file này — hiện trạng và việc tiếp theo |
+| `docs/ARCHITECTURE_TREE.md` | cây module 4 tầng, logic, ranh giới OpenClaw/ClawCompany |
+| `docs/AGENT_WORK_MEMORY.md` | bảy tầng bộ nhớ, ranh giới với OpenClaw, gói ngữ cảnh bảy khối |
+| `docs/AGENT_TEAMWORK.md` | năm kiểu phối hợp, phòng họp có chủ toạ, ràng buộc vật lý của runtime |
+| `docs/BUILD_PLAN.md` | 6 phase, ~24 gói việc, định nghĩa xong và cách kiểm chứng |
 | `_reports/inventory.md` | kiểm kê endpoint/bảng/service/test/bridge (sinh tự động) |
 | `_reports/test-triage.md` | phân loại 37 failure của lần chạy đầu |
 | `_reports/openclaw-protocol-audit.md` | đối chiếu giao thức với upstream + kết quả đo |

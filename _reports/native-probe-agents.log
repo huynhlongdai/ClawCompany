@@ -1,0 +1,71 @@
+# Biên bản dò bề mặt điều khiển OpenClaw (WP-1.1 + WP-1.2)
+
+- Gateway: `ws://127.0.0.1:18789`
+- Scope xin trong handshake: `['operator.read', 'operator.write', 'operator.admin']`
+
+- `status` OK: `{"provider": "openclaw", "mode": "native", "status": "healthy", "result": {"runtimeVersion": "2026.9.4", "hostDesktop": {"enabled": false, "state": "disabled...`
+
+## 1. Method chỉ đọc có tồn tại không
+
+| method | kết quả | payload (rút gọn) |
+| --- | --- | --- |
+| `agents.list` | OK | ["agents", "defaultId", "mainKey", "ownership", "scope", "selectionRequired"] |
+| `config.get` | OK | ["agentRosterIncludeOwned", "appliedConfigHash", "bindingsIncludeOwned", "config", "con... |
+| `config.schema` | OK | ["generatedAt", "schema", "uiHints", "version"] |
+| `models.list` | OK | ["models"] |
+| `tools.catalog` | OK | ["agentId", "groups", "profiles"] |
+| `skills.status` | OK | ["agentId", "managedSkillsDir", "skills", "workspaceDir"] |
+| `usage.cost` | OK | ["cacheStatus", "daily", "days", "totals", "updatedAt"] |
+| `agent.identity.get` | OK | ["agentId", "avatar", "emoji", "name", "nameSource"] |
+
+### Kích thước `config.schema`
+
+- Gọi được, payload đã bóc ~**2,213,528 byte**, version `2026.9.4`, `uiHints` có 7795 mục.
+- Hạn mức frame mặc định của thư viện `websockets` là 1 MiB, nên trước WP-1.2 lời gọi này chết với `1009 message too big`. Đây là lỗi chỉ lộ ra khi gọi thật: không một test nào thấy được.
+- Kết luận cho UI: **đừng** nạp toàn bộ schema mỗi lần mở form; dùng `config.schema.lookup` cho từng path (có cache trong service).
+
+## 2. reloadKind của những path mà UI cấu hình seat sẽ chạm vào
+
+Cột cuối là điều UI phải nói với người dùng **trước** khi họ bấm Lưu.
+
+| path | reloadKind | hệ quả |
+| --- | --- | --- |
+| `agents.defaults.model` | `hot` | áp dụng ngay |
+| `agents.defaults.thinkingDefault` | `hot` | áp dụng ngay |
+| `agents.entries` | `hot` | áp dụng ngay |
+| `agents.defaults.sandbox.mode` | `hot` | áp dụng ngay |
+| `agents.defaults.heartbeat.every` | `hot` | áp dụng ngay |
+| `agents.defaults.compaction.enabled` | `hot` | áp dụng ngay |
+| `tools.exec.mode` | `hot` | áp dụng ngay |
+| `mcp.servers` | `hot` | áp dụng ngay |
+
+## 3. Ghi thật bằng ConfigRegistry.patch
+
+- `config.get` trả hash `hmac-sha256:v1:w…`, revision `hmac-sha256:v1:I…`, pending_apply = `False`
+- Field thử: `agents.entries.dev.identity.theme`, giá trị hiện tại: `AI Chief of Staff của Nova Holding`
+- `dry_run` cho ra params: `{"raw": "{\"agents\": {\"entries\": {\"dev\": {\"identity\": {\"theme\": \"WP-1.2 probe\"}}}}}", "baseHash": "hmac-sha256:v1:wcH2WeQRX3B3_g2-YpK6eTVmGDOxxC_sV3RGcLLaqVs"}`
+
+- **Ghi thành công.** `changedPaths` = `["agents.entries.dev.identity.theme"]`, no_op = `False`, base_hash_source = `config.get`
+- Đọc lại `config.get`: `AI Chief of Staff của Nova Holding (WP-1.2 probe)`
+- Khớp với giá trị vừa ghi: **True**
+
+### Chốt baseHash có hiệu lực thật không
+
+- Gateway **từ chối** patch với baseHash cũ (`hmac-sha256:v1:w…`): `"{'code': 'INVALID_REQUEST', 'message': 'config changed since last load; re-run config.get and retry'}"`
+- Nghĩa là optimistic concurrency có thật — hai người sửa cùng lúc thì người sau bị chặn, không ghi đè im lặng.
+
+- Đã hoàn nguyên `agents.entries.dev.identity.theme` về `AI Chief of Staff của Nova Holding`
+
+## 4. Cấu hình hiệu dụng của một seat
+
+- seat `dev` tồn tại: `True`
+- giá trị của riêng seat: `{"workspace": "/agent/.openclaw/workspace-dev", "model": "cometapi/gpt-4o-mini", "identity": {"name": "Nina", "theme": "AI Chief of Staff của Nova Holding", "emoji": "✦"}}`
+- thừa hưởng từ `agents.defaults`: `["authInheritance", "compaction", "contextPruning", "heartbeat", "maxConcurrent", "skipBootstrap", "subagents"]`
+
+Đây chính là dữ liệu cho sáu tab của màn hình hồ sơ nhân sự AI: UI phân biệt được giá trị riêng của seat với giá trị thừa hưởng, nên người vận hành biết khi nào mình đang sửa cho cả công ty.
+
+## Kết luận
+
+- Method gọi được: **8/8** — `agents.list`, `config.get`, `config.schema`, `models.list`, `tools.catalog`, `skills.status`, `usage.cost`, `agent.identity.get`
+
+Mệnh đề cũ trong `openclaw_protocol.py` — *"There is no agents.create"* — đối chiếu với `agents.list` gọi được ở trên: **sai**.

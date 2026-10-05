@@ -11,6 +11,15 @@ PORT="${1:-8000}"
 # shellcheck disable=SC1090
 eval "$("$ROOT/.venv/bin/python" tools/devstack.py env)"
 
+# WP-2.2: tab Năng lực/Quyền/Hạn mức ghi cấu hình gateway qua config.patch,
+# và method đó cần operator.admin. Không truyền cờ này thì màn hình hồ sơ nhân
+# sự AI đọc được nhưng ghi sẽ bị gateway từ chối — một lỗi rất khó đoán nếu chỉ
+# nhìn UI. Mặc định bật cho môi trường phát triển cục bộ; production phải quyết
+# định có muốn backend giữ quyền đó hay không.
+#
+# APP_TIMEZONE cũng đặt ở đây: mọi phép tính theo ngày lịch (hạn chót, lịch họp)
+# dùng nó, và mặc định rỗng nghĩa là lấy giờ hệ thống của máy chạy API.
+
 # Dừng tiến trình cũ trên cùng cổng, không dùng pkill theo mẫu chuỗi vì nó
 # dễ bắn trúng cả shell đang gọi script này.
 if PID=$(pgrep -f "uvicorn app.main:app --host 127.0.0.1 --port ${PORT}" | head -1); then
@@ -30,6 +39,8 @@ nohup env \
   OPENCLAW_MODE="$OPENCLAW_MODE" \
   OPENCLAW_GATEWAY_WS="$OPENCLAW_GATEWAY_WS" \
   CORS_ORIGINS="$CORS_ORIGINS" \
+  OPENCLAW_REQUEST_ADMIN_SCOPE="${OPENCLAW_REQUEST_ADMIN_SCOPE:-true}" \
+  APP_TIMEZONE="${APP_TIMEZONE:-Asia/Ho_Chi_Minh}" \
   "$ROOT/.venv/bin/python" -m uvicorn app.main:app --host 127.0.0.1 --port "$PORT" \
   > /tmp/clawcompany-api.log 2>&1 &
 

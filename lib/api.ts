@@ -592,3 +592,62 @@ export const apiV36 = {
     request<any>(`/v36/projects/${projectId}/due-date`,
       {method: "POST", body: JSON.stringify({due_date: dueDate})}),
 };
+
+/* WP-2.1 + WP-2.2: hồ sơ nhân sự AI.
+
+   Một seat là ba nguồn phải khớp nhau — hàng trong Postgres, entry
+   `agents.entries.<id>` trong openclaw.json, và 5 file bootstrap trong
+   workspace. `seatProfile` gộp cả ba và nói rõ mỗi phần đến từ đâu.
+
+   Ghi thì tách hai đường, đúng như bản chất của dữ liệu:
+   - tab Hồ sơ/Tính cách/Công việc  -> writeSeatFile  (agents.files.set)
+   - tab Năng lực/Quyền/Hạn mức     -> writeSeatConfig (config.patch)
+
+   `expectedHash` là bắt buộc khi ghi file: thiếu nó thì server từ chối, và
+   nếu hash đã cũ thì trả 409 kèm `current_hash` để tải lại. */
+export const apiSeat = {
+  profile: (agentId: number) => request<any>(`/agents/${agentId}/profile`),
+  writeFile: (agentId: number, name: string, content: string,
+              expectedHash: string | null, force = false) =>
+    request<any>(`/agents/${agentId}/files/${encodeURIComponent(name)}`,
+      {method: "PUT",
+       body: JSON.stringify({content, expected_hash: expectedHash, force})}),
+  writeConfig: (agentId: number, tab: string, values: Record<string, unknown>,
+                opts: {baseHash?: string; allowRestart?: boolean; dryRun?: boolean} = {}) =>
+    request<any>(`/agents/${agentId}/config`,
+      {method: "PATCH",
+       body: JSON.stringify({tab, values, base_hash: opts.baseHash ?? null,
+                             allow_restart: !!opts.allowRestart,
+                             dry_run: !!opts.dryRun})}),
+};
+
+/* WP-4.3 UI: màn hình chi tiết một công việc.
+
+   Ba thứ mà màn hình này cần, và cả ba đều là dữ liệu thật:
+   - journal      -> GET  /api/tasks/{id}/journal       (task_journal_entries)
+   - contextPack  -> GET  /api/tasks/{id}/context-pack  (đúng hàm mà dispatch gọi)
+   - handoff      -> POST /api/tasks/{id}/handoff       (artifact_handoffs + dispatch)
+
+   `contextPack` cố ý gọi cùng `work_context.build_pack` mà `agent_dispatch` gọi:
+   nếu màn hình xem trước hiện một thứ mà agent nhận một thứ khác thì nó không
+   chỉ vô dụng, nó gây tin sai. */
+export const apiTask = {
+  get: (taskId: number) => request<any>(`/tasks`).then((rows: any) =>
+    (rows || []).find((t: any) => t.id === taskId) || null),
+  journal: (taskId: number) => request<any>(`/tasks/${taskId}/journal`),
+  contextPack: (taskId: number) => request<any>(`/tasks/${taskId}/context-pack`),
+  handoff: (taskId: number, body: {to_member_id: number; instructions: string;
+                                   purpose?: string; dispatch?: boolean | null}) =>
+    request<any>(`/tasks/${taskId}/handoff`,
+      {method: "POST", body: JSON.stringify(body)}),
+  dispatch: (taskId: number) =>
+    request<any>(`/tasks/${taskId}/dispatch`, {method: "POST"}),
+};
+
+/* v6 — Hộp việc: hai thao tác ghi mà Hộp việc cần. Cả hai endpoint đã có từ
+   lâu (approvals.py, extended.py) nhưng chưa có hàm nào ở frontend gọi tới. */
+export const apiInbox = {
+  resolveApproval: (id: number, status: "approved" | "rejected", resolution_note = "") =>
+    request<any>(`/approvals/${id}/resolve`, {method: "POST", body: JSON.stringify({status, resolution_note})}),
+  markRead: (id: number) => request<any>(`/inbox/${id}/read`, {method: "POST"}),
+};

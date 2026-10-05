@@ -65,6 +65,21 @@ class CollaborationRoom(Base):
     status: Mapped[str] = mapped_column(String(32), default="open", index=True)  # open|locked|closed
     turn_cursor: Mapped[int] = mapped_column(Integer, default=0)
     max_turns: Mapped[int] = mapped_column(Integer, default=200)
+    # v37 — ba cột để phòng họp chạy được với agent thật.
+    #
+    # chair_member_id: ai giữ búa. `can_decide` trên participant nói ai ĐƯỢC
+    # chốt, nhưng một phòng có thể có nhiều người được chốt; chủ toạ là người
+    # điều khiển lượt và tuyên bố kết thúc. Có thể là người thật hoặc agent.
+    chair_member_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True, index=True)
+    # Tiền cho cả phiên. 0 nghĩa là chưa đặt hạn mức — bộ điều phối sẽ từ chối
+    # chạy, vì một phòng toàn agent không có trần chi phí là một hoá đơn mở.
+    cost_budget_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    cost_spent_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    # Đếm số lượt liên tiếp không thêm thông tin mới, để dừng vòng lặp "vâng,
+    # tôi đồng ý" giữa các agent.
+    stall_count: Mapped[int] = mapped_column(Integer, default=0)
+    # max_turns | budget | stalled | chair_closed | error — vì sao phiên dừng.
+    stopped_reason: Mapped[str] = mapped_column(String(32), default="")
     created_by_member_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True)
     summary: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
