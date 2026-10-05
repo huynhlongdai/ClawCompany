@@ -1,0 +1,212 @@
+/* ==========================================================================
+   ClawCompany theme v4 — nền tảng "Elera"
+   Palette + hình học lấy từ số đo DOM thật của nazday-elera.vercel.app @1512px.
+   Nạp SAU globals.css nên đè lên bản cũ.
+   ========================================================================== */
+
+:root{
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px;
+  --gutter:16px; --block-gap:24px; --row-gap:8px;
+  --side-w:270px; --topbar-h:64px; --rail-w:340px;
+  --col-w:232px; --col-pad:10px; --board-gap:12px;
+  --card-w:212px; --card-pad:12px;
+  --r-sm:8px; --r:12px; --r-md:14px; --r-lg:20px;
+
+  --paper:#f6f5f3; --canvas:#f6f5f3;
+  --card:#ffffff; --cream:#f0efec; --sunken:#edecea; --column:#e9e8e6;
+  --ink:#171a17; --ink-2:#4a4d4a; --muted:#787979;
+  --line:#e2e3e3; --line-soft:#ececeb;
+  --accent:#7cd56e; --accent-ink:#2f7d24; --accent-soft:#e6f7e2;
+  --ok:#2f7d24; --ok-soft:#e6f7e2;
+  --warn:#8a6412; --warn-soft:#faf1dc;
+  --risk:#b23a48; --risk-soft:#fceae6;
+  --info:#2f5fb2; --info-soft:#e6eefb;
+
+  --hairline:0 0 0 1px rgba(0,0,0,.06);
+  --sh:0 1px 1px rgba(0,0,0,.06),0 3px 3px rgba(0,0,0,.04);
+  --sh-hover:0 1px 1px rgba(0,0,0,.06),0 4px 8px rgba(0,0,0,.06);
+  --ease:cubic-bezier(.2,0,0,1);
+  --font-sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+/* ---------- 1. nền & chữ ---------- */
+html,body{background:var(--paper);color:var(--ink);font-family:var(--font-sans);-webkit-font-smoothing:antialiased}
+body{font-size:14px;line-height:21px;letter-spacing:-.14px}
+*{box-sizing:border-box}
+button{font-family:inherit;cursor:pointer}
+p{text-wrap:pretty}
+h1,h2,h3,h4{text-wrap:balance;margin:0}
+
+/* ---------- 2. sidebar nền giấy ---------- */
+aside.v8Side,.sidebar,aside.side{width:var(--side-w) !important;background:var(--paper) !important;
+  color:var(--ink) !important;border-right:0 !important;box-shadow:none !important;
+  display:flex;flex-direction:column}
+aside.v8Side *{color:inherit}
+.v8Brand,.brand{padding:24px 24px 32px !important;display:flex;align-items:center;gap:10px;background:transparent !important}
+.v8Brand b,.brand b{font-size:22px;line-height:33px;font-weight:500;letter-spacing:-.44px;color:var(--ink)}
+.v8Brand small,.brand small{font-size:12px;line-height:18px;color:var(--muted)}
+
+aside.v8Side nav,.navList{padding:0 12px !important;display:flex;flex-direction:column;gap:24px}
+.navGroup{display:flex;flex-direction:column;gap:4px}
+.navLabel,.groupLabel{font-size:13px;line-height:21px;letter-spacing:-.13px;color:var(--muted);padding:0 12px;margin:0}
+aside.v8Side nav a,.navItem{display:flex;align-items:center;gap:10px;min-height:38px;padding:9px 12px;
+  border-radius:8px;font-size:14px;line-height:21px;letter-spacing:-.14px;
+  color:var(--ink-2) !important;background:transparent !important;text-decoration:none;
+  transition:background 120ms var(--ease)}
+aside.v8Side nav a:hover,.navItem:hover{background:var(--cream) !important}
+aside.v8Side nav a.active,.navItem.active,aside.v8Side nav a[aria-current="page"]{
+  background:var(--card) !important;color:var(--ink) !important;font-weight:500;box-shadow:var(--hairline)}
+aside.v8Side nav a svg,.navItem svg{width:18px;height:18px;opacity:.8}
+.sideIcons{padding:12px;display:flex;gap:4px;border-top:1px solid var(--line-soft);background:transparent !important}
+.sideIcons button,.sideIcons a{width:32px;height:32px;border-radius:8px;border:0;background:transparent;
+  display:grid;place-items:center;color:var(--muted)}
+.sideIcons button:hover,.sideIcons a:hover{background:var(--cream);color:var(--ink)}
+
+/* ---------- 3. topbar ---------- */
+header.topBar2,.topbar{height:var(--topbar-h);min-height:var(--topbar-h);padding:0 var(--gutter) !important;
+  display:flex;align-items:center;gap:12px;background:transparent !important;border-bottom:0 !important;box-shadow:none !important}
+.searchWide{flex:1;max-width:420px;height:32px;border-radius:12px;border:0;background:var(--card);
+  box-shadow:var(--hairline);padding:0 10px;display:flex;align-items:center;gap:8px;
+  font-size:12px;color:var(--muted)}
+.searchWide kbd,kbd{height:20px;border-radius:100px;padding:1px 8px;font-size:11px;background:var(--cream);color:var(--muted);border:0;margin-inline-start:auto}
+.bellBtn{width:32px;height:32px;border-radius:12px;border:0;background:var(--card);box-shadow:var(--hairline);
+  display:grid;place-items:center;position:relative;color:var(--ink-2)}
+.clockBox{display:flex;flex-direction:column;align-items:flex-end;line-height:1.2;margin-inline-start:auto}
+.clockBox b{font-size:12px;font-weight:500;color:var(--muted)}
+.clockTime{font-size:16px;font-weight:500;letter-spacing:-.32px;font-variant-numeric:tabular-nums}
+button:active{transform:scale(.97);transition:transform 150ms var(--ease)}
+
+/* ---------- 3b. tài khoản ở GÓC PHẢI topbar (như bản mẫu) ---------- */
+.acctMenu{position:relative;margin-inline-start:4px}
+.acctBtn{display:flex;align-items:center;gap:8px;height:32px;padding:0 4px 0 0;
+  border:0;background:transparent;border-radius:100px;color:var(--ink)}
+.acctBtn:hover{background:var(--cream)}
+.acctAvatar{width:32px;height:32px;border-radius:100px;display:grid;place-items:center;
+  background:var(--accent-soft);color:var(--accent-ink);font-size:13px;font-weight:600;flex:none}
+.acctName{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;padding-inline-end:6px}
+.acctName b{font-size:13px;font-weight:500;letter-spacing:-.13px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acctName small{font-size:11px;color:var(--muted)}
+.acctPop{position:absolute;inset-inline-end:0;top:38px;z-index:40;min-width:220px;
+  background:var(--card);border-radius:var(--r);box-shadow:var(--sh-hover),var(--hairline);padding:6px}
+.acctPop p{margin:0;padding:8px 10px 10px;border-bottom:1px solid var(--line-soft)}
+.acctPop p b{display:block;font-size:13px;font-weight:500}
+.acctPop p small{font-size:11px;color:var(--muted)}
+.acctPop button,.acctPop a{display:flex;width:100%;align-items:center;gap:8px;padding:8px 10px;margin-top:4px;
+  border:0;background:transparent;border-radius:8px;font-size:13px;color:var(--ink-2);text-align:start;text-decoration:none}
+.acctPop button:hover,.acctPop a:hover{background:var(--cream);color:var(--ink)}
+.acctPop .danger{color:var(--risk)}
+@media (max-width:900px){.acctName{display:none}}
+
+/* ---------- 4. vùng nội dung ---------- */
+.v8Content,main .content{padding:0 var(--gutter) var(--gutter) !important;background:transparent !important;
+  display:flex;flex-direction:column}
+.pageHeader{display:flex;align-items:flex-start;gap:12px;padding:0 0 16px}
+.pageHeader h2{font-size:24px;line-height:29px;font-weight:500;letter-spacing:-.72px}
+.pageHeader p{margin:2px 0 0;font-size:13px;line-height:20px;color:var(--muted);max-width:72ch}
+
+/* ---------- 5. bề mặt ---------- */
+.card,.panel,.surface,.box{background:var(--card);border:0;border-radius:var(--r-lg);box-shadow:var(--sh);padding:20px}
+.panel h2,.panel h3,.card h3{font-size:15px;line-height:20px;font-weight:500;letter-spacing:-.15px}
+.panel small,.card small,.meta{font-size:12px;line-height:18px;color:var(--muted)}
+.iconTile{width:36px;height:36px;border-radius:10px;background:var(--cream);display:grid;place-items:center;color:var(--ink-2)}
+.iconTile svg{width:18px;height:18px}
+
+/* ---------- 6. chip / pill ---------- */
+.pill,.tag,.chip,.badge{display:inline-flex;align-items:center;gap:4px;min-height:26px;padding:4px 10px;
+  border-radius:100px;border:0;font-size:13px;line-height:18px;letter-spacing:-.13px;
+  background:var(--card);box-shadow:var(--hairline);color:var(--ink-2)}
+.pillTabs{display:inline-flex;gap:4px}
+.pillTabs button{min-height:28px;padding:4px 10px;border-radius:100px;border:0;background:transparent;
+  font-size:13px;line-height:18px;color:var(--muted)}
+.pillTabs button:hover{background:var(--cream);color:var(--ink-2)}
+.pillTabs button.active{background:var(--card);color:var(--ink);font-weight:500;box-shadow:var(--hairline)}
+.greenTag{background:var(--accent-soft);color:var(--accent-ink)}
+.blueTag{background:var(--info-soft);color:var(--info)}
+.amberTag{background:var(--warn-soft);color:var(--warn)}
+.redTag{background:var(--risk-soft);color:var(--risk)}
+
+/* ---------- 7. bảng ---------- */
+table{width:100%;border-collapse:collapse;font-size:13px;line-height:20px}
+th{text-align:start;font-weight:500;color:var(--muted);font-size:12px;padding:8px 12px;border-bottom:1px solid var(--line-soft)}
+td{padding:10px 12px;border-bottom:1px solid var(--line-soft);color:var(--ink-2)}
+tr:last-child td{border-bottom:0}
+
+/* ---------- 8. trạng thái ---------- */
+.emptyState{display:flex;flex-direction:column;align-items:center;gap:4px;padding:32px 16px;
+  background:var(--card);border-radius:var(--r-lg);box-shadow:var(--sh);color:var(--muted);
+  font-size:13px;line-height:20px;text-align:center}
+.emptyState b{color:var(--ink);font-size:14px;font-weight:500}
+.v8Error,.errorBar{background:var(--risk-soft);color:var(--risk);border:0;border-radius:var(--r);
+  padding:10px 12px;font-size:13px;line-height:20px;margin-bottom:16px}
+
+/* ---------- 9. rail ---------- */
+.rail{width:var(--rail-w);display:flex;flex-direction:column;gap:12px}
+.rail .card,.rail .panel{padding:16px}
+
+/* ---------- 10. hoà sắc trang cũ ---------- */
+.moduleTabs,.tabsCompact,.v8Tabs{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 16px}
+.moduleTabs > *,.v8Tabs > *{padding:4px 10px;border-radius:100px;font-size:13px;line-height:18px;color:var(--muted)}
+.moduleTabs .active,.v8Tabs .active{background:var(--card);box-shadow:var(--hairline);color:var(--ink);font-weight:500}
+.hero,.welcome,.v17Hero,.heroCard{background:linear-gradient(180deg,#ffffff,#f1f0ed) !important;color:var(--ink) !important}
+button.primary,.primaryButton,.btnPrimary,.v8Primary{background:var(--ink) !important;color:#f6f5f3 !important;
+  background-image:none !important;box-shadow:none !important;border-radius:10px}
+.statCard,.kpiCard,.metricCard{background:var(--card);border:0;border-radius:var(--r-lg);box-shadow:var(--sh);padding:20px}
+:focus-visible{outline:2px solid var(--accent-ink);outline-offset:2px;border-radius:6px}
+::selection{background:var(--accent-soft);color:var(--accent-ink)}
+
+/* ============ 11. Work Flow — dựng theo số đo Elera ==================== */
+.wfWrap{display:flex;flex-direction:column;gap:0}
+.wfDemo{margin:0 0 16px;font-size:12px;line-height:18px;color:var(--warn);background:var(--warn-soft);
+  border-radius:100px;padding:4px 10px;align-self:flex-start}
+.wfKpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;background:var(--card);
+  border-radius:20px;box-shadow:var(--sh);overflow:hidden}
+.wfKpi{display:flex;align-items:center;gap:12px;padding:20px;border-left:1px solid var(--line-soft)}
+.wfKpi:first-child{border-left:0}
+.wfKpiIcon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex:none}
+.wfKpiBody{min-width:0}
+.wfKpiLabel{margin:0;font-size:13px;line-height:18px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wfKpiValue{display:flex;align-items:baseline;gap:5px;margin-top:4px}
+.wfKpiNum{font-size:22px;line-height:30px;font-weight:500;letter-spacing:-.44px;font-variant-numeric:tabular-nums}
+.wfKpiValue small{font-size:16px;line-height:30px;letter-spacing:-.44px;color:var(--muted)}
+.statBadge{font-size:12px;line-height:16px;border-radius:3px;padding:0 4px;background:var(--cream);
+  color:var(--ink-2);margin-inline-start:4px;align-self:center}
+.statBadge.critical{background:var(--risk-soft);color:var(--risk)}
+.wfToolbar{display:flex;align-items:center;gap:16px;margin-top:24px;min-height:28px}
+.wfToolbar2{margin-top:8px;margin-bottom:16px}
+.wfGroup{display:flex;gap:4px}
+.wfChips{display:flex;flex-wrap:wrap;gap:4px}
+.wfCount{margin:0 0 0 auto;font-size:13px;line-height:18px;color:var(--muted)}
+.filterChip{display:inline-flex;align-items:center;gap:4px;padding:4px 8px 4px 10px;border-radius:100px;border:0;
+  background:var(--card);box-shadow:var(--hairline);font-size:13px;line-height:18px;letter-spacing:-.13px;color:var(--ink-2)}
+.filterChip.selected{background:#424242;color:#f6f5f3;box-shadow:none}
+.chipCount{font-variant-numeric:tabular-nums;opacity:.65;font-size:12px}
+.wfBoard{display:grid;grid-template-columns:repeat(5,minmax(232px,1fr));gap:12px;align-items:start;
+  overflow-x:auto;margin-inline-end:calc(-1 * var(--gutter));padding-inline-end:var(--gutter);
+  padding-bottom:24px;scroll-snap-type:x proximity}
+.wfBoard > .kanCol{scroll-snap-align:start;display:flex;flex-direction:column;gap:8px;background:#e9e8e6;
+  border-radius:12px;padding:10px;min-width:0}
+.wfDone{background:#e4efe1}
+.kanHead{display:flex;align-items:center;gap:6px;min-height:18px;padding:0 2px 2px}
+.kanHead h4{margin:0;font-size:13px;line-height:16px;font-weight:500;color:var(--ink)}
+.kanCount{font-size:13px;line-height:16px;color:var(--muted);font-variant-numeric:tabular-nums}
+.wfHint{margin-inline-start:auto;font-size:10.5px;line-height:15.75px;color:var(--muted)}
+.taskCard{background:var(--card);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;
+  min-width:0;opacity:.72;box-shadow:rgba(0,0,0,.06) 0 1px 1px,rgba(0,0,0,.04) 0 2px 4px;
+  transition:opacity 150ms var(--ease),box-shadow 150ms var(--ease)}
+.taskCard.focus,.taskCard:hover,.taskCard:focus-within{opacity:1}
+.taskCard.focus{box-shadow:rgba(0,0,0,.08) 0 1px 1px,rgba(0,0,0,.06) 0 4px 8px}
+.tcHead{display:flex;align-items:flex-start;gap:8px}
+.tcAvatar{width:24px;height:24px;border-radius:100px;display:grid;place-items:center;font-size:11px;font-weight:600;padding:0;flex:none}
+.tcTitleWrap{display:flex;flex-direction:column;min-width:0}
+.tcTitle{font-size:13px;line-height:16px;font-weight:500;color:var(--ink);text-wrap:pretty}
+.tcSub{font-size:11px;line-height:14.26px;color:var(--muted)}
+.tcFoot{display:flex;align-items:center;gap:8px;padding-inline-start:32px}
+.tcWho{font-size:11px;line-height:13px;color:var(--muted)}
+.timePill{margin-inline-start:auto;font-size:11px;line-height:13px;font-weight:500;border-radius:6px;
+  padding:3px 6px;background:#eaebe7;color:var(--ink-2)}
+.timePill.amber{background:#faf1dc;color:var(--warn)}
+.timePill.red{background:#fceae6;color:var(--risk)}
+.tcNote{margin:0;background:#faf1dc;color:var(--warn);border-radius:8px;padding:7px;font-size:11px;line-height:13px}
+.kanAdd{margin-top:2px;padding:8px 0 4px;background:transparent;border:0;font-size:13px;line-height:16px;
+  font-weight:500;letter-spacing:-.13px;color:var(--muted);text-align:start;border-radius:8px}
+.kanAdd:hover{color:var(--ink)}

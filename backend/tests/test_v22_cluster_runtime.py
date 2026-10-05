@@ -103,11 +103,22 @@ def db():
 
 
 @pytest.fixture()
-def memory_registry():
-    # StreamRegistry.cluster_wide delegates to pool.available.  In the test
-    # environment no real Redis is running so pool.client() returns None and
-    # the registry naturally reports "memory".  We keep the fixture lean;
-    # the old `reg._redis = None` assignment was a no-op after v26.
+def memory_registry(monkeypatch):
+    # These tests assert the DEGRADED path: no shared Redis, so the registry
+    # must admit "memory" / cluster_wide: false.  The old fixture just
+    # returned StreamRegistry() and relied on the test host having no Redis
+    # running -- true on a laptop, false under docker compose where the suite
+    # runs beside a real redis service.  The condition has to be CREATED, not
+    # assumed, or the test measures the environment instead of the code.
+    #
+    # drop() is the pool's own "this connection is bad" call: it clears the
+    # handle AND pushes _next_attempt into the future, so client() returns
+    # None without dialling.  Setting _client = None alone would not work --
+    # client() would reconnect to the live Redis on the very next call.
+    import app.services.redis_pool as rp
+    down_pool = rp.RedisPool()
+    down_pool.drop("test: redis deliberately unavailable")
+    _patch_pool(monkeypatch, down_pool)
     return StreamRegistry()
 
 

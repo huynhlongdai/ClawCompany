@@ -50,8 +50,28 @@ def org(db):
 
 
 @pytest.fixture(autouse=True)
-def fresh_history():
-    """The reconcile history is process-global; tests must not inherit it."""
+def fresh_history(monkeypatch):
+    """Give every test a genuinely empty reconcile history.
+
+    `rec.clear()` only forgets the IN-PROCESS history -- its own docstring
+    says so. Since v26 the ledger and the cooldown live in shared Redis, so
+    with a real Redis around (docker compose) the first test wrote the ledger
+    and every later one was refused by the 30s cooldown, reporting
+    `ran: False`. The tests then measured the environment, not the code.
+
+    These tests are about the decision to run, not about the ledger being
+    shared -- that is v26's subject. So pin them to the in-process path by
+    injecting a dropped pool; then `rec.clear()` really does clear
+    everything the code reads.
+    """
+    import app.services.redis_pool as rp
+    import app.services.stream_reconcile as rec_mod
+
+    down_pool = rp.RedisPool()
+    down_pool.drop("test: redis deliberately unavailable")
+    monkeypatch.setattr(rp, "pool", down_pool)
+    monkeypatch.setattr(rec_mod, "pool", down_pool)
+
     rec.clear()
     yield
     rec.clear()
