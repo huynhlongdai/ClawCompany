@@ -16,7 +16,7 @@ Nhánh `impl-plan`. Migration `0020_tool_permissions`.
 | UI **Kiểm soát → Công cụ của agent** (`/app/agent-tools`): tóm tắt theo bậc, ma trận tool × bậc (admin chỉnh), đoạn cấu hình OpenClaw, nhật ký gọi tool | `components/AgentToolsConsole.tsx`, `lib/api.ts::apiMcp` |
 
 ## Kiểm chứng
-- `tests/test_d15_mcp_company_tools.py` — 12 test qua TestClient + API key thật; mutation (bỏ kiểm quyền, bỏ lọc phòng ban, bỏ default-deny) làm test đỏ.
+- `tests/test_d15_mcp_company_tools.py` — 12 test qua TestClient + API key thật; đã kiểm mutation: bỏ chốt chính thì test đỏ.
 - Full pytest: 805 passed, 2 skipped. Alembic 0018→0020 up/down/up trên Postgres 16 sạch.
 - Dev server, seat **Nina** gọi qua `POST /api/mcp`: `company_project_get` → `running_count: 1` (dữ liệu công ty thật, không còn đoán). Đổi `company_budget_check`=off cho bậc lead → 403 `-32003`; `company_event_emit`=ask → `pending_approval`, approval #2.
 - UI (Playwright): chọn "Tắt" cho `company_report_submit`/Thực thi → API trả `off/override`, tải lại vẫn giữ; đặt lại "Được dùng" → lưu đúng. 0 lỗi console. Ảnh: `ui/d15-agent-tools.png`.
