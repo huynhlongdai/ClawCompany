@@ -1,6 +1,8 @@
 "use client";
 import {Suspense, useEffect, useMemo, useState} from "react";
 import {useRouter, useSearchParams} from "next/navigation";
+import Link from "next/link";
+import {matchNav} from "../lib/nav";
 import {api, apiV10, apiV17, apiV36} from "../lib/api";
 import {Icon, IconName} from "./Icon";
 import {NINA_PORTRAIT} from "./ninaPortrait";
@@ -27,10 +29,6 @@ const PRIMARY: [string, string, IconName][] = [
   ["projects_active", "Dự án đang chạy", "board"],
   ["customers", "Khách hàng", "building"],
 ];
-const SECONDARY: [string, string][] = [
-  ["companies", "Công ty"], ["humans", "Người"],
-  ["approvals_pending", "Chờ phê duyệt"], ["knowledge_documents", "Tài liệu"],
-];
 
 /* Định dạng tiền gọn: 1.240.000 USD -> $1.24M */
 function money(value: number, unit = "USD") {
@@ -47,12 +45,22 @@ function deltaOf(current: number, previous: number) {
 
 const COMPANY_HUES = ["pink", "blue", "violet", "green"];
 
+/* v6: một tên cho mỗi trạng thái — cùng nhãn và màu với Bảng việc. */
+const STATUS_VI: Record<string, [string, string]> = {
+  active: ["Đang chạy", "is-running"], in_progress: ["Đang làm", "is-running"],
+  done: ["Xong", "is-done"], completed: ["Hoàn tất", "is-done"], healthy: ["Ổn định", "is-done"], indexed: ["Đã lập chỉ mục", "is-done"], ok: ["Ổn", "is-done"],
+  planning: ["Lên kế hoạch", ""], backlog: ["Tồn đọng", ""], todo: ["Cần làm", ""],
+  pending: ["Đang chờ", "is-waiting"], review: ["Chờ duyệt", "is-waiting"],
+  blocked: ["Bị chặn", "is-blocked"], risk: ["Rủi ro", "is-blocked"], at_risk: ["Rủi ro", "is-blocked"],
+  failed: ["Lỗi", "is-failed"], error: ["Lỗi", "is-failed"], denied: ["Bị từ chối", "is-failed"], cancelled: ["Đã huỷ", ""],
+  archived: ["Lưu trữ", ""],
+};
+const PRIORITY_VI: Record<string, string> = {urgent: "Khẩn", high: "Cao", medium: "Vừa", low: "Thấp"};
+
 function Tag({value}: {value?: string | null}) {
   const v = (value || "").toLowerCase();
-  const cls = /active|done|completed|healthy|indexed|ok/.test(v) ? "tag greenTag"
-    : /planning|pending|review|in_progress|backlog|todo/.test(v) ? "tag orangeTag"
-    : /risk|failed|blocked|denied|cancelled|error/.test(v) ? "tag redTag" : "tag blueTag";
-  return <span className={cls}>{value || "—"}</span>;
+  const [label, cls] = STATUS_VI[v] || [value || "—", ""];
+  return <span className={"ui-status " + cls}>{label}</span>;
 }
 
 function Bar({value}: {value: number}) {
@@ -111,6 +119,11 @@ const EVENT_LABELS: Record<string, string> = {
   "board.write.conflict": "Xung đột ghi",
   "delegation.budget.overrun": "Vượt trần ngân sách",
 };
+
+function greeting() {
+  const h = new Date().getHours();
+  return h < 11 ? "Chào buổi sáng" : h < 14 ? "Chào buổi trưa" : h < 18 ? "Chào buổi chiều" : "Chào buổi tối";
+}
 
 const TAB_IDS = new Set<string>(TABS.map(([id]) => id));
 
@@ -191,6 +204,21 @@ function WorkspaceCockpitInner() {
     () => (metrics || []).find(m => m.metric_key === "revenue") || null, [metrics]);
   const revenueDelta = revenue ? deltaOf(revenue.current_value, revenue.previous_value) : null;
 
+  const [hello, setHello] = useState("Xin chào");
+  useEffect(() => { setHello(greeting()); }, []);
+  const current = matchNav("/app/os", tab === "home" ? "" : tab);
+  const blockedCount = tasks.filter(t => t.status === "blocked").length;
+  const reviewCount = tasks.filter(t => t.status === "review").length;
+  const runningCount = tasks.filter(t => t.status === "in_progress").length;
+  const needs = [
+    {label: "Phê duyệt chờ anh", value: Number(k.approvals_pending || 0), hint: "Agent đang dừng chờ quyết định", tone: "waiting"},
+    {label: "Nhiệm vụ bị chặn", value: blockedCount, hint: "Cần gỡ trước khi đội chạy tiếp", tone: "blocked"},
+    {label: "Kết quả chờ duyệt", value: reviewCount, hint: "Đã làm xong, chờ người xem", tone: "review"},
+  ];
+  const summaryLine = overview
+    ? `${runningCount} việc đang làm · ${k.agents ?? 0} agent · ${k.projects_active ?? 0} dự án đang chạy`
+    : "Đang tải số liệu…";
+
   const totalMembers = useMemo(
     () => companies.reduce((sum, c) => sum + (c.members || 0) + (c.agents || 0), 0),
     [companies],
@@ -201,43 +229,34 @@ function WorkspaceCockpitInner() {
       {error} — đăng nhập lại hoặc kiểm tra API.
     </div>}
 
-    {/* ---------- hero ---------- */}
-    <section className="v14Hero">
-      <div>
-        <div className="eyebrow">Chào mừng trở lại</div>
-        <h2>{orgName}</h2>
-        <p>
-          Toàn bộ số liệu trên trang này đọc trực tiếp từ <code>/api/v17/workspace/*</code>
-          {" "}và <code>/api/v10/events</code> — không có dữ liệu demo.
-        </p>
-        <div className="quote">“Một công ty lớn là tập hợp những trí tuệ lớn, cả người và AI,
-          cùng hướng về một tương lai có ý nghĩa.”</div>
-        <div className="heroActions" style={{marginTop: 16}}>
-          <button className="v8Primary" onClick={load} disabled={busy}>
-            {busy ? "Đang tải…" : "Làm mới số liệu"}
-          </button>
-          <a className="v8Ghost" href="/app/workspace-ops">Vận hành tổ chức →</a>
+    {tab === "home" ? <>
+      {/* v6: hero cũ in đường dẫn API ("/api/v17/workspace/*") cho người
+          dùng đọc và một câu trích dẫn chiếm nửa màn hình. Thay bằng lời
+          chào gọn + một câu trạng thái thật, rồi tới ngay "Cần anh". */}
+      <section className="ui-hello">
+        <img src={NINA_PORTRAIT} alt="" width={48} height={48} className="ui-hello-ava"/>
+        <div className="ui-hello-text">
+          <p className="ui-eyebrow">{hello}</p>
+          <h1>{orgName}</h1>
+          <p>{summaryLine}</p>
         </div>
-      </div>
-      <div className="heroArt" style={{textAlign: "center"}}>
-        {/* Chân dung Nina nhúng sẵn (xem ninaPortrait.ts để biết vì sao không
-            dùng file trong public/). Mockup lấy một ảnh nhân vật lớn làm điểm
-            nhìn của hero. */}
-        <img src={NINA_PORTRAIT} alt="Nina — AI Chief of Staff"
-             className="portrait" width={168} height={168}
-             style={{width: 168, height: 168}}/>
-        <div style={{marginTop: 12}}>
-          <b style={{display: "block", fontSize: 14}}>Nina</b>
-          <small>AI Chief of Staff · luôn ở cạnh bạn</small>
+        <div className="ui-hello-actions">
+          <button className="ui-btn is-ghost" onClick={load} disabled={busy}>{busy ? "Đang tải…" : "Làm mới"}</button>
+          <Link href="/app/nina" className="ui-btn is-primary"><Icon name="crown" size={14}/>Giao mục tiêu cho Nina</Link>
         </div>
-      </div>
-    </section>
+      </section>
 
-    {/* ---------- tab ---------- */}
-    <nav className="moduleTabs">
-      {TABS.map(([id, label]) =>
-        <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}>{label}</button>)}
-    </nav>
+      <section className="ui-needs" aria-label="Cần anh">
+        {needs.map(n => <Link key={n.label} href="/app/inbox" className={"ui-need" + (n.value ? " is-" + n.tone : " is-calm")}>
+          <span className="ui-need-num ui-num">{n.value}</span>
+          <span className="ui-need-label"><b>{n.label}</b><small>{n.value ? n.hint : "Không có gì"}</small></span>
+          <Icon name="arrow-right" size={14}/>
+        </Link>)}
+      </section>
+    </> : <div className="ui-pagehead">
+      <h1>{current?.label}</h1>
+      {current?.desc && <p>{current.desc}</p>}
+    </div>}
 
     {tab === "home" && <>
       <section className="v14Metrics" style={{gridTemplateColumns: "repeat(auto-fit,minmax(178px,1fr))"}}>
@@ -254,14 +273,6 @@ function WorkspaceCockpitInner() {
             <div className="metricIcon"><Icon name={icon} size={16}/></div>
             <label>{label}</label>
             <strong>{k[key] ?? 0}</strong>
-          </div>)}
-      </section>
-
-      <section className="v14Metrics" style={{gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))"}}>
-        {SECONDARY.map(([key, label]) =>
-          <div key={key} className="metric" style={{minHeight: 68}}>
-            <label>{label}</label>
-            <strong style={{fontSize: 19}}>{k[key] ?? 0}</strong>
           </div>)}
       </section>
 
@@ -340,7 +351,7 @@ function WorkspaceCockpitInner() {
           <div className="panel">
             <div className="panelHead">
               <div><b>Nhiệm vụ cần chú ý</b></div>
-              <button className="v8Ghost" onClick={() => setTab("tasks")}>Xem bảng việc →</button>
+              <Link className="v8Ghost" href="/app/flow">Mở bảng việc →</Link>
             </div>
             <table className="dataTable">
               <thead><tr><th>Nhiệm vụ</th><th>Người / Agent</th><th>Ưu tiên</th><th>Trạng thái</th></tr></thead>
@@ -349,8 +360,8 @@ function WorkspaceCockpitInner() {
                   .slice(0, 5).map(t =>
                   <tr key={t.id}>
                     <td>{t.title}</td>
-                    <td>{t.assignee_name || <small>chưa giao</small>}{t.assignee_type === "agent" ? " ✦" : ""}</td>
-                    <td>{t.priority}</td>
+                    <td>{t.assignee_name || <small>chưa giao</small>}{t.assignee_type === "agent" ? <small> · agent</small> : ""}</td>
+                    <td>{PRIORITY_VI[t.priority] || t.priority}</td>
                     <td><Tag value={t.status}/></td>
                   </tr>)}
                 {!tasks.some(t => ["in_progress", "review", "blocked", "todo"].includes(t.status)) &&
@@ -537,8 +548,8 @@ function WorkspaceCockpitInner() {
         <tbody>{tasks.map(t =>
           <tr key={t.id}>
             <td>{t.title}</td><td>{t.project_name || "—"}</td>
-            <td>{t.assignee_name || "—"}{t.assignee_type === "agent" ? " ✦" : ""}</td>
-            <td>{t.priority}</td><td><Tag value={t.status}/></td>
+            <td>{t.assignee_name || "—"}{t.assignee_type === "agent" ? <small> · agent</small> : ""}</td>
+            <td>{PRIORITY_VI[t.priority] || t.priority}</td><td><Tag value={t.status}/></td>
           </tr>)}
           {!tasks.length && <tr><td colSpan={5}><div className="v8Empty">Chưa có nhiệm vụ.</div></td></tr>}
         </tbody>

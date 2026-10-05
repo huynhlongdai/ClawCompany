@@ -7,9 +7,14 @@
 type Name =
   | "home" | "building" | "users" | "sparkle" | "board" | "check" | "book"
   | "pencil" | "room" | "mesh" | "crown" | "gear" | "pulse" | "search"
-  | "plus" | "arrow-right" | "bell" | "shield" | "chart" | "doc";
+  | "plus" | "arrow-right" | "bell" | "shield" | "chart" | "doc"
+  | "inbox" | "layers" | "target" | "zap" | "coins" | "list" | "server" | "alert"
+  | "key" | "x" | "chevron-down" | "chevron-right" | "clock" | "play" | "flag" | "command"
+  | "grid" | "logout" | "user" | "menu" | "more";
 
 const PATHS: Record<Name, string> = {
+  menu: "M3.5 5.5h13M3.5 10h13M3.5 14.5h13",
+  more: "M5 10h.01M10 10h.01M15 10h.01",
   home: "M3 9.5 10 4l7 5.5V16a1 1 0 0 1-1 1h-3.5v-4.5h-5V17H4a1 1 0 0 1-1-1V9.5Z",
   building: "M4 17V4.8c0-.4.3-.8.8-.8h6.4c.5 0 .8.4.8.8V17M12 9h3.2c.5 0 .8.4.8.8V17M6.5 7h3M6.5 10h3M6.5 13h3",
   users: "M7 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Zm7 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM2.5 16.5c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4M13 12.6c2.2.1 4 1.5 4 3.9",
@@ -30,6 +35,25 @@ const PATHS: Record<Name, string> = {
   shield: "M10 3.5 16 6v4.2c0 3.3-2.4 5.6-6 6.8-3.6-1.2-6-3.5-6-6.8V6l6-2.5Z",
   chart: "M4 16V9m4 7V5m4 11v-4.5M16 16V7",
   doc: "M5.5 3.5h6L15 7v9.5h-9.5v-13ZM11 3.5V7h4",
+  inbox: "M3.5 11 5.6 4.8c.1-.5.6-.8 1-.8h6.8c.5 0 .9.3 1 .8L16.5 11v4.2c0 .5-.4.8-.8.8H4.3a.8.8 0 0 1-.8-.8V11Zm0 0h4l1 2h3l1-2h4",
+  layers: "M10 3.5 17 7l-7 3.5L3 7l7-3.5ZM3 10.5 10 14l7-3.5M3 14l7 3.5 7-3.5",
+  target: "M10 16.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Zm0-3.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0-2.2a.8.8 0 1 0 0-1.6.8.8 0 0 0 0 1.6Z",
+  zap: "M11 3 4.5 11H10l-1 6 6.5-8H10l1-6Z",
+  coins: "M8 8.5c2.5 0 4.5-.9 4.5-2S10.5 4.5 8 4.5s-4.5.9-4.5 2 2 2 4.5 2Zm-4.5-2v7c0 1.1 2 2 4.5 2m4.5-9V9m-9-.5c0 1.1 2 2 4.5 2m4.5 1c2.5 0 4.5-.9 4.5-2s-2-2-4.5-2-4.5.9-4.5 2 2 2 4.5 2Zm-4.5-2v4c0 1.1 2 2 4.5 2s4.5-.9 4.5-2v-4",
+  list: "M7.5 5.5h9m-9 4.5h9m-9 4.5h9M4 5.5h.01M4 10h.01M4 14.5h.01",
+  server: "M4 4.5h12v4.5H4V4.5Zm0 6.5h12v4.5H4V11Zm2.5-4.2h.01m-.01 6.5h.01",
+  alert: "M10 4 17 16H3L10 4Zm0 4.5v3.2m0 2.3h.01",
+  key: "M12.5 10a3.5 3.5 0 1 0-3.3-2.3L3.5 13.4V16H6v-1.5h1.5V13h1.5l1.3-1.3A3.5 3.5 0 0 0 12.5 10Zm1-4h.01",
+  x: "M5 5l10 10M15 5 5 15",
+  "chevron-down": "M5.5 8 10 12.5 14.5 8",
+  "chevron-right": "M8 5.5 12.5 10 8 14.5",
+  clock: "M10 16.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13ZM10 6.5V10l2.5 1.5",
+  play: "M6.5 4.5v11l9-5.5-9-5.5Z",
+  flag: "M5 17V3.5m0 0h9l-1.8 3.2L14 10H5",
+  command: "M7 7V5.5a1.5 1.5 0 1 0-1.5 1.5H7Zm0 0h6m-6 0v6m6-6V5.5A1.5 1.5 0 1 1 14.5 7H13Zm0 0v6m0 0h1.5a1.5 1.5 0 1 1-1.5 1.5V13Zm0 0H7m0 0v1.5A1.5 1.5 0 1 1 5.5 13H7Z",
+  grid: "M4 4h5v5H4V4Zm7 0h5v5h-5V4ZM4 11h5v5H4v-5Zm7 0h5v5h-5v-5Z",
+  logout: "M8 16H4.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1H8m4.5 9.5L16 10l-3.5-3.5M16 10H8",
+  user: "M10 9.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5.5 7c0-3 2.5-4.5 5.5-4.5s5.5 1.5 5.5 4.5",
 };
 
 export function Icon({name, size = 18, strokeWidth = 1.6, fill = false}: {

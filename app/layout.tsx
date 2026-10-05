@@ -1,5 +1,6 @@
 import "./globals.css";
 import "./theme-v2.css";
+import "./v6.css";
 
 export const metadata = {
   title: "ClawCompany — AI Organization OS",

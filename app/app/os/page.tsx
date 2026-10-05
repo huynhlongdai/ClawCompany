@@ -1,18 +1,13 @@
 import {AuthGate} from "../../../components/AuthGate";
-import {V17AppShell} from "../../../components/V17AppShell";
+import {AppShell} from "../../../components/AppShell";
 import {WorkspaceCockpit} from "../../../components/WorkspaceCockpit";
-import {HomeRail} from "../../../components/HomeRail";
+import {HomeRailIfHome} from "../../../components/HomeRailIfHome";
 import {CreateButton} from "../../../components/CreateButton";
 
 export default function Page() {
   return <AuthGate>
-    <V17AppShell
-      title=""
-      subtitle=""
-      action={<CreateButton/>}
-      rail={<HomeRail/>}
-    >
+    <AppShell title="" subtitle="" action={<CreateButton/>} rail={<HomeRailIfHome/>}>
       <WorkspaceCockpit/>
-    </V17AppShell>
+    </AppShell>
   </AuthGate>;
 }

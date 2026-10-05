@@ -643,3 +643,11 @@ export const apiTask = {
   dispatch: (taskId: number) =>
     request<any>(`/tasks/${taskId}/dispatch`, {method: "POST"}),
 };
+
+/* v6 — Hộp việc: hai thao tác ghi mà Hộp việc cần. Cả hai endpoint đã có từ
+   lâu (approvals.py, extended.py) nhưng chưa có hàm nào ở frontend gọi tới. */
+export const apiInbox = {
+  resolveApproval: (id: number, status: "approved" | "rejected", resolution_note = "") =>
+    request<any>(`/approvals/${id}/resolve`, {method: "POST", body: JSON.stringify({status, resolution_note})}),
+  markRead: (id: number) => request<any>(`/inbox/${id}/read`, {method: "POST"}),
+};
