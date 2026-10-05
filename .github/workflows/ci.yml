@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       pg:
-        image: postgres:16
+        image: pgvector/pgvector:pg16  # migration cần extension vector
         env: {POSTGRES_PASSWORD: postgres, POSTGRES_DB: cc}
         ports: ["5432:5432"]
         options: >-
