@@ -164,9 +164,25 @@ class NativeOpenClawRuntime(AgentRuntime):
             "role": ocp.ROLE_OPERATOR,
             "scopes": self.scopes(),
         }
+        caps = self.caps()
+        if caps:
+            params["caps"] = caps
         if self.token:
             params["auth"] = {"token": self.token}
         return params
+
+    def caps(self) -> list[str]:
+        """D1.1 — năng lực client khai trong ``connect.params.caps``.
+
+        Đo trên gateway 2026.9.8: lượt chạy do ClawCompany mở mà gọi ``exec``
+        cần duyệt bị từ chối ngay với "Headless runs cannot wait for
+        interactive exec approval", vì gateway chỉ gửi thẻ duyệt tới client
+        khai ``exec-approvals`` (docs/tools/exec-approvals.md, "API clients
+        that declare the approvals or exec-approvals capability"). Chỉ khai
+        khi đã bật OPENCLAW_REQUEST_APPROVALS_SCOPE — khi đó ClawCompany thật
+        sự nhận (follower → hàng approvals) và trả lời (exec.approval.resolve).
+        """
+        return [ocp.CAP_EXEC_APPROVALS] if settings.openclaw_request_approvals_scope else []
 
     async def _handshake(self, ws) -> dict[str, Any]:
         """Gửi ``connect`` và đọc ``hello-ok``.
@@ -176,12 +192,12 @@ class NativeOpenClawRuntime(AgentRuntime):
         chấp nhận cả hai hình dạng thay vì ghim một cái.
         """
         request_id = str(uuid.uuid4())
-        await ws.send(json.dumps(self._request_frame("connect", self._connect_params(), request_id)))
+        await _send(ws, json.dumps(self._request_frame("connect", self._connect_params(), request_id)))
         # Không đọc đúng một frame rồi tin đó là hello-ok: gateway thật có thể
         # chen event/tick vào trước. Đọc tới khi thấy frame mang đúng id của
         # lời gọi connect (đo được với OpenClaw 2026.9.4).
         while True:
-            raw = await asyncio.wait_for(ws.recv(), timeout=self.timeout)
+            raw = await _recv(ws, timeout=self.timeout)
             hello = json.loads(raw)
             if hello.get("id") is not None and str(hello.get("id")) != request_id:
                 continue
@@ -221,9 +237,9 @@ class NativeOpenClawRuntime(AgentRuntime):
         async with websockets.connect(self.url, additional_headers=self._headers(),
                                       max_size=settings.openclaw_max_frame_bytes) as ws:
             await self._handshake(ws)
-            await ws.send(json.dumps(self._request_frame(method, params, request_id)))
+            await _send(ws, json.dumps(self._request_frame(method, params, request_id)))
             while True:
-                raw = await asyncio.wait_for(ws.recv(), timeout=self.timeout)
+                raw = await _recv(ws, timeout=self.timeout)
                 msg = json.loads(raw)
                 if str(msg.get("id")) != request_id:
                     continue  # broadcast event arriving on the same socket
@@ -337,7 +353,8 @@ class NativeOpenClawRuntime(AgentRuntime):
         async with websockets.connect(self.url, additional_headers=self._headers(),
                                       max_size=settings.openclaw_max_frame_bytes) as ws:
             await self._handshake(ws)
-            await ws.send(
+            await _send(
+                ws,
                 # v35.1: tham số là ``key``, không phải ``sessionKey``.
                 # Upstream dùng ``{ key: ... }`` nhất quán ở
                 # src/gateway/session-message-events.test.ts,
@@ -355,7 +372,7 @@ class NativeOpenClawRuntime(AgentRuntime):
                 )
             )
             while True:
-                raw = await asyncio.wait_for(ws.recv(), timeout=max(self.timeout, 60))
+                raw = await _recv(ws, timeout=max(self.timeout, 60))
                 msg = json.loads(raw)
                 if str(msg.get("id")) == request_id:
                     self._read_response(msg)  # raises on error / ok=false
@@ -513,6 +530,38 @@ class NativeOpenClawRuntime(AgentRuntime):
     async def history(self, session_key: str, limit: int = 50) -> dict:
         return await self._rpc(ocp.M_CHAT_HISTORY, {"sessionKey": session_key, "limit": limit})
 
+
+
+# D1.1 — băng ghi frame. Báo cáo approval đầu-cuối phải kèm frame thật của cả
+# hai chiều, nên khi OPENCLAW_FRAME_LOG trỏ tới một file thì mọi frame gửi/nhận
+# được ghi thêm vào đó (jsonl). Token trong ``auth`` bị che trước khi ghi.
+def _tap(direction: str, raw) -> None:
+    path = settings.openclaw_frame_log
+    if not path:
+        return
+    try:
+        frame = json.loads(raw) if isinstance(raw, (str, bytes)) else raw
+        if isinstance(frame, dict):
+            params = frame.get("params")
+            if isinstance(params, dict) and isinstance(params.get("auth"), dict):
+                frame = {**frame, "params": {**params, "auth": {"token": "***"}}}
+    except Exception:  # noqa: BLE001 - frame không phải JSON thì ghi nguyên văn
+        frame = str(raw)[:2000]
+    import time as _time
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"t": round(_time.time(), 3), "dir": direction, "frame": frame},
+                            ensure_ascii=False, default=str) + "\n")
+
+
+async def _send(ws, raw: str) -> None:
+    _tap("out", raw)
+    await ws.send(raw)
+
+
+async def _recv(ws, timeout: float):
+    raw = await asyncio.wait_for(ws.recv(), timeout=timeout)
+    _tap("in", raw)
+    return raw
 
 def normalize_event(msg: dict) -> dict | None:
     """Flatten an upstream gateway frame into ClawCompany's event shape.

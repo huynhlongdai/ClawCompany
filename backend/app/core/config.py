@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     # từ schema sống" sập ngay bước đầu. Xem _reports/native-probe-agents.log.
     # 16 MiB khớp với checkpoint tối đa mà upstream tự đặt cho compaction.
     openclaw_max_frame_bytes: int = 16 * 1024 * 1024
+    openclaw_frame_log: str = ""  # D1.1: đường dẫn jsonl ghi mọi frame WS (để trống = tắt)
     # Múi giờ để tính những thứ theo **ngày lịch**: hạn chót dự án, lịch họp,
     # "hôm nay có gì". Rỗng nghĩa là dùng giờ hệ thống của máy chạy API.
     #

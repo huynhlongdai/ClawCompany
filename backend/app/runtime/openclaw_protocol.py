@@ -230,6 +230,8 @@ APPROVAL_EVENTS = frozenset({E_SESSION_APPROVAL, E_EXEC_APPROVAL_REQUESTED, E_EX
 # to backfill requests that predate the connection.
 M_EXEC_APPROVAL_RESOLVE = "exec.approval.resolve"
 M_EXEC_APPROVAL_LIST = "exec.approval.list"
+# D1.1: client capability (docs/gateway/clients.md, GATEWAY_CLIENT_CAPS).
+CAP_EXEC_APPROVALS = "exec-approvals"
 
 METHOD_SCOPES[M_EXEC_APPROVAL_RESOLVE] = SCOPE_APPROVALS
 
