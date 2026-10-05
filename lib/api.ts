@@ -658,6 +658,24 @@ export const apiTask = {
   runs: (taskId: number) => request<any>(`/tasks/${taskId}/runs`),
 };
 
+/* D1.5 + D1.6 — máy chủ MCP của ClawCompany và bảng quyền tool theo bậc ghế.
+   `toolLog` đọc event bus (v10) vì mỗi lần gọi tool đã ghi `mcp.tool.called`
+   hoặc `mcp.tool.denied` — không có bảng log riêng để lệch với sự thật. */
+export const apiMcp = {
+  tools: () => request<any>(`/mcp/tools`),
+  permissions: () => request<any>(`/mcp/permissions`),
+  setPermission: (body: {tool: string; level: string; role?: string; member_id?: number}) =>
+    request<any>(`/mcp/permissions`, {method: "PUT", body: JSON.stringify(body)}),
+  toolLog: async (limit = 40) => {
+    const [called, denied] = await Promise.all([
+      request<any[]>(`/v10/events?event_type=mcp.tool.called&limit=${limit}`),
+      request<any[]>(`/v10/events?event_type=mcp.tool.denied&limit=${limit}`),
+    ]);
+    return [...(called || []), ...(denied || [])]
+      .sort((a, b) => (b.id || 0) - (a.id || 0)).slice(0, limit);
+  },
+};
+
 /* Lỗi từ `request` là nguyên văn body. FastAPI trả {"detail": ...}, mà detail
    có thể là chuỗi hoặc {message}. Rút ra câu người đọc được. */
 export function errorText(e: any, fallback = "Thao tác thất bại"): string {

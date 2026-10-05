@@ -61,6 +61,8 @@ export const NAV: NavEntry[] = [
 
   {href: "/app/budgets", label: "Ngân sách", group: "control", icon: "coins",
    desc: "Hạn mức chi và sổ cái giữ chỗ", keywords: "budget cost chi phí"},
+  {href: "/app/agent-tools", label: "Công cụ của agent", group: "control", icon: "shield",
+   desc: "Tool company_* qua MCP và quyền theo ghế", keywords: "mcp tool quyền permission"},
   {href: "/app/live-runs", label: "Phiên đang chạy", group: "control", icon: "pulse",
    desc: "Phiên OpenClaw, lease, chuyển trạng thái", keywords: "run session live"},
   {href: "/app/events", label: "Nhật ký sự kiện", group: "control", icon: "list",
