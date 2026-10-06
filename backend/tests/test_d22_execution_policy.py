@@ -267,7 +267,7 @@ def test_parse_decision_takes_the_last_marker():
 # ------------------------------------------------------------ báo cáo bắt buộc
 
 
-def _run_ends(env, t, *, comment: bool):
+def _run_ends(env, t, *, comment: bool, by: str = "nina"):
     db = env["db"]
     run = TaskRun(organization_id=env["org"].id, task_id=t.id, member_id=env["nina"].id, status="running",
                   session_key=f"agent:dev:company-task-{t.id}")
@@ -277,7 +277,7 @@ def _run_ends(env, t, *, comment: bool):
     t.checkout_run_id = run.id; db.add(t); db.commit()
     if comment:
         task_journal.append(db, t, kind="result", summary="Đã xong, file ở /out/report.md",
-                            actor_member_id=env["nina"].id)
+                            actor_member_id=env[by].id)
     state = stream.ConsumerState(session_key=run.session_key, task_id=t.id, organization_id=env["org"].id)
     stream.apply_terminal_state(db, _fresh(env, t), state, {"state": "final"})
     return _fresh(env, t)
@@ -294,3 +294,9 @@ def test_run_with_a_comment_goes_to_review_and_starts_the_stage(env):
     t = _task(env, stages=_review_stage(env))
     t1 = _run_ends(env, t, comment=True)
     assert t1.status == "review" and t1.execution_state["status"] == "in_review"
+
+
+def test_a_comment_by_someone_else_is_not_the_doers_report(env):
+    t = _task(env, stages=_review_stage(env))
+    t1 = _run_ends(env, t, comment=True, by="boss")
+    assert t1.status == "blocked" and t1.execution_state["missing_report"]
