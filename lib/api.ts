@@ -720,3 +720,17 @@ export const apiInbox = {
   quickApprovals: () => request<any>(`/v9/approvals/quick`),
   escalateOverdue: () => request<any>(`/v9/approvals/escalate-overdue`, {method: "POST"}),
 };
+
+// D3.4: routines — cron theo múi giờ / webhook, chạy bù, tự dừng khi lỗi liên tiếp
+export const apiRoutines = {
+  list: () => request<any>(`/routines`),
+  templates: () => request<any>(`/routines/templates`),
+  get: (id: number) => request<any>(`/routines/${id}`),
+  create: (body: any) => request<any>(`/routines`, {method: "POST", body: JSON.stringify(body)}),
+  fromTemplate: (key: string, assignee_member_id?: number | null, department_id?: number | null) =>
+    request<any>(`/routines/from-template`, {method: "POST", body: JSON.stringify({key, assignee_member_id, department_id})}),
+  setEnabled: (id: number, enabled: boolean) => request<any>(`/routines/${id}`, {method: "PATCH", body: JSON.stringify({enabled})}),
+  run: (id: number) => request<any>(`/routines/${id}/run`, {method: "POST"}),
+  runs: (id: number) => request<any>(`/routines/${id}/runs`),
+  tick: () => request<any>(`/routines/tick`, {method: "POST"}),
+};

@@ -49,6 +49,8 @@ export const NAV: NavEntry[] = [
    desc: "Phòng phối hợp có chủ toạ, bàn giao giữa agent", keywords: "room meeting collaboration"},
   {href: "/app/workflows", label: "Tự động hoá", group: "work", icon: "zap",
    desc: "Quy trình và việc định kỳ", keywords: "workflow automation"},
+  {href: "/app/routines", label: "Việc định kỳ", group: "work", icon: "zap",
+   desc: "Routine theo lịch / webhook, chạy bù, tự dừng khi lỗi", keywords: "routine cron lịch webhook định kỳ"},
 
   {href: "/app/os?tab=agents", label: "Nhân sự AI", group: "team", icon: "sparkle", countKey: "agents",
    desc: "Seat agent, model, trạng thái runtime", keywords: "agent seat ai"},
