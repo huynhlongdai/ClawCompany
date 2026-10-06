@@ -143,9 +143,8 @@ class RoomConductRequest(BaseModel):
     # Số lượt tối đa cho LỜI GỌI NÀY, không phải cho cả phòng. Trần của phòng là
     # `max_turns`; đây là "chạy thêm mấy lượt nữa rồi trả kết quả".
     max_turns: int = Field(default=4, ge=1, le=20)
-    # Ước lượng chi phí mỗi lượt. Không tự đoán ở server: giá thật nằm ở
-    # `usage.cost` của gateway và hai nguồn tiền chưa được đối chiếu (WP-1.4).
-    cost_per_turn_usd: float = Field(default=0.01, ge=0, le=10)
+    # D2.3: bỏ `cost_per_turn_usd` do caller ước lượng — giá mỗi lượt lấy từ
+    # sessions.usage của gateway và đi qua budget_envelopes (giữ chỗ/quyết toán).
 
 
 class RoomChairRequest(BaseModel):
@@ -193,8 +192,7 @@ async def conduct_room(room_id: int, payload: RoomConductRequest,
     room = _room(db, room_id, principal)
     try:
         return await conductor.conduct(db, room, get_runtime(),
-                                       max_turns=payload.max_turns,
-                                       cost_per_turn_usd=payload.cost_per_turn_usd)
+                                       max_turns=payload.max_turns)
     except conductor.ConductorError as exc:
         raise HTTPException(409, str(exc))
 

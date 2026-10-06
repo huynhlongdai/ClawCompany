@@ -47,6 +47,17 @@ class BudgetEnvelopeCreate(BaseModel):
     name: str
     currency: str = "USD"
     amount_limit: float = Field(ge=0)
+    # D2.3: phạm vi + nấc cảnh báo
+    scope_type: str = Field(default="company", pattern="^(company|department|member|project|goal)$")
+    scope_id: int | None = None
+    warn_pct: int = Field(default=80, ge=1, le=99)
+    period: str = Field(default="total", pattern="^(total|monthly)$")
+
+
+class BudgetOverride(BaseModel):
+    reason: str = Field(min_length=3, max_length=500)
+    amount_limit: float | None = Field(default=None, ge=0)
+    add_usd: float | None = Field(default=None, gt=0)
 
 
 class BudgetEntryCreate(BaseModel):

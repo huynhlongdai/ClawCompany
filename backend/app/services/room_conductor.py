@@ -87,9 +87,10 @@ STOP_WAITING_HUMAN = "waiting_for_human"
 STOP_CALL_LIMIT = "call_limit"
 
 
-COST_NOTE = ("cost_usd là ƯỚC LƯỢNG do caller đưa vào, không phải giá thật từ "
-             "usage.cost của gateway. Hai nguồn tiền chưa được đối chiếu — "
-             "xem WP-1.4.")
+COST_NOTE = ("D2.3: cost_usd mỗi lượt là số thật từ sessions.usage của gateway "
+             "(tổng phiên phòng − các lượt trước), giữ chỗ/quyết toán qua "
+             "budget_envelopes của người nói. Runtime không có sessions.usage "
+             "thì lượt đó ghi 0 (unmetered).")
 
 
 class ConductorError(RuntimeError):
@@ -435,14 +436,31 @@ async def _ask(runtime, room: CollaborationRoom, agent: Agent,
     return "", run.run_id or "", time.monotonic() - started
 
 
-async def run_turn(db: Session, room: CollaborationRoom, runtime, *,
-                   cost_per_turn_usd: float = 0.0) -> TurnResult:
-    """Một lượt: chọn người, hỏi, ghi biên bản, ghi vận hành.
+async def _turn_cost(db: Session, runtime, session_key: str) -> tuple[float, str]:
+    """Giá thật của lượt vừa xong: tổng phiên phòng (gateway) − các lượt đã ghi."""
+    if not hasattr(runtime, "rpc"):
+        return 0.0, "unmetered"
+    from sqlalchemy import func as _f
+    from app.services.cost_ledger import fetch_gateway_usage
+    try:
+        got = await fetch_gateway_usage(runtime, session_key, attempts=3)
+    except Exception:  # noqa: BLE001
+        return 0.0, "unmetered"
+    usage = got.get("usage")
+    if usage is None:
+        return 0.0, "unmetered"
+    before = db.query(_f.sum(RoomConductorRun.cost_usd)).filter(
+        RoomConductorRun.runtime_session_key == session_key).scalar() or 0.0
+    return max(0.0, round(float(usage["cost_usd"]) - float(before), 10)), "gateway"
 
-    ``cost_per_turn_usd`` là ước lượng do caller đưa vào. Cố ý **không** tự đoán
-    giá ở đây: giá thật nằm ở ``usage.cost`` của gateway, và hai nguồn tiền của
-    dự án này chưa từng được đối chiếu (đó là WP-1.4, còn nợ). Ghi ước lượng vào
-    ``cost_usd`` và nói rõ nó là ước lượng.
+
+async def run_turn(db: Session, room: CollaborationRoom, runtime) -> TurnResult:
+    """Một lượt: chọn người, giữ chỗ ngân sách, hỏi, ghi biên bản, quyết toán.
+
+    D2.3: bỏ ``cost_per_turn_usd`` do caller ước lượng. Trước khi hỏi, giữ chỗ
+    ``budget_scope.estimate`` trên các phong bì của người nói (không giữ được →
+    ``ConductorError('budget: ...')``, không gửi gì). Sau khi trả lời, quyết toán
+    bằng giá thật từ ``sessions.usage`` của phiên phòng.
     """
     chair = chair_of(db, room)
     speaker, blocker = next_speaker(db, room)
@@ -455,6 +473,15 @@ async def run_turn(db: Session, room: CollaborationRoom, runtime, *,
     ).scalars().first()
     if not agent or not agent.runtime_agent_id:
         raise ConductorError(f"{member.name if member else speaker.member_id} chưa gắn seat runtime")
+
+    from types import SimpleNamespace
+    from app.services import budget_scope
+    scope = SimpleNamespace(project_id=room.project_id, goal_id=None)
+    why, envs, amount = budget_scope.gate(db, member, scope)
+    if why:
+        raise ConductorError(why)
+    hold_key = f"room:{room.id}:turn:{(room.turn_cursor or 0) + 1}:{speaker.member_id}:{int(time.time() * 1000)}"
+    budget_scope.hold(db, envs, amount, hold_key, memo=f"giữ chỗ lượt họp phòng #{room.id}")
 
     prompt = build_turn_prompt(db, room, speaker, chair=chair)
     is_chair = bool(chair and speaker.member_id == chair.member_id)
@@ -474,17 +501,22 @@ async def run_turn(db: Session, room: CollaborationRoom, runtime, *,
                                turn_type=turn_type,
                                references={"conducted": True, "runtime_run_id": run_id})
 
+    session_key = room_session_key(agent.runtime_agent_id, room)
+    cost, cost_source = await _turn_cost(db, runtime, session_key)
+    budget_scope.settle_key(db, envs, hold_key, cost, final=True,
+                            memo=f"lượt họp phòng #{room.id} — {cost_source}")
+
     db.add(RoomConductorRun(
         organization_id=room.organization_id, room_id=room.id,
         turn_id=turn.id if turn else None, speaker_member_id=speaker.member_id,
         runtime_agent_id=agent.runtime_agent_id,
         runtime_session_key=room_session_key(agent.runtime_agent_id, room),
         runtime_run_id=run_id, prompt_chars=len(prompt), reply_chars=len(reply),
-        elapsed_seconds=round(elapsed, 2), cost_usd=cost_per_turn_usd,
+        elapsed_seconds=round(elapsed, 2), cost_usd=cost,
         status=status, error=error,
     ))
 
-    room.cost_spent_usd = (room.cost_spent_usd or 0.0) + cost_per_turn_usd
+    room.cost_spent_usd = (room.cost_spent_usd or 0.0) + cost
 
     # Phát hiện treo.
     #
@@ -548,8 +580,7 @@ def stop_reason(db: Session, room: CollaborationRoom) -> str:
     return ""
 
 
-async def conduct(db: Session, room: CollaborationRoom, runtime, *, max_turns: int = 6,
-                  cost_per_turn_usd: float = 0.01) -> dict:
+async def conduct(db: Session, room: CollaborationRoom, runtime, *, max_turns: int = 6) -> dict:
     """Chạy phiên họp tới khi có điều kiện dừng, hoặc hết ``max_turns`` của lượt gọi này.
 
     Từ chối chạy khi phòng chưa có trần tiền: một phòng toàn agent không có
@@ -570,10 +601,12 @@ async def conduct(db: Session, room: CollaborationRoom, runtime, *, max_turns: i
     reason = ""
     for _ in range(max(1, min(max_turns, 20))):
         try:
-            result = await run_turn(db, room, runtime, cost_per_turn_usd=cost_per_turn_usd)
+            result = await run_turn(db, room, runtime)
         except ConductorError as exc:
             message = str(exc)
-            if "là người thật" in message:
+            if message.startswith("budget:"):
+                reason = STOP_BUDGET
+            elif "là người thật" in message:
                 reason = STOP_WAITING_HUMAN
             elif "không có người dự" in message:
                 reason = STOP_NO_SPEAKER

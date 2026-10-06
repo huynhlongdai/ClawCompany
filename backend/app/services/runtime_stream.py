@@ -383,6 +383,16 @@ def apply_terminal_state(db: Session, task: Task, state: ConsumerState, event: d
                              or ("missing_report" if reason == "missing_report" else ""), commit=False)
     lifecycle.transition(db, task, new_status, system=True, via="runtime",
                          reason=reason, commit=True, emit=False)
+    if holder is not None:
+        # D2.3: quyết toán bằng task_runs.cost_usd (cộng từ session.message), trả
+        # phần giữ thừa; rồi đối chiếu nền bằng sessions.usage của gateway.
+        from app.services import budget_scope
+        try:
+            db.refresh(holder)
+            budget_scope.settle_run(db, holder, final=True)
+            budget_scope.schedule_true_up(holder.id)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[D2.3] settle run #{holder.id} failed: {exc}")
     if holder is not None and holder.member_id:
         # D2.1: lý do bị bỏ vì seat bận được xếp lại khi lượt này xong.
         from app.services import wakeup

@@ -307,8 +307,7 @@ async def run_agent_review(db: Session, task: Task, reviewer: Member, runtime) -
         room.chair_member_id = reviewer.id
         room.cost_budget_usd = settings.review_room_budget_usd
         db.add(room); db.commit(); db.refresh(room)
-    out = await room_conductor.conduct(db, room, runtime, max_turns=4,
-                                       cost_per_turn_usd=settings.wakeup_run_estimate_usd)
+    out = await room_conductor.conduct(db, room, runtime, max_turns=4)
     # Đọc từ biên bản (room_turns), không từ bản xem trước 280 ký tự của kết quả.
     decision, text = None, ""
     for turn in rooms.transcript(db, room):

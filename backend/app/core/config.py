@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     # buộc; bật cờ này để bắt buộc cho mọi task.
     require_run_report: bool = False
     review_room_budget_usd: float = 0.5
+    # D2.3: sau khi run kết thúc, đối chiếu lại số đã quyết toán bằng
+    # sessions.usage của gateway (nguồn sự thật theo D1.2). Chỉ chạy ở chế độ native.
+    budget_true_up: bool = True
+    budget_true_up_delay_seconds: float = 3.0
 
     # v25: reconcile (report the gap, pull pending approvals) whenever a
     # follower attaches to a session. On by default because it is a no-op

@@ -155,21 +155,20 @@ def open_run_for(db: Session, member_id: int, now: datetime) -> TaskRun | None:
     return None
 
 
-def budget_block(db: Session, member: Member) -> str:
-    q = db.query(BudgetEnvelope).filter(BudgetEnvelope.organization_id == member.organization_id,
-                                        BudgetEnvelope.status != "archived")
-    for env in q.all():
-        if env.company_id not in (None, member.company_id) or env.goal_id is not None:
-            continue
-        ok, msg = budget_svc.can_reserve(env, settings.wakeup_run_estimate_usd)
-        if not ok:
-            return f"budget: {env.name}: {msg}"
-    return ""
+def budget_block(db: Session, member: Member, task: Task | None = None) -> str:
+    """D2.3: cổng ngân sách theo phạm vi (company/department/member/project/goal)."""
+    from app.services import budget_scope
+    return budget_scope.gate(db, member, task)[0]
 
 
 async def skip_reason(db: Session, member: Member | None, agent: Agent | None, now: datetime) -> str:
     if member is None or member.member_type != "agent":
         return "not_an_agent_seat"
+    if member.status == "paused":
+        from app.services import budget_scope
+        spent = [e for e in budget_scope.applicable(db, member) if (e.threshold_state or "") == "exhausted"]
+        if spent:
+            return f"budget: {spent[0].name}: đã hết hạn mức — seat tạm dừng"
     if member.status != "active" or agent is None or (agent.lifecycle or "active") != "active":
         return "seat_inactive"
     busy = open_run_for(db, member.id, now)
@@ -177,7 +176,7 @@ async def skip_reason(db: Session, member: Member | None, agent: Agent | None, n
         return f"seat_busy: run #{busy.id} (task #{busy.task_id})"
     if not within_active_hours(await ACTIVE_HOURS_LOOKUP(agent), now):
         return "outside_active_hours"
-    return budget_block(db, member)
+    return ""
 
 
 # ------------------------------------------------------------------ drain
@@ -271,17 +270,34 @@ async def _process(db: Session, member_id: int, items: list[Wakeup], now: dateti
                 "wakeups": [w.id for w in items]}
     same = [w for w in items if w is not primary and w.status == "queued" and w.task_id == primary.task_id]
 
+    # D2.3: giữ chỗ TRƯỚC chat.send. Không giữ được → gateway không nhận gì.
+    from app.services import budget_scope
+    why, envs, amount = budget_scope.gate(db, member, task)
+    if why:
+        for wk in [primary, *same]:
+            _close(wk, "skipped", skip=why, now=now)
+        db.commit()
+        for wk in [primary, *same]:
+            _emit(db, wk, "wakeup.skipped", why)
+        return {"member_id": member_id, "decision": "skipped", "reason": why,
+                "wakeups": [w.id for w in [primary, *same]]}
+    hold_key = f"wakeup:{primary.id}"
+    budget_scope.hold(db, envs, amount, hold_key,
+                      memo=f"giữ chỗ khi drain wakeup #{primary.id} (task #{task.id}, ước tính {amount:.4f})")
+
     from app.services import agent_dispatch
     from app.services import task_lifecycle as lifecycle
     try:
         task = await agent_dispatch.dispatch_task(db, task, trigger_kind=primary.reason, wakeup_id=primary.id)
     except agent_dispatch.DispatchError as exc:
+        budget_scope.release_key(db, hold_key, "dispatch lỗi — trả phần giữ")
         why = f"dispatch_error: {exc}"
         for wk in [primary, *same]:
             _close(wk, "skipped", skip=why, now=now)
         db.commit(); _emit(db, primary, "wakeup.skipped", why)
         return {"member_id": member_id, "decision": "skipped", "reason": why, "wakeups": [primary.id]}
     except Exception as exc:  # noqa: BLE001
+        budget_scope.release_key(db, hold_key, "runtime lỗi — trả phần giữ")
         why = f"runtime_error: {exc}"
         for wk in [primary, *same]:
             _close(wk, "failed", skip=why, now=now)
@@ -294,6 +310,10 @@ async def _process(db: Session, member_id: int, items: list[Wakeup], now: dateti
     followed = _follow(task, member.organization_id) if follow else None
     run = lifecycle.current_run(db, task)
     run_id = run.id if run else None
+    if run_id is not None:
+        budget_scope.rekey(db, hold_key, budget_scope.run_key(run_id))
+    else:
+        budget_scope.release_key(db, hold_key, "không có task_run — trả phần giữ")
     _close(primary, "dispatched", run_id=run_id, now=now)
     for wk in same:
         _close(wk, "coalesced", run_id=run_id, into=primary.id, now=now)

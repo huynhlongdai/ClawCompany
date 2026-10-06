@@ -213,8 +213,10 @@ def _block5_handoff(db: Session, task: Task, handoffs: list[ArtifactHandoff],
 
 
 def _block6_rules(sops: list[SOP], decisions: list[Decision],
-                  pending_approvals: int) -> Block:
+                  pending_approvals: int, budget_lines: list[str] | None = None) -> Block:
     block = Block(6, "Luật áp dụng cho việc này")
+    # D2.3: nấc 80% của ngân sách — luật đứng đầu khối không bao giờ bị cắt.
+    block.lines.extend(budget_lines or [])
     if sops:
         block.original_count += len(sops)
         block.lines.append(f"- SOP đang hiệu lực ({len(sops)}):")
@@ -252,6 +254,14 @@ def _block7_agreement() -> Block:
 
 
 # ------------------------------------------------------------------ lắp gói
+
+def _budget_lines(db: Session, assignee: Member | None, task: Task) -> list[str]:
+    try:
+        from app.services import budget_scope
+        return budget_scope.context_lines(db, assignee, task)
+    except Exception:  # noqa: BLE001 - gói ngữ cảnh không được hỏng vì ngân sách
+        return []
+
 
 def build_pack(db: Session, task: Task, *, organization_id: int,
                budget_chars: int = TOTAL_BUDGET_CHARS) -> dict:
@@ -294,7 +304,7 @@ def build_pack(db: Session, task: Task, *, organization_id: int,
         _block3_project(project, company, siblings),
         _block4_journal(entries, actors),
         _block5_handoff(db, task, handoffs, actors),
-        _block6_rules(sops, decisions, pending),
+        _block6_rules(sops, decisions, pending, _budget_lines(db, assignee, task)),
         _block7_agreement(),
     ]
 

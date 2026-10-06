@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.authz import Principal, enforce_org, require_human, require_role
-from app.core.tenancy import active_org, ensure_company, ensure_department, ensure_project, ensure_agent
+from app.core.tenancy import active_org, ensure_company, ensure_department, ensure_project, ensure_agent, ensure_member
 from app.db.session import get_db
 from app.models import (
     Agent, Approval, AutonomyPolicy, BudgetEnvelope, BudgetLedgerEntry, DelegationAssignment, ExecutiveGoal,
@@ -13,7 +13,7 @@ from app.models import (
 )
 from app.schemas.v9 import (
     AutonomyPolicyUpsert, BudgetEntryCreate, BudgetEnvelopeCreate, ExecutiveGoalCreate, GoalPlanRequest,
-    GoalRunRequest, IncidentRetryRequest, MemoryCreate, RecurringOperationCreate,
+    GoalRunRequest, IncidentRetryRequest, MemoryCreate, RecurringOperationCreate, BudgetOverride,
 )
 from app.services.autonomy import get_policy
 from app.services.budget import remaining, reserve, settle_reserved, release_reserved
@@ -162,9 +162,54 @@ def create_budget(payload: BudgetEnvelopeCreate, principal: Principal = Depends(
         ensure_company(db, payload.company_id, principal)
     if payload.goal_id is not None:
         _goal(db, payload.goal_id, principal)
-    item = BudgetEnvelope(**payload.model_dump(), amount_reserved=0, amount_spent=0, status="active")
+    # D2.3: phạm vi phải thuộc tổ chức của người tạo.
+    st, sid = payload.scope_type, payload.scope_id
+    if st != "company" and sid is None:
+        raise HTTPException(422, f"scope_type={st} cần scope_id")
+    if st == "department":
+        ensure_department(db, sid, principal)
+    elif st == "member":
+        ensure_member(db, sid, principal)
+    elif st == "project":
+        ensure_project(db, sid, principal)
+    elif st == "goal":
+        _goal(db, sid, principal)
+    elif st == "company" and sid is not None:
+        ensure_company(db, sid, principal)
+    item = BudgetEnvelope(**payload.model_dump(), amount_reserved=0, amount_spent=0, status="active",
+                          threshold_state="ok")
     db.add(item); db.commit(); db.refresh(item)
     return item
+
+
+@router.get("/budgets-overview")
+def budgets_overview(principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    """D2.3: phong bì kèm phạm vi/nấc + chi tiêu thật theo seat, task, dự án (từ sổ cái)."""
+    from app.services import budget_scope
+    org_id = active_org(principal)
+    rows = db.query(BudgetEnvelope).filter(BudgetEnvelope.organization_id == org_id).order_by(BudgetEnvelope.id.desc()).all()
+    return {"budgets": [{**budget_scope.public(x), "spend": budget_scope.spend_breakdown(db, org_id, x.id)}
+                        for x in rows],
+            "all": budget_scope.spend_breakdown(db, org_id)}
+
+
+@router.post("/budgets/{budget_id}/override")
+def budget_override(budget_id: int, payload: BudgetOverride, principal: Principal = Depends(require_role("manager")),
+                    db: Session = Depends(get_db)):
+    """D2.3: đường duy nhất mở lại phong bì đã hết — đổi hạn mức, khôi phục seat/task, ghi audit."""
+    from app.services import budget_scope
+    budget = _budget(db, budget_id, principal)
+    if payload.amount_limit is None and payload.add_usd is None:
+        raise HTTPException(422, "cần amount_limit hoặc add_usd")
+    member = db.get(Member, principal.member_id) if principal.member_id else None
+    try:
+        out = budget_scope.override(db, budget, actor_member_id=member.id if member else None,
+                                    actor_name=member.name if member else f"user#{principal.user_id}",
+                                    reason=payload.reason, new_limit=payload.amount_limit, add_usd=payload.add_usd)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    db.refresh(budget)
+    return {"budget": budget_scope.public(budget), **out}
 
 
 @router.get("/budgets")

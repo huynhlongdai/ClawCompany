@@ -308,6 +308,14 @@ class FakeRuntime:
                         "text": pending})
         return {"messages": list(log)}
 
+    async def rpc(self, method, params=None):
+        """D2.3: ``sessions.usage`` giả — mỗi lượt đã trả lời tốn 0,01 USD."""
+        assert method == "sessions.usage"
+        key = (params or {}).get("key")
+        n = sum(1 for m in self.history_by_session.get(key, []) if m["role"] == "assistant")
+        return {"sessions": [{"key": key, "usage": {"totalCost": round(0.01 * n, 10)}}],
+                "cacheStatus": {"status": "fresh"}}
+
 
 def test_conductor_refuses_a_room_without_a_cost_ceiling(db, world):
     """Phòng toàn agent không có trần tiền là một hoá đơn mở."""
@@ -406,7 +414,7 @@ def test_conduct_writes_real_turns_and_advances_the_cursor(db, world):
                     seat_order=1)
 
     runtime = FakeRuntime(["Tôi đề xuất hook A và B.", "Bổ sung: hook C hợp trend."])
-    out = asyncio.run(rc.conduct(db, room, runtime, max_turns=2, cost_per_turn_usd=0.01))
+    out = asyncio.run(rc.conduct(db, room, runtime, max_turns=2, ))
 
     assert out["ran"] == 2
     turns = db.query(RoomTurn).order_by(RoomTurn.sequence).all()
@@ -516,7 +524,7 @@ def test_stops_when_the_budget_runs_out(db, world):
     rooms.join_room(db, room, member_id=world["mia"].id, participant_role="contributor",
                     seat_order=1)
     runtime = FakeRuntime(["một", "hai", "ba", "bốn", "năm"])
-    out = asyncio.run(rc.conduct(db, room, runtime, max_turns=5, cost_per_turn_usd=0.01))
+    out = asyncio.run(rc.conduct(db, room, runtime, max_turns=5, ))
 
     assert out["ran"] == 2, "trần 0,02 USD với 0,01 mỗi lượt thì chỉ chạy được 2 lượt"
     assert out["stopped_reason"] == rc.STOP_BUDGET
