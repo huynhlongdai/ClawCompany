@@ -43,6 +43,8 @@ export const NAV: NavEntry[] = [
    desc: "Dự án, tiến độ và hạn chót", keywords: "project"},
   {href: "/app/goals", label: "Mục tiêu", group: "work", icon: "target",
    desc: "Mục tiêu điều hành, kế hoạch và vòng vận hành", keywords: "goal okr"},
+  {href: "/app/strategy", label: "Kế hoạch mục tiêu", group: "work", icon: "target",
+   desc: "Nina phân rã mục tiêu → duyệt / yêu cầu sửa → giao phòng", keywords: "strategy plan nina kế hoạch phân rã"},
   {href: "/app/nina", label: "Nina lập kế hoạch", group: "work", icon: "crown",
    desc: "Đưa mục tiêu, Nina chia việc và giao cho đội", keywords: "planner chief of staff"},
   {href: "/app/collaboration", label: "Phòng họp", group: "work", icon: "room",

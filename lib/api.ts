@@ -734,3 +734,11 @@ export const apiRoutines = {
   runs: (id: number) => request<any>(`/routines/${id}/runs`),
   tick: () => request<any>(`/routines/tick`, {method: "POST"}),
 };
+
+// D3.3: kế hoạch mục tiêu của Nina — duyệt / yêu cầu sửa / từ chối
+export const apiStrategy = {
+  goals: () => request<any>(`/strategy/goals`),
+  goal: (id: number) => request<any>(`/strategy/goals/${id}`),
+  requestRevision: (approvalId: number, note: string) =>
+    request<any>(`/strategy/plans/${approvalId}/request-revision`, {method: "POST", body: JSON.stringify({note})}),
+};
