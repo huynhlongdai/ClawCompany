@@ -137,6 +137,9 @@ def visible_task(ctx: ToolContext, task: Task | None) -> bool:
         return False
     if task.assignee_member_id == ctx.member.id:
         return True
+    # D3.1: việc phòng đang giữ — người trong phòng thấy được.
+    if task.assignee_department_id and task.assignee_department_id == ctx.member.department_id:
+        return True
     if task_scope(ctx) == "company":
         return True
     if task.assignee_member_id is None:
@@ -303,6 +306,22 @@ def _task_comment(ctx: ToolContext, args: dict) -> dict:
     except task_journal.JournalError as exc:
         raise ToolError("invalid_argument", str(exc)) from exc
     return {"task_id": task.id, "journal_seq": entry.seq}
+
+
+@tool("company_task_assign", "work", "Trưởng phòng giao việc của phòng cho một người trong phòng "
+      "(hoặc seat điều hành giao cho bất kỳ ai). Bắt buộc nêu lý do. Bỏ member_id để hệ thống "
+      "chọn theo tải. Giao xong thì dừng lượt định tuyến.", "company.tasks:write",
+      {"task_id": {"type": "integer"}, "member_id": {"type": "integer"}, "reason": {"type": "string"}},
+      ("task_id", "reason"), writes=True)
+def _task_assign(ctx: ToolContext, args: dict) -> dict:
+    from app.services import routing
+    task = _task_or_404(ctx, _int(args, "task_id"))
+    try:
+        return routing.assign(ctx.db, task, actor=ctx.member,
+                              member_id=_int(args, "member_id", required=False),
+                              reason=_str(args, "reason", limit=1000), run=ctx.run)
+    except routing.RoutingError as exc:
+        raise ToolError(exc.code, exc.message) from exc
 
 
 @tool("company_task_checkout", "work", "Nhận giữ một việc của tôi cho lượt chạy hiện tại trước "

@@ -115,7 +115,10 @@ def append(db: Session, task: Task, *, kind: str, summary: str,
                aggregate_type="task", aggregate_id=str(task.id),
                actor_member_id=actor_member_id,
                payload={"seq": entry.seq, "outcome": outcome, "kind": kind})
-    wake_mentions(db, task, entry, organization_id)
+    mentioned = wake_mentions(db, task, entry, organization_id)
+    if getattr(task, "assignee_department_id", None):
+        from app.services import routing
+        routing.on_journal_entry(db, task, entry, mentioned)
     return entry
 
 
@@ -135,19 +138,22 @@ def mentioned_members(db: Session, organization_id: int, text: str, *, exclude: 
     return out
 
 
-def wake_mentions(db: Session, task: Task, entry: TaskJournalEntry, organization_id: int | None) -> None:
-    """D2.1: comment có @seat → xếp đánh thức seat đó (lý do ``mentioned``)."""
+def wake_mentions(db: Session, task: Task, entry: TaskJournalEntry, organization_id: int | None) -> list:
+    """D2.1: comment có @seat → xếp đánh thức seat đó (lý do ``mentioned``). Trả các seat được @."""
     if organization_id is None:
-        return
+        return []
+    found: list = []
     try:
         from app.services import wakeup
-        for member in mentioned_members(db, organization_id, f"{entry.summary}\n{entry.detail or ''}",
-                                        exclude=entry.actor_member_id):
+        found = mentioned_members(db, organization_id, f"{entry.summary}\n{entry.detail or ''}",
+                                  exclude=entry.actor_member_id)
+        for member in found:
             wakeup.enqueue_for_task(db, task, "mentioned", member_id=member.id,
                                     dedupe_key=f"mentioned:j{entry.id}:m{member.id}",
                                     payload={"journal_seq": entry.seq, "by_member_id": entry.actor_member_id})
     except Exception as exc:  # noqa: BLE001 — ghi sổ đã xong; đánh thức hỏng không được làm hỏng nó
         print(f"[D2.1] mention wake failed: {exc}")
+    return found
 
 
 def read(db: Session, task_id: int, *, limit: int = 100) -> list[TaskJournalEntry]:

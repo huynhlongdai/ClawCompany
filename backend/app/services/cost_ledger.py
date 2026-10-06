@@ -83,7 +83,8 @@ def message_usage(raw: dict) -> dict | None:
 
 
 def record_message_usage(db: Session, *, organization_id: int, task: Task | None,
-                         agent_id: int | None, session_key: str, raw: dict) -> UsageEvent | None:
+                         agent_id: int | None, session_key: str, raw: dict,
+                         run=None) -> UsageEvent | None:
     """Ghi một lượt model vào ``usage_events`` + ``task_runs``. Không ghi hai lần."""
     u = message_usage(raw)
     if u is None or not u["message_id"]:
@@ -96,8 +97,7 @@ def record_message_usage(db: Session, *, organization_id: int, task: Task | None
               .first())
     if exists:
         return None
-    run = None
-    if task is not None:
+    if run is None and task is not None:  # D3.1: lượt định tuyến truyền run của nó
         from app.services import task_lifecycle as lifecycle
         run = lifecycle.current_run(db, task)
     item = record_usage(

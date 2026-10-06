@@ -49,7 +49,7 @@ class TaskRun(Base):
 
 
 WAKEUP_REASONS = ("assigned", "mentioned", "handoff", "approval_resolved", "blocker_cleared",
-                  "review_requested", "routine", "goal_created", "changes_requested")
+                  "review_requested", "routine", "goal_created", "changes_requested", "routed")
 WAKEUP_STATUSES = ("queued", "coalesced", "dispatched", "skipped", "failed")
 
 

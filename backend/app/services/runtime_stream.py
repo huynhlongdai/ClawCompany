@@ -208,7 +208,15 @@ def handle_event(db: Session, state: ConsumerState, event: dict) -> None:
     task = db.get(Task, state.task_id) if state.task_id else None
     agent_id = None
     member = None
-    if task is not None and task.assignee_member_id:
+    from app.services import routing
+    route_run = routing.run_for_session(db, state.session_key)
+    if route_run is not None:
+        # D3.1: phiên định tuyến của trưởng phòng — người chạy là trưởng phòng,
+        # tiền tính vào lượt định tuyến, kết thúc không đổi trạng thái task.
+        member = db.get(Member, route_run.member_id) if route_run.member_id else None
+        agent = db.query(Agent).filter(Agent.member_id == route_run.member_id).first()
+        agent_id = agent.id if agent else None
+    elif task is not None and task.assignee_member_id:
         member = db.get(Member, task.assignee_member_id)
         agent = db.query(Agent).filter(Agent.member_id == task.assignee_member_id).first()
         agent_id = agent.id if agent else None
@@ -227,13 +235,15 @@ def handle_event(db: Session, state: ConsumerState, event: dict) -> None:
     if str(event.get("family") or "") == "session.message" and isinstance(event.get("raw"), dict):
         cost_ledger.record_message_usage(
             db, organization_id=state.organization_id, task=task, agent_id=agent_id,
-            session_key=state.session_key, raw=event["raw"])
+            session_key=state.session_key, raw=event["raw"], run=route_run)
 
     if str(event.get("family") or "") in ocp.APPROVAL_EVENTS:
         state.approvals += 1
         record_approval(db, state, event, member=member)
 
-    if event.get("terminal") and task is not None:
+    if event.get("terminal") and route_run is not None:
+        routing.finish_routing_run(db, route_run, event)
+    elif event.get("terminal") and task is not None:
         apply_terminal_state(db, task, state, event)
 
 

@@ -228,6 +228,52 @@ async def _review(db: Session, member: Member, primary: Wakeup, task: Task, item
             "wakeups": [primary.id]}
 
 
+async def _route(db: Session, member: Member, agent: Agent, primary: Wakeup, task: Task,
+                 items: list[Wakeup], now: datetime, follow: bool) -> dict:
+    """D3.1: lượt định tuyến của trưởng phòng — cổng ngân sách như lượt thường."""
+    from app.services import budget_scope, routing
+    same = [w for w in items if w is not primary and w.status == "queued" and w.task_id == task.id
+            and w.reason == "routed"]
+    why, envs, amount = budget_scope.gate(db, member, task)
+    if why:
+        for wk in [primary, *same]:
+            _close(wk, "skipped", skip=why, now=now)
+        db.commit()
+        for wk in [primary, *same]:
+            _emit(db, wk, "wakeup.skipped", why)
+        return {"member_id": member.id, "decision": "skipped", "reason": why,
+                "wakeups": [w.id for w in [primary, *same]]}
+    hold_key = f"wakeup:{primary.id}"
+    budget_scope.hold(db, envs, amount, hold_key,
+                      memo=f"giữ chỗ lượt định tuyến wakeup #{primary.id} (task #{task.id})")
+    try:
+        run = await routing.dispatch_routing(db, task, member, agent, wakeup_id=primary.id)
+    except Exception as exc:  # noqa: BLE001
+        budget_scope.release_key(db, hold_key, "runtime lỗi — trả phần giữ")
+        why = f"runtime_error: {exc}"[:200]
+        for wk in [primary, *same]:
+            _close(wk, "failed", skip=why, now=now)
+        db.commit(); _emit(db, primary, "wakeup.failed", why)
+        return {"member_id": member.id, "decision": "failed", "reason": why, "wakeups": [primary.id]}
+    followed = None
+    if follow:
+        try:
+            from app.services.runtime_stream import supervisor
+            followed = getattr(supervisor.follow(session_key=run.session_key, organization_id=member.organization_id,
+                                                 task_id=task.id), "status", "following")
+        except Exception as exc:  # noqa: BLE001
+            followed = f"error: {exc}"
+    budget_scope.rekey(db, hold_key, budget_scope.run_key(run.id))
+    _close(primary, "dispatched", run_id=run.id, now=now)
+    for wk in same:
+        _close(wk, "coalesced", run_id=run.id, into=primary.id, now=now)
+    db.commit()
+    _emit(db, primary, "wakeup.dispatched", f"routed: lượt định tuyến #{run.id} cho task #{task.id}",
+          run_id=run.id, coalesced=[w.id for w in same], session_key=run.session_key)
+    return {"member_id": member.id, "decision": "routed", "task_id": task.id, "run_id": run.id,
+            "wakeups": [primary.id], "coalesced": [w.id for w in same], "followed": followed}
+
+
 async def _process(db: Session, member_id: int, items: list[Wakeup], now: datetime,
                    follow: bool, prefer: int | None = None) -> dict:
     if prefer is not None:
@@ -251,6 +297,15 @@ async def _process(db: Session, member_id: int, items: list[Wakeup], now: dateti
             if t.status == "review" and execution_policy.is_current_reviewer(t, member_id):
                 return await _review(db, member, wk, t, items, now)
             why_one = "not_current_reviewer"
+            _close(wk, "skipped", skip=why_one, now=now); db.commit()
+            _emit(db, wk, "wakeup.skipped", why_one)
+            continue
+        if t is not None and wk.reason == "routed":
+            # D3.1: trưởng phòng định tuyến việc của phòng — lượt riêng, không giữ task.
+            from app.services import routing
+            why_one = routing.routable(db, t, member_id)
+            if not why_one:
+                return await _route(db, member, agent, wk, t, items, now, follow)
             _close(wk, "skipped", skip=why_one, now=now); db.commit()
             _emit(db, wk, "wakeup.skipped", why_one)
             continue

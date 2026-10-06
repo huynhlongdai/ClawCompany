@@ -35,7 +35,7 @@ router = APIRouter(tags=["mcp"])
 
 PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
 SERVER_INFO = {"name": "clawcompany", "version": "d1.5"}
-TASK_SESSION = re.compile(r"company-task-(\d+)$")
+TASK_SESSION = re.compile(r"company-(?:task|route)-(\d+)$")  # D3.1: phiên định tuyến
 
 
 def _seat(db: Session, principal: Principal, seat_header: str | None) -> tuple[Member, Agent | None]:

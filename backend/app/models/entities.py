@@ -39,6 +39,8 @@ class Department(Base, TimestampMixin, RevisionMixin):
     # column, so v29 archived them by flipping access_level to
     # "confidential" -- overloading a permission field to mean "closed".
     status: Mapped[str] = mapped_column(String(32), default="active")
+    # D3.1 (0024): hướng dẫn phòng — trưởng phòng đọc khi định tuyến việc.
+    guide: Mapped[str] = mapped_column(Text, default="")
 
 class Member(Base, TimestampMixin, RevisionMixin):
     __tablename__ = "members"
@@ -106,6 +108,9 @@ class Task(Base, TimestampMixin, RevisionMixin):
     # và vị trí hiện tại trên các chặng đó. Chỉ services/execution_policy.py ghi.
     execution_policy: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
     execution_state: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
+    # D3.1 (0024_department_routing): việc giao cho phòng ban; trưởng phòng
+    # được đánh thức (lý do ``routed``) để chọn người. Chỉ services/routing.py ghi.
+    assignee_department_id: Mapped[int | None] = mapped_column(ForeignKey("departments.id"), nullable=True, index=True)
 
 class KnowledgeDocument(Base, TimestampMixin):
     __tablename__ = "knowledge_documents"
