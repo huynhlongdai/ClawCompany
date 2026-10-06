@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     # sessions.usage của gateway (nguồn sự thật theo D1.2). Chỉ chạy ở chế độ native.
     budget_true_up: bool = True
     budget_true_up_delay_seconds: float = 3.0
+    # D3.2: một seat đang có từ số run mở này trở lên (queued/dispatched/running)
+    # thì coi là đầy, không nhận thêm việc qua dispatch_policy.
+    dispatch_max_open_runs: int = 2
 
     # v25: reconcile (report the gap, pull pending approvals) whenever a
     # follower attaches to a session. On by default because it is a no-op
