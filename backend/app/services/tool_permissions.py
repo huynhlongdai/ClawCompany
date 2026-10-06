@@ -22,7 +22,7 @@ ASK_GRANT_HOURS = 24
 
 # Mặc định theo bậc seat. Thừa hành không xem ngân sách (việc của trưởng
 # phòng); mọi thứ khác của một nhân viên bình thường đều được.
-_EXECUTOR_OFF = {"company_budget_check", "company_task_assign"}  # D3.1: giao việc là của trưởng phòng
+_EXECUTOR_OFF = {"company_budget_check", "company_task_assign", "company_plan_submit"}  # D3.3: kế hoạch là của seat chiến lược  # D3.1: giao việc là của trưởng phòng
 
 
 def _defaults() -> dict[str, dict[str, str]]:

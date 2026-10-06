@@ -368,6 +368,8 @@ def _collect(session: Session, _ctx) -> None:
                 hist = inspect(obj).attrs.status.history
                 if hist.has_changes() and obj.status != "pending":
                     todo.append(("resolved", obj))
+                elif hist.has_changes() and obj.status == "pending":
+                    todo.append(("new", obj))   # D3.3: gửi lại sau yêu cầu sửa → báo lại, hạn mới
         if not todo:
             session.info.pop(_KEY, None)
     except Exception as exc:  # noqa: BLE001 — hook không được làm hỏng flush

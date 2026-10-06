@@ -49,6 +49,12 @@ async def resolve_approval(approval_id: int, payload: ApprovalResolve, principal
             raise HTTPException(409, str(exc))
         db.refresh(obj)
         return obj
+    from app.services import strategy
+    plan = strategy.is_strategy(obj)
+    if plan and obj.status != "pending":
+        raise HTTPException(409, f"Kế hoạch đang {obj.status}")
+    if plan and obj.approver_member_id and principal.member_id != obj.approver_member_id:
+        raise HTTPException(403, {"error": "not_the_approver", "approver_member_id": obj.approver_member_id})
     stage = (obj.policy_key or "").startswith("task_stage:")
     if stage:
         # D2.2: chặng approval của execution policy — chỉ đúng người duyệt được quyết.
@@ -66,6 +72,14 @@ async def resolve_approval(approval_id: int, payload: ApprovalResolve, principal
     if stage:
         from app.services import execution_policy
         execution_policy.on_approval_resolved(db, obj, actor_member_id=principal.member_id)
+        db.refresh(obj)
+        return obj
+    if plan:
+        # D3.3: duyệt → plan_apply tạo việc con và giao phòng/seat; từ chối → goal plan_rejected.
+        try:
+            strategy.on_resolved(db, obj, actor_member_id=principal.member_id)
+        except strategy.StrategyError as exc:
+            raise HTTPException(409, exc.message)
         db.refresh(obj)
         return obj
     _wake_requester(db, obj)

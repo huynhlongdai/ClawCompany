@@ -52,6 +52,7 @@ from app.api.v34 import router as v34_router
 from app.api.v35 import router as v35_router
 from app.api.v36 import router as v36_router
 from app.api.routines import router as routines_router
+from app.api.strategy import router as strategy_router
 from app.core.middleware import RequestContextMiddleware
 
 Base.metadata.create_all(bind=engine)
@@ -123,6 +124,7 @@ app.include_router(v34_router, prefix="/api")
 app.include_router(v35_router, prefix="/api")
 app.include_router(v36_router, prefix="/api")
 app.include_router(routines_router, prefix="/api")
+app.include_router(strategy_router, prefix="/api")
 
 
 @app.on_event("startup")

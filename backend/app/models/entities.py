@@ -142,3 +142,6 @@ class Approval(Base, TimestampMixin):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     escalate_to_member_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True)
     escalated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # D3.3: kế hoạch chiến lược (action='strategy') — nội dung có cấu trúc + số lần sửa.
+    payload: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, default=1, server_default="1")

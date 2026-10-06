@@ -53,6 +53,12 @@ def create_goal(db: Session, *, organization_id: int, user_id: int | None, compa
         )
         db.add(budget); db.commit()
     log_event(db, organization_id, "goal.create", "executive_goals", goal.id, actor_name="Founder", payload={"title": title, "risk": risk})
+    from app.core.config import settings
+    if settings.strategy_plan_on_goal:
+        # D3.3: goal mới → việc lập kế hoạch cho seat chiến lược (Nina) + wakeup goal_created.
+        from app.services import strategy
+        strategy.on_goal_created(db, goal)
+        db.refresh(goal)
     return goal
 
 

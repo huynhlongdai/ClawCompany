@@ -324,6 +324,23 @@ def _task_assign(ctx: ToolContext, args: dict) -> dict:
         raise ToolError(exc.code, exc.message) from exc
 
 
+@tool("company_plan_submit", "work", "Seat chiến lược gửi kế hoạch phân rã một mục tiêu vào hàng duyệt. "
+      "tasks: [{key, title, description, acceptance_criteria, department_id | member_id, budget_usd, "
+      "depends_on: [key], priority}]. Bị yêu cầu sửa thì sửa theo ghi chú trong sổ việc rồi gửi lại.",
+      "company.tasks:write",
+      {"goal_id": {"type": "integer"}, "summary": {"type": "string"},
+       "tasks": {"type": "array", "items": {"type": "object"}}},
+      ("goal_id", "summary", "tasks"), writes=True)
+def _plan_submit(ctx: ToolContext, args: dict) -> dict:
+    from app.services import strategy
+    try:
+        return strategy.submit(ctx.db, actor=ctx.member, goal_id=_int(args, "goal_id"),
+                               summary=_str(args, "summary", limit=4000), tasks=args.get("tasks"),
+                               run_task_id=ctx.run.task_id if ctx.run else None)
+    except strategy.StrategyError as exc:
+        raise ToolError(exc.code, exc.message) from exc
+
+
 @tool("company_task_checkout", "work", "Nhận giữ một việc của tôi cho lượt chạy hiện tại trước "
       "khi bắt tay làm. Thua (đã có lượt khác giữ) thì dừng, không thử lại.",
       "company.tasks:write", {"task_id": {"type": "integer"}}, ("task_id",), writes=True)

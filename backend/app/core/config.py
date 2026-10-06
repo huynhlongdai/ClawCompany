@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     # D3.4: nhịp routines (cron/catch-up/kết cục) trong tiến trình API; 0 = tắt.
     # Bật là cho phép hệ thống tự tạo việc và đánh thức seat theo lịch.
     routines_tick_seconds: float = 0
+    # D3.3: goal mới → tạo việc "Lập kế hoạch" cho seat Nina và đánh thức (goal_created).
+    strategy_plan_on_goal: bool = True
 
     # v25: reconcile (report the gap, pull pending approvals) whenever a
     # follower attaches to a session. On by default because it is a no-op

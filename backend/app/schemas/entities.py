@@ -172,3 +172,5 @@ class ApprovalOut(ORMModel):
     expires_at: datetime | None = None
     escalate_to_member_id: int | None = None
     escalated_at: datetime | None = None
+    payload: dict | None = None
+    revision: int = 1

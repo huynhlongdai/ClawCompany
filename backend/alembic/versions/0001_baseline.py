@@ -93,7 +93,8 @@ COLUMNS_OWNED_BY_LATER_MIGRATIONS = {
     "departments": ["row_revision", "status",       # 0013, 0014
                     "guide"],                       # 0024
     "inbox_items": ["task_id", "group_key", "kinds", "count", "body"],   # 0025_inbox_escalation
-    "approvals": ["expires_at", "escalate_to_member_id", "escalated_at"],  # 0025
+    "approvals": ["expires_at", "escalate_to_member_id", "escalated_at",   # 0025
+                  "payload", "revision"],                                 # 0027_strategy_plans
 }
 
 # 0014 tự tạo index unique này; model cũng khai nó, nên create_all sẽ tạo
