@@ -244,3 +244,54 @@ async def tools_invoke(body: ToolInvokeIn, db: Session = Depends(get_db),
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"OpenClaw tool invoke failed: {exc}")
     return result
+
+
+# -- D2.1 / WP-6.2: skill heartbeat + chính sách heartbeat ------------------------
+
+
+class HeartbeatPolicyIn(BaseModel):
+    keeper_member_id: int | None = None
+    active_hours: dict | None = None  # {"start": "08:00", "end": "20:00", "timezone": "Asia/Ho_Chi_Minh"}
+    keeper_every: str = "30m"
+    dry_run: bool = True
+
+
+@router.post("/openclaw/heartbeat-policy")
+async def heartbeat_policy(body: HeartbeatPolicyIn, db: Session = Depends(get_db),
+                           principal: Principal = Depends(writer("admin"))):
+    """Chỉ giữ heartbeat cho một seat điều phối; tắt (``every: "0m"``) cho mọi seat khác.
+
+    Mặc định ``dry_run=True``: ghi config của gateway là việc của cả công ty,
+    phải nói ra mới ghi thật."""
+    from app.services import heartbeat_policy as hp
+    from app.services.openclaw_config import ConfigError, ConfigRegistry
+    runtime = get_runtime()
+    if not isinstance(runtime, NativeOpenClawRuntime):
+        raise HTTPException(409, "Cần OpenClaw native runtime")
+    if body.keeper_member_id is not None:
+        ensure_member(db, body.keeper_member_id, principal)
+    try:
+        return await hp.apply(db, active_org(principal), ConfigRegistry(runtime),
+                              keeper_member_id=body.keeper_member_id, active_hours=body.active_hours,
+                              keeper_every=body.keeper_every, dry_run=body.dry_run)
+    except ConfigError as exc:
+        raise HTTPException(409, getattr(exc, "as_dict", lambda: str(exc))())
+
+
+@router.post("/openclaw/heartbeat-skill")
+async def heartbeat_skill(db: Session = Depends(get_db), principal: Principal = Depends(writer("admin"))):
+    """Cài skill ``clawcompany-heartbeat`` cho mọi seat agent đã gắn, rồi đọc lại
+    ``skills.status`` để xác nhận — không coi là cài nếu gateway không liệt kê."""
+    from app.services import heartbeat_policy as hp
+    runtime = get_runtime()
+    if not isinstance(runtime, NativeOpenClawRuntime):
+        raise HTTPException(409, "Cần OpenClaw native runtime")
+    ids = [a.runtime_agent_id for _, a in hp.agent_seats(db, active_org(principal))]
+    rows = await hp.install_skill(runtime, ids)
+    for r in rows:
+        try:
+            r["verified"] = await hp.skill_present(runtime, r["agent_id"])
+        except Exception as exc:  # noqa: BLE001
+            r["verified"] = None
+            r["verify_error"] = str(exc)[:200]
+    return {"slug": hp.SKILL_SLUG, "agents": rows}
