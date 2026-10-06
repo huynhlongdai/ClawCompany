@@ -1,0 +1,41 @@
+/* ClawCompany design tokens v2 — đã chốt. Tương phản đo theo WCAG (≥ 4.5:1 cho chữ thường). */
+:root{
+  /* Font: Be Vietnam Pro (UI) · JetBrains Mono (log, mã) — nạp bằng next/font/google */
+  --font-sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --fs-12:12px;--fs-14:14px;--fs-16:16px;--fs-20:20px;--fs-28:28px;
+  --fw-regular:400;--fw-medium:500;--fw-semibold:600;--fw-bold:700;
+  --lh-tight:1.25;--lh-body:1.5;
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-6:24px;--sp-8:32px;--sp-12:48px;
+  --radius-sm:8px;--radius-md:12px;--radius-lg:20px;--radius-full:999px;
+
+  /* Thương hiệu */
+  --brand-cang:#FF5A4E;        /* mascot, điểm nhấn — KHÔNG dùng làm nền chữ trắng (3.1:1) */
+  --brand-cang-strong:#D63A2F; /* nút chính, chữ trắng 4.7:1 */
+  --brand-muc:#1A1C2B; --brand-kem:#FFF7F0; --brand-rong:#16B3A3; --brand-den:#FFD36B;
+
+  /* Light (mặc định) */
+  --bg:#FFF7F0; --surface:#FFFFFF; --surface-2:#FBF1E8; --border:#EADFD5; --border-strong:#D6C8BB;
+  --text:#1A1C2B;      /* 15.9:1 trên --bg */
+  --text-muted:#5B6075;/* 5.9:1 */
+  --primary:var(--brand-cang-strong); --on-primary:#FFFFFF; --primary-hover:#BF3027;
+  --ok:#0B7A6D;  --ok-bg:#DDF5F1;     /* 4.9:1 */
+  --wait:#8A5A00;--wait-bg:#FFF3D1;   /* chờ duyệt — 5.4:1 */
+  --risk:#C0262D;--risk-bg:#FDE4E2;   /* lỗi/chặn — 5.6:1 */
+  --info:#2F5FD0;--info-bg:#E4ECFD;   /* 5.4:1 */
+  --shadow-1:0 1px 2px rgba(26,28,43,.06),0 1px 1px rgba(26,28,43,.04);
+  --shadow-2:0 8px 24px rgba(26,28,43,.10);
+  --focus:0 0 0 3px rgba(214,58,47,.35);
+}
+[data-theme="dark"]{
+  --bg:#12131C; --surface:#1A1C2B; --surface-2:#22253A; --border:#2E3250; --border-strong:#3E4366;
+  --text:#F4EEE8;      /* 16.1:1 */
+  --text-muted:#A3A7BD;/* 7.1:1 trên --surface */
+  --primary:var(--brand-cang-strong); --on-primary:#FFFFFF; --primary-hover:#E44B3F;
+  --ok:#3CCFBE;  --ok-bg:#123B38;     /* 9.6:1 */
+  --wait:#FFD36B;--wait-bg:#3A3018;   /* 13:1 */
+  --risk:#FF7A80;--risk-bg:#3D1C22;   /* 6.7:1 */
+  --info:#8FB0FF;--info-bg:#1D2A4D;
+  --shadow-1:0 1px 2px rgba(0,0,0,.4); --shadow-2:0 8px 24px rgba(0,0,0,.5);
+  --focus:0 0 0 3px rgba(255,122,110,.45);
+}
