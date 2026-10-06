@@ -39,13 +39,60 @@ def _tool_result(messages):
     return None
 
 
-def _reply(messages):
+def _called(messages):
+    """Tên các tool trợ lý đã gọi trong phiên này."""
+    out = []
+    for m in messages:
+        for tc in m.get("tool_calls") or []:
+            out.append(((tc.get("function") or {}).get("name") or ""))
+    return out
+
+
+def _task_id(messages):
+    import re
+    for m in messages:
+        if m.get("role") == "user":
+            hit = re.search(r"Task #(\d+)", _text(m.get("content")))
+            if hit:
+                return int(hit.group(1))
+    return None
+
+
+def _call(name, args):
+    return {"tool_calls": [{"id": "call_" + uuid.uuid4().hex[:12], "type": "function",
+                            "function": {"name": name, "arguments": json.dumps(args, ensure_ascii=False)}}]}
+
+
+def _reply(messages, tools=()):
+    """Lượt 1: exec. D2.2: nếu gateway có tool ``*company_task_comment`` (MCP
+    ClawCompany) thì lượt 2 ghi báo cáo vào sổ của việc, rồi mới trả lời cuối."""
+    # Chỉ xét lượt hiện tại: phiên của task dài qua nhiều lượt (vòng sửa → làm
+    # lại), nên lượt mới bắt đầu ở tin user cuối cùng có gói ngữ cảnh "Task #".
+    start = 0
+    for i, m in enumerate(messages):
+        if m.get("role") == "user" and "Task #" in _text(m.get("content")):
+            start = i
+    messages = messages[start:]
     result = _tool_result(messages)
     if result is None:
-        return {"tool_calls": [{"id": "call_" + uuid.uuid4().hex[:12], "type": "function",
-                                "function": {"name": "exec",
-                                             "arguments": json.dumps({"command": COMMAND})}}]}
-    return {"content": "Lệnh đã chạy. Kết quả: " + result.strip()[:400]}
+        return _call("exec", {"command": COMMAND})
+    import re
+    called = _called(messages)
+    tid = _task_id(messages)
+    exec_out = next((_text(m.get("content")) for m in messages if m.get("role") == "tool"), result)
+    args = {"task_id": tid, "kind": "result", "body": "Đã chạy lệnh kiểm tra; kết quả ở chi tiết.",
+            "detail": exec_out.strip()[:400]}
+    comment = next((t for t in tools if t.endswith("company_task_comment")), None)
+    if tid and comment and comment not in called:
+        return _call(comment, args)  # tool lộ thẳng
+    # Gateway 2026.9.8 giấu tool MCP sau Tool Search (tool_search → tool_call).
+    if tid and "tool_search" in tools and "tool_search" not in called:
+        return _call("tool_search", {"query": "company task comment journal"})
+    if tid and called and called[-1] == "tool_search":
+        hit = re.search(r"[\w.:/-]*company_task_comment", result)
+        if hit:
+            return _call("tool_call", {"id": hit.group(0), "args": args})
+    return {"content": "Lệnh đã chạy. Kết quả: " + exec_out.strip()[:400]}
 
 
 class H(BaseHTTPRequestHandler):
@@ -71,8 +118,14 @@ class H(BaseHTTPRequestHandler):
         if not self.path.rstrip("/").endswith("/chat/completions"):
             return self._json(404, {"error": "not found"})
         msgs = body.get("messages") or []
-        reply = _reply(msgs)
+        names = [((t.get("function") or {}).get("name") or "") for t in body.get("tools") or []]
+        meta = [t for t in body.get("tools") or [] if (t.get("function") or {}).get("name") in ("tool_search", "tool_call", "tool_describe")]
+        if meta:
+            with open(LOG + ".meta.json", "w") as f:
+                json.dump(meta, f, ensure_ascii=False, indent=1)
+        reply = _reply(msgs, names)
         _log("request", {"roles": [m.get("role") for m in msgs], "tools": len(body.get("tools") or []),
+                         "tool_names": names[:60],
                          "tail": [{"role": m.get("role"), "text": _text(m.get("content"))[:600]} for m in msgs[-3:]],
                          "stream": bool(body.get("stream")), "reply": reply})
         cid, now = "chatcmpl-" + uuid.uuid4().hex[:10], int(time.time())
@@ -105,7 +158,8 @@ class H(BaseHTTPRequestHandler):
         if "tool_calls" in reply:
             tc = reply["tool_calls"][0]
             chunk({"tool_calls": [{"index": 0, "id": tc["id"], "type": "function",
-                                   "function": {"name": "exec", "arguments": tc["function"]["arguments"]}}]})
+                                   "function": {"name": tc["function"]["name"],
+                                                "arguments": tc["function"]["arguments"]}}]})
         else:
             chunk({"content": reply["content"]})
         chunk({}, finish)
