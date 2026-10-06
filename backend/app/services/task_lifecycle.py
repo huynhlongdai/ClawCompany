@@ -92,6 +92,10 @@ def transition(db: Session, task: Task, to: str, *, reason: str = "", via: str =
     current = task.status or "backlog"
     if to == current:
         return task
+    if to == "done":
+        # D2.2: chốt duy nhất cho mọi đường (API cũ/mới, tool của agent, hệ thống).
+        from app.services import execution_policy
+        execution_policy.guard_done(task)
     if system:
         if to not in TASK_STATUSES:
             raise HTTPException(400, f"status must be one of: {', '.join(TASK_STATUSES)}")
@@ -120,6 +124,9 @@ def transition(db: Session, task: Task, to: str, *, reason: str = "", via: str =
                        actor_member_id=actor_member_id)
     if to in ("done", "cancelled"):
         wake_unblocked(db, task)
+    if to == "review":
+        from app.services import execution_policy
+        execution_policy.on_submitted(db, task, actor_member_id=actor_member_id)
     return task
 
 

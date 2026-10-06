@@ -206,6 +206,29 @@ def _follow(task, organization_id: int) -> str | None:
         print(f"[D2.1] follow after wakeup failed: {exc}")
         return f"error: {exc}"
 
+async def _review(db: Session, member: Member, primary: Wakeup, task: Task, items: list[Wakeup],
+                  now: datetime) -> dict:
+    """D2.2: reviewer là agent → phòng review 2 người thay cho một run thường."""
+    from app.runtime.factory import get_runtime
+    from app.services import execution_policy
+    same = [w for w in items if w is not primary and w.status == "queued" and w.task_id == task.id]
+    try:
+        out = await execution_policy.run_agent_review(db, task, member, get_runtime())
+    except Exception as exc:  # noqa: BLE001
+        why = f"review_error: {exc}"[:200]
+        for wk in [primary, *same]:
+            _close(wk, "failed", skip=why, now=now)
+        db.commit(); _emit(db, primary, "wakeup.failed", why)
+        return {"member_id": member.id, "decision": "failed", "reason": why, "wakeups": [primary.id]}
+    _close(primary, "dispatched", now=now)
+    for wk in same:
+        _close(wk, "coalesced", into=primary.id, now=now)
+    db.commit()
+    _emit(db, primary, "wakeup.dispatched", f"review_requested: phòng #{out.get('room_id')} → {out.get('decision')}")
+    return {"member_id": member.id, "decision": "reviewed", "task_id": task.id, "review": out,
+            "wakeups": [primary.id]}
+
+
 async def _process(db: Session, member_id: int, items: list[Wakeup], now: datetime,
                    follow: bool, prefer: int | None = None) -> dict:
     if prefer is not None:
@@ -224,6 +247,14 @@ async def _process(db: Session, member_id: int, items: list[Wakeup], now: dateti
     primary, task = None, None
     for wk in items:
         t = db.get(Task, wk.task_id) if wk.task_id else None
+        if t is not None and wk.reason == "review_requested":
+            from app.services import execution_policy
+            if t.status == "review" and execution_policy.is_current_reviewer(t, member_id):
+                return await _review(db, member, wk, t, items, now)
+            why_one = "not_current_reviewer"
+            _close(wk, "skipped", skip=why_one, now=now); db.commit()
+            _emit(db, wk, "wakeup.skipped", why_one)
+            continue
         if t is None:
             why_one = "no_task"
         elif t.assignee_member_id != member_id:

@@ -49,11 +49,25 @@ async def resolve_approval(approval_id: int, payload: ApprovalResolve, principal
             raise HTTPException(409, str(exc))
         db.refresh(obj)
         return obj
+    stage = (obj.policy_key or "").startswith("task_stage:")
+    if stage:
+        # D2.2: chặng approval của execution policy — chỉ đúng người duyệt được quyết.
+        if payload.status not in ("approved", "rejected"):
+            raise HTTPException(422, "Task stage approvals take approved or rejected")
+        if obj.status != "pending":
+            raise HTTPException(409, "Approval already resolved")
+        if obj.approver_member_id and principal.member_id != obj.approver_member_id:
+            raise HTTPException(403, {"error": "not_the_approver", "approver_member_id": obj.approver_member_id})
     obj.status = payload.status; obj.resolution_note = payload.resolution_note
     db.add(obj); db.commit(); db.refresh(obj)
     from app.services.runtime_stream import _audit
     _audit(db, obj, "approval.decided", actor_member_id=principal.member_id, actor_name="human",
            result=payload.status, payload={"decision": payload.status, "policy_key": obj.policy_key})
+    if stage:
+        from app.services import execution_policy
+        execution_policy.on_approval_resolved(db, obj, actor_member_id=principal.member_id)
+        db.refresh(obj)
+        return obj
     _wake_requester(db, obj)
     return obj
 

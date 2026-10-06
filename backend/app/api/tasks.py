@@ -347,3 +347,46 @@ def task_runs_read(task_id: int, limit: int = 50, principal: Principal = Depends
             "error_reason": r.error_reason, "holds_task": r.id == task.checkout_run_id,
         } for r in rows],
     }
+
+
+# -- D2.2: execution policy ------------------------------------------------------
+
+
+class ExecutionPolicyIn(BaseModel):
+    stages: list[dict] = []
+
+
+class ReviewDecisionIn(BaseModel):
+    decision: str
+    note: str = ""
+
+
+@router.get("/{task_id}/execution-policy")
+def execution_policy_read(task_id: int, principal: Principal = Depends(require_human()),
+                          db: Session = Depends(get_db)):
+    from app.services import execution_policy as ep
+    task = ensure_task(db, task_id, principal)
+    return ep.public(task)
+
+
+@router.put("/{task_id}/execution-policy")
+def execution_policy_write(task_id: int, payload: ExecutionPolicyIn,
+                           principal: Principal = Depends(require_role("manager")),
+                           db: Session = Depends(get_db)):
+    """Đặt/bỏ các chặng. Gửi ``stages: []`` để bỏ policy."""
+    from app.services import execution_policy as ep
+    task = ensure_task(db, task_id, principal)
+    ep.set_policy(db, task, {"stages": payload.stages})
+    return ep.public(task)
+
+
+@router.post("/{task_id}/review")
+def execution_policy_review(task_id: int, payload: ReviewDecisionIn,
+                            principal: Principal = Depends(require_role("member")),
+                            db: Session = Depends(get_db)):
+    """Reviewer (người) quyết chặng review hiện tại: ``approve`` hoặc ``revise``."""
+    from app.services import execution_policy as ep
+    task = ensure_task(db, task_id, principal)
+    ep.decide(db, task, member_id=principal.member_id, decision=payload.decision, note=payload.note, via="api")
+    db.refresh(task)
+    return ep.public(task)

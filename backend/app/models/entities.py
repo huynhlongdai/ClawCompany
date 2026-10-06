@@ -1,5 +1,6 @@
 from datetime import date, datetime
-from sqlalchemy import String, Integer, DateTime, Date, ForeignKey, Text, Float, Boolean
+from sqlalchemy import JSON, String, Integer, DateTime, Date, ForeignKey, Text, Float, Boolean
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
@@ -100,6 +101,11 @@ class Task(Base, TimestampMixin, RevisionMixin):
     # agent không thể cùng nhận một việc. Không khai FK để tránh vòng
     # tasks <-> task_runs khi create_all.
     checkout_run_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    # D2.2 (0022_execution_policy): các chặng phải qua trước khi việc được
+    # "done" ({"stages": [{"type": "review"|"approval", "participants": [id]}]})
+    # và vị trí hiện tại trên các chặng đó. Chỉ services/execution_policy.py ghi.
+    execution_policy: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
+    execution_state: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
 
 class KnowledgeDocument(Base, TimestampMixin):
     __tablename__ = "knowledge_documents"

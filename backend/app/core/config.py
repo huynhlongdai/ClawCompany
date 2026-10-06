@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     wakeup_window_seconds: float = 10  # gộp các lý do của cùng seat trong cửa sổ này
     wakeup_run_estimate_usd: float = 0.05  # số giữ chỗ để hỏi budget.can_reserve
     wakeup_follow: bool = True  # gắn follower ngay sau khi dispatch (cần cho thẻ duyệt và chi phí)
+    # D2.2: run kết thúc không có comment → missing_report. Task có policy luôn bắt
+    # buộc; bật cờ này để bắt buộc cho mọi task.
+    require_run_report: bool = False
+    review_room_budget_usd: float = 0.5
 
     # v25: reconcile (report the gap, pull pending approvals) whenever a
     # follower attaches to a session. On by default because it is a no-op

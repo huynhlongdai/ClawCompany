@@ -368,11 +368,21 @@ def apply_terminal_state(db: Session, task: Task, state: ConsumerState, event: d
         return task
     previous = task.status
     holder = lifecycle.current_run(db, task)
+    reason = f"run {upstream_state}"
+    if new_status == "review":
+        # D2.2: báo cáo là bắt buộc. Run xong mà người làm chưa ghi comment nào
+        # vào sổ thì việc không được đi tiếp sang review.
+        from app.services import execution_policy
+        if execution_policy.requires_report(task) and not execution_policy.has_report(db, task, holder):
+            new_status, reason = "blocked", "missing_report"
+            execution_policy.flag_missing_report(db, task, holder)
     if holder is not None:
-        lifecycle.finish_run(db, holder, RUN_OUTCOME.get(new_status, "completed"),
-                             error_reason=str(event.get("errorMessage") or ""), commit=False)
+        lifecycle.finish_run(db, holder, RUN_OUTCOME.get(new_status, "completed")
+                             if reason != "missing_report" else "completed",
+                             error_reason=str(event.get("errorMessage") or "")
+                             or ("missing_report" if reason == "missing_report" else ""), commit=False)
     lifecycle.transition(db, task, new_status, system=True, via="runtime",
-                         reason=f"run {upstream_state}", commit=True, emit=False)
+                         reason=reason, commit=True, emit=False)
     if holder is not None and holder.member_id:
         # D2.1: lý do bị bỏ vì seat bận được xếp lại khi lượt này xong.
         from app.services import wakeup
