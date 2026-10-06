@@ -4,6 +4,7 @@ import Link from "next/link";
 import {api, apiTask} from "../lib/api";
 import {Icon, IconName} from "./Icon";
 import {TaskLinksPanel, TaskRunsPanel, TaskWakeupsPanel} from "./TaskGraphPanels";
+import {TaskPolicyPanel} from "./TaskPolicyPanel";
 
 /* WP-4.3 UI — Chi tiết một công việc: sổ ghi, bàn giao, và gói ngữ cảnh.
 
@@ -160,6 +161,7 @@ export function TaskDetail({taskId}: {taskId: number}) {
       <div style={{display: "grid", gap: 18}}>
         <HandoffPanel taskId={taskId} members={members} ownerId={task?.assignee_member_id}
                       onDone={load}/>
+        <TaskPolicyPanel taskId={taskId} members={members} onChange={load} refreshKey={tick}/>
         <TaskLinksPanel taskId={taskId} onChange={load}/>
         <TaskRunsPanel taskId={taskId} refreshKey={tick}/>
         <TaskWakeupsPanel taskId={taskId} refreshKey={tick}/>

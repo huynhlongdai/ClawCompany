@@ -87,7 +87,8 @@ COLUMNS_OWNED_BY_LATER_MIGRATIONS = {
     "tasks": ["row_revision",                       # 0013
               "parent_task_id", "goal_id", "due_at",  # 0018_task_graph
               "acceptance_criteria",
-              "checkout_run_id"],                    # 0019_task_runs
+              "checkout_run_id",                     # 0019_task_runs
+              "execution_policy", "execution_state"],  # 0022_execution_policy
     "departments": ["row_revision", "status"],      # 0013, 0014
 }
 

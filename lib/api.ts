@@ -661,6 +661,11 @@ export const apiTask = {
     request<any>(`/tasks/${taskId}/journal`, {method: "POST", body: JSON.stringify({summary})}),
   /* D2.1 — hàng đợi đánh thức của việc này: lý do, trạng thái, vì sao bị bỏ qua. */
   wakeups: (taskId: number) => request<any>(`/tasks/wakeups?task_id=${taskId}`),
+  policy: (taskId: number) => request<any>(`/tasks/${taskId}/execution-policy`),
+  setPolicy: (taskId: number, stages: {type: string; participants: number[]}[]) =>
+    request<any>(`/tasks/${taskId}/execution-policy`, {method: "PUT", body: JSON.stringify({stages})}),
+  review: (taskId: number, decision: "approve" | "revise", note: string) =>
+    request<any>(`/tasks/${taskId}/review`, {method: "POST", body: JSON.stringify({decision, note})}),
 };
 
 /* D1.5 + D1.6 — máy chủ MCP của ClawCompany và bảng quyền tool theo bậc ghế.
