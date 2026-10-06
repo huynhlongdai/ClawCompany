@@ -48,7 +48,26 @@ trước được requeue và chiếm seat — hành vi đúng của hàng đợ
 30 phút. Phiên `agent:dev:main` có lượt heartbeat lúc 00:07:42, 00:37:42, 01:07:42, 01:37:42 — đúng
 30 phút, dù không có việc. Mỗi lượt 10.005–10.722 token vào, 117 ra, **$0,0326–0,0339**.
 
-HEARTBEAT_AFTER_PLACEHOLDER
+**Tắt (đo trên gateway thật):** `POST /api/v19/openclaw/heartbeat-policy` (`keeper_member_id: null`)
+ghi `agents.entries.dev.heartbeat.every = "0m"` lúc 01:46:14 qua `config.patch` (reload `hot`).
+Log gateway: `01:46:16 [heartbeat] disabled`. Mốc kế tiếp 02:07:42 **không có lượt nào** trong
+`agent:dev:main` (`evidence/d21/heartbeat_main_session.txt`, `heartbeat_gateway_log.txt`).
+
+**Trạng thái cuối (đúng WP-6.2):** giữ heartbeat cho Nina — `every 30m`, `activeHours 08:00–20:00
+Asia/Ho_Chi_Minh` — log `02:09:47 [heartbeat] started`. Seat khác: `every 0m`; seat có agent id
+chưa có trong config gateway được báo `not_in_config` và **không** bị ghi (ghi vào sẽ sinh agent ma).
+
+**Chi phí/ngày** (chi phí một lượt đo được, trung bình $0,0333; công thức `daily_cost` trong
+`services/heartbeat_policy.py`):
+
+| | Seat có heartbeat | Lượt/ngày | Chi phí/ngày |
+|---|---|---|---|
+| Trước — mặc định OpenClaw, 3 seat agent của công ty | 3 × 30 phút, 24 h | 144 | **$4,80** |
+| Trước — gateway dev (chỉ 1 agent thật) | 1 × 30 phút, 24 h | 48 | **$1,60** (đo: 4 lượt/2 giờ) |
+| Sau — chỉ Nina, 08:00–20:00 | 1 × 30 phút, 12 h | 24 | **$0,80** |
+
+Số "3 seat" là phép tính từ số đo một lượt, không phải đo 24 giờ; số 1 seat khớp nhịp đo thật.
+Việc thật của seat thừa hành vẫn tới đủ qua hàng wakeup (mục 1), nên tắt nhịp không làm mất việc.
 
 ## 4. Skill `clawcompany-heartbeat`
 
