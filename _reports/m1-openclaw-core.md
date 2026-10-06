@@ -95,3 +95,22 @@ Sau e2e đã gắn lại seat Nina về `nina` (script e2e đổi sang `dev`). D
 Chi phí khớp gateway tuyệt đối: task 6 = 12 797 in × 0,4 + 63 out × 1,6 (USD/1M) = **$0,0052196**; task 5 (bắt kịp sau resume) = **$0,005242** = `usage.cost.total` của gateway. Không ghi trùng: `__openclaw.id` trong history trùng `messageId` của `session.message`.
 
 Test: `tests/test_m12_followers.py` 22 test, mutation **10/10** bị bắt. Full pytest **969 passed, 2 skipped**. `tsc --noEmit` sạch.
+
+## M1.3 — Lỗi có CORS, /health báo schema, doctor 1 nút, tự nối lại, chaos test (06/10/2026)
+
+| Việc | Kết quả đo trên VM (gateway 2026.9.8 thật) |
+|---|---|
+| Lỗi chưa bắt → JSON tiếng Việt `{detail, code, request_id}` **có header CORS** (`JSONErrorMiddleware` nằm trong CORS) | `OpenClawProtocolError` → 502 `openclaw_error`; timeout → 504; mất kết nối → 503; còn lại 500 `internal_error` |
+| `/health` báo `schema: ok/behind` (so `alembic_version` với head), `?deep=1` hỏi gateway | `{"status":"ok","schema":{"db":["0027_strategy_plans"],...},"openclaw":{"status":"healthy","version":"2026.9.8"}}` |
+| Doctor `GET /api/v19/openclaw/doctor` + bảng "Kiểm tra kết nối" trên `/app/openclaw` | 7/8 xanh: DB, chế độ, token, kết nối + thiết bị, model `comet/gpt-4.1-mini`, agent↔ghế, quyền duyệt. Cảnh báo thật: chưa có skill heartbeat |
+| Bỏ chế độ `gateway` kiểu cũ (`runtime/gateway.py` đã xoá) | `OPENCLAW_MODE=gateway` cũ được hiểu là `native`, không âm thầm rơi về mock |
+| Follower tự nối lại (backoff 1,2,4…≤30s, tối đa 8 lần; im lặng 60s không tính là lỗi), bắt kịp trước mỗi lần nghe lại | Chaos #2: restart gateway 23:12:45 → lên lại 23:12:55 → `chat.final` nhận trực tiếp → task **review** lúc 23:13:01 |
+| Resume khi khởi động + quét phiên mồ côi mỗi 60s (`OPENCLAW_RESUME_ON_BOOT`, `OPENCLAW_CLAIM_SWEEP_SECONDS`) | Task 4 kẹt sau chaos #1 được sweeper nhận lại và đóng, không ai bấm nút |
+| Khoá cổng: Postgres 5432, Redis 6379, API 8000 chỉ nghe `127.0.0.1` (`docker-compose.prized.yml`, `ports: !override`) | Chỉ còn web 3000 mở ra ngoài; E2E sau đó vẫn 16/16 |
+
+**Hai phát hiện thật từ chaos test:**
+
+1. OpenClaw 2026.9.8 **tự chạy tiếp lượt bị ngắt bằng một runId mới**, mở đầu bằng tin `[System] Your previous turn was interrupted by a gateway restart…`. Catch-up nay nhận "chuỗi lượt": run gốc + các run tiếp nối sau tin hệ thống đó, miễn không có tin user thật chen vào. Chi phí tính cho cả hai run (task 4: $0,0064348 + $0,0051884 = **$0,0116232**).
+2. Gateway mặc định **chặn cài skill tải lên** (`skills.install.allowUploadedArchives`), nên `heartbeat-skill` trả `uploads_disabled`. Doctor nay đọc `config.get` để nói đúng nguyên nhân và lệnh sửa, thay vì hiện nút "Cài ngay" rồi thất bại. Chưa bật trên VM, đang chờ duyệt.
+
+Test: `tests/test_m13_doctor_errors.py` 21 test + 3 test chuỗi lượt trong `test_m12_followers.py`; mutation **11/11** và **4/4**. Full pytest **993 passed, 2 skipped**. Ảnh UI: `docs/screenshots/m1/` (9 trang, 0 lỗi console, 0 HTTP ≥ 400).

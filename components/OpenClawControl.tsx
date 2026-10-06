@@ -10,6 +10,9 @@ type Descriptor = {
   notes:string[];
 };
 
+const DOC_ICON:Record<string,string> = {ok:"✓", warn:"!", fail:"✕", skip:"–"};
+const DOC_COLOR:Record<string,string> = {ok:"#0B7A6D", warn:"#8A5A00", fail:"#D63A2F", skip:"#5A5F73"};
+
 export function OpenClawControl(){
   const [protocol,setProtocol] = useState<any>(null);
   const [health,setHealth] = useState<any>(null);
@@ -18,6 +21,15 @@ export function OpenClawControl(){
   const [seats,setSeats] = useState<Record<string,any>>({});
   const [err,setErr] = useState("");
   const [busy,setBusy] = useState(false);
+  const [doc,setDoc] = useState<any>(null);
+  const [docBusy,setDocBusy] = useState(false);
+
+  async function runDoctor(){
+    setDocBusy(true);
+    try{ setDoc(await apiV19.doctor()); }
+    catch(e:any){ setDoc({status:"fail", checks:[{id:"api", label:"Gọi doctor", status:"fail", detail:e.message||String(e), fix:""}]}); }
+    finally{ setDocBusy(false); }
+  }
 
   async function load(){
     setErr("");
@@ -28,7 +40,7 @@ export function OpenClawControl(){
       catch(e:any){ /* gateway offline is normal in mock mode */ setAgents([]); }
     }catch(e:any){ setErr(e.message||String(e)); }
   }
-  useEffect(()=>{ load(); },[]);
+  useEffect(()=>{ load(); runDoctor(); },[]);
 
   async function reconcile(){
     setBusy(true); setErr("");
@@ -42,6 +54,32 @@ export function OpenClawControl(){
 
   return <div style={{display:"grid", gap:16}}>
     {err && <div className="panel pad" style={{borderColor:"var(--risk)"}}><b>Lỗi:</b> {err}</div>}
+
+    <section className="panel" data-testid="openclaw-doctor">
+      <div className="panelHead"><b>Kiểm tra kết nối {doc && <span style={{marginLeft:8, fontWeight:500, color:DOC_COLOR[doc.status]}}>
+          {DOC_ICON[doc.status]} {doc.status==="ok"?"Mọi thứ ổn":doc.status==="warn"?"Chạy được, có điểm cần chú ý":"Cần xử lý"} · {doc.ok}/{doc.total}</span>}</b>
+        <button className="darkBtn" onClick={runDoctor} disabled={docBusy}>{docBusy?"Đang kiểm tra…":"Kiểm tra lại"}</button></div>
+      <div className="pad" style={{display:"grid", gap:8}}>
+        {!doc && <p>Đang kiểm tra cơ sở dữ liệu, gateway, model và agent…</p>}
+        {(doc?.checks||[]).map((c:any)=><div key={c.id} style={{display:"grid", gridTemplateColumns:"28px 200px 1fr", gap:8, alignItems:"start",
+            padding:"8px 10px", borderRadius:8, background: c.status==="fail"?"#FDECEA":c.status==="warn"?"#FFF6DD":"transparent"}}>
+          <span style={{color:DOC_COLOR[c.status], fontWeight:700}}>{DOC_ICON[c.status]}</span>
+          <b>{c.label}</b>
+          <div><div>{c.detail}</div>{c.fix && <div style={{marginTop:4, color:"#5A5F73"}}>→ {c.fix}</div>}
+            {c.action && <button className="darkBtn" style={{marginTop:6}} disabled={docBusy} onClick={async()=>{
+              setDocBusy(true);
+              try{
+                const r:any = await apiV19.doctorAction(c.action.method, c.action.path);
+                const bad = (r?.agents||[]).filter((a:any)=>a.status==="failed");
+                if(bad.length) setErr(`Cài chưa được cho ${bad.map((a:any)=>a.agent_id).join(", ")}: ${bad[0].reason||bad[0].error}`);
+              }
+              catch(e:any){ setErr(e.message||String(e)); }
+              finally{ setDocBusy(false); }
+              runDoctor();
+            }}>{c.action.label}</button>}</div>
+        </div>)}
+      </div>
+    </section>
 
     <div className="metric5">
       <div className="v8Card"><small>Chế độ runtime</small><b>{d?.mode ?? "…"}</b>
@@ -77,20 +115,6 @@ export function OpenClawControl(){
             <td><code>agent:{rid}:main</code></td>
           </tr>)}
           {Object.keys(seats).length===0 && <tr><td colSpan={4}>Chưa có ghế agent nào gắn với OpenClaw.</td></tr>}
-        </tbody>
-      </table>
-    </section>
-
-    <section className="panel">
-      <div className="panelHead"><b>Bản đồ hợp đồng: giả định cũ → OpenClaw thật</b></div>
-      <table className="dataTable">
-        <thead><tr><th>Adapter cũ</th><th>Upstream thật</th><th>Ghi chú</th></tr></thead>
-        <tbody>
-          {Object.entries(d?.legacy_contract_map||{}).map(([legacy,info]:any)=><tr key={legacy}>
-            <td><code>{legacy}</code></td>
-            <td>{info.upstream ? <code>{info.upstream}</code> : <span className="tag redTag">không tồn tại</span>}</td>
-            <td>{info.note}</td>
-          </tr>)}
         </tbody>
       </table>
     </section>

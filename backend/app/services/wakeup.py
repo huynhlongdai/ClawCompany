@@ -27,6 +27,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.runtime.factory import resolve_mode
 from app.models import Agent, BudgetEnvelope, Member, Task, TaskRun, Wakeup
 from app.models.work_graph import OPEN_RUN_STATUSES, WAKEUP_REASONS
 from app.services import budget as budget_svc
@@ -129,7 +130,7 @@ async def _gateway_active_hours(agent: Agent) -> dict | None:
     if hit and time.monotonic() - hit[0] < 60:
         return hit[1]
     spec = None
-    if settings.openclaw_mode == "native" and key:
+    if resolve_mode(settings.openclaw_mode) == "native" and key:
         try:
             from app.runtime.factory import get_runtime
             from app.services.openclaw_config import ConfigRegistry

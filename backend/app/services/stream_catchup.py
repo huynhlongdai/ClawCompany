@@ -15,8 +15,14 @@ Nguồn sự thật dùng ở đây đều đo được trên gateway thật:
   không bao giờ trùng với ghi từ stream (``record_message_usage`` khử trùng
   theo message_id).
 
-Chỉ hành động khi ``lastRunId`` đúng là run của task: phiên ``done`` của lượt
+Chỉ hành động khi ``lastRunId`` thuộc lượt của task: phiên ``done`` của lượt
 TRƯỚC không được phép đóng lượt hiện tại. Không bao giờ raise.
+
+M1.3 — chaos test (restart gateway giữa lượt, task 4): OpenClaw 2026.9.8 TỰ
+chạy tiếp lượt bị ngắt bằng một runId MỚI, mở đầu bằng tin user
+``[System] Your previous turn was interrupted by a gateway restart…``. Nên
+"lượt của task" là một chuỗi: run gốc + các run tiếp nối sau tin hệ thống đó,
+miễn là không có tin user thật nào chen vào (tin chen vào = lượt của người khác).
 """
 
 from __future__ import annotations
@@ -37,6 +43,45 @@ def _session_terminal(session: dict) -> str | None:
     if session.get("abortedLastRun") is True and status in DONE_STATES:
         return "aborted"
     return DONE_STATES.get(status)
+
+
+RESUME_MARKERS = ("interrupted by a gateway restart",)
+
+
+def _text(msg: dict) -> str:
+    content = msg.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(str(part.get("text") or "") for part in content if isinstance(part, dict))
+    return ""
+
+
+def is_resume_notice(msg: dict) -> bool:
+    text = _text(msg).lstrip()
+    return msg.get("role") == "user" and text.startswith("[System]") and any(m in text for m in RESUME_MARKERS)
+
+
+def run_chain(messages: list, run_id: str) -> set[str] | None:
+    """runId của lượt gốc + các lượt gateway tự chạy tiếp; ``None`` nếu không thấy lượt gốc
+    hoặc đã có người gửi lượt mới sau nó."""
+    chain, seen = {run_id}, False
+    for msg in messages or []:
+        if not isinstance(msg, dict):
+            continue
+        meta = msg.get("__openclaw") if isinstance(msg.get("__openclaw"), dict) else {}
+        rid = str(meta.get("runId") or "")
+        key = str(msg.get("idempotencyKey") or meta.get("idempotencyKey") or "")
+        if rid == run_id or key.startswith(run_id):
+            seen = True
+            continue
+        if not seen:
+            continue
+        if msg.get("role") == "user" and not is_resume_notice(msg):
+            return None
+        if rid:
+            chain.add(rid)
+    return chain if seen else None
 
 
 def history_usage_raw(msg: dict, session_key: str) -> dict | None:
@@ -65,19 +110,23 @@ async def catch_up(db: Session, runtime, state, apply_terminal) -> dict:
         described = await runtime.rpc(ocp.M_SESSIONS_DESCRIBE, {"key": state.session_key})
         session = described.get("session") if isinstance(described.get("session"), dict) else {}
         out["status"] = str(session.get("status") or "")
-        if str(session.get("lastRunId") or "") != task.runtime_run_id:
-            out["skipped"] = "lượt trên gateway không phải lượt của task"
-            return out
         terminal = _session_terminal(session)
         if terminal is None:
             out["skipped"] = "lượt còn đang chạy"
             return out
+        history = await runtime.history(state.session_key, limit=200)
+        messages = history.get("messages") or []
+        last_run = str(session.get("lastRunId") or "")
+        chain = {task.runtime_run_id} if last_run == task.runtime_run_id else run_chain(messages, task.runtime_run_id)
+        if not chain or last_run not in chain:
+            out["skipped"] = "lượt trên gateway không phải lượt của task"
+            return out
+        out["chain"] = sorted(chain)
         agent = (db.query(Agent).filter(Agent.member_id == task.assignee_member_id).first()
                  if task.assignee_member_id else None)
-        history = await runtime.history(state.session_key, limit=200)
-        for msg in history.get("messages") or []:
+        for msg in messages:
             raw = history_usage_raw(msg, state.session_key)
-            if raw is None or raw["runId"] != task.runtime_run_id:
+            if raw is None or raw["runId"] not in chain:
                 continue
             if cost_ledger.record_message_usage(
                     db, organization_id=state.organization_id, task=task,

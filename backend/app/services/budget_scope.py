@@ -30,6 +30,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.runtime.factory import resolve_mode
 from app.models import BudgetEnvelope, BudgetLedgerEntry, Member, Task, TaskRun
 from app.services import budget as budget_svc
 
@@ -221,7 +222,7 @@ async def true_up_run(db: Session, run: TaskRun, runtime) -> dict:
 def schedule_true_up(run_id: int) -> bool:
     """Chạy ``true_up_run`` nền khi đang có event loop và runtime là gateway thật."""
     import asyncio
-    if not settings.budget_true_up or settings.openclaw_mode.lower() != "native":
+    if not settings.budget_true_up or resolve_mode(settings.openclaw_mode) != "native":
         return False
     try:
         loop = asyncio.get_running_loop()

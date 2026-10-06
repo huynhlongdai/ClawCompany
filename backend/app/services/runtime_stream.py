@@ -28,7 +28,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from sqlalchemy.orm import Session
+from websockets.exceptions import WebSocketException
 
+from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models import Agent, Approval, Member, Task
 from app.realtime import broker
@@ -54,6 +56,9 @@ ORPHAN_STATUSES = ("stopped", "failed")
 # the same as the company accepting the work.
 # D1.4: kết cục của hàng task_runs theo trạng thái board mà run đưa task tới.
 RUN_OUTCOME = {"review": "completed", "blocked": "failed", "todo": "cancelled"}
+
+# M1.3: lỗi kết nối thì nối lại; lỗi giao thức (sai quyền, sai tham số) thì không.
+RECONNECTABLE = (OSError, asyncio.TimeoutError, TimeoutError, WebSocketException)
 
 TERMINAL_STATUS = {
     "complete": "review",
@@ -81,6 +86,7 @@ class ConsumerState:
     status: str = "running"  # running | finished | failed | stopped | declined
     error: str = ""
     lease_backend: str = ""  # v21: "redis" (shared) or "memory" (this process only)
+    reconnects: int = 0  # M1.3: số lần nối lại sau khi mất kết nối
 
     def public(self) -> dict:
         return {
@@ -94,6 +100,7 @@ class ConsumerState:
             "status": self.status,
             "error": self.error,
             "lease_backend": self.lease_backend,
+            "reconnects": self.reconnects,
         }
 
 
@@ -167,26 +174,50 @@ async def _consume(state: ConsumerState) -> None:
             task_id=state.task_id, reason="follow",
         )
         # M1: lượt đã xong trước khi ta gắn vào thì frame cuối không bao giờ tới.
+        # M1.3: mất kết nối (gateway restart, mạng chập chờn, im lặng quá lâu)
+        # thì nối lại thay vì chết; trước mỗi lần nối lại đều bắt kịp, vì lượt có
+        # thể đã kết thúc đúng lúc ta không nghe.
         from app.services import stream_catchup
-        caught = await stream_catchup.catch_up(db, runtime, state, apply_terminal_state)
-        if caught.get("terminal"):
-            state.status = "finished"
-            state.last_event_type = "catch_up"
-            return
-        async for event in runtime.stream_run(state.session_key):
-            state.events += 1
-            state.last_event_type = str(event.get("type") or "")
-            # v21: keep the shared claim alive; losing it means another process
-            # took over, so we stop rather than write the same events twice.
-            if not lease_store.renew(state.session_key):
-                state.status = "stopped"
-                state.error = "Lease lost to another process"
+        failures = 0
+        while True:
+            caught = await stream_catchup.catch_up(db, runtime, state, apply_terminal_state)
+            if caught.get("terminal"):
+                state.status = "finished"
+                state.last_event_type = "catch_up"
                 return
-            handle_event(db, state, event)
-            registry.publish(state.public())
-            if event.get("terminal"):
-                break
-        state.status = "finished"
+            try:
+                async for event in runtime.stream_run(state.session_key):
+                    failures = 0
+                    state.events += 1
+                    state.last_event_type = str(event.get("type") or "")
+                    # v21: keep the shared claim alive; losing it means another process
+                    # took over, so we stop rather than write the same events twice.
+                    if not lease_store.renew(state.session_key):
+                        state.status = "stopped"
+                        state.error = "Lease lost to another process"
+                        return
+                    handle_event(db, state, event)
+                    registry.publish(state.public())
+                    if event.get("terminal"):
+                        break
+                state.status = "finished"
+                return
+            except RECONNECTABLE as exc:
+                idle = isinstance(exc, (asyncio.TimeoutError, TimeoutError))
+                if not idle:
+                    failures += 1
+                if failures > settings.openclaw_stream_max_reconnects:
+                    raise
+                state.reconnects += 1
+                state.error = (f"Mất kết nối gateway ({type(exc).__name__}), "
+                               f"nối lại lần {state.reconnects}")
+                registry.publish(state.public())
+                if not lease_store.renew(state.session_key):
+                    state.status = "stopped"
+                    state.error = "Lease lost to another process"
+                    return
+                if not idle:
+                    await asyncio.sleep(min(30.0, settings.openclaw_stream_backoff_seconds * 2 ** (failures - 1)))
     except asyncio.CancelledError:
         state.status = "stopped"
         raise
