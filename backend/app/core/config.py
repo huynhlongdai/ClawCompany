@@ -82,6 +82,9 @@ class Settings(BaseSettings):
     approval_ttl_hours: float = 24.0
     # Quét approval quá hạn trong tiến trình API (dev, không Celery); 0 = tắt.
     approval_escalate_seconds: float = 0
+    # D3.4: nhịp routines (cron/catch-up/kết cục) trong tiến trình API; 0 = tắt.
+    # Bật là cho phép hệ thống tự tạo việc và đánh thức seat theo lịch.
+    routines_tick_seconds: float = 0
 
     # v25: reconcile (report the gap, pull pending approvals) whenever a
     # follower attaches to a session. On by default because it is a no-op

@@ -25,6 +25,8 @@ celery_app.conf.update(
         "drain-wakeups": {"task": "wakeups.drain", "schedule": 5.0},
         # D3.5: approval quá hạn → chuyển lên quản lý (audit approval.escalated).
         "escalate-overdue-approvals": {"task": "approvals.escalate_overdue", "schedule": 60.0},
+        # D3.4: routines — giờ hẹn cron theo múi giờ, chạy bù, kết cục từng lần chạy.
+        "tick-routines": {"task": "routines.tick", "schedule": 30.0},
     },
 )
 celery_app.autodiscover_tasks(["app.tasks"])

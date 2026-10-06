@@ -46,3 +46,15 @@ def escalate_overdue_approvals():
         return inbox.escalate_overdue(db)
     finally:
         db.close()
+
+
+@celery_app.task(name="routines.tick")
+def tick_routines():
+    """D3.4: kích hoạt routine tới giờ (idempotency_key UNIQUE chặn chạy trùng)."""
+    from app.db.session import SessionLocal
+    from app.services import routines
+    db = SessionLocal()
+    try:
+        return routines.tick(db)
+    finally:
+        db.close()

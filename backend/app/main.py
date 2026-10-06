@@ -51,6 +51,7 @@ from app.api.v33 import router as v33_router
 from app.api.v34 import router as v34_router
 from app.api.v35 import router as v35_router
 from app.api.v36 import router as v36_router
+from app.api.routines import router as routines_router
 from app.core.middleware import RequestContextMiddleware
 
 Base.metadata.create_all(bind=engine)
@@ -121,6 +122,7 @@ app.include_router(v33_router, prefix="/api")
 app.include_router(v34_router, prefix="/api")
 app.include_router(v35_router, prefix="/api")
 app.include_router(v36_router, prefix="/api")
+app.include_router(routines_router, prefix="/api")
 
 
 @app.on_event("startup")
@@ -177,6 +179,21 @@ async def start_approval_escalation() -> None:
         asyncio.create_task(escalate_forever(interval), name="approval-escalation")
     except Exception as exc:  # noqa: BLE001
         print(f"[D3.5] approval escalation not started: {exc}")
+
+
+@app.on_event("startup")
+async def start_routines_tick() -> None:
+    """D3.4: nhịp routines trong tiến trình API (dev, không Celery); 0 = tắt."""
+    interval = settings.routines_tick_seconds
+    if interval <= 0:
+        return
+    import asyncio
+
+    from app.services.routines import tick_forever
+    try:
+        asyncio.create_task(tick_forever(interval), name="routines-tick")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[D3.4] routines tick not started: {exc}")
 
 
 @app.on_event("startup")
