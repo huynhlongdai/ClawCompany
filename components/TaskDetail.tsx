@@ -3,7 +3,7 @@ import {useEffect, useState} from "react";
 import Link from "next/link";
 import {api, apiTask} from "../lib/api";
 import {Icon, IconName} from "./Icon";
-import {TaskLinksPanel, TaskRunsPanel} from "./TaskGraphPanels";
+import {TaskLinksPanel, TaskRunsPanel, TaskWakeupsPanel} from "./TaskGraphPanels";
 
 /* WP-4.3 UI — Chi tiết một công việc: sổ ghi, bàn giao, và gói ngữ cảnh.
 
@@ -154,7 +154,7 @@ export function TaskDetail({taskId}: {taskId: number}) {
     <div style={{display: "grid", gridTemplateColumns: "minmax(0,1.35fr) minmax(0,1fr)",
                  gap: 18, alignItems: "start"}}>
       <div style={{display: "grid", gap: 18}}>
-        <JournalPanel entries={entries} kinds={journal?.kinds || []}/>
+        <JournalPanel entries={entries} kinds={journal?.kinds || []} taskId={taskId} onDone={load}/>
         <ContextPackPanel pack={pack}/>
       </div>
       <div style={{display: "grid", gap: 18}}>
@@ -162,6 +162,7 @@ export function TaskDetail({taskId}: {taskId: number}) {
                       onDone={load}/>
         <TaskLinksPanel taskId={taskId} onChange={load}/>
         <TaskRunsPanel taskId={taskId} refreshKey={tick}/>
+        <TaskWakeupsPanel taskId={taskId} refreshKey={tick}/>
       </div>
     </div>
   </>;
@@ -169,9 +170,25 @@ export function TaskDetail({taskId}: {taskId: number}) {
 
 /* ------------------------------------------------- sổ ghi theo thời gian */
 
-function JournalPanel({entries, kinds}: {entries: Row[]; kinds: string[]}) {
+function JournalPanel({entries, kinds, taskId, onDone}: {entries: Row[]; kinds: string[];
+                                                     taskId: number; onDone: () => void}) {
   const [open, setOpen] = useState<number | null>(null);
   const [filter, setFilter] = useState<string>("");
+  const [note, setNote] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState("");
+
+  async function send() {
+    if (!note.trim()) return;
+    setSending(true); setSent("");
+    try {
+      const out = await apiTask.comment(taskId, note.trim());
+      setNote("");
+      setSent(out?.woke?.length ? `Đã ghi. Đánh thức ${out.woke.length} seat được nhắc tên.` : "Đã ghi vào sổ.");
+      onDone();
+    } catch (e: any) { setSent(`Không ghi được: ${e?.message || e}`); }
+    setSending(false);
+  }
 
   const shown = filter ? entries.filter(e => e.kind === filter) : entries;
   const present = kinds.filter(k => entries.some(e => e.kind === k));
@@ -181,6 +198,17 @@ function JournalPanel({entries, kinds}: {entries: Row[]; kinds: string[]}) {
       <div><b>Sổ ghi công việc</b></div>
       <small>task_journal_entries</small>
     </div>
+
+    <div style={{display: "flex", gap: 8, marginBottom: 10}}>
+      <input data-testid="journal-input" value={note} onChange={e => setNote(e.target.value)}
+             placeholder="Ghi một dòng… gõ @Tên để gọi seat agent"
+             onKeyDown={e => { if (e.key === "Enter") send(); }}
+             style={{flex: 1, padding: "7px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13}}/>
+      <button className="primary" data-testid="journal-send" disabled={sending || !note.trim()} onClick={send}>
+        {sending ? "Đang ghi…" : "Ghi"}
+      </button>
+    </div>
+    {sent && <small data-testid="journal-sent" style={{display: "block", marginBottom: 8, color: "var(--muted)"}}>{sent}</small>}
 
     {!!present.length && <div className="pillTabs">
       <button className={filter === "" ? "active" : ""} onClick={() => setFilter("")}>

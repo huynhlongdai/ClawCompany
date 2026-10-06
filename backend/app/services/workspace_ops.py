@@ -437,6 +437,12 @@ def assign_task(db: Session, task: Task, project: Project, organization_id: int,
     payload.update(trail.finish(task))
     _emit(db, organization_id, "task.assigned", payload,
           project.company_id, "task", task.id, actor_member_id)
+    if assignee_member_id is not None:
+        # D2.1: giao cho seat agent = một lý do để seat thức dậy.
+        from app.services import wakeup
+        wakeup.enqueue_for_task(db, task, "assigned",
+                                dedupe_key=f"assigned:t{task.id}:m{assignee_member_id}:{task.updated_at.isoformat() if task.updated_at else ''}",
+                                payload={"by_member_id": actor_member_id})
     return task
 
 

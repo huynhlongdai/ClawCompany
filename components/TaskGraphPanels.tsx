@@ -224,3 +224,55 @@ export function GoalTasks({goalId}: {goalId: number}) {
         <small>{STATUS_VI[t.status] || t.status} · ưu tiên {t.priority}</small></div>
     </div>)}</div>;
 }
+
+
+/* D2.1 — vì sao seat được (hoặc không được) đánh thức cho việc này. */
+const WAKE_REASON_VI: Record<string, string> = {
+  assigned: "được giao việc", mentioned: "được nhắc tên", handoff: "nhận bàn giao",
+  approval_resolved: "approval có kết quả", blocker_cleared: "hết bị chặn",
+  review_requested: "được nhờ review", routine: "lịch định kỳ", goal_created: "mục tiêu mới",
+};
+const WAKE_STATUS_VI: Record<string, {text: string; cls: string}> = {
+  queued: {text: "đang chờ gộp", cls: "mid"}, dispatched: {text: "đã chạy", cls: "low"},
+  coalesced: {text: "gộp vào lượt khác", cls: "low"}, skipped: {text: "bỏ qua", cls: "high"},
+  failed: {text: "lỗi", cls: "high"},
+};
+
+export function TaskWakeupsPanel({taskId, refreshKey = 0}: {taskId: number; refreshKey?: number}) {
+  const [rows, setRows] = useState<Row[] | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    apiTask.wakeups(taskId).then(setRows).catch(e => setError(errorText(e)));
+  }, [taskId, refreshKey]);
+  const list = rows || [];
+  return <div className="panel" data-testid="task-wakeups">
+    <div className="panelHead">
+      <div><b>Đánh thức</b></div>
+      <small>wakeups · {list.length}</small>
+    </div>
+    {error && <div className="v8Error">{error}</div>}
+    {!error && rows && !list.length && <div className="v8Empty">
+      Chưa có lý do nào để đánh thức seat. Giao việc cho agent, nhắc @tên trong sổ,
+      hoặc đóng việc đang chặn thì sẽ có.
+    </div>}
+    <div style={{display: "grid", gap: 8}}>
+      {list.map(w => {
+        const s = WAKE_STATUS_VI[w.status] || {text: w.status, cls: "mid"};
+        return <div key={w.id} data-testid="wakeup-row"
+                    style={{border: "1px solid var(--line)", borderRadius: 10, padding: "8px 10px", fontSize: 12.5}}>
+          <div style={{display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap"}}>
+            <b>{WAKE_REASON_VI[w.reason] || w.reason}</b>
+            <span className={`prio ${s.cls}`}>{s.text}</span>
+            <small style={{color: "var(--muted)", marginLeft: "auto"}}>
+              {when(w.created_at)}{w.run_id ? ` · lượt #${w.run_id}` : ""}
+            </small>
+          </div>
+          {w.skip_reason && <div style={{marginTop: 3}}>Lý do: {w.skip_reason}</div>}
+          {w.coalesced_into_id && <div style={{marginTop: 3, color: "var(--muted)"}}>
+            Gộp cùng lượt với lý do #{w.coalesced_into_id} (trong cửa sổ 10 giây).
+          </div>}
+        </div>;
+      })}
+    </div>
+  </div>;
+}

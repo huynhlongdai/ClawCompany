@@ -20,3 +20,17 @@ def dispatch_company_task(task_id:int):
         if job:job.status="failed";job.error=str(exc);db.add(job);db.commit()
         raise
     finally:db.close()
+
+
+@celery_app.task(name="wakeups.drain")
+def drain_wakeups():
+    """D2.1: một vòng drain. Celery không giữ follower sống qua các task, nên
+    follower do API gắn lại (``OPENCLAW_CLAIM_SWEEP_SECONDS``)."""
+    import asyncio
+    from app.db.session import SessionLocal
+    from app.services import wakeup
+    db = SessionLocal()
+    try:
+        return asyncio.run(wakeup.drain(db, follow=False))
+    finally:
+        db.close()

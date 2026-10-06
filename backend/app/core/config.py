@@ -61,6 +61,12 @@ class Settings(BaseSettings):
     # following. 0 disables the sweep; followers are then only re-attached by
     # boot resume or an explicit API call.
     openclaw_claim_sweep_seconds: int = 0
+    # D2.1 — hàng đợi wakeup. drain chạy bằng Celery beat (mỗi 5 giây); để
+    # chạy trong tiến trình API (dev, không có Redis) đặt WAKEUP_DRAIN_SECONDS > 0.
+    wakeup_drain_seconds: float = 0
+    wakeup_window_seconds: float = 10  # gộp các lý do của cùng seat trong cửa sổ này
+    wakeup_run_estimate_usd: float = 0.05  # số giữ chỗ để hỏi budget.can_reserve
+    wakeup_follow: bool = True  # gắn follower ngay sau khi dispatch (cần cho thẻ duyệt và chi phí)
 
     # v25: reconcile (report the gap, pull pending approvals) whenever a
     # follower attaches to a session. On by default because it is a no-op

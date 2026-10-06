@@ -50,6 +50,41 @@ async def cost_reconciliation(task_id: int | None = None, limit: int = 20,
                                        task_ids=[task_id] if task_id else None, limit=limit)
 
 
+@router.get("/wakeups")
+def list_wakeups(member_id: int | None = None, task_id: int | None = None, status: str | None = None,
+                 limit: int = 50, principal: Principal = Depends(require_human()),
+                 db: Session = Depends(get_db)):
+    """D2.1: hàng đợi đánh thức — lý do, trạng thái, và vì sao bị bỏ qua."""
+    from app.models import Wakeup
+    from app.services import wakeup
+    q = db.query(Wakeup).filter(Wakeup.organization_id == active_org(principal))
+    if member_id is not None:
+        q = q.filter(Wakeup.member_id == member_id)
+    if task_id is not None:
+        q = q.filter(Wakeup.task_id == task_id)
+    if status:
+        q = q.filter(Wakeup.status == status)
+    return [wakeup.public(w) for w in q.order_by(Wakeup.id.desc()).limit(max(1, min(limit, 200))).all()]
+
+
+@router.post("/wakeups/drain")
+async def drain_wakeups(force: bool = False, principal: Principal = Depends(require_role("admin")),
+                        db: Session = Depends(get_db)):
+    """Chạy một vòng drain ngay (vận hành/kiểm thử). ``force`` bỏ cửa sổ gộp."""
+    from app.models import Member
+    from app.services import wakeup
+    org = active_org(principal)
+    out = []
+    for (mid,) in db.query(Member.id).filter(Member.organization_id == org).all():
+        out.extend(await wakeup.drain(db, member_id=mid, force=force, follow=settings_follow()))
+    return [o for o in out if o.get("wakeups")]
+
+
+def settings_follow() -> bool:
+    from app.core.config import settings
+    return settings.wakeup_follow
+
+
 @router.post("/{task_id}/dispatch", response_model=TaskOut)
 async def dispatch(task_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
     task = ensure_task(db, task_id, principal)
@@ -95,6 +130,28 @@ def task_journal_read(task_id: int, principal: Principal = Depends(require_human
         } for e in entries],
         "kinds": list(task_journal.KINDS),
     }
+
+
+class JournalNote(BaseModel):
+    summary: str = Field(min_length=1, max_length=2000)
+    detail: str = Field(default="", max_length=8000)
+    kind: str = Field(default="note", pattern="^(note|decision)$")
+
+
+@router.post("/{task_id}/journal", status_code=201)
+def task_journal_write(task_id: int, payload: JournalNote, principal: Principal = Depends(require_role("member")),
+                       db: Session = Depends(get_db)):
+    """D2.1: người thật ghi một dòng vào sổ việc. ``@Tên`` một seat agent → seat đó được đánh thức."""
+    task = ensure_task(db, task_id, principal)
+    try:
+        entry = task_journal.append(db, task, kind=payload.kind, summary=payload.summary,
+                                    detail=payload.detail, actor_member_id=principal.member_id)
+    except task_journal.JournalError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    from app.models import Wakeup
+    woken = db.query(Wakeup).filter(Wakeup.dedupe_key.like(f"mentioned:j{entry.id}:%")).all()
+    return {"task_id": task.id, "seq": entry.seq,
+            "woke": [{"wakeup_id": w.id, "member_id": w.member_id} for w in woken]}
 
 
 @router.get("/{task_id}/context-pack")

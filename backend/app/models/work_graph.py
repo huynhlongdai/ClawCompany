@@ -46,3 +46,28 @@ class TaskRun(Base):
     tokens_out: Mapped[int] = mapped_column(Integer, default=0)
     error_reason: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+WAKEUP_REASONS = ("assigned", "mentioned", "handoff", "approval_resolved", "blocker_cleared",
+                  "review_requested", "routine", "goal_created")
+WAKEUP_STATUSES = ("queued", "coalesced", "dispatched", "skipped", "failed")
+
+
+class Wakeup(Base):
+    """D2.1 — một lý do để đánh thức một seat. ``drain`` gộp các lý do của cùng
+    seat trong cửa sổ 10 giây thành một lượt chạy; lý do bị bỏ qua thì giữ
+    ``skip_reason`` để người đọc biết vì sao không có run."""
+    __tablename__ = "wakeups"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), index=True)
+    reason: Mapped[str] = mapped_column(String(32), index=True)
+    task_id: Mapped[int | None] = mapped_column(ForeignKey("tasks.id"), nullable=True, index=True)
+    payload: Mapped[str] = mapped_column(Text, default="{}")
+    dedupe_key: Mapped[str] = mapped_column(String(200), unique=True)
+    status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
+    skip_reason: Mapped[str] = mapped_column(String(200), default="")
+    run_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    coalesced_into_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

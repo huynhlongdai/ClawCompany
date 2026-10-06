@@ -656,6 +656,11 @@ export const apiTask = {
   byGoal: (goalId: number) => request<any>(`/tasks?goal_id=${goalId}`),
   /* D1.4 — mỗi lượt agent làm việc này là một hàng task_runs. */
   runs: (taskId: number) => request<any>(`/tasks/${taskId}/runs`),
+  /* D2.1 — người ghi một dòng vào sổ; `@Tên` seat agent sẽ đánh thức seat đó. */
+  comment: (taskId: number, summary: string) =>
+    request<any>(`/tasks/${taskId}/journal`, {method: "POST", body: JSON.stringify({summary})}),
+  /* D2.1 — hàng đợi đánh thức của việc này: lý do, trạng thái, vì sao bị bỏ qua. */
+  wakeups: (taskId: number) => request<any>(`/tasks/wakeups?task_id=${taskId}`),
 };
 
 /* D1.5 + D1.6 — máy chủ MCP của ClawCompany và bảng quyền tool theo bậc ghế.

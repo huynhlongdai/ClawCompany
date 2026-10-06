@@ -373,6 +373,13 @@ def apply_terminal_state(db: Session, task: Task, state: ConsumerState, event: d
                              error_reason=str(event.get("errorMessage") or ""), commit=False)
     lifecycle.transition(db, task, new_status, system=True, via="runtime",
                          reason=f"run {upstream_state}", commit=True, emit=False)
+    if holder is not None and holder.member_id:
+        # D2.1: lý do bị bỏ vì seat bận được xếp lại khi lượt này xong.
+        from app.services import wakeup
+        try:
+            wakeup.requeue_deferred(db, holder.member_id, after_run_id=holder.id)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[D2.1] requeue after run #{holder.id} failed: {exc}")
     emit_event(
         db, organization_id=state.organization_id, event_type=f"openclaw.run.{upstream_state}",
         source=SOURCE, aggregate_type="task", aggregate_id=str(task.id),

@@ -146,6 +146,25 @@ def resume_openclaw_followers() -> None:
 
 
 @app.on_event("startup")
+async def start_wakeup_drain() -> None:
+    """D2.1: drain hàng đợi wakeup trong tiến trình API (dev, không có Celery).
+
+    Tắt mặc định (WAKEUP_DRAIN_SECONDS=0): bật là cho phép hệ thống tự gọi
+    model có phí, nên phải là một quyết định nói ra."""
+    interval = settings.wakeup_drain_seconds
+    if interval <= 0:
+        return
+    import asyncio
+
+    from app.services.wakeup import drain_forever
+
+    try:
+        asyncio.create_task(drain_forever(interval), name="wakeup-drain")
+    except Exception as exc:  # noqa: BLE001 - never block startup
+        print(f"[D2.1] wakeup drain not started: {exc}")
+
+
+@app.on_event("startup")
 async def start_orphan_sweep() -> None:
     """v22: keep taking over sessions whose follower died.
 

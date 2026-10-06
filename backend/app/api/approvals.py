@@ -54,4 +54,23 @@ async def resolve_approval(approval_id: int, payload: ApprovalResolve, principal
     from app.services.runtime_stream import _audit
     _audit(db, obj, "approval.decided", actor_member_id=principal.member_id, actor_name="human",
            result=payload.status, payload={"decision": payload.status, "policy_key": obj.policy_key})
+    _wake_requester(db, obj)
     return obj
+
+
+def _wake_requester(db: Session, obj: Approval) -> None:
+    """D2.1: approval của seat agent có kết quả → đánh thức seat đó trên việc nó đang làm.
+
+    Hàng ``openclaw:`` không đi qua đây: lượt chạy đang chờ tự chạy tiếp khi
+    gateway nhận quyết định, đánh thức thêm chỉ sinh lượt thứ hai."""
+    if obj.status not in ("approved", "rejected") or not obj.requester_member_id:
+        return
+    from app.models import Task, TaskRun
+    from app.services import wakeup
+    last = (db.query(TaskRun).filter(TaskRun.member_id == obj.requester_member_id)
+            .order_by(TaskRun.id.desc()).first())
+    task = db.get(Task, last.task_id) if last else None
+    if task is not None:
+        wakeup.enqueue_for_task(db, task, "approval_resolved", member_id=obj.requester_member_id,
+                                dedupe_key=f"approval_resolved:a{obj.id}:{obj.status}",
+                                payload={"approval_id": obj.id, "decision": obj.status})

@@ -118,7 +118,26 @@ def transition(db: Session, task: Task, to: str, *, reason: str = "", via: str =
                        company_id=company_id or company, source=source,
                        aggregate_type="task", aggregate_id=str(task.id),
                        actor_member_id=actor_member_id)
+    if to in ("done", "cancelled"):
+        wake_unblocked(db, task)
     return task
+
+
+def wake_unblocked(db: Session, task: Task) -> list[int]:
+    """D2.1: việc này đóng → việc nào hết bị chặn thì đánh thức người nhận của nó."""
+    from app.models import TaskDependency
+    from app.services import task_graph, wakeup
+    woken = []
+    for dep in db.query(TaskDependency).filter(TaskDependency.blocked_by_task_id == task.id).all():
+        waiting = db.get(Task, dep.task_id)
+        if waiting is None or task_graph.open_blockers(db, waiting.id):
+            continue
+        wk = wakeup.enqueue_for_task(db, waiting, "blocker_cleared",
+                                     dedupe_key=f"blocker_cleared:t{waiting.id}:by{task.id}",
+                                     payload={"cleared_by_task_id": task.id})
+        if wk is not None:
+            woken.append(waiting.id)
+    return woken
 
 
 # ------------------------------------------------------------------ checkout
