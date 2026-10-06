@@ -73,6 +73,35 @@ def chat_sends(session):
     return n
 
 
+E2E_TITLES = ("Kiểm tra máy chủ", "Tổng hợp log", "Viết báo cáo tuần", "Việc khi hết tiền")
+DB = "/data/cc/backend/dev.db"
+
+
+def preflight():
+    """Dọn rác của lần chạy trước: việc e2e còn mở của seat bị huỷ, lệnh chờ
+    duyệt của chúng bị từ chối, rồi đợi seat rảnh. Không có bước này, việc
+    tồn đọng được requeue sẽ chiếm seat và làm sai mọi kịch bản phía sau."""
+    left = [t for t in c.get("/api/tasks", headers=H).json()
+            if t.get("assignee_member_id") == SEAT and t["status"] in ("backlog", "todo", "in_progress", "blocked")
+            and t["title"].startswith(E2E_TITLES)]
+    for t in left:
+        c.post(f"/api/v18/workspace/tasks/{t['id']}/move", headers=H, json={"status": "cancelled"})
+    for a in c.get("/api/approvals", params={"status": "pending"}, headers=H).json():
+        if any(f"company-task-{t['id']}" in (a.get("policy_key") or "") for t in left):
+            c.post(f"/api/approvals/{a['id']}/resolve", headers=H, json={"status": "rejected", "resolution_note": "e2e preflight"})
+
+    def seat_free():
+        con = sqlite3.connect(DB)
+        n = con.execute("select count(*) from task_runs where member_id=? and status in ('queued','running') "
+                        "and started_at > datetime('now','-30 minutes')", (SEAT,)).fetchone()[0]
+        con.close()
+        return n == 0
+    free = wait_for(seat_free, timeout=90, every=2)
+    step("0. preflight: dọn việc e2e cũ, seat rảnh", free, {"cancelled": [t["id"] for t in left]})
+    if not free:
+        sys.exit(1)
+
+
 def finish(tid):
     session = f"agent:dev:company-task-{tid}"
     aid = wait_for(lambda: approve_pending(session), timeout=60)
@@ -80,6 +109,7 @@ def finish(tid):
     return aid, st
 
 
+preflight()
 # A. Giao việc → run ≤ 60 giây, không ai bấm dispatch.
 x = new_task("Kiểm tra máy chủ")
 t0 = time.time(); code = assign(x)

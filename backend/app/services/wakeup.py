@@ -192,6 +192,20 @@ def _close(wk: Wakeup, status: str, *, skip: str = "", run_id: int | None = None
         wk.coalesced_into_id = into
 
 
+
+def _follow(task, organization_id: int) -> str | None:
+    """Theo dõi phiên vừa gửi; trả trạng thái follower (hoặc 'error: ...')."""
+    if not task.runtime_session_key:
+        return None
+    try:
+        from app.services.runtime_stream import supervisor
+        state = supervisor.follow(session_key=task.runtime_session_key, organization_id=organization_id,
+                                  task_id=task.id)
+        return getattr(state, "status", "following")
+    except Exception as exc:  # noqa: BLE001 - follow lỗi không được làm hỏng lượt đã gửi
+        print(f"[D2.1] follow after wakeup failed: {exc}")
+        return f"error: {exc}"
+
 async def _process(db: Session, member_id: int, items: list[Wakeup], now: datetime,
                    follow: bool, prefer: int | None = None) -> dict:
     if prefer is not None:
@@ -243,6 +257,10 @@ async def _process(db: Session, member_id: int, items: list[Wakeup], now: dateti
         db.commit(); _emit(db, primary, "wakeup.failed", why)
         return {"member_id": member_id, "decision": "failed", "reason": why, "wakeups": [primary.id]}
 
+    # Gắn follower NGAY sau chat.send, trước mọi ghi DB khác: gateway từ chối
+    # exec cần duyệt nếu lúc agent xin lệnh chưa có client duyệt nào kết nối
+    # (approval-e2e.md, giới hạn #5).
+    followed = _follow(task, member.organization_id) if follow else None
     run = lifecycle.current_run(db, task)
     run_id = run.id if run else None
     _close(primary, "dispatched", run_id=run_id, now=now)
@@ -253,15 +271,8 @@ async def _process(db: Session, member_id: int, items: list[Wakeup], now: dateti
           f"{primary.reason}: lượt chạy #{run_id} cho task #{task.id}"
           + (f", gộp {len(same)} lý do khác" if same else ""),
           run_id=run_id, coalesced=[w.id for w in same], session_key=task.runtime_session_key)
-    if follow and task.runtime_session_key:
-        try:
-            from app.services.runtime_stream import registry
-            registry.follow(session_key=task.runtime_session_key, organization_id=member.organization_id,
-                            task_id=task.id)
-        except Exception as exc:  # noqa: BLE001
-            print(f"[D2.1] follow after wakeup failed: {exc}")
     return {"member_id": member_id, "decision": "dispatched", "task_id": task.id, "run_id": run_id,
-            "wakeups": [primary.id], "coalesced": [w.id for w in same]}
+            "wakeups": [primary.id], "coalesced": [w.id for w in same], "followed": followed}
 
 
 async def drain(db: Session, *, now: datetime | None = None, member_id: int | None = None,

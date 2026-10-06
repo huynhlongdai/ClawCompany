@@ -328,3 +328,24 @@ def test_wakeups_endpoint_is_scoped_to_the_org(env):
     wakeup.enqueue(env["db"], organization_id=other.id, member_id=om.id, reason="routine", dedupe_key="other")
     rows = env["client"].get("/api/tasks/wakeups", headers=env["H"]).json()
     assert [r["reason"] for r in rows] == ["assigned"]
+
+
+def test_dispatch_from_a_wakeup_attaches_the_follower_to_the_new_session(env, monkeypatch):
+    """E2E lần đầu: drain gọi ``registry.follow`` (không tồn tại) → lượt chạy
+    không bao giờ được nghe tới cuối, seat kẹt seat_busy. Test thẳng vào
+    supervisor thật để tên/đối số sai là đỏ."""
+    from app.services import runtime_stream
+    seen = []
+
+    def fake_follow(*, session_key, organization_id, task_id=None):
+        seen.append((session_key, organization_id, task_id))
+        return runtime_stream.ConsumerState(session_key=session_key, task_id=task_id,
+                                            organization_id=organization_id)
+
+    monkeypatch.setattr(runtime_stream.supervisor, "follow", fake_follow)
+    t = _task(env)
+    _assign_via_api(env, t, env["nina"])
+    out = _drain(env, now=_later(), follow=True)
+    assert out[0]["decision"] == "dispatched", out
+    assert not str(out[0]["followed"]).startswith("error")
+    assert seen == [(f"agent:dev:company-task-{t.id}", env["org"].id, t.id)]
