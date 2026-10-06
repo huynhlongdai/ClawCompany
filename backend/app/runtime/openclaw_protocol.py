@@ -230,6 +230,8 @@ APPROVAL_EVENTS = frozenset({E_SESSION_APPROVAL, E_EXEC_APPROVAL_REQUESTED, E_EX
 # to backfill requests that predate the connection.
 M_EXEC_APPROVAL_RESOLVE = "exec.approval.resolve"
 M_EXEC_APPROVAL_LIST = "exec.approval.list"
+# D1.1: client capability (docs/gateway/clients.md, GATEWAY_CLIENT_CAPS).
+CAP_EXEC_APPROVALS = "exec-approvals"
 
 METHOD_SCOPES[M_EXEC_APPROVAL_RESOLVE] = SCOPE_APPROVALS
 
@@ -243,7 +245,7 @@ APPROVAL_DECISIONS = frozenset({D_ALLOW_ONCE, D_ALLOW_ALWAYS, D_DENY})
 
 # Upstream chat events carry a coarse lifecycle state rather than our old
 # invented "run.completed" event names.
-TERMINAL_STATES = frozenset({"complete", "completed", "error", "aborted", "cancelled", "canceled"})
+TERMINAL_STATES = frozenset({"complete", "completed", "final", "error", "aborted", "cancelled", "canceled"})
 ERROR_STATES = frozenset({"error"})
 
 

@@ -1,0 +1,173 @@
+OK   bind seat → agent 'dev'
+      {'agent_id': 1, 'member_id': 2, 'runtime_agent_id': 'dev', 'main_session_key': 'agent:dev:main'}
+OK   start task (chat.send)
+      {'task_id': 17, 'status': 'in_progress', 'run_id': 'clawcompany:agent:dev:company-task-17:task-17:4eacf5067c54', 'session_key': 'agent:dev:company-task-17'}
+OK   follow session
+      {'session_key': 'agent:dev:company-task-17', 'task_id': 17, 'organization_id': 1, 'started_at': '2026-10-05T23:50:58.058701', 'events': 0, 'approvals': 0, 'last_event_type': '', 'status': 'running', 'error': '', 'lease_backend': 'memory'}
+OK   hàng approvals từ exec.approval.requested
+      {'id': 6, 'action': 'Chạy lệnh: echo clawcompany-approval-e2e && date -u +%Y-%m-%dT%H:%M:%SZ', 'policy_key': 'openclaw:agent:dev:company-task-17:ddd59a07-bd7c-423c-aeb4-623a0b970bb5', 'status': 'pending'}
+OK   duyệt trong Hộp việc (rejected)
+      {'id': 6, 'organization_id': 1, 'company_id': None, 'requester_member_id': 2, 'approver_member_id': 1, 'action': 'Chạy lệnh: echo clawcompany-approval-e2e && date -u +%Y-%m-%dT%H:%M:%SZ', 'risk': 'medium', 'policy_key': 'openclaw:agent:dev:company-task-17:ddd59a07-bd7c-423c-aeb4-623a0b970bb5', 'stat
+OK   task kết thúc lượt chạy
+      status=review sau 2.4s
+OK   lệnh KHÔNG chạy
+      [{"role": "toolResult", "toolCallId": "call_4891004aec46", "toolName": "exec", "content": [{"type": "text", "text": "Exec denied (gateway id=ddd59a07-bd7c-423c-aeb4-623a0b970bb5, user-denied): echo clawcompany-approval-e2e && date -u +%Y-%m-%dT%H:%M:%SZ"}], "isError": true, "timestamp": 179124426128
+OK   không có hàng approval trùng
+      [{'id': 6, 'status': 'denied', 'resolution_note': 'D1.1 e2e [decision relayed to OpenClaw; this note stayed in ClawCompany] [gateway: deny]'}]
+OK   audit_events đủ ba mốc
+      [{'action': 'approval.requested', 'result': 'success', 'actor': 'Nina', 'at': '2026-10-05T23:50:59.249752'}, {'action': 'approval.decided', 'result': 'denied', 'actor': 'member:1', 'at': '2026-10-05T23:51:01.236859'}, {'action': 'approval.resolved', 'result': 'denied', 'actor': 'openclaw', 'at': '20
+{
+ "mode": "deny",
+ "steps": [
+  {
+   "step": "bind seat → agent 'dev'",
+   "ok": true,
+   "detail": {
+    "agent_id": 1,
+    "member_id": 2,
+    "runtime_agent_id": "dev",
+    "main_session_key": "agent:dev:main"
+   }
+  },
+  {
+   "step": "start task (chat.send)",
+   "ok": true,
+   "detail": {
+    "task_id": 17,
+    "status": "in_progress",
+    "run_id": "clawcompany:agent:dev:company-task-17:task-17:4eacf5067c54",
+    "session_key": "agent:dev:company-task-17"
+   }
+  },
+  {
+   "step": "follow session",
+   "ok": true,
+   "detail": {
+    "session_key": "agent:dev:company-task-17",
+    "task_id": 17,
+    "organization_id": 1,
+    "started_at": "2026-10-05T23:50:58.058701",
+    "events": 0,
+    "approvals": 0,
+    "last_event_type": "",
+    "status": "running",
+    "error": "",
+    "lease_backend": "memory"
+   }
+  },
+  {
+   "step": "hàng approvals từ exec.approval.requested",
+   "ok": true,
+   "detail": {
+    "id": 6,
+    "action": "Chạy lệnh: echo clawcompany-approval-e2e && date -u +%Y-%m-%dT%H:%M:%SZ",
+    "policy_key": "openclaw:agent:dev:company-task-17:ddd59a07-bd7c-423c-aeb4-623a0b970bb5",
+    "status": "pending"
+   }
+  },
+  {
+   "step": "duyệt trong Hộp việc (rejected)",
+   "ok": true,
+   "detail": {
+    "id": 6,
+    "organization_id": 1,
+    "company_id": null,
+    "requester_member_id": 2,
+    "approver_member_id": 1,
+    "action": "Chạy lệnh: echo clawcompany-approval-e2e && date -u +%Y-%m-%dT%H:%M:%SZ",
+    "risk": "medium",
+    "policy_key": "openclaw:agent:dev:company-task-17:ddd59a07-bd7c-423c-aeb4-623a0b970bb5",
+    "status": "denied",
+    "evidence": "{\"session_key\": \"agent:dev:company-task-17\", \"task_id\": 17, \"event\": {\"approvalKind\": \"exec\", \"id\": \"ddd59a07-bd7c-423c-aeb4-623a0b970bb5\", \"request\": {\"command\": \"echo clawcompany-approval-e2e && date -u +%Y-%m-%dT%H:%M:%SZ\", \"systemRunBinding\": null, \"systemRunPlan\": null, \"cwd\": \"/data/oc/home/.openclaw/workspace-e2e\", \"nodeId\": null, \"host\": \"gateway\", \"security\": \"allowlist\", \"ask\": \"on-miss\", \"warningText\": null, \"scope\": null, \"commandAnalysis\": {\"commandCount\": 2, \"nestedCommandCount\": 0, \"riskKinds\": [], \"warningLines\": []}, \"allowedDecisions\": [\"allow-once\", \"allow-always\", \"deny\"], \"agentId\": \"dev\", \"resolvedPath\": \"/usr/bin/echo\", \"sessionKey\": \"agent:dev:company-task-17\", \"sessionId\": null, \"runId\": \"clawcompany:agent:dev:company-task-17:task-17:4eacf5067c54\", \"toolCallId\": \"call_4891004aec46\", \"turnSourceChannel\": \"webchat\", \"turnSourceTo\": \"agent:dev:company-task-17\", \"turnSourceAccountId\": null, \"turnSourceThreadId\": null, \"cronExecutionSource\": null, \"cronOperationBinding\": null}, \"createdAtMs\": 1791244259158, \"expiresAtMs\": 1791246059158}, \"command\": \"echo clawcompany-approval-e2e && date -u +%Y-%m-%dT%H:%M:%SZ\", \"cwd\": \"/data/oc/home/.openclaw/workspace-e2e\", \"host\": \"gateway\", \"expires_at_ms\": 1791246059158}",
+    "resolution_note": "D1.1 e2e [decision relayed to OpenClaw; this note stayed in ClawCompany] [gateway: deny]"
+   }
+  },
+  {
+   "step": "task kết thúc lượt chạy",
+   "ok": true,
+   "detail": "status=review sau 2.4s"
+  },
+  {
+   "step": "lệnh KHÔNG chạy",
+   "ok": true,
+   "detail": "[{\"role\": \"toolResult\", \"toolCallId\": \"call_4891004aec46\", \"toolName\": \"exec\", \"content\": [{\"type\": \"text\", \"text\": \"Exec denied (gateway id=ddd59a07-bd7c-423c-aeb4-623a0b970bb5, user-denied): echo clawcompany-approval-e2e && date -u +%Y-%m-%dT%H:%M:%SZ\"}], \"isError\": true, \"timestamp\": 179124426128"
+  },
+  {
+   "step": "không có hàng approval trùng",
+   "ok": true,
+   "detail": [
+    {
+     "id": 6,
+     "status": "denied",
+     "resolution_note": "D1.1 e2e [decision relayed to OpenClaw; this note stayed in ClawCompany] [gateway: deny]"
+    }
+   ]
+  },
+  {
+   "step": "audit_events đủ ba mốc",
+   "ok": true,
+   "detail": [
+    {
+     "action": "approval.requested",
+     "result": "success",
+     "actor": "Nina",
+     "at": "2026-10-05T23:50:59.249752"
+    },
+    {
+     "action": "approval.decided",
+     "result": "denied",
+     "actor": "member:1",
+     "at": "2026-10-05T23:51:01.236859"
+    },
+    {
+     "action": "approval.resolved",
+     "result": "denied",
+     "actor": "openclaw",
+     "at": "2026-10-05T23:51:01.291163"
+    }
+   ]
+  }
+ ],
+ "task_id": 17,
+ "session_key": "agent:dev:company-task-17",
+ "elapsed_after_decision_s": 2.4,
+ "runs": [
+  {
+   "id": 9,
+   "status": "completed",
+   "started_at": "2026-10-05T23:50:57.940865",
+   "ended_at": "2026-10-05T23:51:01.725350",
+   "error_reason": ""
+  }
+ ],
+ "exec_results": [
+  "[{\"type\": \"text\", \"text\": \"Exec denied (gateway id=ddd59a07-bd7c-423c-aeb4-623a0b970bb5, user-denied): echo clawcompany-approval-e2e && date -u +%Y-%m-%dT%H:%M:%SZ\"}]"
+ ],
+ "approvals_for_session": [
+  {
+   "id": 6,
+   "status": "denied",
+   "resolution_note": "D1.1 e2e [decision relayed to OpenClaw; this note stayed in ClawCompany] [gateway: deny]"
+  }
+ ],
+ "audit": [
+  {
+   "action": "approval.requested",
+   "result": "success",
+   "actor": "Nina",
+   "at": "2026-10-05T23:50:59.249752"
+  },
+  {
+   "action": "approval.decided",
+   "result": "denied",
+   "actor": "member:1",
+   "at": "2026-10-05T23:51:01.236859"
+  },
+  {
+   "action": "approval.resolved",
+   "result": "denied",
+   "actor": "openclaw",
+   "at": "2026-10-05T23:51:01.291163"
+  }
+ ]
+}

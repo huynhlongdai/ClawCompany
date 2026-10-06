@@ -6,13 +6,13 @@ Writes require the `company.workspace:write` scope for API keys and at least the
 `member` human role; structural changes (company, department, seats) require
 `manager`.
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.authz import Principal, require_role, require_scope
-from app.core.tenancy import (active_org, ensure_company, ensure_member, ensure_project,
-                             ensure_task)
+from app.core.tenancy import (active_org, ensure_company, ensure_department, ensure_member,
+                             ensure_project, ensure_task)
 from app.db.session import get_db
 from app.services import workspace_ops as ops
 
@@ -97,6 +97,8 @@ class TaskIn(BaseModel):
     description: str = ""
     assignee_member_id: int | None = None
     priority: str = "medium"
+    # D3.1: giao cho phòng thay vì một người — trưởng phòng sẽ định tuyến.
+    assignee_department_id: int | None = None
 
 
 class TaskMove(BaseModel):
@@ -214,12 +216,92 @@ def create_task(payload: TaskIn, principal: Principal = Depends(writer("member")
     task = ops.create_task(db, project, active_org(principal), title=payload.title,
                            description=payload.description, assignee_member_id=payload.assignee_member_id,
                            priority=payload.priority, actor_member_id=principal.member_id)
+    if payload.assignee_department_id is not None:
+        if payload.assignee_member_id is not None:
+            raise HTTPException(422, "Chọn một: assignee_member_id hoặc assignee_department_id")
+        _route(db, task, payload.assignee_department_id, principal, "giao khi tạo việc")
+        db.refresh(task)
     return _task_out(task)
 
 
-@router.post("/workspace/tasks/{task_id}/move")
-def move_task(task_id: int, payload: TaskMove, principal: Principal = Depends(writer("member")),
+class TaskRoute(BaseModel):
+    department_id: int
+    reason: str = ""
+
+
+class DepartmentGuide(BaseModel):
+    guide: str = Field(..., max_length=8000)
+
+
+_ROUTING_HTTP = {"not_found": 404, "forbidden": 403, "conflict": 409, "invalid_argument": 422,
+                 "no_candidate": 409}
+
+
+def _route(db: Session, task, department_id: int, principal: Principal, reason: str) -> dict:
+    from app.services import routing
+    ensure_department(db, department_id, principal)
+    try:
+        return routing.route_to_department(db, task, department_id, organization_id=active_org(principal),
+                                           actor_member_id=principal.member_id, reason=reason)
+    except routing.RoutingError as exc:
+        raise HTTPException(_ROUTING_HTTP.get(exc.code, 400), exc.message) from exc
+
+
+@router.post("/workspace/tasks/{task_id}/route")
+def route_task(task_id: int, payload: TaskRoute, principal: Principal = Depends(writer("member")),
+               db: Session = Depends(get_db)):
+    """D3.1: giao việc cho phòng; trưởng phòng được đánh thức (lý do ``routed``)."""
+    task = ensure_task(db, task_id, principal)
+    out = _route(db, task, payload.department_id, principal, payload.reason)
+    db.refresh(task)
+    return {"task": _task_out(task), **out}
+
+
+@router.get("/workspace/departments/{department_id}/routing")
+def department_routing(department_id: int, principal: Principal = Depends(require_scope("company.workspace:read")),
+                       db: Session = Depends(get_db)):
+    """Nhân sự, hướng dẫn và các việc phòng đang giữ, kèm lịch sử định tuyến gần đây."""
+    import json as _json
+    from app.models import CompanyEvent, Member, Task
+    from app.services import routing
+    dept = ensure_department(db, department_id, principal)
+    head = db.get(Member, dept.head_member_id) if dept.head_member_id else None
+    held = (db.query(Task).filter(Task.assignee_department_id == dept.id,
+                                  Task.status.notin_(("done", "cancelled", "archived")))
+            .order_by(Task.id.desc()).limit(50).all())
+    ids = [str(t.id) for t in held]
+    events = (db.query(CompanyEvent).filter(CompanyEvent.organization_id == active_org(principal),
+                                            CompanyEvent.event_type.in_(("task.routed", "task.routed_to_department",
+                                                                         "routing.head_wake", "routing.run_finished")),
+                                            CompanyEvent.aggregate_id.in_(ids or ["-"]))
+              .order_by(CompanyEvent.id.desc()).limit(40).all())
+    return {
+        "department": {"id": dept.id, "name": dept.name, "guide": dept.guide or "",
+                       "head": {"id": head.id, "name": head.name, "type": head.member_type} if head else None},
+        "roster": routing.roster(db, dept),
+        "tasks": [{**_task_out(t), "unassigned": t.assignee_member_id is None} for t in held],
+        "events": [{"id": e.id, "type": e.event_type, "task_id": int(e.aggregate_id) if e.aggregate_id.isdigit() else None,
+                    "at": e.occurred_at.isoformat(), "payload": _json.loads(e.payload_json or "{}")} for e in events],
+    }
+
+
+@router.put("/workspace/departments/{department_id}/guide")
+def set_department_guide(department_id: int, payload: DepartmentGuide,
+                         principal: Principal = Depends(writer("manager")), db: Session = Depends(get_db)):
+    dept = ensure_department(db, department_id, principal)
+    dept.guide = payload.guide.strip()
+    db.add(dept); db.commit()
+    return {"id": dept.id, "guide": dept.guide}
+
+
+@router.post("/workspace/tasks/{task_id}/move", deprecated=True)
+def move_task(task_id: int, payload: TaskMove, response: Response,
+              principal: Principal = Depends(writer("member")),
               db: Session = Depends(get_db)):
+    # D1.4: ba đường move (v18, v20, v27) giờ cùng đi qua task_lifecycle; v27
+    # có thêm kiểm revision nên là đường nên dùng.
+    response.headers["Deprecation"] = "true"
+    response.headers["Link"] = '</api/v27/tasks/{id}/move>; rel="successor-version"'
     task = ensure_task(db, task_id, principal)
     project = ensure_project(db, task.project_id, principal)
     task = ops.move_task(db, task, project, active_org(principal), status=payload.status,
@@ -273,4 +355,5 @@ def vocabulary(principal: Principal = Depends(require_scope("company.context:rea
 def _task_out(task) -> dict:
     return {"id": task.id, "project_id": task.project_id, "title": task.title,
             "status": task.status, "priority": task.priority,
-            "assignee_member_id": task.assignee_member_id}
+            "assignee_member_id": task.assignee_member_id,
+            "assignee_department_id": getattr(task, "assignee_department_id", None)}

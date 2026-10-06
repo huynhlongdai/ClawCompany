@@ -1,0 +1,8 @@
+# Deploy lên box Prized: chỉ chia sẻ cổng 3000, web tự chuyển /api → api:8000.
+#   docker compose -f docker-compose.yml -f docker-compose.prized.yml up -d --build
+#   prized ports share 3000
+services:
+  web:
+    environment:
+      NEXT_PUBLIC_API_BASE: /api
+      API_PROXY_TARGET: http://api:8000

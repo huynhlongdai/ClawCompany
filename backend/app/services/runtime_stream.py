@@ -36,7 +36,9 @@ from app.runtime import openclaw_protocol as ocp
 from app.runtime.factory import get_runtime
 from app.services.company_event_bus import emit_event
 from app.services import runtime_gap
+from app.services import task_lifecycle as lifecycle
 from app.services import stream_reconcile
+from app.services import cost_ledger
 from app.services.runtime_events import persist_runtime_event
 from app.services.runtime_leases import store as lease_store
 from app.services.stream_registry import registry
@@ -50,9 +52,16 @@ ORPHAN_STATUSES = ("stopped", "failed")
 # Company task status after a run ends, keyed by the upstream terminal state.
 # A completed run goes to review rather than done: the agent finishing is not
 # the same as the company accepting the work.
+# D1.4: kết cục của hàng task_runs theo trạng thái board mà run đưa task tới.
+RUN_OUTCOME = {"review": "completed", "blocked": "failed", "todo": "cancelled"}
+
 TERMINAL_STATUS = {
     "complete": "review",
     "completed": "review",
+    # D1.1: gateway 2026.9.8 kết thúc lượt bằng ``chat`` state ``final`` (đo
+    # được). Thiếu khoá này thì follower không bao giờ dừng và việc kẹt ở
+    # in_progress dù agent đã trả lời xong.
+    "final": "review",
     "error": "blocked",
     "aborted": "todo",
     "cancelled": "todo",
@@ -157,6 +166,13 @@ async def _consume(state: ConsumerState) -> None:
             db, organization_id=state.organization_id, session_key=state.session_key,
             task_id=state.task_id, reason="follow",
         )
+        # M1: lượt đã xong trước khi ta gắn vào thì frame cuối không bao giờ tới.
+        from app.services import stream_catchup
+        caught = await stream_catchup.catch_up(db, runtime, state, apply_terminal_state)
+        if caught.get("terminal"):
+            state.status = "finished"
+            state.last_event_type = "catch_up"
+            return
         async for event in runtime.stream_run(state.session_key):
             state.events += 1
             state.last_event_type = str(event.get("type") or "")
@@ -199,7 +215,15 @@ def handle_event(db: Session, state: ConsumerState, event: dict) -> None:
     task = db.get(Task, state.task_id) if state.task_id else None
     agent_id = None
     member = None
-    if task is not None and task.assignee_member_id:
+    from app.services import routing
+    route_run = routing.run_for_session(db, state.session_key)
+    if route_run is not None:
+        # D3.1: phiên định tuyến của trưởng phòng — người chạy là trưởng phòng,
+        # tiền tính vào lượt định tuyến, kết thúc không đổi trạng thái task.
+        member = db.get(Member, route_run.member_id) if route_run.member_id else None
+        agent = db.query(Agent).filter(Agent.member_id == route_run.member_id).first()
+        agent_id = agent.id if agent else None
+    elif task is not None and task.assignee_member_id:
         member = db.get(Member, task.assignee_member_id)
         agent = db.query(Agent).filter(Agent.member_id == task.assignee_member_id).first()
         agent_id = agent.id if agent else None
@@ -214,25 +238,76 @@ def handle_event(db: Session, state: ConsumerState, event: dict) -> None:
         session_key=state.session_key,
     )
 
+    # D1.2: tiền model đi kèm session.message của assistant; ghi một lần theo messageId.
+    if str(event.get("family") or "") == "session.message" and isinstance(event.get("raw"), dict):
+        cost_ledger.record_message_usage(
+            db, organization_id=state.organization_id, task=task, agent_id=agent_id,
+            session_key=state.session_key, raw=event["raw"], run=route_run)
+
     if str(event.get("family") or "") in ocp.APPROVAL_EVENTS:
         state.approvals += 1
         record_approval(db, state, event, member=member)
 
-    if event.get("terminal") and task is not None:
+    if event.get("terminal") and route_run is not None:
+        routing.finish_routing_run(db, route_run, event)
+    elif event.get("terminal") and task is not None:
         apply_terminal_state(db, task, state, event)
+
+
+# D1.1 — quyết định gateway dùng (allow-once/allow-always/deny) và từ cũ.
+_ALLOW_WORDS = ("approve", "approved", "allow", "allow-once", "allow-always", "allowed")
+_DENY_WORDS = ("deny", "denied", "reject", "rejected")
+
+
+def _approval_request(raw: dict) -> dict:
+    """``exec.approval.requested`` thật (2026.9.8) để lệnh trong ``request``:
+    ``{id, request: {command, cwd, host, agentId, sessionKey, runId,
+    commandAnalysis, allowedDecisions...}, createdAtMs, expiresAtMs}``.
+    Bản trước đọc ``raw.command`` ở cấp ngoài nên mọi hàng ghi "action"."""
+    req = raw.get("request") if isinstance(raw.get("request"), dict) else {}
+    return req
+
+
+def _resolution_decision(raw: dict) -> str:
+    for source in (raw, raw.get("resolution") if isinstance(raw.get("resolution"), dict) else {},
+                   raw.get("record") if isinstance(raw.get("record"), dict) else {}):
+        value = source.get("decision") or source.get("result") or source.get("outcome")
+        if value:
+            return str(value).lower()
+    return ""
+
+
+def _audit(db: Session, approval: Approval, action: str, *, result: str = "success",
+           actor_member_id: int | None = None, actor_name: str = "openclaw", payload: dict | None = None,
+           once: bool = False) -> None:
+    from app.models import AuditEvent
+    from app.services.audit import log_event
+    if once and db.query(AuditEvent).filter(
+            AuditEvent.organization_id == approval.organization_id, AuditEvent.action == action,
+            AuditEvent.object_type == "approval", AuditEvent.object_id == str(approval.id)).first():
+        return
+    log_event(db, approval.organization_id, action, object_type="approval", object_id=str(approval.id),
+              actor_member_id=actor_member_id, actor_name=actor_name, result=result,
+              risk=approval.risk or "medium", payload=payload or {})
 
 
 def record_approval(db: Session, state: ConsumerState, event: dict, member: Member | None = None) -> Approval | None:
     """Turn a gateway permission prompt into a row in the company queue.
 
-    Resolution events update the matching pending row instead of creating a
-    second one, so the queue does not fill with duplicates when the operator
-    answers in the OpenClaw UI.
+    Resolution events update the matching row instead of creating a second
+    one. D1.1: the resolved frame is recognised by its family as well as by a
+    decision word, because the real decision words are ``allow-once`` /
+    ``allow-always`` / ``deny`` — the old word list missed ``allow-once``, so a
+    resolution for a row we had already decided fell through and minted a
+    duplicate pending row. Each of the three milestones (requested → decided
+    → resolved by the gateway) writes one ``audit_events`` row.
     """
     raw = event.get("raw") if isinstance(event.get("raw"), dict) else {}
     request_id = str(raw.get("id") or raw.get("approvalId") or raw.get("requestId") or "")
     policy_key = f"openclaw:{state.session_key}:{request_id}" if request_id else f"openclaw:{state.session_key}"
-    decision = str(raw.get("decision") or raw.get("result") or "").lower()
+    family = str(event.get("family") or "")
+    decision = _resolution_decision(raw)
+    is_resolution = family == ocp.E_EXEC_APPROVAL_RESOLVED or decision.startswith(_ALLOW_WORDS + _DENY_WORDS)
 
     existing = (
         db.query(Approval)
@@ -241,30 +316,46 @@ def record_approval(db: Session, state: ConsumerState, event: dict, member: Memb
         .first()
     )
 
-    if decision in ("approve", "approved", "allow", "deny", "denied", "reject", "rejected"):
+    if is_resolution:
         if existing is None:
             return None
-        existing.status = "approved" if decision.startswith(("approve", "allow")) else "rejected"
-        existing.resolution_note = f"Resolved in OpenClaw: {decision}"
+        allowed = decision.startswith(_ALLOW_WORDS)
+        if existing.status == "pending":
+            existing.status = "approved" if allowed else "rejected"
+            existing.resolution_note = f"Resolved in OpenClaw: {decision or 'resolved'}"
+        elif "[gateway:" not in (existing.resolution_note or ""):
+            existing.resolution_note = f"{existing.resolution_note or ''} [gateway: {decision or 'resolved'}]".strip()
         db.add(existing)
         db.commit()
         db.refresh(existing)
+        _audit(db, existing, "approval.resolved", result="allowed" if allowed else "denied", once=True,
+               payload={"decision": decision, "request_id": request_id, "session_key": state.session_key,
+                        "status": existing.status})
         return existing
 
-    if existing is not None and existing.status == "pending":
-        return existing  # idempotent: the gateway may re-announce a pending prompt
+    if existing is not None:
+        return existing  # idempotent: the gateway may re-announce a prompt (backfill, reconnect)
 
-    tool = str(raw.get("tool") or raw.get("toolName") or raw.get("command") or "action")
+    req = _approval_request(raw)
+    command = str(req.get("command") or raw.get("command") or "")
+    tool = str(raw.get("tool") or raw.get("toolName") or ("exec" if command else "action"))
+    risk_kinds = ((req.get("commandAnalysis") or {}).get("riskKinds") or []) if isinstance(
+        req.get("commandAnalysis"), dict) else []
+    risk = str(raw.get("risk") or ("high" if risk_kinds or (tool in ocp.HTTP_DENIED_TOOLS and not command)
+                                   else "medium"))
+    action = f"Chạy lệnh: {command}" if command else f"OpenClaw agent requests: {tool}"
     approval = Approval(
         organization_id=state.organization_id,
         company_id=member.company_id if member is not None else None,
         requester_member_id=member.id if member is not None else None,
-        action=f"OpenClaw agent requests: {tool}"[:220],
-        risk=str(raw.get("risk") or ("high" if tool in ocp.HTTP_DENIED_TOOLS else "medium"))[:24],
+        action=action[:220],
+        risk=risk[:24],
         policy_key=policy_key[:120],
         status="pending",
         evidence=json.dumps(
-            {"session_key": state.session_key, "task_id": state.task_id, "event": raw},
+            {"session_key": state.session_key, "task_id": state.task_id, "event": raw,
+             "command": command, "cwd": req.get("cwd"), "host": req.get("host"),
+             "expires_at_ms": raw.get("expiresAtMs")},
             ensure_ascii=False, default=str,
         ),
     )
@@ -275,8 +366,14 @@ def record_approval(db: Session, state: ConsumerState, event: dict, member: Memb
         db, organization_id=state.organization_id, event_type="openclaw.approval.requested",
         source=SOURCE, company_id=approval.company_id, aggregate_type="approval",
         aggregate_id=str(approval.id),
-        payload={"session_key": state.session_key, "task_id": state.task_id, "tool": tool},
+        payload={"session_key": state.session_key, "task_id": state.task_id, "tool": tool,
+                 "command": command},
     )
+    _audit(db, approval, "approval.requested", actor_member_id=member.id if member is not None else None,
+           actor_name=member.name if member is not None else "openclaw",
+           payload={"command": command, "tool": tool, "request_id": request_id,
+                    "session_key": state.session_key, "task_id": state.task_id,
+                    "cwd": req.get("cwd"), "expires_at_ms": raw.get("expiresAtMs")})
     return approval
 
 
@@ -287,10 +384,44 @@ def apply_terminal_state(db: Session, task: Task, state: ConsumerState, event: d
     if new_status is None or task.status == new_status:
         return task
     previous = task.status
-    task.status = new_status
-    db.add(task)
-    db.commit()
-    db.refresh(task)
+    holder = lifecycle.current_run(db, task)
+    reason = f"run {upstream_state}"
+    if new_status == "review":
+        # D2.2: báo cáo là bắt buộc. Run xong mà người làm chưa ghi comment nào
+        # vào sổ thì việc không được đi tiếp sang review.
+        from app.services import execution_policy
+        if execution_policy.requires_report(task) and not execution_policy.has_report(db, task, holder):
+            new_status, reason = "blocked", "missing_report"
+            execution_policy.flag_missing_report(db, task, holder)
+    if holder is not None:
+        lifecycle.finish_run(db, holder, RUN_OUTCOME.get(new_status, "completed")
+                             if reason != "missing_report" else "completed",
+                             error_reason=str(event.get("errorMessage") or "")
+                             or ("missing_report" if reason == "missing_report" else ""), commit=False)
+    lifecycle.transition(db, task, new_status, system=True, via="runtime",
+                         reason=reason, commit=True, emit=False)
+    if new_status == "blocked":
+        # D3.5: run lỗi / thiếu báo cáo → quản lý (người) của người làm nhận báo.
+        from app.services import inbox
+        inbox.run_failed(db, task, str(event.get("errorMessage") or reason),
+                         member_id=holder.member_id if holder is not None else None)
+    if holder is not None:
+        # D2.3: quyết toán bằng task_runs.cost_usd (cộng từ session.message), trả
+        # phần giữ thừa; rồi đối chiếu nền bằng sessions.usage của gateway.
+        from app.services import budget_scope
+        try:
+            db.refresh(holder)
+            budget_scope.settle_run(db, holder, final=True)
+            budget_scope.schedule_true_up(holder.id)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[D2.3] settle run #{holder.id} failed: {exc}")
+    if holder is not None and holder.member_id:
+        # D2.1: lý do bị bỏ vì seat bận được xếp lại khi lượt này xong.
+        from app.services import wakeup
+        try:
+            wakeup.requeue_deferred(db, holder.member_id, after_run_id=holder.id)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[D2.1] requeue after run #{holder.id} failed: {exc}")
     emit_event(
         db, organization_id=state.organization_id, event_type=f"openclaw.run.{upstream_state}",
         source=SOURCE, aggregate_type="task", aggregate_id=str(task.id),

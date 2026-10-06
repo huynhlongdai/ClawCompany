@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.authz import Principal, enforce_org, require_human, require_role
-from app.core.tenancy import active_org, ensure_company, ensure_department, ensure_project, ensure_agent
+from app.core.tenancy import active_org, ensure_company, ensure_department, ensure_project, ensure_agent, ensure_member
 from app.db.session import get_db
 from app.models import (
     Agent, Approval, AutonomyPolicy, BudgetEnvelope, BudgetLedgerEntry, DelegationAssignment, ExecutiveGoal,
@@ -13,7 +13,7 @@ from app.models import (
 )
 from app.schemas.v9 import (
     AutonomyPolicyUpsert, BudgetEntryCreate, BudgetEnvelopeCreate, ExecutiveGoalCreate, GoalPlanRequest,
-    GoalRunRequest, IncidentRetryRequest, MemoryCreate, RecurringOperationCreate,
+    GoalRunRequest, IncidentRetryRequest, MemoryCreate, RecurringOperationCreate, BudgetOverride,
 )
 from app.services.autonomy import get_policy
 from app.services.budget import remaining, reserve, settle_reserved, release_reserved
@@ -162,9 +162,54 @@ def create_budget(payload: BudgetEnvelopeCreate, principal: Principal = Depends(
         ensure_company(db, payload.company_id, principal)
     if payload.goal_id is not None:
         _goal(db, payload.goal_id, principal)
-    item = BudgetEnvelope(**payload.model_dump(), amount_reserved=0, amount_spent=0, status="active")
+    # D2.3: phạm vi phải thuộc tổ chức của người tạo.
+    st, sid = payload.scope_type, payload.scope_id
+    if st != "company" and sid is None:
+        raise HTTPException(422, f"scope_type={st} cần scope_id")
+    if st == "department":
+        ensure_department(db, sid, principal)
+    elif st == "member":
+        ensure_member(db, sid, principal)
+    elif st == "project":
+        ensure_project(db, sid, principal)
+    elif st == "goal":
+        _goal(db, sid, principal)
+    elif st == "company" and sid is not None:
+        ensure_company(db, sid, principal)
+    item = BudgetEnvelope(**payload.model_dump(), amount_reserved=0, amount_spent=0, status="active",
+                          threshold_state="ok")
     db.add(item); db.commit(); db.refresh(item)
     return item
+
+
+@router.get("/budgets-overview")
+def budgets_overview(principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    """D2.3: phong bì kèm phạm vi/nấc + chi tiêu thật theo seat, task, dự án (từ sổ cái)."""
+    from app.services import budget_scope
+    org_id = active_org(principal)
+    rows = db.query(BudgetEnvelope).filter(BudgetEnvelope.organization_id == org_id).order_by(BudgetEnvelope.id.desc()).all()
+    return {"budgets": [{**budget_scope.public(x), "spend": budget_scope.spend_breakdown(db, org_id, x.id)}
+                        for x in rows],
+            "all": budget_scope.spend_breakdown(db, org_id)}
+
+
+@router.post("/budgets/{budget_id}/override")
+def budget_override(budget_id: int, payload: BudgetOverride, principal: Principal = Depends(require_role("manager")),
+                    db: Session = Depends(get_db)):
+    """D2.3: đường duy nhất mở lại phong bì đã hết — đổi hạn mức, khôi phục seat/task, ghi audit."""
+    from app.services import budget_scope
+    budget = _budget(db, budget_id, principal)
+    if payload.amount_limit is None and payload.add_usd is None:
+        raise HTTPException(422, "cần amount_limit hoặc add_usd")
+    member = db.get(Member, principal.member_id) if principal.member_id else None
+    try:
+        out = budget_scope.override(db, budget, actor_member_id=member.id if member else None,
+                                    actor_name=member.name if member else f"user#{principal.user_id}",
+                                    reason=payload.reason, new_limit=payload.amount_limit, add_usd=payload.add_usd)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    db.refresh(budget)
+    return {"budget": budget_scope.public(budget), **out}
 
 
 @router.get("/budgets")
@@ -310,3 +355,87 @@ def control_center(principal: Principal = Depends(require_human()), db: Session 
         "incidents": incidents,
         "budgets": [{"id":x.id,"name":x.name,"currency":x.currency,"limit":x.amount_limit,"reserved":x.amount_reserved,"spent":x.amount_spent,"remaining":remaining(x)} for x in budgets],
     }
+
+
+# ------------------------------------------------------------ D3.5 Hộp việc + duyệt nhanh
+
+from pydantic import BaseModel as _BM  # noqa: E402
+
+
+class InboxStatus(_BM):
+    status: str
+
+
+@router.get("/inbox/mine")
+def inbox_mine(status: str = "open", principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    """Hộp việc của người đang đăng nhập, gộp theo task (mỗi việc một dòng)."""
+    from app.models.extended import InboxItem
+    from app.services import inbox
+    q = db.query(InboxItem).filter(InboxItem.organization_id == active_org(principal),
+                                   InboxItem.recipient_member_id == principal.member_id)
+    if status == "open":
+        q = q.filter(InboxItem.status.in_(inbox.OPEN))
+    elif status != "all":
+        q = q.filter(InboxItem.status == status)
+    rows = q.order_by(InboxItem.updated_at.desc(), InboxItem.id.desc()).limit(200).all()
+    items = [inbox.public(i) for i in rows]
+    items.sort(key=lambda x: (x["status"] != "unread", -inbox.PRIO.get(x["priority"] or "normal", 1)))
+    return {"member_id": principal.member_id, "unread": sum(1 for i in items if i["status"] == "unread"),
+            "items": items}
+
+
+@router.post("/inbox/{item_id}/status")
+def inbox_set_status(item_id: int, payload: InboxStatus, principal: Principal = Depends(require_human()),
+                     db: Session = Depends(get_db)):
+    from app.models.extended import InboxItem
+    from app.services import inbox
+    if payload.status not in ("unread", "read", "done"):
+        raise HTTPException(422, "status phải là unread|read|done")
+    item = db.get(InboxItem, item_id)
+    if item is None or item.organization_id != active_org(principal):
+        raise HTTPException(404, "Inbox item not found")
+    if item.recipient_member_id not in (None, principal.member_id):
+        raise HTTPException(403, "Không phải hộp việc của anh")
+    item.status = payload.status
+    db.add(item); db.commit(); db.refresh(item)
+    return inbox.public(item)
+
+
+@router.get("/approvals/quick")
+def approvals_quick(principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    """Màn duyệt nhanh (điện thoại): approval đang chờ mà anh là người duyệt hoặc người nhận báo."""
+    from app.models import Task
+    from app.models.extended import InboxItem
+    from app.services import inbox
+    org, me = active_org(principal), principal.member_id
+    ids = {int(r) for (r,) in db.query(InboxItem.related_id).filter(
+        InboxItem.organization_id == org, InboxItem.recipient_member_id == me,
+        InboxItem.related_type == "approval").all() if str(r).isdigit()}
+    q = db.query(Approval).filter(Approval.organization_id == org, Approval.status == "pending")
+    rows = [a for a in q.order_by(Approval.expires_at.is_(None), Approval.expires_at, Approval.id).all()
+            if a.approver_member_id == me or a.id in ids]
+    now = datetime.utcnow()
+    names = {m.id: m.name for m in db.query(Member).filter(Member.organization_id == org).all()}
+    out = []
+    for a in rows:
+        tid = inbox.task_of_approval(a)
+        task = db.get(Task, tid) if tid else None
+        left = (a.expires_at - now).total_seconds() if a.expires_at else None
+        out.append({"id": a.id, "action": a.action, "risk": a.risk, "policy_key": a.policy_key,
+                    "requester": names.get(a.requester_member_id), "approver": names.get(a.approver_member_id),
+                    "approver_member_id": a.approver_member_id, "is_mine": a.approver_member_id == me,
+                    "gateway": (a.policy_key or "").startswith("openclaw:"),
+                    "task": {"id": task.id, "title": task.title, "status": task.status} if task else None,
+                    "expires_at": a.expires_at.isoformat() if a.expires_at else None,
+                    "seconds_left": int(left) if left is not None else None, "overdue": left is not None and left <= 0,
+                    "escalated_at": a.escalated_at.isoformat() if a.escalated_at else None,
+                    "escalate_to": names.get(a.escalate_to_member_id), "evidence": (a.evidence or "")[:600],
+                    "created_at": a.created_at.isoformat() if a.created_at else None})
+    return {"member_id": me, "approvals": out}
+
+
+@router.post("/approvals/escalate-overdue")
+def approvals_escalate_overdue(principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    """Chạy ngay routine leo thang (bình thường do Celery beat chạy mỗi phút)."""
+    from app.services import inbox
+    return {"escalated": inbox.escalate_overdue(db, organization_id=active_org(principal))}

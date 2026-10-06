@@ -1,0 +1,4 @@
+usage.cost days with tokens: [('2026-10-05', 108600, 0.543), ('2026-10-06', 130524, 0.399036)]
+usage.cost totals: {'totalTokens': 239124, 'totalCost': 0.9420360000000313}
+sessions.usage totals: {'totalTokens': 239124, 'totalCost': 0.9420359999999965} sessions: 15
+cache: {'status': 'fresh', 'cachedFiles': 15, 'pendingFiles': 0, 'staleFiles': 0, 'refreshedAt': 1791245677550}

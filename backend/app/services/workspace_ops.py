@@ -21,6 +21,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Agent, Company, Department, KnowledgeDocument, Member, Project, Task
+from app.services import task_lifecycle as lifecycle
 from app.services import write_trail
 from app.services.company_event_bus import emit_event
 
@@ -29,9 +30,7 @@ SOURCE = "workspace_ops"
 COMPANY_STATUSES = ("active", "paused", "archived")
 MEMBER_STATUSES = ("active", "onboarding", "suspended", "offboarded")
 PROJECT_STATUSES = ("planning", "active", "running", "in_progress", "blocked", "done", "cancelled")
-# v20 fix: "blocked" was reachable in TASK_TRANSITIONS but missing here, so
-# _check rejected it and no task could ever be blocked through the API.
-TASK_STATUSES = ("backlog", "todo", "in_progress", "review", "blocked", "done", "cancelled")
+# v20 fix (blocked thiếu trong từ vựng) giờ sống ở task_lifecycle cùng bảng chuyển.
 TASK_PRIORITIES = ("low", "medium", "high", "urgent")
 ACCESS_LEVELS = ("org_public", "restricted", "confidential")
 # v31: a real status column, so "closed" stops being spelled as
@@ -39,17 +38,10 @@ ACCESS_LEVELS = ("org_public", "restricted", "confidential")
 # questions and were sharing one field since v29.
 DEPARTMENT_STATUSES = ("active", "paused", "archived")
 
-# A task may only move along these edges. This stops an agent from silently
-# flipping work from backlog straight to done without review.
-TASK_TRANSITIONS: dict[str, tuple[str, ...]] = {
-    "backlog": ("todo", "cancelled"),
-    "todo": ("in_progress", "backlog", "cancelled"),
-    "in_progress": ("review", "todo", "blocked", "cancelled"),
-    "review": ("done", "in_progress", "cancelled"),
-    "blocked": ("in_progress", "todo", "cancelled"),
-    "done": ("review",),
-    "cancelled": ("backlog",),
-}
+# D1.4: bảng chuyển và từ vựng trạng thái chuyển sang task_lifecycle; giữ
+# tên ở đây vì v18 trả chúng cho UI và nhiều nơi import từ workspace_ops.
+TASK_STATUSES = lifecycle.TASK_STATUSES
+TASK_TRANSITIONS = lifecycle.TASK_TRANSITIONS
 
 
 def _check(value: str, allowed: tuple[str, ...], label: str) -> str:
@@ -424,24 +416,9 @@ def _assignable(db: Session, member_id: int, organization_id: int) -> Member:
 def move_task(db: Session, task: Task, project: Project, organization_id: int, *, status: str,
               actor_member_id: int | None = None) -> Task:
     _check(status, TASK_STATUSES, "status")
-    current = task.status or "backlog"
-    if status == current:
-        return task
-    allowed = TASK_TRANSITIONS.get(current, ())
-    if status not in allowed:
-        raise HTTPException(409, f"Cannot move a task from '{current}' to '{status}'. "
-                                 f"Allowed: {', '.join(allowed) or 'none'}")
-    if status in ("in_progress", "review") and task.assignee_member_id is None:
-        raise HTTPException(400, "Assign the task before moving it into progress")
-    trail = write_trail.start("task", task)
-    task.status = status
-    db.add(task); db.commit(); db.refresh(task)
-    payload = {"task_id": task.id, "project_id": task.project_id,
-               "from": current, "to": status}
-    payload.update(trail.finish(task))
-    _emit(db, organization_id, f"task.{status}", payload,
-          project.company_id, "task", task.id, actor_member_id)
-    return task
+    return lifecycle.transition(db, task, status, via="move", actor_member_id=actor_member_id,
+                                source=SOURCE, organization_id=organization_id,
+                                company_id=project.company_id)
 
 
 def assign_task(db: Session, task: Task, project: Project, organization_id: int, *,
@@ -460,6 +437,12 @@ def assign_task(db: Session, task: Task, project: Project, organization_id: int,
     payload.update(trail.finish(task))
     _emit(db, organization_id, "task.assigned", payload,
           project.company_id, "task", task.id, actor_member_id)
+    if assignee_member_id is not None:
+        # D2.1: giao cho seat agent = một lý do để seat thức dậy.
+        from app.services import wakeup
+        wakeup.enqueue_for_task(db, task, "assigned",
+                                dedupe_key=f"assigned:t{task.id}:m{assignee_member_id}:{task.updated_at.isoformat() if task.updated_at else ''}",
+                                payload={"by_member_id": actor_member_id})
     return task
 
 

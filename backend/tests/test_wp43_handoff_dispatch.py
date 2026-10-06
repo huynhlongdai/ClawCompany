@@ -337,8 +337,14 @@ def test_dispatch_failure_does_not_lose_the_handoff(db, world, monkeypatch):
     monkeypatch.setattr("app.services.agent_dispatch.get_runtime", lambda: Broken())
     handoff = make_handoff(db, world, to_member=world["mia"])
 
-    with pytest.raises(RuntimeError):
-        asyncio.run(hd.dispatch_on_handoff(db, handoff, dispatch=True))
+    # D2.1: bàn giao đi qua wakeup; lỗi runtime thành wakeup ``failed`` có lý do
+    # thay vì một exception làm hỏng cả request.
+    out = asyncio.run(hd.dispatch_on_handoff(db, handoff, dispatch=True))
+    assert out["dispatched"] is False and out["reason"] == "dispatch_error"
+    assert "gateway sập" in out["error"]
+    from app.models import Wakeup
+    wk = db.get(Wakeup, out["wakeup_id"])
+    assert wk.status == "failed" and wk.skip_reason.startswith("runtime_error: gateway sập")
 
     # Sổ ghi đã có trước khi gọi runtime, nên lịch sử không mất.
     assert db.query(TaskJournalEntry).filter(

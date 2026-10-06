@@ -1,12 +1,17 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.models import Artifact, Member, Task, Project, Company
+from app.models import Artifact, ExecutiveGoal, Member, Task, TaskRun, Project, Company
 from app.schemas import TaskCreate, TaskOut
 from app.services.tasks import dispatch_task
-from app.services import handoff_dispatch, task_journal, work_context
+from app.services import agent_dispatch, handoff_dispatch, task_graph, task_journal, work_context
+from app.services import task_lifecycle
+from app.services import cost_ledger
+from app.runtime.factory import get_runtime
 from app.services.artifacts import handoff_artifact, register_artifact
 from app.core.authz import Principal, get_principal, require_role, require_human
 from app.core.tenancy import active_org, ensure_project, ensure_member, ensure_task
@@ -14,25 +19,81 @@ from app.core.tenancy import active_org, ensure_project, ensure_member, ensure_t
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 @router.get("", response_model=list[TaskOut])
-def list_tasks(project_id: int | None = None, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+def list_tasks(project_id: int | None = None, goal_id: int | None = None, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
     org_id = active_org(principal)
     q = db.query(Task).join(Project, Project.id == Task.project_id).join(Company, Company.id == Project.company_id).filter(Company.organization_id == org_id)
     if project_id is not None:
         ensure_project(db, project_id, principal); q = q.filter(Task.project_id == project_id)
+    if goal_id is not None:
+        q = q.filter(Task.goal_id == goal_id)
     return q.order_by(Task.id.desc()).all()
 
 @router.post("", response_model=TaskOut)
 def create_task(payload: TaskCreate, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
     ensure_project(db, payload.project_id, principal)
     if payload.assignee_member_id is not None: ensure_member(db, payload.assignee_member_id, principal)
+    if payload.status not in task_lifecycle.TASK_STATUSES:
+        raise HTTPException(400, f"status must be one of: {', '.join(task_lifecycle.TASK_STATUSES)}")
     obj = Task(**payload.model_dump())
     db.add(obj); db.commit(); db.refresh(obj)
     return obj
 
+@router.get("/cost-reconciliation")
+async def cost_reconciliation(task_id: int | None = None, limit: int = 20,
+                              principal: Principal = Depends(require_role("admin")),
+                              db: Session = Depends(get_db)):
+    """D1.2: so ``usage_events`` (model_usage) của từng phiên task với ``sessions.usage`` của gateway."""
+    org_id = active_org(principal)
+    if task_id is not None:
+        ensure_task(db, task_id, principal)
+    return await cost_ledger.reconcile(db, get_runtime(), organization_id=org_id,
+                                       task_ids=[task_id] if task_id else None, limit=limit)
+
+
+@router.get("/wakeups")
+def list_wakeups(member_id: int | None = None, task_id: int | None = None, status: str | None = None,
+                 limit: int = 50, principal: Principal = Depends(require_human()),
+                 db: Session = Depends(get_db)):
+    """D2.1: hàng đợi đánh thức — lý do, trạng thái, và vì sao bị bỏ qua."""
+    from app.models import Wakeup
+    from app.services import wakeup
+    q = db.query(Wakeup).filter(Wakeup.organization_id == active_org(principal))
+    if member_id is not None:
+        q = q.filter(Wakeup.member_id == member_id)
+    if task_id is not None:
+        q = q.filter(Wakeup.task_id == task_id)
+    if status:
+        q = q.filter(Wakeup.status == status)
+    return [wakeup.public(w) for w in q.order_by(Wakeup.id.desc()).limit(max(1, min(limit, 200))).all()]
+
+
+@router.post("/wakeups/drain")
+async def drain_wakeups(force: bool = False, principal: Principal = Depends(require_role("admin")),
+                        db: Session = Depends(get_db)):
+    """Chạy một vòng drain ngay (vận hành/kiểm thử). ``force`` bỏ cửa sổ gộp."""
+    from app.models import Member
+    from app.services import wakeup
+    org = active_org(principal)
+    out = []
+    for (mid,) in db.query(Member.id).filter(Member.organization_id == org).all():
+        out.extend(await wakeup.drain(db, member_id=mid, force=force, follow=settings_follow()))
+    return [o for o in out if o.get("wakeups")]
+
+
+def settings_follow() -> bool:
+    from app.core.config import settings
+    return settings.wakeup_follow
+
+
 @router.post("/{task_id}/dispatch", response_model=TaskOut)
 async def dispatch(task_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
     task = ensure_task(db, task_id, principal)
-    return await dispatch_task(db, task)
+    try:
+        return await agent_dispatch.dispatch_task(db, task)
+    except agent_dispatch.DispatchConflict as exc:
+        raise HTTPException(409, str(exc))
+    except agent_dispatch.DispatchError as exc:
+        raise HTTPException(400, str(exc))
 
 
 # ------------------------------------------------------------------ WP-4.3 UI
@@ -69,6 +130,28 @@ def task_journal_read(task_id: int, principal: Principal = Depends(require_human
         } for e in entries],
         "kinds": list(task_journal.KINDS),
     }
+
+
+class JournalNote(BaseModel):
+    summary: str = Field(min_length=1, max_length=2000)
+    detail: str = Field(default="", max_length=8000)
+    kind: str = Field(default="note", pattern="^(note|decision)$")
+
+
+@router.post("/{task_id}/journal", status_code=201)
+def task_journal_write(task_id: int, payload: JournalNote, principal: Principal = Depends(require_role("member")),
+                       db: Session = Depends(get_db)):
+    """D2.1: người thật ghi một dòng vào sổ việc. ``@Tên`` một seat agent → seat đó được đánh thức."""
+    task = ensure_task(db, task_id, principal)
+    try:
+        entry = task_journal.append(db, task, kind=payload.kind, summary=payload.summary,
+                                    detail=payload.detail, actor_member_id=principal.member_id)
+    except task_journal.JournalError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    from app.models import Wakeup
+    woken = db.query(Wakeup).filter(Wakeup.dedupe_key.like(f"mentioned:j{entry.id}:%")).all()
+    return {"task_id": task.id, "seq": entry.seq,
+            "woke": [{"wakeup_id": w.id, "member_id": w.member_id} for w in woken]}
 
 
 @router.get("/{task_id}/context-pack")
@@ -152,3 +235,158 @@ async def task_handoff(task_id: int, payload: TaskHandoffIn,
         "handoff_id": handoff.id,
         "dispatch": outcome,
     }
+
+
+# ------------------------------------------------------------------ D1.3 đồ thị
+#
+# Task cha, mục tiêu, hạn, tiêu chí nghiệm thu và các task đang chặn. Ghi cạnh
+# đi qua task_graph (chặn vòng), không có endpoint nào ở đây ghi task.status.
+
+class DependencyIn(BaseModel):
+    blocked_by_task_id: int
+
+
+class TaskLinksIn(BaseModel):
+    parent_task_id: int | None = None
+    goal_id: int | None = None
+    due_at: datetime | None = None
+    acceptance_criteria: str | None = Field(default=None, max_length=20000)
+
+
+def _same_tenant_or_404(db: Session, task_id: int, principal: Principal) -> Task:
+    """Task của tenant khác trả 404, không 403: không xác nhận nó tồn tại."""
+    try:
+        return ensure_task(db, task_id, principal)
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            raise HTTPException(404, "Task not found") from exc
+        raise
+
+
+@router.get("/{task_id}/graph")
+def task_graph_read(task_id: int, principal: Principal = Depends(require_human()),
+                    db: Session = Depends(get_db)):
+    task = ensure_task(db, task_id, principal)
+    return task_graph.graph(db, task)
+
+
+@router.post("/{task_id}/dependencies", status_code=201)
+def task_dependency_add(task_id: int, payload: DependencyIn,
+                        principal: Principal = Depends(require_role("member")),
+                        db: Session = Depends(get_db)):
+    task = ensure_task(db, task_id, principal)
+    other = db.get(Task, payload.blocked_by_task_id)
+    if other is None:
+        raise HTTPException(404, "Task not found")
+    _same_tenant_or_404(db, other.id, principal)
+    dep = task_graph.add_dependency(db, task, other, actor_member_id=principal.member_id)
+    return {"id": dep.id, "task_id": dep.task_id, "blocked_by_task_id": dep.blocked_by_task_id,
+            "graph": task_graph.graph(db, task)}
+
+
+@router.delete("/{task_id}/dependencies/{blocked_by_task_id}")
+def task_dependency_remove(task_id: int, blocked_by_task_id: int,
+                           principal: Principal = Depends(require_role("member")),
+                           db: Session = Depends(get_db)):
+    task = ensure_task(db, task_id, principal)
+    if not task_graph.remove_dependency(db, task, blocked_by_task_id):
+        raise HTTPException(404, "Dependency not found")
+    return {"removed": True, "graph": task_graph.graph(db, task)}
+
+
+@router.patch("/{task_id}/links")
+def task_links_update(task_id: int, payload: TaskLinksIn,
+                      principal: Principal = Depends(require_role("member")),
+                      db: Session = Depends(get_db)):
+    """Chỉ đổi những trường có mặt trong body; gửi ``null`` để gỡ liên kết."""
+    task = ensure_task(db, task_id, principal)
+    sent = payload.model_fields_set
+    if "parent_task_id" in sent:
+        parent = None
+        if payload.parent_task_id is not None:
+            parent = db.get(Task, payload.parent_task_id)
+            if parent is None:
+                raise HTTPException(404, "Parent task not found")
+            _same_tenant_or_404(db, parent.id, principal)
+        task_graph.set_parent(db, task, parent)
+    if "goal_id" in sent:
+        if payload.goal_id is not None:
+            goal = db.get(ExecutiveGoal, payload.goal_id)
+            if goal is None or goal.organization_id != active_org(principal):
+                raise HTTPException(404, "Goal not found")
+        task.goal_id = payload.goal_id
+    if "due_at" in sent:
+        task.due_at = payload.due_at
+    if "acceptance_criteria" in sent:
+        task.acceptance_criteria = payload.acceptance_criteria or ""
+    db.add(task); db.commit(); db.refresh(task)
+    return task_graph.graph(db, task)
+
+
+# ------------------------------------------------------------------ D1.4 lượt chạy
+
+@router.get("/{task_id}/runs")
+def task_runs_read(task_id: int, limit: int = 50, principal: Principal = Depends(require_human()),
+                   db: Session = Depends(get_db)):
+    task = ensure_task(db, task_id, principal)
+    rows = db.execute(select(TaskRun).where(TaskRun.task_id == task.id)
+                      .order_by(TaskRun.id.desc()).limit(max(1, min(limit, 200)))).scalars().all()
+    members = {m.id: m.name for m in db.query(Member).filter(
+        Member.id.in_({r.member_id for r in rows if r.member_id})).all()} if rows else {}
+    return {
+        "task_id": task.id,
+        "checkout_run_id": task.checkout_run_id,
+        "runs": [{
+            "id": r.id, "status": r.status, "trigger_kind": r.trigger_kind,
+            "member_id": r.member_id, "member_name": members.get(r.member_id),
+            "session_key": r.session_key, "runtime_run_id": r.runtime_run_id,
+            "started_at": r.started_at.isoformat() if r.started_at else None,
+            "ended_at": r.ended_at.isoformat() if r.ended_at else None,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "cost_usd": r.cost_usd, "tokens_in": r.tokens_in, "tokens_out": r.tokens_out,
+            "error_reason": r.error_reason, "holds_task": r.id == task.checkout_run_id,
+        } for r in rows],
+    }
+
+
+# -- D2.2: execution policy ------------------------------------------------------
+
+
+class ExecutionPolicyIn(BaseModel):
+    stages: list[dict] = []
+
+
+class ReviewDecisionIn(BaseModel):
+    decision: str
+    note: str = ""
+
+
+@router.get("/{task_id}/execution-policy")
+def execution_policy_read(task_id: int, principal: Principal = Depends(require_human()),
+                          db: Session = Depends(get_db)):
+    from app.services import execution_policy as ep
+    task = ensure_task(db, task_id, principal)
+    return ep.public(task)
+
+
+@router.put("/{task_id}/execution-policy")
+def execution_policy_write(task_id: int, payload: ExecutionPolicyIn,
+                           principal: Principal = Depends(require_role("manager")),
+                           db: Session = Depends(get_db)):
+    """Đặt/bỏ các chặng. Gửi ``stages: []`` để bỏ policy."""
+    from app.services import execution_policy as ep
+    task = ensure_task(db, task_id, principal)
+    ep.set_policy(db, task, {"stages": payload.stages})
+    return ep.public(task)
+
+
+@router.post("/{task_id}/review")
+def execution_policy_review(task_id: int, payload: ReviewDecisionIn,
+                            principal: Principal = Depends(require_role("member")),
+                            db: Session = Depends(get_db)):
+    """Reviewer (người) quyết chặng review hiện tại: ``approve`` hoặc ``revise``."""
+    from app.services import execution_policy as ep
+    task = ensure_task(db, task_id, principal)
+    ep.decide(db, task, member_id=principal.member_id, decision=payload.decision, note=payload.note, via="api")
+    db.refresh(task)
+    return ep.public(task)

@@ -54,6 +54,14 @@ class BudgetEnvelope(Base):
     amount_reserved: Mapped[float] = mapped_column(Float, default=0)
     amount_spent: Mapped[float] = mapped_column(Float, default=0)
     status: Mapped[str] = mapped_column(String(32), default="active")
+    # D2.3 (0023_budget_scopes): hạn mức theo phạm vi + ba nấc. scope_type ∈
+    # company|department|member|project|goal; scope_id NULL với company = dùng
+    # company_id (hoặc cả tổ chức khi company_id cũng NULL — hành vi cũ).
+    scope_type: Mapped[str] = mapped_column(String(24), default="company")
+    scope_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    warn_pct: Mapped[int] = mapped_column(Integer, default=80)
+    period: Mapped[str] = mapped_column(String(16), default="total")
+    threshold_state: Mapped[str] = mapped_column(String(16), default="ok")  # ok|warned|exhausted
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

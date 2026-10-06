@@ -1,0 +1,4 @@
+2026-10-05T23:45:01.779+00:00 [heartbeat] started
+2026-10-06T01:46:16.115+00:00 [reload] config change detected; evaluating reload (agents.entries.dev.heartbeat)
+2026-10-06T01:46:16.282+00:00 [heartbeat] disabled
+2026-10-06T01:46:16.900+00:00 [reload] config hot reload applied (agents.entries.dev.heartbeat)

@@ -19,6 +19,12 @@ class InboxItem(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(32), default="unread")
     related_type: Mapped[str] = mapped_column(String(64), default="")
     related_id: Mapped[str] = mapped_column(String(120), default="")
+    # D3.5 (0025): gộp theo task — một dòng cho mỗi (người nhận, group_key) còn mở.
+    task_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    group_key: Mapped[str] = mapped_column(String(160), default="", index=True)
+    kinds: Mapped[str] = mapped_column(String(200), default="")
+    count: Mapped[int] = mapped_column(Integer, default=1)
+    body: Mapped[str] = mapped_column(Text, default="")
 
 class Mission(Base, TimestampMixin):
     __tablename__ = "missions"

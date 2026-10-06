@@ -1,5 +1,6 @@
 from datetime import date, datetime
-from sqlalchemy import String, Integer, DateTime, Date, ForeignKey, Text, Float, Boolean
+from sqlalchemy import JSON, String, Integer, DateTime, Date, ForeignKey, Text, Float, Boolean
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
@@ -38,6 +39,8 @@ class Department(Base, TimestampMixin, RevisionMixin):
     # column, so v29 archived them by flipping access_level to
     # "confidential" -- overloading a permission field to mean "closed".
     status: Mapped[str] = mapped_column(String(32), default="active")
+    # D3.1 (0024): hướng dẫn phòng — trưởng phòng đọc khi định tuyến việc.
+    guide: Mapped[str] = mapped_column(Text, default="")
 
 class Member(Base, TimestampMixin, RevisionMixin):
     __tablename__ = "members"
@@ -88,6 +91,26 @@ class Task(Base, TimestampMixin, RevisionMixin):
     runtime_task_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
     runtime_run_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
     runtime_session_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # D1.3 (0018_task_graph): task biết nó phục vụ mục tiêu nào và nằm dưới
+    # task nào. Không có hai cột này thì agent không trả lời được "vì sao làm
+    # việc này" — gói ngữ cảnh chỉ có dự án.
+    parent_task_id: Mapped[int | None] = mapped_column(ForeignKey("tasks.id"), nullable=True, index=True)
+    goal_id: Mapped[int | None] = mapped_column(ForeignKey("executive_goals.id"), nullable=True, index=True)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    acceptance_criteria: Mapped[str] = mapped_column(Text, default="")
+    # D1.4 (0019_task_runs): lượt chạy đang giữ task. Chỉ đổi qua
+    # task_lifecycle.checkout/release bằng một UPDATE có điều kiện, nên hai
+    # agent không thể cùng nhận một việc. Không khai FK để tránh vòng
+    # tasks <-> task_runs khi create_all.
+    checkout_run_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    # D2.2 (0022_execution_policy): các chặng phải qua trước khi việc được
+    # "done" ({"stages": [{"type": "review"|"approval", "participants": [id]}]})
+    # và vị trí hiện tại trên các chặng đó. Chỉ services/execution_policy.py ghi.
+    execution_policy: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
+    execution_state: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
+    # D3.1 (0024_department_routing): việc giao cho phòng ban; trưởng phòng
+    # được đánh thức (lý do ``routed``) để chọn người. Chỉ services/routing.py ghi.
+    assignee_department_id: Mapped[int | None] = mapped_column(ForeignKey("departments.id"), nullable=True, index=True)
 
 class KnowledgeDocument(Base, TimestampMixin):
     __tablename__ = "knowledge_documents"
@@ -115,3 +138,10 @@ class Approval(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(24), default="pending")
     evidence: Mapped[str] = mapped_column(Text, default="")
     resolution_note: Mapped[str] = mapped_column(Text, default="")
+    # D3.5 (0025_inbox_escalation): hạn duyệt và người nhận khi quá hạn.
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    escalate_to_member_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True)
+    escalated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # D3.3: kế hoạch chiến lược (action='strategy') — nội dung có cấu trúc + số lần sửa.
+    payload: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, default=1, server_default="1")

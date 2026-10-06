@@ -20,3 +20,41 @@ def dispatch_company_task(task_id:int):
         if job:job.status="failed";job.error=str(exc);db.add(job);db.commit()
         raise
     finally:db.close()
+
+
+@celery_app.task(name="wakeups.drain")
+def drain_wakeups():
+    """D2.1: một vòng drain. Celery không giữ follower sống qua các task, nên
+    follower do API gắn lại (``OPENCLAW_CLAIM_SWEEP_SECONDS``)."""
+    import asyncio
+    from app.db.session import SessionLocal
+    from app.services import wakeup
+    db = SessionLocal()
+    try:
+        return asyncio.run(wakeup.drain(db, follow=False))
+    finally:
+        db.close()
+
+
+@celery_app.task(name="approvals.escalate_overdue")
+def escalate_overdue_approvals():
+    """D3.5: routine hệ thống — approval quá ``APPROVAL_TTL_HOURS`` chuyển lên quản lý."""
+    from app.db.session import SessionLocal
+    from app.services import inbox
+    db = SessionLocal()
+    try:
+        return inbox.escalate_overdue(db)
+    finally:
+        db.close()
+
+
+@celery_app.task(name="routines.tick")
+def tick_routines():
+    """D3.4: kích hoạt routine tới giờ (idempotency_key UNIQUE chặn chạy trùng)."""
+    from app.db.session import SessionLocal
+    from app.services import routines
+    db = SessionLocal()
+    try:
+        return routines.tick(db)
+    finally:
+        db.close()

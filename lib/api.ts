@@ -84,6 +84,10 @@ export const apiV9 = {
   saveAutonomyPolicy: (payload:Record<string,unknown>) => request(`/v9/autonomy-policy`, {method:"PUT", body:JSON.stringify(payload)}),
   budgets: () => request(`/v9/budgets`),
   budget: (id:number) => request(`/v9/budgets/${id}`),
+  // D2.3: phạm vi + nấc + chi tiêu thật theo seat/task/dự án; override có audit
+  budgetsOverview: () => request(`/v9/budgets-overview`),
+  createBudget: (payload:Record<string,unknown>) => request(`/v9/budgets`, {method:"POST", body:JSON.stringify(payload)}),
+  overrideBudget: (id:number,payload:Record<string,unknown>) => request(`/v9/budgets/${id}/override`, {method:"POST", body:JSON.stringify(payload)}),
   memorySearch: (q:string="",companyId?:number) => request(`/v9/memory/search?q=${encodeURIComponent(q)}${companyId?`&company_id=${companyId}`:""}`),
   createMemory: (payload:Record<string,unknown>) => request(`/v9/memory`, {method:"POST", body:JSON.stringify(payload)}),
   recurringOperations: () => request(`/v9/recurring-operations`),
@@ -300,6 +304,10 @@ export const apiV18 = {
   updateProject: (id:number, body:any) => request(`/v18/workspace/projects/${id}`, {method:"PATCH", body:JSON.stringify(body)}),
   createTask: (body:any) => request(`/v18/workspace/tasks`, {method:"POST", body:JSON.stringify(body)}),
   moveTask: (id:number, status:string) => request(`/v18/workspace/tasks/${id}/move`, {method:"POST", body:JSON.stringify({status})}),
+  // D3.1: giao việc cho phòng ban; trưởng phòng định tuyến
+  routeTask: (id:number, department_id:number, reason="") => request(`/v18/workspace/tasks/${id}/route`, {method:"POST", body:JSON.stringify({department_id, reason})}),
+  departmentRouting: (id:number) => request<any>(`/v18/workspace/departments/${id}/routing`),
+  setDepartmentGuide: (id:number, guide:string) => request(`/v18/workspace/departments/${id}/guide`, {method:"PUT", body:JSON.stringify({guide})}),
   assignTask: (id:number, assignee_member_id:number|null) => request(`/v18/workspace/tasks/${id}/assign`, {method:"POST", body:JSON.stringify({assignee_member_id})}),
   createKnowledge: (body:any) => request(`/v18/workspace/knowledge`, {method:"POST", body:JSON.stringify(body)}),
 };
@@ -642,7 +650,63 @@ export const apiTask = {
       {method: "POST", body: JSON.stringify(body)}),
   dispatch: (taskId: number) =>
     request<any>(`/tasks/${taskId}/dispatch`, {method: "POST"}),
+  /* D1.3 — đồ thị: cha/con, mục tiêu, task đang chặn. */
+  graph: (taskId: number) => request<any>(`/tasks/${taskId}/graph`),
+  addBlocker: (taskId: number, blockedBy: number) =>
+    request<any>(`/tasks/${taskId}/dependencies`,
+      {method: "POST", body: JSON.stringify({blocked_by_task_id: blockedBy})}),
+  removeBlocker: (taskId: number, blockedBy: number) =>
+    request<any>(`/tasks/${taskId}/dependencies/${blockedBy}`, {method: "DELETE"}),
+  /* Chỉ trường có trong `links` bị đổi; `null` là gỡ liên kết. */
+  setLinks: (taskId: number, links: {parent_task_id?: number | null; goal_id?: number | null;
+                                     due_at?: string | null; acceptance_criteria?: string}) =>
+    request<any>(`/tasks/${taskId}/links`, {method: "PATCH", body: JSON.stringify(links)}),
+  byGoal: (goalId: number) => request<any>(`/tasks?goal_id=${goalId}`),
+  /* D1.4 — mỗi lượt agent làm việc này là một hàng task_runs. */
+  runs: (taskId: number) => request<any>(`/tasks/${taskId}/runs`),
+  /* D2.1 — người ghi một dòng vào sổ; `@Tên` seat agent sẽ đánh thức seat đó. */
+  comment: (taskId: number, summary: string) =>
+    request<any>(`/tasks/${taskId}/journal`, {method: "POST", body: JSON.stringify({summary})}),
+  /* D2.1 — hàng đợi đánh thức của việc này: lý do, trạng thái, vì sao bị bỏ qua. */
+  wakeups: (taskId: number) => request<any>(`/tasks/wakeups?task_id=${taskId}`),
+  policy: (taskId: number) => request<any>(`/tasks/${taskId}/execution-policy`),
+  setPolicy: (taskId: number, stages: {type: string; participants: number[]}[]) =>
+    request<any>(`/tasks/${taskId}/execution-policy`, {method: "PUT", body: JSON.stringify({stages})}),
+  review: (taskId: number, decision: "approve" | "revise", note: string) =>
+    request<any>(`/tasks/${taskId}/review`, {method: "POST", body: JSON.stringify({decision, note})}),
 };
+
+/* D1.5 + D1.6 — máy chủ MCP của ClawCompany và bảng quyền tool theo bậc ghế.
+   `toolLog` đọc event bus (v10) vì mỗi lần gọi tool đã ghi `mcp.tool.called`
+   hoặc `mcp.tool.denied` — không có bảng log riêng để lệch với sự thật. */
+export const apiMcp = {
+  tools: () => request<any>(`/mcp/tools`),
+  permissions: () => request<any>(`/mcp/permissions`),
+  setPermission: (body: {tool: string; level: string; role?: string; member_id?: number}) =>
+    request<any>(`/mcp/permissions`, {method: "PUT", body: JSON.stringify(body)}),
+  toolLog: async (limit = 40) => {
+    const [called, denied] = await Promise.all([
+      request<any[]>(`/v10/events?event_type=mcp.tool.called&limit=${limit}`),
+      request<any[]>(`/v10/events?event_type=mcp.tool.denied&limit=${limit}`),
+    ]);
+    return [...(called || []), ...(denied || [])]
+      .sort((a, b) => (b.id || 0) - (a.id || 0)).slice(0, limit);
+  },
+};
+
+/* Lỗi từ `request` là nguyên văn body. FastAPI trả {"detail": ...}, mà detail
+   có thể là chuỗi hoặc {message}. Rút ra câu người đọc được. */
+export function errorText(e: any, fallback = "Thao tác thất bại"): string {
+  const raw = e?.message || "";
+  try {
+    const body = JSON.parse(raw);
+    const d = body?.detail;
+    if (typeof d === "string") return d;
+    if (d?.message) return d.message;
+    if (Array.isArray(d)) return d.map((x: any) => x?.msg || "").filter(Boolean).join("; ");
+  } catch { /* không phải JSON */ }
+  return raw || fallback;
+}
 
 /* v6 — Hộp việc: hai thao tác ghi mà Hộp việc cần. Cả hai endpoint đã có từ
    lâu (approvals.py, extended.py) nhưng chưa có hàm nào ở frontend gọi tới. */
@@ -650,4 +714,31 @@ export const apiInbox = {
   resolveApproval: (id: number, status: "approved" | "rejected", resolution_note = "") =>
     request<any>(`/approvals/${id}/resolve`, {method: "POST", body: JSON.stringify({status, resolution_note})}),
   markRead: (id: number) => request<any>(`/inbox/${id}/read`, {method: "POST"}),
+  // D3.5: hộp việc của tôi, gộp theo task; duyệt nhanh; chạy leo thang ngay
+  mine: (status = "open") => request<any>(`/v9/inbox/mine?status=${status}`),
+  setStatus: (id: number, status: "unread" | "read" | "done") => request<any>(`/v9/inbox/${id}/status`, {method: "POST", body: JSON.stringify({status})}),
+  quickApprovals: () => request<any>(`/v9/approvals/quick`),
+  escalateOverdue: () => request<any>(`/v9/approvals/escalate-overdue`, {method: "POST"}),
+};
+
+// D3.4: routines — cron theo múi giờ / webhook, chạy bù, tự dừng khi lỗi liên tiếp
+export const apiRoutines = {
+  list: () => request<any>(`/routines`),
+  templates: () => request<any>(`/routines/templates`),
+  get: (id: number) => request<any>(`/routines/${id}`),
+  create: (body: any) => request<any>(`/routines`, {method: "POST", body: JSON.stringify(body)}),
+  fromTemplate: (key: string, assignee_member_id?: number | null, department_id?: number | null) =>
+    request<any>(`/routines/from-template`, {method: "POST", body: JSON.stringify({key, assignee_member_id, department_id})}),
+  setEnabled: (id: number, enabled: boolean) => request<any>(`/routines/${id}`, {method: "PATCH", body: JSON.stringify({enabled})}),
+  run: (id: number) => request<any>(`/routines/${id}/run`, {method: "POST"}),
+  runs: (id: number) => request<any>(`/routines/${id}/runs`),
+  tick: () => request<any>(`/routines/tick`, {method: "POST"}),
+};
+
+// D3.3: kế hoạch mục tiêu của Nina — duyệt / yêu cầu sửa / từ chối
+export const apiStrategy = {
+  goals: () => request<any>(`/strategy/goals`),
+  goal: (id: number) => request<any>(`/strategy/goals/${id}`),
+  requestRevision: (approvalId: number, note: string) =>
+    request<any>(`/strategy/plans/${approvalId}/request-revision`, {method: "POST", body: JSON.stringify({note})}),
 };

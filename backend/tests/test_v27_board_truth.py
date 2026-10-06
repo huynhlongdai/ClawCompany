@@ -1,291 +1,233 @@
 """v27 tests: derived progress, revision guards, archive cascade.
 
-These use light stand-ins for the ORM rows so the rules can be pinned
-without a database. What they check is the *decision* logic; the SQL itself
-still needs a real run (see the handover's testing section).
+D0.2: chạy trên ORM thật (SQLite in-memory), không còn ``FakeDb``. Double cũ
+trả *mọi* task cho mọi truy vấn đếm — bỏ ``WHERE project_id`` ở production
+thì test vẫn xanh. Ở đây mỗi phép thử có thêm một dự án "nhiễu" cùng DB
+(task done + task đang chạy có session), nên bỏ bất kỳ điều kiện WHERE nào
+của ``board_truth`` đều làm test đỏ.
 """
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
+from app.db.base import Base
+import app.models  # noqa: F401
+from app.models import CompanyEvent
+from app.models.entities import Company, Organization, Project, Task
 from app.services import board_truth as bt
 
 
-class FakeProject:
-    __name__ = "Project"
-
-    def __init__(self, pid=1, progress=0, status="active", company_id=7,
-                 updated_at=None):
-        self.id = pid
-        self.progress = progress
-        self.status = status
-        self.company_id = company_id
-        self.updated_at = updated_at or datetime(2026, 9, 14, 12, 0, 0)
-
-
-class FakeTask:
-    def __init__(self, tid, status, session_key=None, title="t"):
-        self.id = tid
-        self.status = status
-        self.runtime_session_key = session_key
-        self.title = title
-        self.project_id = 1
-        self.updated_at = datetime(2026, 9, 14, 12, 0, 0)
+@pytest.fixture()
+def orm():
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(bind=engine)
+    db = sessionmaker(bind=engine, autoflush=False)()
+    org = Organization(name="Nova", slug="nova-v27"); db.add(org); db.commit()
+    co = Company(organization_id=org.id, name="Nova Labs", status="active"); db.add(co); db.commit()
+    noise = Project(company_id=co.id, name="Nhiễu", status="active", progress=0); db.add(noise); db.commit()
+    # Dự án khác cùng công ty: 3 việc xong + 1 việc đang chạy có session.
+    for i, st in enumerate(["done", "done", "done", "in_progress"]):
+        db.add(Task(project_id=noise.id, title=f"n{i}", status=st,
+                    runtime_session_key="agent:nina:company-task-noise" if st == "in_progress" else None))
+    db.commit()
+    yield {"db": db, "org": org, "company": co, "noise": noise}
+    db.close()
 
 
-def _eval_where(tasks, stmt):
-    """Apply the WHERE clause of a SQLAlchemy select() to an in-memory task list.
-
-    This makes the double honest: if production's query drops a filter (e.g.
-    removes ``runtime_session_key IS NOT NULL``), the unfiltered statement
-    arrives here and unfiltered tasks reach archive_project — causing the test
-    to fail, exactly as intended.  Unsupported clause types are treated as
-    True (permissive), so only clauses the double understands gate results.
-    """
-    from sqlalchemy.sql import operators as ops
-
-    def _eval(clause, task):
-        # BooleanClauseList (AND / OR)
-        if hasattr(clause, "clauses"):
-            op = getattr(clause, "operator", None)
-            results = [_eval(c, task) for c in clause.clauses]
-            # SQLAlchemy uses operator.and_ for AND, operator.or_ for OR
-            import operator as pyops
-            if op is pyops.or_:
-                return any(results)
-            return all(results)  # default to AND
-
-        # BinaryExpression: column OP value
-        if hasattr(clause, "left") and hasattr(clause, "right"):
-            col_key = getattr(clause.left, "key", None)
-            if col_key and hasattr(task, col_key):
-                task_val = getattr(task, col_key)
-                right_val = getattr(clause.right, "value", None)
-                op = clause.operator
-                if op is ops.eq:
-                    return task_val == right_val
-                if op is ops.ne:
-                    return task_val != right_val
-                if op is ops.is_:
-                    return task_val is right_val
-                if op is ops.is_not:
-                    return task_val is not right_val
-        return True  # unknown predicate: let it through (safe default)
-
-    try:
-        wc = stmt.whereclause
-    except AttributeError:
-        return list(tasks)
-    if wc is None:
-        return list(tasks)
-    return [t for t in tasks if _eval(wc, t)]
+def _project(orm, progress=0, status="active"):
+    p = Project(company_id=orm["company"].id, name="P", status=status, progress=progress)
+    orm["db"].add(p); orm["db"].commit(); orm["db"].refresh(p)
+    return p
 
 
-class FakeDb:
-    """Answers only the two shapes board_truth asks for.
-
-    execute().all()             → status-count tuples (for task_counts)
-    execute().scalars().all()   → filtered task rows (for live_attachments
-                                  and archive_project's task iteration)
-
-    The WHERE-clause evaluator in _eval_where makes the double honest: a
-    test that passes only because the double ignores a filter would also
-    pass if production removed that filter.  With _eval_where, removing a
-    filter from the production query removes it from the double too, so the
-    wrong tasks reach the caller and the assertion fails.
-    """
-
-    def __init__(self, tasks):
-        self.tasks = list(tasks)
-        self.committed = 0
-        self.events = []
-
-    # board_truth calls db.execute(...).all() for counts and
-    # db.execute(...).scalars().all() for task rows.
-    def execute(self, stmt):
-        db = self
-
-        class Result:
-            def all(self):
-                counts = {}
-                for t in db.tasks:
-                    counts[t.status] = counts.get(t.status, 0) + 1
-                return list(counts.items())
-
-            def scalars(self):
-                filtered = _eval_where(db.tasks, stmt)
-
-                class S:
-                    def all(self_inner):
-                        return filtered
-                return S()
-
-        return Result()
-
-    def add(self, _obj):
-        pass
-
-    def commit(self):
-        self.committed += 1
-
-    def refresh(self, _obj):
-        pass
+def _tasks(orm, project, *specs):
+    out = []
+    for spec in specs:
+        status, session = (spec, None) if isinstance(spec, str) else spec
+        t = Task(project_id=project.id, title=status, status=status, runtime_session_key=session)
+        orm["db"].add(t); out.append(t)
+    orm["db"].commit()
+    return out
 
 
-@pytest.fixture(autouse=True)
-def no_events(monkeypatch):
-    calls = []
-    monkeypatch.setattr(bt, "emit_event",
-                        lambda db, **kw: calls.append(kw) or object())
-    return calls
+def _events(orm, event_type):
+    return orm["db"].query(CompanyEvent).filter(CompanyEvent.event_type == event_type).count()
 
 
 # -- derived progress -------------------------------------------------------
 
 
-def test_progress_is_done_over_countable():
-    db = FakeDb([FakeTask(1, "done"), FakeTask(2, "done"),
-                 FakeTask(3, "todo"), FakeTask(4, "review")])
-    out = bt.derive(db, FakeProject())
+def test_progress_is_done_over_countable(orm):
+    p = _project(orm)
+    _tasks(orm, p, "done", "done", "todo", "review")
+    out = bt.derive(orm["db"], p)
     assert out["derived_progress"] == 50
+    assert out["total_tasks"] == 4, "việc của dự án khác không được đếm"
 
 
-def test_cancelled_tasks_leave_the_denominator():
+def test_cancelled_tasks_leave_the_denominator(orm):
     """Dropping scope must not pin a project at half done forever."""
-    db = FakeDb([FakeTask(1, "done"), FakeTask(2, "cancelled")])
-    out = bt.derive(db, FakeProject())
+    p = _project(orm)
+    _tasks(orm, p, "done", "cancelled")
+    out = bt.derive(orm["db"], p)
     assert out["countable"] == 1 and out["derived_progress"] == 100
 
 
-def test_review_is_not_partial_credit():
-    db = FakeDb([FakeTask(1, "review"), FakeTask(2, "todo")])
-    assert bt.derive(db, FakeProject())["derived_progress"] == 0
+def test_review_is_not_partial_credit(orm):
+    p = _project(orm)
+    _tasks(orm, p, "review", "todo")
+    assert bt.derive(orm["db"], p)["derived_progress"] == 0
 
 
-def test_no_tasks_is_not_zero_percent():
+def test_no_tasks_is_not_zero_percent(orm):
     """"Nothing to measure" must not read as "measured zero"."""
-    out = bt.derive(FakeDb([]), FakeProject(progress=40))
+    p = _project(orm, progress=40)
+    out = bt.derive(orm["db"], p)
     assert out["derivable"] is False
     assert out["derived_progress"] is None
     assert out["drift"] is None
 
 
-def test_drift_is_signed_against_the_stored_column():
-    db = FakeDb([FakeTask(1, "done"), FakeTask(2, "todo")])
-    assert bt.derive(db, FakeProject(progress=90))["drift"] == -40
+def test_drift_is_signed_against_the_stored_column(orm):
+    p = _project(orm, progress=90)
+    _tasks(orm, p, "done", "todo")
+    assert bt.derive(orm["db"], p)["drift"] == -40
 
 
-def test_sync_refuses_to_overwrite_when_nothing_is_measurable():
-    project = FakeProject(progress=40)
-    out = bt.sync_progress(FakeDb([]), project, 1)
-    assert out["applied"] is False and project.progress == 40
+def test_sync_refuses_to_overwrite_when_nothing_is_measurable(orm):
+    p = _project(orm, progress=40)
+    out = bt.sync_progress(orm["db"], p, orm["org"].id)
+    orm["db"].refresh(p)
+    assert out["applied"] is False and p.progress == 40
 
 
-def test_sync_applies_and_reports_the_previous_value():
-    project = FakeProject(progress=0)
-    db = FakeDb([FakeTask(1, "done"), FakeTask(2, "todo")])
-    out = bt.sync_progress(db, project, 1)
+def test_sync_applies_and_reports_the_previous_value(orm):
+    p = _project(orm, progress=0)
+    _tasks(orm, p, "done", "todo")
+    out = bt.sync_progress(orm["db"], p, orm["org"].id)
+    orm["db"].expire_all()
     assert out["applied"] is True
-    assert out["previous_progress"] == 0 and project.progress == 50
+    assert out["previous_progress"] == 0 and orm["db"].get(Project, p.id).progress == 50
+    assert _events(orm, bt.PROGRESS_EVENT) == 1
 
 
-def test_sync_in_sync_is_a_no_op_not_a_write():
-    project = FakeProject(progress=50)
-    db = FakeDb([FakeTask(1, "done"), FakeTask(2, "todo")])
-    out = bt.sync_progress(db, project, 1)
-    assert out["applied"] is False and db.committed == 0
+def test_sync_in_sync_is_a_no_op_not_a_write(orm):
+    p = _project(orm, progress=50)
+    _tasks(orm, p, "done", "todo")
+    rev = bt.revision(p)
+    out = bt.sync_progress(orm["db"], p, orm["org"].id)
+    orm["db"].expire_all()
+    assert out["applied"] is False
+    assert bt.revision(orm["db"].get(Project, p.id)) == rev and _events(orm, bt.PROGRESS_EVENT) == 0
 
 
 # -- revisions --------------------------------------------------------------
 
 
-def test_revision_changes_when_the_row_is_touched():
-    p = FakeProject()
+def test_revision_changes_when_the_row_is_touched(orm):
+    p = _project(orm)
     first = bt.revision(p)
     p.updated_at = p.updated_at + timedelta(seconds=1)
     assert bt.revision(p) != first
 
 
-def test_missing_revision_opts_out_rather_than_failing():
+def test_missing_revision_opts_out_rather_than_failing(orm):
     """Pre-v27 clients must keep working."""
-    bt.check_revision(FakeDb([]), FakeProject(), None)
+    bt.check_revision(orm["db"], _project(orm), None)
 
 
-def test_stale_revision_is_409_and_carries_the_current_one():
-    p = FakeProject()
+def test_stale_revision_is_409_and_carries_the_current_one(orm):
+    p = _project(orm)
     with pytest.raises(HTTPException) as err:
-        bt.check_revision(FakeDb([]), p, "project:1:1999-01-01T00:00:00")
+        bt.check_revision(orm["db"], p, "project:1:1999-01-01T00:00:00")
     assert err.value.status_code == 409
     assert err.value.detail["current_revision"] == bt.revision(p)
 
 
-def test_matching_revision_passes():
-    p = FakeProject()
-    bt.check_revision(FakeDb([]), p, bt.revision(p))
+def test_matching_revision_passes(orm):
+    p = _project(orm)
+    bt.check_revision(orm["db"], p, bt.revision(p))
 
 
-def test_conflict_event_failure_does_not_mask_the_409(monkeypatch):
+def test_conflict_event_failure_does_not_mask_the_409(orm, monkeypatch):
     def boom(db, **kw):
         raise RuntimeError("bus down")
 
     monkeypatch.setattr(bt, "emit_event", boom)
     with pytest.raises(HTTPException) as err:
-        bt.check_revision(FakeDb([]), FakeProject(), "stale", organization_id=1)
+        bt.check_revision(orm["db"], _project(orm), "stale", organization_id=orm["org"].id)
     assert err.value.status_code == 409
 
 
-def test_sync_honours_the_revision_guard():
-    project = FakeProject(progress=0)
-    db = FakeDb([FakeTask(1, "done")])
+def test_sync_honours_the_revision_guard(orm):
+    p = _project(orm, progress=0)
+    _tasks(orm, p, "done")
     with pytest.raises(HTTPException):
-        bt.sync_progress(db, project, 1, expected_revision="stale")
-    assert project.progress == 0
+        bt.sync_progress(orm["db"], p, orm["org"].id, expected_revision="stale")
+    orm["db"].expire_all()
+    assert orm["db"].get(Project, p.id).progress == 0
 
 
 # -- archive ----------------------------------------------------------------
 
 
-def test_preview_counts_what_would_be_cancelled_without_writing():
-    db = FakeDb([FakeTask(1, "todo"), FakeTask(2, "done"), FakeTask(3, "blocked")])
-    out = bt.archive_preview(db, FakeProject())
+def test_preview_counts_what_would_be_cancelled_without_writing(orm):
+    p = _project(orm)
+    _tasks(orm, p, "todo", "done", "blocked")
+    out = bt.archive_preview(orm["db"], p)
     assert out["will_cancel_tasks"] == 2
     assert out["will_keep_done_tasks"] == 1
-    assert db.committed == 0
+    assert out["blocked"] is False, "phiên đang chạy của dự án khác không chặn dự án này"
+    orm["db"].expire_all()
+    assert sorted(t.status for t in orm["db"].query(Task).filter(Task.project_id == p.id)) == ["blocked", "done", "todo"]
 
 
-def test_live_session_blocks_the_archive(monkeypatch):
+def test_live_session_blocks_the_archive(orm, monkeypatch):
     monkeypatch.setattr(bt.lease_store, "holder", lambda key: "worker-a")
-    db = FakeDb([FakeTask(1, "in_progress", session_key="agent:nina:company-task-1")])
+    p = _project(orm)
+    _tasks(orm, p, ("in_progress", "agent:nina:company-task-1"))
     with pytest.raises(HTTPException) as err:
-        bt.archive_project(db, FakeProject(), 1)
+        bt.archive_project(orm["db"], p, orm["org"].id)
     assert err.value.status_code == 409
-    assert err.value.detail["live_runtime_sessions"][0]["followed_by"] == "worker-a"
+    live = err.value.detail["live_runtime_sessions"]
+    assert [x["session_key"] for x in live] == ["agent:nina:company-task-1"]
+    assert live[0]["followed_by"] == "worker-a"
 
 
-def test_in_progress_without_a_session_does_not_block(monkeypatch):
+def test_in_progress_without_a_session_does_not_block(orm, monkeypatch):
     monkeypatch.setattr(bt.lease_store, "holder", lambda key: "")
-    db = FakeDb([FakeTask(1, "in_progress")])
-    out = bt.archive_project(db, FakeProject(), 1)
-    assert out["cancelled_task_ids"] == [1]
+    p = _project(orm)
+    (t,) = _tasks(orm, p, "in_progress")
+    out = bt.archive_project(orm["db"], p, orm["org"].id)
+    assert out["cancelled_task_ids"] == [t.id]
 
 
-def test_force_archives_but_admits_what_it_left_running(monkeypatch):
+def test_force_archives_but_admits_what_it_left_running(orm, monkeypatch):
     monkeypatch.setattr(bt.lease_store, "holder", lambda key: "worker-a")
-    db = FakeDb([FakeTask(1, "in_progress", session_key="s1")])
-    out = bt.archive_project(db, FakeProject(), 1, force=True)
+    p = _project(orm)
+    _tasks(orm, p, ("in_progress", "s1"))
+    out = bt.archive_project(orm["db"], p, orm["org"].id, force=True)
     assert out["forced"] is True
-    assert out["left_running"][0]["session_key"] == "s1"
+    assert [x["session_key"] for x in out["left_running"]] == ["s1"]
 
 
-def test_archive_never_deletes_and_keeps_done_work():
-    tasks = [FakeTask(1, "todo"), FakeTask(2, "done")]
-    db = FakeDb(tasks)
-    project = FakeProject()
-    out = bt.archive_project(db, project, 1)
-    assert out["deleted"] is False
-    assert project.status == bt.ARCHIVE_STATUS
-    assert tasks[0].status == "cancelled" and tasks[1].status == "done"
+def test_archive_never_deletes_and_keeps_done_work(orm):
+    p = _project(orm)
+    todo, done = _tasks(orm, p, "todo", "done")
+    out = bt.archive_project(orm["db"], p, orm["org"].id)
+    orm["db"].expire_all()
+    db = orm["db"]
+    assert out["deleted"] is False and out["cancelled_task_ids"] == [todo.id]
+    assert db.get(Project, p.id).status == bt.ARCHIVE_STATUS
+    assert db.get(Task, todo.id).status == "cancelled" and db.get(Task, done.id).status == "done"
+    # Dự án nhiễu không bị đụng tới.
+    assert db.get(Project, orm["noise"].id).status == "active"
+    assert sorted(t.status for t in db.query(Task).filter(Task.project_id == orm["noise"].id)) == \
+        ["done", "done", "done", "in_progress"]
 
 
 def test_archive_uses_existing_vocabulary_only():
@@ -297,9 +239,18 @@ def test_archive_uses_existing_vocabulary_only():
     assert all(s in TASK_STATUSES for s in bt.OPEN_STATUSES)
 
 
-def test_archive_honours_the_revision_guard():
-    project = FakeProject()
+def test_archive_honours_the_revision_guard(orm):
+    p = _project(orm)
     with pytest.raises(HTTPException) as err:
-        bt.archive_project(FakeDb([]), project, 1, expected_revision="stale")
+        bt.archive_project(orm["db"], p, orm["org"].id, expected_revision="stale")
     assert err.value.status_code == 409
-    assert project.status == "active"
+    orm["db"].expire_all()
+    assert orm["db"].get(Project, p.id).status == "active"
+
+
+def test_finished_run_keeps_its_session_key_but_does_not_block(orm, monkeypatch):
+    """Sau khi chạy xong, task ở review/blocked vẫn giữ session key — không còn agent nào chạy."""
+    monkeypatch.setattr(bt.lease_store, "holder", lambda key: "")
+    p = _project(orm)
+    _tasks(orm, p, ("review", "agent:nina:company-task-7"), ("blocked", "agent:nina:company-task-8"))
+    assert bt.archive_preview(orm["db"], p)["live_runtime_sessions"] == []

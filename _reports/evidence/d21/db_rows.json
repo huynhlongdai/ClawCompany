@@ -1,0 +1,141 @@
+{
+ "wakeups": [
+  {
+   "id": 19,
+   "organization_id": 1,
+   "member_id": 2,
+   "reason": "assigned",
+   "task_id": 33,
+   "payload": "{\"by_member_id\": 1}",
+   "dedupe_key": "assigned:t33:m2:2026-10-06T01:21:24.833033",
+   "status": "dispatched",
+   "skip_reason": "",
+   "run_id": 20,
+   "coalesced_into_id": null,
+   "created_at": "2026-10-06 01:21:24.842648",
+   "processed_at": "2026-10-06 01:21:38.510165"
+  },
+  {
+   "id": 20,
+   "organization_id": 1,
+   "member_id": 2,
+   "reason": "assigned",
+   "task_id": 34,
+   "payload": "{\"by_member_id\": 1, \"requeued_as\": 22}",
+   "dedupe_key": "assigned:t34:m2:2026-10-06T01:21:39.126303",
+   "status": "skipped",
+   "skip_reason": "seat_busy: run #20 (task #33)",
+   "run_id": null,
+   "coalesced_into_id": null,
+   "created_at": "2026-10-06 01:21:39.137065",
+   "processed_at": "2026-10-06 01:21:53.779733"
+  },
+  {
+   "id": 21,
+   "organization_id": 1,
+   "member_id": 2,
+   "reason": "mentioned",
+   "task_id": 31,
+   "payload": "{\"requeued_from\": 13}",
+   "dedupe_key": "mentioned:j20:m2:after-run-20",
+   "status": "skipped",
+   "skip_reason": "task_status: cancelled",
+   "run_id": null,
+   "coalesced_into_id": null,
+   "created_at": "2026-10-06 01:21:54.605617",
+   "processed_at": "2026-10-06 01:22:08.793426"
+  },
+  {
+   "id": 22,
+   "organization_id": 1,
+   "member_id": 2,
+   "reason": "assigned",
+   "task_id": 34,
+   "payload": "{\"requeued_from\": 20}",
+   "dedupe_key": "assigned:t34:m2:2026-10-06T01:21:39.126303:after-run-20",
+   "status": "dispatched",
+   "skip_reason": "",
+   "run_id": 21,
+   "coalesced_into_id": null,
+   "created_at": "2026-10-06 01:21:54.620814",
+   "processed_at": "2026-10-06 01:22:08.793426"
+  },
+  {
+   "id": 23,
+   "organization_id": 1,
+   "member_id": 2,
+   "reason": "assigned",
+   "task_id": 35,
+   "payload": "{\"by_member_id\": 1}",
+   "dedupe_key": "assigned:t35:m2:2026-10-06T01:22:10.136792",
+   "status": "dispatched",
+   "skip_reason": "",
+   "run_id": 22,
+   "coalesced_into_id": null,
+   "created_at": "2026-10-06 01:22:10.142695",
+   "processed_at": "2026-10-06 01:22:24.016661"
+  },
+  {
+   "id": 24,
+   "organization_id": 1,
+   "member_id": 2,
+   "reason": "mentioned",
+   "task_id": 35,
+   "payload": "{\"journal_seq\": 1, \"by_member_id\": 1}",
+   "dedupe_key": "mentioned:j23:m2",
+   "status": "coalesced",
+   "skip_reason": "",
+   "run_id": 22,
+   "coalesced_into_id": 23,
+   "created_at": "2026-10-06 01:22:12.163369",
+   "processed_at": "2026-10-06 01:22:24.016661"
+  },
+  {
+   "id": 25,
+   "organization_id": 1,
+   "member_id": 2,
+   "reason": "assigned",
+   "task_id": 36,
+   "payload": "{\"by_member_id\": 1}",
+   "dedupe_key": "assigned:t36:m2:2026-10-06T01:22:25.819257",
+   "status": "skipped",
+   "skip_reason": "budget: E2E D2.1 hạn mức $0.04: Budget exceeded: need 0.05, remaining 0.04",
+   "run_id": null,
+   "coalesced_into_id": null,
+   "created_at": "2026-10-06 01:22:25.828512",
+   "processed_at": "2026-10-06 01:22:39.225328"
+  }
+ ],
+ "task_runs": [
+  {
+   "id": 20,
+   "task_id": 33,
+   "trigger_kind": "assigned",
+   "wakeup_id": 19,
+   "status": "completed",
+   "session_key": "agent:dev:company-task-33",
+   "started_at": "2026-10-06 01:21:38.715520",
+   "ended_at": "2026-10-06 01:21:54.592788"
+  },
+  {
+   "id": 21,
+   "task_id": 34,
+   "trigger_kind": "assigned",
+   "wakeup_id": 22,
+   "status": "completed",
+   "session_key": "agent:dev:company-task-34",
+   "started_at": "2026-10-06 01:22:08.950937",
+   "ended_at": "2026-10-06 01:22:10.018361"
+  },
+  {
+   "id": 22,
+   "task_id": 35,
+   "trigger_kind": "assigned",
+   "wakeup_id": 23,
+   "status": "completed",
+   "session_key": "agent:dev:company-task-35",
+   "started_at": "2026-10-06 01:22:24.140614",
+   "ended_at": "2026-10-06 01:22:25.664730"
+  }
+ ]
+}

@@ -15,6 +15,7 @@ from app.services.org_memory import remember, search_memories
 from app.services.runtime_events import persist_runtime_event
 from app.services.artifacts import register_artifact
 from app.services.tasks import dispatch_task
+from app.services import task_lifecycle as lifecycle
 
 TERMINAL_COMPLETE = {"run.completed", "completed", "run.complete"}
 TERMINAL_FAILED = {"run.failed", "run.error", "failed", "error"}
@@ -52,6 +53,12 @@ def create_goal(db: Session, *, organization_id: int, user_id: int | None, compa
         )
         db.add(budget); db.commit()
     log_event(db, organization_id, "goal.create", "executive_goals", goal.id, actor_name="Founder", payload={"title": title, "risk": risk})
+    from app.core.config import settings
+    if settings.strategy_plan_on_goal:
+        # D3.3: goal mới → việc lập kế hoạch cho seat chiến lược (Nina) + wakeup goal_created.
+        from app.services import strategy
+        strategy.on_goal_created(db, goal)
+        db.refresh(goal)
     return goal
 
 
@@ -343,7 +350,9 @@ def _auto_retry(db: Session, goal: ExecutiveGoal, cycle: OperatingCycle, policy:
         if assignment.task_id:
             task = db.get(Task, assignment.task_id)
             if task:
-                task.status = "backlog"; task.runtime_run_id = None; db.add(task)
+                lifecycle.transition(db, task, "backlog", system=True, via="orchestration",
+                                     reason="incident retry", commit=False, emit=False)
+                task.runtime_run_id = None; db.add(task)
         db.add_all([incident, assignment]); db.commit(); retried += 1
     return retried
 
@@ -382,7 +391,9 @@ async def tick_cycle(db: Session, cycle: OperatingCycle, *, capture_runtime: boo
             assignment.status = "completed"; assignment.completed_at = datetime.utcnow()
             if assignment.task_id:
                 task = db.get(Task, assignment.task_id)
-                if task: task.status = "done"; db.add(task)
+                if task:
+                    lifecycle.transition(db, task, "done", system=True, via="orchestration",
+                                         reason="assignment completed", commit=False, emit=False)
             if assignment.plan_step_id:
                 step = db.get(NinaPlanStep, assignment.plan_step_id)
                 if step: step.status = "completed"; db.add(step)
@@ -462,7 +473,8 @@ def retry_incident(db: Session, incident: RecoveryIncident, *, force: bool = Fal
     if assignment.task_id:
         task = db.get(Task, assignment.task_id)
         if task:
-            task.status = "backlog"
+            lifecycle.transition(db, task, "backlog", system=True, via="orchestration",
+                                 reason="incident retry", commit=False, emit=False)
             task.runtime_run_id = None
             task.runtime_task_id = None
             db.add(task)

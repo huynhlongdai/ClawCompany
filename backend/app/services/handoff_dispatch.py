@@ -51,7 +51,8 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models import Agent, Artifact, ArtifactHandoff, Member, Task
 from app.services import task_journal
-from app.services.agent_dispatch import DispatchError, dispatch_task
+from app.services.agent_dispatch import DispatchError, dispatch_task  # noqa: F401 — giữ cho caller cũ
+from app.services import task_lifecycle as lifecycle
 from app.services.artifacts import accept_handoff
 from app.services.company_event_bus import emit_event
 
@@ -137,6 +138,12 @@ def reassign_task(db: Session, task: Task, to_member_id: int) -> dict:
     if previous == to_member_id:
         return {"reassigned": False, "reason": "already_owner", "owner": to_member_id}
     task.assignee_member_id = to_member_id
+    # D1.4: lượt chạy của chủ cũ không còn giữ việc. Không ghi "completed" vì
+    # hệ thống không biết chặng đó xong thật hay chưa — chỉ biết nó bị thay.
+    holder = lifecycle.current_run(db, task)
+    if holder is not None and holder.member_id != to_member_id:
+        lifecycle.finish_run(db, holder, "cancelled", commit=False,
+                             error_reason=f"handed off to member #{to_member_id}")
     db.add(task); db.commit(); db.refresh(task)
     return {"reassigned": True, "from_member_id": previous, "to_member_id": to_member_id}
 
@@ -200,11 +207,22 @@ async def dispatch_on_handoff(db: Session, handoff: ArtifactHandoff, *,
             result["accepted"] = False
             result["accept_error"] = str(exc)
 
-    try:
-        task = await dispatch_task(db, task)
-    except DispatchError as exc:
-        result["reason"] = "dispatch_error"
-        result["error"] = str(exc)
+    # D2.1: bàn giao không tự gọi dispatch_task nữa — nó xếp một wakeup và
+    # drain ngay cho seat nhận (bỏ cửa sổ gộp), nên luật bỏ qua (seat bận, ngân
+    # sách, giờ làm) áp dụng như mọi nguồn khác và lượt chạy mang wakeup_id.
+    from app.services import wakeup
+    wk, _ = wakeup.enqueue(db, organization_id=handoff.organization_id, member_id=handoff.to_member_id,
+                           reason="handoff", task_id=task.id, dedupe_key=f"handoff:{handoff.id}",
+                           payload={"handoff_id": handoff.id})
+    result["wakeup_id"] = wk.id
+    await wakeup.drain(db, member_id=handoff.to_member_id, force=True, prefer=wk.id,
+                       follow=settings.wakeup_follow)
+    db.refresh(wk)
+    if wk.status not in ("dispatched", "coalesced"):
+        why = wk.skip_reason or wk.status
+        failed = why.startswith(("dispatch_error", "runtime_error"))
+        result["reason"] = "dispatch_error" if failed else "wakeup_skipped"
+        result["error"] = why.split(": ", 1)[1] if failed and ": " in why else why
         result["note"] = ("Ghi sổ xong nhưng không giao được việc. Bàn giao "
                           "không mất: người thật dispatch tay vẫn được, và gói "
                           "ngữ cảnh sẽ mang hướng dẫn bàn giao theo.")

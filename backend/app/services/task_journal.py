@@ -115,7 +115,48 @@ def append(db: Session, task: Task, *, kind: str, summary: str,
                aggregate_type="task", aggregate_id=str(task.id),
                actor_member_id=actor_member_id,
                payload={"seq": entry.seq, "outcome": outcome, "kind": kind})
+    mentioned = wake_mentions(db, task, entry, organization_id)
+    if organization_id is not None:
+        from app.services import inbox  # D3.5: @người → Hộp việc của người đó
+        inbox.mention(db, task, entry, organization_id)
+    if getattr(task, "assignee_department_id", None):
+        from app.services import routing
+        routing.on_journal_entry(db, task, entry, mentioned)
     return entry
+
+
+def mentioned_members(db: Session, organization_id: int, text: str, *, exclude: int | None = None) -> list:
+    """Seat agent được gọi tên bằng ``@Tên`` hoặc ``@agentId`` trong một dòng sổ."""
+    from app.models import Agent, Member
+    low = (text or "").lower()
+    if "@" not in low:
+        return []
+    out = []
+    rows = (db.query(Member, Agent).join(Agent, Agent.member_id == Member.id)
+            .filter(Member.organization_id == organization_id, Member.member_type == "agent").all())
+    for member, agent in rows:
+        handles = {f"@{(member.name or '').lower()}", f"@{(agent.runtime_agent_id or '').lower()}"}
+        if member.id != exclude and any(h != "@" and h in low for h in handles):
+            out.append(member)
+    return out
+
+
+def wake_mentions(db: Session, task: Task, entry: TaskJournalEntry, organization_id: int | None) -> list:
+    """D2.1: comment có @seat → xếp đánh thức seat đó (lý do ``mentioned``). Trả các seat được @."""
+    if organization_id is None:
+        return []
+    found: list = []
+    try:
+        from app.services import wakeup
+        found = mentioned_members(db, organization_id, f"{entry.summary}\n{entry.detail or ''}",
+                                  exclude=entry.actor_member_id)
+        for member in found:
+            wakeup.enqueue_for_task(db, task, "mentioned", member_id=member.id,
+                                    dedupe_key=f"mentioned:j{entry.id}:m{member.id}",
+                                    payload={"journal_seq": entry.seq, "by_member_id": entry.actor_member_id})
+    except Exception as exc:  # noqa: BLE001 — ghi sổ đã xong; đánh thức hỏng không được làm hỏng nó
+        print(f"[D2.1] mention wake failed: {exc}")
+    return found
 
 
 def read(db: Session, task_id: int, *, limit: int = 100) -> list[TaskJournalEntry]:

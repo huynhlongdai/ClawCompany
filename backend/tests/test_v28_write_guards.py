@@ -259,45 +259,85 @@ def test_entity_without_a_field_list_gets_no_generic_write_path():
 
 
 # -- restore ----------------------------------------------------------------
+# D0.2: phần restore chạy trên ORM thật. Bản lưu trữ được tạo bằng
+# board_truth.archive_project thật, nên payload là đúng thứ production ghi,
+# không phải FakeEvent tự dựng. Mỗi DB có thêm dự án và tổ chức "nhiễu".
+
+import json as _json
+
+from sqlalchemy.orm import sessionmaker as _sessionmaker
+
+from app.db.base import Base as _AppBase
+import app.models  # noqa: F401,E402
+from app.models import CompanyEvent as _CompanyEvent
+from app.models.entities import Company as _Company, Organization as _Org, Project as _Project, Task as _Task
+from app.services import board_truth as _bt
 
 
-class FakeEvent:
-    def __init__(self, payload, id=11):
-        import json
-        self.id = id
-        self.payload_json = json.dumps(payload)
-        self.occurred_at = datetime(2026, 9, 14, 11, 0, 0)
+@pytest.fixture()
+def orm(monkeypatch):
+    # Phần restore ghi sự kiện thật (autouse ở trên tắt nó cho phần guard).
+    from app.services.company_event_bus import emit_event as _real_emit
+    monkeypatch.setattr(br, "emit_event", _real_emit)
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    _AppBase.metadata.create_all(bind=engine)
+    db = _sessionmaker(bind=engine, autoflush=False)()
+    org = _Org(name="Nova", slug="nova-v28"); other = _Org(name="Khác", slug="other-v28")
+    db.add_all([org, other]); db.commit()
+    co = _Company(organization_id=org.id, name="Nova", status="active"); db.add(co); db.commit()
+    yield {"db": db, "org": org, "other": other, "company": co}
+    db.close()
 
 
-def _preview(monkeypatch, project, event, rows):
-    monkeypatch.setattr(br, "last_archive_event", lambda *a, **k: event)
-    db = FakeDb(rows=rows, get_map={t.id: t for t in rows})
-    return db, br.restore_preview(db, project, 1)
+def _proj(orm, *statuses, status="active"):
+    db = orm["db"]
+    p = _Project(company_id=orm["company"].id, name="P", status=status); db.add(p); db.commit()
+    tasks = [_Task(project_id=p.id, title=s, status=s) for s in statuses]
+    db.add_all(tasks); db.commit()
+    return p, tasks
 
 
-def test_restore_reads_the_cancelled_ids_out_of_the_archive_event(monkeypatch):
-    tasks = [FakeTask(5), FakeTask(6)]
-    event = FakeEvent({"cancelled_task_ids": [5, 6], "previous_status": "active"})
-    _db, preview = _preview(monkeypatch, FakeProject(status="cancelled"), event, tasks)
-    assert [t["task_id"] for t in preview["will_restore_tasks"]] == [5, 6]
-    assert preview["previous_status"] == "active"
-    assert preview["previous_status_known"] is True
+def _archived(orm, *statuses):
+    p, tasks = _proj(orm, *statuses)
+    _bt.archive_project(orm["db"], p, orm["org"].id)
+    orm["db"].refresh(p)
+    return p, tasks
 
 
-def test_pre_v28_archive_has_no_previous_status_and_says_so(monkeypatch):
-    event = FakeEvent({"cancelled_task_ids": [5]})
-    _db, preview = _preview(monkeypatch, FakeProject(status="cancelled"), event, [FakeTask(5)])
-    assert preview["previous_status"] == br.RESTORE_STATUS
-    assert preview["previous_status_known"] is False
+def _status(orm, task):
+    orm["db"].expire_all()
+    return orm["db"].get(_Task, task.id).status
 
 
-def test_a_task_someone_moved_after_the_archive_is_left_alone(monkeypatch):
-    tasks = [FakeTask(5), FakeTask(6, status="in_progress")]
-    event = FakeEvent({"cancelled_task_ids": [5, 6]})
-    db, _ = _preview(monkeypatch, FakeProject(status="cancelled"), event, tasks)
-    out = br.restore_project(db, FakeProject(status="cancelled"), 1)
-    assert out["restored_task_ids"] == [5]
-    assert [t["task_id"] for t in out["skipped_tasks"]] == [6]
+def test_restore_reads_the_cancelled_ids_out_of_the_archive_event(orm):
+    p, (a, b, done) = _archived(orm, "todo", "blocked", "done")
+    preview = br.restore_preview(orm["db"], p, orm["org"].id)
+    assert [t["task_id"] for t in preview["will_restore_tasks"]] == [a.id, b.id]
+    assert preview["previous_status"] == "active" and preview["previous_status_known"] is True
+    out = br.restore_project(orm["db"], p, orm["org"].id)
+    assert out["restored_task_ids"] == [a.id, b.id]
+    assert (_status(orm, a), _status(orm, b), _status(orm, done)) == ("todo", "blocked", "done")
+    assert orm["db"].get(_Project, p.id).status == "active"
+
+
+def test_pre_v28_archive_has_no_previous_status_and_says_so(orm):
+    p, (t,) = _proj(orm, "cancelled", status="cancelled")
+    orm["db"].add(_CompanyEvent(organization_id=orm["org"].id, event_type=_bt.ARCHIVE_EVENT, source="v27",
+                                aggregate_type="project", aggregate_id=str(p.id),
+                                payload_json=_json.dumps({"cancelled_task_ids": [t.id]})))
+    orm["db"].commit()
+    preview = br.restore_preview(orm["db"], p, orm["org"].id)
+    assert preview["previous_status"] == br.RESTORE_STATUS and preview["previous_status_known"] is False
+    assert preview["will_restore_tasks"][0]["restore_to"] == br.RESTORE_TASK_STATUS
+
+
+def test_a_task_someone_moved_after_the_archive_is_left_alone(orm):
+    p, (a, b) = _archived(orm, "todo", "todo")
+    moved = orm["db"].get(_Task, b.id); moved.status = "in_progress"; orm["db"].commit()
+    out = br.restore_project(orm["db"], p, orm["org"].id)
+    assert out["restored_task_ids"] == [a.id]
+    assert [t["task_id"] for t in out["skipped_tasks"]] == [b.id]
+    assert _status(orm, b) == "in_progress"
 
 
 def test_restored_tasks_land_in_existing_board_vocabulary():
@@ -306,59 +346,89 @@ def test_restored_tasks_land_in_existing_board_vocabulary():
     assert br.RESTORE_STATUS in PROJECT_STATUSES
 
 
-def test_restoring_a_live_project_is_refused(monkeypatch):
-    monkeypatch.setattr(br, "last_archive_event", lambda *a, **k: None)
+def test_restoring_a_live_project_is_refused(orm):
+    p, _ = _proj(orm, "todo")
     with pytest.raises(HTTPException) as err:
-        br.restore_project(FakeDb(), FakeProject(status="active"), 1)
+        br.restore_project(orm["db"], p, orm["org"].id)
     assert err.value.status_code == 409
 
 
-def test_archive_without_a_record_refuses_and_points_at_the_manual_path(monkeypatch):
-    monkeypatch.setattr(br, "last_archive_event", lambda *a, **k: None)
+def test_archive_without_a_record_refuses_and_points_at_the_manual_path(orm):
+    p, _ = _proj(orm, "cancelled", status="cancelled")
     with pytest.raises(HTTPException) as err:
-        br.restore_project(FakeDb(), FakeProject(status="cancelled"), 1)
+        br.restore_project(orm["db"], p, orm["org"].id)
     assert "hint" in err.value.detail
 
 
-def test_ids_recorded_but_no_longer_present_are_reported_not_silently_dropped(monkeypatch):
-    event = FakeEvent({"cancelled_task_ids": [5, 99]})
-    _db, preview = _preview(monkeypatch, FakeProject(status="cancelled"), event, [FakeTask(5)])
-    assert preview["missing_tasks"] == [99]
+def test_ids_recorded_but_no_longer_present_are_reported_not_silently_dropped(orm):
+    p, (a, b) = _archived(orm, "todo", "todo")
+    orm["db"].delete(orm["db"].get(_Task, b.id)); orm["db"].commit()
+    preview = br.restore_preview(orm["db"], p, orm["org"].id)
+    assert preview["missing_tasks"] == [b.id]
 
 
-def test_corrupt_payload_degrades_to_nothing_to_restore(monkeypatch):
-    class Broken:
-        id = 3; payload_json = "{not json"; occurred_at = None
-    monkeypatch.setattr(br, "last_archive_event", lambda *a, **k: Broken())
-    preview = br.restore_preview(FakeDb(), FakeProject(status="cancelled"), 1)
-    assert preview["recorded_cancelled_tasks"] == 0
+def test_task_of_another_project_named_in_the_payload_is_not_touched(orm):
+    """Payload chỉ là dữ liệu; restore phải lọc theo project_id."""
+    p, (a,) = _archived(orm, "todo")
+    q, (foreign,) = _proj(orm, "cancelled")
+    ev = br.last_archive_event(orm["db"], p, orm["org"].id)
+    payload = _json.loads(ev.payload_json); payload["cancelled_task_ids"].append(foreign.id)
+    ev.payload_json = _json.dumps(payload); orm["db"].commit()
+    out = br.restore_project(orm["db"], p, orm["org"].id)
+    assert out["restored_task_ids"] == [a.id]
+    assert _status(orm, foreign) == "cancelled"
 
 
-def test_archive_now_records_what_it_is_reversing():
-    import inspect
-    from app.services import board_truth
-    assert "previous_status" in inspect.getsource(board_truth.archive_project)
+def test_corrupt_payload_degrades_to_nothing_to_restore(orm):
+    p, _ = _archived(orm, "todo")
+    ev = br.last_archive_event(orm["db"], p, orm["org"].id)
+    ev.payload_json = "{not json"; orm["db"].commit()
+    assert br.restore_preview(orm["db"], p, orm["org"].id)["recorded_cancelled_tasks"] == 0
 
 
-def test_restore_event_is_distinct_from_the_archive_event():
-    from app.services.board_truth import ARCHIVE_EVENT
-    assert br.RESTORE_EVENT != ARCHIVE_EVENT
+def test_archive_now_records_what_it_is_reversing(orm):
+    p, (t,) = _archived(orm, "review")
+    payload = _json.loads(br.last_archive_event(orm["db"], p, orm["org"].id).payload_json)
+    assert payload["previous_status"] == "active"
+    assert payload["task_statuses"] == {str(t.id): "review"}
 
 
-def test_archive_lookup_is_scoped_to_one_organization():
-    import inspect
-    assert "organization_id" in inspect.getsource(br.last_archive_event)
+def test_restore_event_is_distinct_from_the_archive_event(orm):
+    p, _ = _archived(orm, "todo")
+    br.restore_project(orm["db"], p, orm["org"].id)
+    types = [e.event_type for e in orm["db"].query(_CompanyEvent).order_by(_CompanyEvent.id)]
+    assert br.RESTORE_EVENT != _bt.ARCHIVE_EVENT
+    assert types.count(_bt.ARCHIVE_EVENT) == 1 and types.count(br.RESTORE_EVENT) == 1
+
+
+def test_archive_lookup_is_scoped_to_one_organization(orm):
+    """aggregate_id là số trần: thiếu lọc tổ chức thì đọc được bản lưu trữ của tenant khác."""
+    p, (t,) = _proj(orm, "cancelled", status="cancelled")
+    orm["db"].add(_CompanyEvent(organization_id=orm["other"].id, event_type=_bt.ARCHIVE_EVENT, source="x",
+                                aggregate_type="project", aggregate_id=str(p.id),
+                                payload_json=_json.dumps({"cancelled_task_ids": [t.id], "previous_status": "active"})))
+    orm["db"].commit()
+    assert br.last_archive_event(orm["db"], p, orm["org"].id) is None
+    with pytest.raises(HTTPException):
+        br.restore_project(orm["db"], p, orm["org"].id)
+    assert _status(orm, t) == "cancelled"
+
+
+def test_archive_lookup_picks_this_project_and_the_latest_archive(orm):
+    p, _ = _archived(orm, "todo")
+    q, _ = _archived(orm, "todo")
+    assert _json.loads(br.last_archive_event(orm["db"], p, orm["org"].id).payload_json)["project_id"] == p.id
+    br.restore_project(orm["db"], p, orm["org"].id)
+    orm["db"].refresh(p)
+    _bt.archive_project(orm["db"], p, orm["org"].id)
+    events = orm["db"].query(_CompanyEvent).filter(_CompanyEvent.event_type == _bt.ARCHIVE_EVENT,
+                                                   _CompanyEvent.aggregate_id == str(p.id)).order_by(_CompanyEvent.id).all()
+    assert br.last_archive_event(orm["db"], p, orm["org"].id).id == events[-1].id
 
 
 def test_guard_conflict_reuses_v27_event_type():
     from app.services.board_truth import CONFLICT_EVENT
     assert rg.CONFLICT_EVENT == CONFLICT_EVENT
-
-
-def test_stale_window_is_documented_as_closed_by_the_database():
-    import inspect
-    source = inspect.getsource(rg.compare_and_set)
-    assert "rowcount" in source
 
 
 def test_guarded_update_sets_updated_at_explicitly(_guard_session, _guard_proj):

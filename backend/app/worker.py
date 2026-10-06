@@ -21,6 +21,12 @@ celery_app.conf.update(
         "review-v14-engineering-portfolios": {"task": "v14.review_portfolios", "schedule": 300.0},
         "v15-control-plane-tick": {"task": "v15.control_plane_tick", "schedule": 20.0},
         "v15-export-telemetry": {"task": "v15.export_telemetry", "schedule": 60.0},
+        # D2.1: biến lý do đánh thức thành lượt chạy (gộp trong cửa sổ 10 giây).
+        "drain-wakeups": {"task": "wakeups.drain", "schedule": 5.0},
+        # D3.5: approval quá hạn → chuyển lên quản lý (audit approval.escalated).
+        "escalate-overdue-approvals": {"task": "approvals.escalate_overdue", "schedule": 60.0},
+        # D3.4: routines — giờ hẹn cron theo múi giờ, chạy bù, kết cục từng lần chạy.
+        "tick-routines": {"task": "routines.tick", "schedule": 30.0},
     },
 )
 celery_app.autodiscover_tasks(["app.tasks"])

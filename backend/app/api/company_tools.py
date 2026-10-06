@@ -5,10 +5,11 @@ from app.db.session import get_db
 from app.models import Agent, Member, Company, Department, Task, Project, Approval, InboxItem
 from app.services.vector_search import search_vectors
 from app.services.policy import authorize
+from app.services import task_lifecycle as lifecycle
 
 router = APIRouter(prefix="/company-tools", tags=["company-tools"])
 
-def resolve_agent(db: Session, runtime_agent_id: str, principal: Principal):
+def resolve_agent(db: Session, runtime_agent_id: str, principal: Principal, tool: str | None = None):
     agent = db.query(Agent).filter(Agent.runtime_agent_id == runtime_agent_id).first()
     if not agent:
         raise HTTPException(404, "Agent binding not found")
@@ -16,11 +17,18 @@ def resolve_agent(db: Session, runtime_agent_id: str, principal: Principal):
     if not member:
         raise HTTPException(404, "Member not found")
     enforce_org(member.organization_id, principal)
+    if tool is not None:
+        # D1.6: cùng bảng quyền với MCP. "off" → 403; "ask" ở đường REST cũ
+        # không có cách trả "chờ duyệt" nên cũng 403 kèm lý do.
+        from app.services import tool_permissions
+        level, source = tool_permissions.resolve(db, member, tool)
+        if level != "allowed":
+            raise HTTPException(403, {"error": "tool_" + level, "tool": tool, "source": source})
     return agent, member
 
 @router.get("/context")
 def company_context(runtime_agent_id: str, principal: Principal = Depends(require_scope("company.context:read")), db: Session = Depends(get_db)):
-    agent, member = resolve_agent(db, runtime_agent_id, principal)
+    agent, member = resolve_agent(db, runtime_agent_id, principal, "company_context")
     company = db.get(Company, member.company_id) if member.company_id else None
     department = db.get(Department, member.department_id) if member.department_id else None
     manager = db.get(Member, member.manager_id) if member.manager_id else None
@@ -35,7 +43,7 @@ def company_context(runtime_agent_id: str, principal: Principal = Depends(requir
 
 @router.get("/tasks")
 def company_tasks(runtime_agent_id: str, status: str | None = None, principal: Principal = Depends(require_scope("company.tasks:read")), db: Session = Depends(get_db)):
-    agent, member = resolve_agent(db, runtime_agent_id, principal)
+    agent, member = resolve_agent(db, runtime_agent_id, principal, "company_tasks_list")
     q = db.query(Task).filter(Task.assignee_member_id == member.id)
     if status:
         q = q.filter(Task.status == status)
@@ -44,17 +52,18 @@ def company_tasks(runtime_agent_id: str, status: str | None = None, principal: P
 
 @router.post("/tasks/{task_id}/status")
 def update_task_status(task_id: int, runtime_agent_id: str, payload: dict = Body(...), principal: Principal = Depends(require_scope("company.tasks:write")), db: Session = Depends(get_db)):
-    agent, member = resolve_agent(db, runtime_agent_id, principal)
+    agent, member = resolve_agent(db, runtime_agent_id, principal, "company_task_status")
     task = db.get(Task, task_id)
     if not task or task.assignee_member_id != member.id:
         raise HTTPException(404, "Assigned task not found")
-    task.status = str(payload.get("status", task.status))
-    db.add(task); db.commit(); db.refresh(task)
+    # D1.4: trước đây nhận bất kỳ chuỗi nào; giờ agent đi cùng luật với người.
+    lifecycle.transition(db, task, str(payload.get("status", task.status)), via="agent_tool",
+                         actor_member_id=member.id, reason=str(payload.get("reason", "")))
     return {"id": task.id, "status": task.status}
 
 @router.post("/knowledge/search")
 def company_knowledge_search(runtime_agent_id: str, payload: dict = Body(...), principal: Principal = Depends(require_scope("company.knowledge:read")), db: Session = Depends(get_db)):
-    agent, member = resolve_agent(db, runtime_agent_id, principal)
+    agent, member = resolve_agent(db, runtime_agent_id, principal, "company_knowledge_search")
     query = str(payload.get("query", "")).strip()
     if not query:
         raise HTTPException(400, "query is required")
@@ -66,7 +75,7 @@ def company_knowledge_search(runtime_agent_id: str, payload: dict = Body(...), p
 
 @router.post("/approval/request")
 def company_approval_request(runtime_agent_id: str, payload: dict = Body(...), principal: Principal = Depends(require_scope("company.approvals:write")), db: Session = Depends(get_db)):
-    agent, member = resolve_agent(db, runtime_agent_id, principal)
+    agent, member = resolve_agent(db, runtime_agent_id, principal, "company_approval_request")
     action = str(payload.get("action", "")).strip()
     if not action:
         raise HTTPException(400, "action is required")
@@ -79,7 +88,7 @@ def company_approval_request(runtime_agent_id: str, payload: dict = Body(...), p
 
 @router.post("/message/owner")
 def company_message_owner(runtime_agent_id: str, payload: dict = Body(...), principal: Principal = Depends(require_scope("company.messages:write")), db: Session = Depends(get_db)):
-    agent, member = resolve_agent(db, runtime_agent_id, principal)
+    agent, member = resolve_agent(db, runtime_agent_id, principal, "company_message_send")
     manager = db.get(Member, member.manager_id) if member.manager_id else None
     recipient = manager.id if manager else None
     item = InboxItem(

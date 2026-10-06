@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     # từ schema sống" sập ngay bước đầu. Xem _reports/native-probe-agents.log.
     # 16 MiB khớp với checkpoint tối đa mà upstream tự đặt cho compaction.
     openclaw_max_frame_bytes: int = 16 * 1024 * 1024
+    openclaw_frame_log: str = ""  # D1.1: đường dẫn jsonl ghi mọi frame WS (để trống = tắt)
+    # M1.1: ký connect.challenge bằng khoá Ed25519 (bắt buộc khi gateway không ở loopback).
+    openclaw_device_auth: bool = True
+    openclaw_device_identity_path: str = ""  # trống = ~/.clawcompany/openclaw-device.json
+    openclaw_challenge_timeout_seconds: float = 5.0
     # Múi giờ để tính những thứ theo **ngày lịch**: hạn chót dự án, lịch họp,
     # "hôm nay có gì". Rỗng nghĩa là dùng giờ hệ thống của máy chạy API.
     #
@@ -60,6 +65,32 @@ class Settings(BaseSettings):
     # following. 0 disables the sweep; followers are then only re-attached by
     # boot resume or an explicit API call.
     openclaw_claim_sweep_seconds: int = 0
+    # D2.1 — hàng đợi wakeup. drain chạy bằng Celery beat (mỗi 5 giây); để
+    # chạy trong tiến trình API (dev, không có Redis) đặt WAKEUP_DRAIN_SECONDS > 0.
+    wakeup_drain_seconds: float = 0
+    wakeup_window_seconds: float = 10  # gộp các lý do của cùng seat trong cửa sổ này
+    wakeup_run_estimate_usd: float = 0.05  # số giữ chỗ để hỏi budget.can_reserve
+    wakeup_follow: bool = True  # gắn follower ngay sau khi dispatch (cần cho thẻ duyệt và chi phí)
+    # D2.2: run kết thúc không có comment → missing_report. Task có policy luôn bắt
+    # buộc; bật cờ này để bắt buộc cho mọi task.
+    require_run_report: bool = False
+    review_room_budget_usd: float = 0.5
+    # D2.3: sau khi run kết thúc, đối chiếu lại số đã quyết toán bằng
+    # sessions.usage của gateway (nguồn sự thật theo D1.2). Chỉ chạy ở chế độ native.
+    budget_true_up: bool = True
+    budget_true_up_delay_seconds: float = 3.0
+    # D3.2: một seat đang có từ số run mở này trở lên (queued/dispatched/running)
+    # thì coi là đầy, không nhận thêm việc qua dispatch_policy.
+    dispatch_max_open_runs: int = 2
+    # D3.5: approval chưa quyết sau chừng này giờ thì chuyển lên quản lý (có audit).
+    approval_ttl_hours: float = 24.0
+    # Quét approval quá hạn trong tiến trình API (dev, không Celery); 0 = tắt.
+    approval_escalate_seconds: float = 0
+    # D3.4: nhịp routines (cron/catch-up/kết cục) trong tiến trình API; 0 = tắt.
+    # Bật là cho phép hệ thống tự tạo việc và đánh thức seat theo lịch.
+    routines_tick_seconds: float = 0
+    # D3.3: goal mới → tạo việc "Lập kế hoạch" cho seat Nina và đánh thức (goal_created).
+    strategy_plan_on_goal: bool = True
 
     # v25: reconcile (report the gap, pull pending approvals) whenever a
     # follower attaches to a session. On by default because it is a no-op

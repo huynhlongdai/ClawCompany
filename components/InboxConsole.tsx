@@ -35,7 +35,35 @@ function Section({title, count, icon, children, empty}: {
   </section>;
 }
 
+/* D1.1 — hàng sinh từ gateway OpenClaw có evidence là JSON (lệnh, thư mục,
+   hạn). Bản trước in nguyên khối JSON làm tiêu đề. */
+function gatewayRequest(a: any): {command: string; cwd?: string; host?: string; expires?: number} | null {
+  if (!String(a.policy_key || "").startsWith("openclaw:")) return null;
+  try {
+    const ev = JSON.parse(a.evidence || "{}");
+    const req = ev?.event?.request || {};
+    const command = ev?.command || req.command || "";
+    return command ? {command, cwd: ev?.cwd || req.cwd, host: ev?.host || req.host,
+                      expires: ev?.expires_at_ms || ev?.event?.expiresAtMs} : null;
+  } catch { return null; }
+}
+
+function plainEvidence(a: any): string {
+  const t = String(a.evidence || "").trim();
+  return t && !t.startsWith("{") ? t : a.action;
+}
+
+/* D3.5: hạn duyệt; quá hạn thì routine hệ thống chuyển lên quản lý. */
+export function deadline(iso: string): string {
+  const ms = new Date(iso + (iso.endsWith("Z") ? "" : "Z")).getTime() - Date.now();
+  if (ms <= 0) return "quá hạn — sắp chuyển lên quản lý";
+  const h = Math.floor(ms / 3600000), m = Math.floor(ms % 3600000 / 60000);
+  return `còn ${h ? h + " giờ " : ""}${m} phút để duyệt`;
+}
+
 function ApprovalRow({a, who, onDone}: {a: any; who: string; onDone: (id: number) => void}) {
+  const gw = gatewayRequest(a);
+  const [notice, setNotice] = useState<string | null>(null);
   const [mode, setMode] = useState<null | "approved" | "rejected">(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -47,11 +75,22 @@ function ApprovalRow({a, who, onDone}: {a: any; who: string; onDone: (id: number
     if (mode === "rejected" && !note.trim()) { setErr("Ghi lý do từ chối để người gửi biết cần sửa gì."); return; }
     setBusy(true); setErr(null);
     try {
-      await apiInbox.resolveApproval(a.id, mode, note.trim());
+      const res: any = await apiInbox.resolveApproval(a.id, mode, note.trim());
+      const note_ = String(res?.resolution_note || "");
+      if (gw && note_.includes("recorded locally only")) {
+        // Quyết định đã ghi nhưng không tới được gateway: nói thẳng, lệnh của agent vẫn đang chờ.
+        setNotice("Đã ghi quyết định nhưng chưa gửi được tới OpenClaw — lệnh của agent vẫn đang chờ. "
+                  + (note_.match(/\((.*)\)\]?$/)?.[1] || ""));
+        setMode(null);
+        refreshCounts();
+        return;
+      }
       onDone(a.id);
       refreshCounts();
     } catch (e: any) {
-      setErr(String(e?.message || e).includes("403") ? "Tài khoản này không có quyền duyệt (cần vai trò quản lý)." : "Không gửi được quyết định. Thử lại.");
+      const msg = String(e?.message || e);
+      setErr(msg.includes("403") ? "Tài khoản này không có quyền duyệt (cần vai trò quản lý)."
+        : msg.includes("already") ? "Yêu cầu này đã được quyết định ở nơi khác." : "Không gửi được quyết định. Thử lại.");
     } finally { setBusy(false); }
   };
 
@@ -59,12 +98,20 @@ function ApprovalRow({a, who, onDone}: {a: any; who: string; onDone: (id: number
     <span className="ui-row-icon is-waiting"><Icon name="shield" size={16}/></span>
     <div className="ui-row-body">
       <div className="ui-row-title">
-        <b>{a.evidence || a.action}</b>
+        <b>{gw ? "Agent xin chạy lệnh trên máy chủ OpenClaw" : plainEvidence(a)}</b>
         <span className={"ui-status " + risk.cls}>{risk.label}</span>
       </div>
+      {gw && <pre className="ui-mono" data-testid="approval-command" style={{margin: "6px 0", padding: "8px 10px",
+        background: "var(--paper-2, #efeee9)", borderRadius: 8, whiteSpace: "pre-wrap", fontSize: 12.5}}>{gw.command}</pre>}
       <p className="ui-row-meta">
-        <code>{a.action}</code><span>·</span><span>{who} gửi</span><span>·</span><span className="ui-mono">#{a.id}</span>
+        {gw ? <>{gw.cwd && <><span>thư mục <code>{gw.cwd}</code></span><span>·</span></>}
+                {gw.expires && <><span>hết hạn {new Date(gw.expires).toLocaleTimeString("vi-VN", {hour: "2-digit", minute: "2-digit"})}</span><span>·</span></>}</>
+            : <><code>{a.action}</code><span>·</span>
+                {a.expires_at && <><span>{deadline(a.expires_at)}</span><span>·</span></>}
+                {a.escalated_at && <><span className="ui-status is-blocked">đã chuyển lên quản lý</span><span>·</span></>}</>}
+        <span>{who} gửi</span><span>·</span><span className="ui-mono">#{a.id}</span>
       </p>
+      {notice && <p className="ui-inline-error" role="status" data-testid="approval-notice">{notice}</p>}
       {mode && <div className="ui-confirm">
         <label htmlFor={"note-" + a.id}>{mode === "approved" ? "Ghi chú (không bắt buộc)" : "Lý do từ chối"}</label>
         <textarea id={"note-" + a.id} rows={2} value={note} onChange={e => setNote(e.target.value)} autoFocus
@@ -102,22 +149,39 @@ function TaskRow({t, tone}: {t: any; tone: "blocked" | "review"}) {
   </Link>;
 }
 
+/* D3.5 — mỗi việc một dòng: các báo cho cùng task (chờ duyệt, run lỗi, vào
+   review, được nhắc tên, ngân sách) gộp lại, có số lần và vài dòng gần nhất. */
 function NoticeRow({n, onRead}: {n: any; onRead: (id: number) => void}) {
   const unread = n.status === "unread";
-  const [busy, setBusy] = useState(false);
-  const when = n.created_at ? new Date(n.created_at).toLocaleString("vi-VN", {day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit"}) : "";
-  return <article className={"ui-row" + (unread ? " is-unread" : "")}>
-    <span className="ui-row-icon"><Icon name={n.item_type === "approval" ? "shield" : n.item_type === "project" ? "layers" : "bell"} size={16}/></span>
+  const [busy, setBusy] = useState(false), [open, setOpen] = useState(false);
+  const at = n.updated_at || n.created_at;
+  const when = at ? new Date(at + (String(at).endsWith("Z") ? "" : "Z")).toLocaleString("vi-VN", {day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit"}) : "";
+  const lines: string[] = n.lines || [];
+  return <article className={"ui-row" + (unread ? " is-unread" : "")} data-testid={`inbox-item-${n.id}`}>
+    <span className="ui-row-icon"><Icon name={String(n.kind).startsWith("approval") ? "shield" : n.kind === "run_failed" ? "alert" : "bell"} size={16}/></span>
     <div className="ui-row-body">
-      <div className="ui-row-title"><b>{n.title}</b>{n.priority === "high" && <span className="ui-prio is-high">Cao</span>}</div>
-      <p className="ui-row-meta"><span>{n.source || "Hệ thống"}</span>{when && <><span>·</span><span className="ui-mono">{when}</span></>}</p>
+      <div className="ui-row-title"><b>{n.title}</b>
+        {n.count > 1 && <span className="ui-num" title="Số báo đã gộp">×{n.count}</span>}
+        {(n.priority === "high" || n.priority === "urgent") && <span className="ui-prio is-high">{n.priority === "urgent" ? "Khẩn" : "Cao"}</span>}
+      </div>
+      <p className="ui-row-meta">
+        {(n.kinds_vi || []).map((k: string) => <span key={k} className="ui-status">{k}</span>)}
+        {n.task_id && <><span>·</span><Link href={`/app/tasks/${n.task_id}`}>task #{n.task_id}</Link></>}
+        {when && <><span>·</span><span className="ui-mono">{when}</span></>}
+        {lines.length > 1 && <><span>·</span><button className="ui-btn is-ghost" style={{padding: "0 6px"}} onClick={() => setOpen(!open)}>{open ? "Thu gọn" : `${lines.length} dòng`}</button></>}
+      </p>
+      {(open ? lines : lines.slice(0, 1)).map((l, i) => <p key={i} className="ui-row-meta" style={{margin: 0}}>{l}</p>)}
     </div>
-    {unread && <div className="ui-row-actions">
+    <div className="ui-row-actions">
+      {unread && <button className="ui-btn is-ghost" disabled={busy} onClick={async () => {
+        setBusy(true);
+        try { await apiInbox.setStatus(n.id, "read"); onRead(n.id); refreshCounts(); } catch { /* giữ nguyên */ } finally { setBusy(false); }
+      }}>Đã đọc</button>}
       <button className="ui-btn is-ghost" disabled={busy} onClick={async () => {
         setBusy(true);
-        try { await apiInbox.markRead(n.id); onRead(n.id); refreshCounts(); } catch { setBusy(false); }
-      }}>Đánh dấu đã đọc</button>
-    </div>}
+        try { await apiInbox.setStatus(n.id, "done"); onRead(-n.id); refreshCounts(); } catch { /* giữ nguyên */ } finally { setBusy(false); }
+      }}>Xong</button>
+    </div>
   </article>;
 }
 
@@ -131,7 +195,7 @@ export function InboxConsole() {
   const load = useCallback(() => {
     api.approvals().then((d: any) => setApprovals({data: d, error: null})).catch(e => setApprovals({data: null, error: String(e)}));
     apiV17.tasks().then(d => setTasks({data: d, error: null})).catch(e => setTasks({data: null, error: String(e)}));
-    api.inbox().then((d: any) => setNotices({data: d, error: null})).catch(e => setNotices({data: null, error: String(e)}));
+    apiInbox.mine().then((d: any) => setNotices({data: d.items, error: null})).catch(e => setNotices({data: null, error: String(e)}));
     apiV17.people().then(ps => setPeople(Object.fromEntries(ps.map((p: any) => [p.id, p.name])))).catch(() => {});
   }, []);
   useEffect(load, [load]);
@@ -140,7 +204,7 @@ export function InboxConsole() {
   const blocked = tasks.data?.filter(t => t.status === "blocked") ?? null;
   const review = tasks.data?.filter(t => t.status === "review") ?? null;
   const sortedNotices = notices.data ? [...notices.data].sort((a, b) =>
-    (a.status === "unread" ? 0 : 1) - (b.status === "unread" ? 0 : 1) || String(b.created_at).localeCompare(String(a.created_at))) : null;
+    (a.status === "unread" ? 0 : 1) - (b.status === "unread" ? 0 : 1) || String(b.updated_at || b.created_at).localeCompare(String(a.updated_at || a.created_at))) : null;
 
   const loading = approvals.data === null && !approvals.error;
   const anyError = approvals.error || tasks.error || notices.error;
@@ -173,9 +237,11 @@ export function InboxConsole() {
       {review?.map(t => <TaskRow key={t.id} t={t} tone="review"/>)}
     </Section>
 
-    <Section title="Thông báo" icon="bell" count={sortedNotices ? sortedNotices.length : null} empty="Chưa có thông báo.">
+    <Section title="Thông báo theo việc" icon="bell" count={sortedNotices ? sortedNotices.length : null} empty="Chưa có thông báo.">
       {sortedNotices?.map(n => <NoticeRow key={n.id} n={n} onRead={id =>
-        setNotices(s => ({...s, data: s.data?.map(x => x.id === id ? {...x, status: "read"} : x) || null}))}/>)}
+        setNotices(s => ({...s, data: id < 0 ? (s.data?.filter(x => x.id !== -id) || null)
+          : (s.data?.map(x => x.id === id ? {...x, status: "read"} : x) || null)}))}/>)}
     </Section>
+    <p className="ui-row-meta"><Link href="/app/approve">Mở màn duyệt nhanh (điện thoại) →</Link></p>
   </div>;
 }

@@ -82,9 +82,12 @@ def resumable(principal: Principal = Depends(require_scope(READ)), db: Session =
 
 
 @router.post("/runtime/resume")
-def resume(payload: ResumeIn, principal: Principal = Depends(writer("manager")),
+async def resume(payload: ResumeIn, principal: Principal = Depends(writer("manager")),
            db: Session = Depends(get_db)):
     """Re-attach followers for this organization's in-flight sessions.
+
+    ``async def`` vì ``supervisor.follow()`` gọi ``asyncio.create_task()``;
+    bản ``def`` chạy trong threadpool và luôn trả 500 "no running event loop".
 
     Safe to call repeatedly and from every worker: the lease decides who wins,
     the rest come back as declined.

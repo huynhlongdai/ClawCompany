@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
-from app.models import PermissionPolicy, RoleBinding, Approval
+from app.models import PermissionPolicy, RoleBinding, Approval, Member
 from app.core.authz import ROLE_ORDER
 
 @dataclass
@@ -27,6 +27,13 @@ def authorize(db: Session, organization_id: int, action: str, actor_member_id: i
         PermissionPolicy.enabled == True,
     ).first()
     if not policy:
+        # D1.6: với agent, "không có luật" nghĩa là "không được". Trước đây trả
+        # allow, nên mọi hành động chưa ai nghĩ tới đều tự động được phép cho
+        # agent. Người dùng giữ hành vi cũ.
+        actor = db.get(Member, actor_member_id) if actor_member_id else None
+        if actor is not None and actor.member_type == "agent":
+            return PolicyDecision("deny", f"No policy grants '{action}' to agent seats "
+                                          "(default deny)", "default_deny")
         return PolicyDecision("allow", "No restrictive policy matched")
     role = role_for_member(db, organization_id, actor_member_id, fallback_role)
     if ROLE_ORDER.get(role, -1) < ROLE_ORDER.get(policy.minimum_role, 999):

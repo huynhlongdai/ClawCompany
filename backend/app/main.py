@@ -22,6 +22,7 @@ from app.api.realtime import router as realtime_router
 from app.api.health import router as health_router
 from app.api.v7 import router as v7_router
 from app.api.company_tools import router as company_tools_router
+from app.api.mcp import router as mcp_router
 from app.api.v8 import router as v8_router
 from app.api.v9 import router as v9_router
 from app.api.v10 import router as v10_router
@@ -50,9 +51,17 @@ from app.api.v33 import router as v33_router
 from app.api.v34 import router as v34_router
 from app.api.v35 import router as v35_router
 from app.api.v36 import router as v36_router
+from app.api.routines import router as routines_router
+from app.api.strategy import router as strategy_router
 from app.core.middleware import RequestContextMiddleware
 
-Base.metadata.create_all(bind=engine)
+# M0: Postgres chỉ được dựng schema bằng alembic. Dòng create_all này từng chạy
+# trong uvicorn --reload (bind mount) ngay khi code mới được kéo về, TRƯỚC khi
+# container mới chạy ``alembic upgrade head`` → tạo sẵn bảng ``routines`` →
+# migration 0026 chết vì DuplicateTable trên box (06/10/2026). SQLite (dev/test)
+# vẫn giữ để chạy nhanh không cần alembic.
+if engine.url.get_backend_name() == "sqlite":
+    Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title=settings.app_name, version="1.26.0")
 app.add_middleware(RequestContextMiddleware)
@@ -85,6 +94,7 @@ app.include_router(realtime_router, prefix="/api")
 app.include_router(health_router, prefix="/api")
 app.include_router(v7_router, prefix="/api")
 app.include_router(company_tools_router, prefix="/api")
+app.include_router(mcp_router, prefix="/api")
 app.include_router(v8_router, prefix="/api")
 app.include_router(v9_router, prefix="/api")
 
@@ -119,10 +129,12 @@ app.include_router(v33_router, prefix="/api")
 app.include_router(v34_router, prefix="/api")
 app.include_router(v35_router, prefix="/api")
 app.include_router(v36_router, prefix="/api")
+app.include_router(routines_router, prefix="/api")
+app.include_router(strategy_router, prefix="/api")
 
 
 @app.on_event("startup")
-def resume_openclaw_followers() -> None:
+async def resume_openclaw_followers() -> None:
     """v21: re-attach session followers for work that was mid-run on restart.
 
     Opt-in, because attaching followers on boot starts outbound gateway
@@ -141,6 +153,55 @@ def resume_openclaw_followers() -> None:
         print(f"[v21] follower resume skipped: {exc}")
     finally:
         db.close()
+
+
+@app.on_event("startup")
+async def start_wakeup_drain() -> None:
+    """D2.1: drain hàng đợi wakeup trong tiến trình API (dev, không có Celery).
+
+    Tắt mặc định (WAKEUP_DRAIN_SECONDS=0): bật là cho phép hệ thống tự gọi
+    model có phí, nên phải là một quyết định nói ra."""
+    interval = settings.wakeup_drain_seconds
+    if interval <= 0:
+        return
+    import asyncio
+
+    from app.services.wakeup import drain_forever
+
+    try:
+        asyncio.create_task(drain_forever(interval), name="wakeup-drain")
+    except Exception as exc:  # noqa: BLE001 - never block startup
+        print(f"[D2.1] wakeup drain not started: {exc}")
+
+
+@app.on_event("startup")
+async def start_approval_escalation() -> None:
+    """D3.5: quét approval quá hạn trong tiến trình API (dev, không Celery)."""
+    interval = settings.approval_escalate_seconds
+    if interval <= 0:
+        return
+    import asyncio
+
+    from app.services.inbox import escalate_forever
+    try:
+        asyncio.create_task(escalate_forever(interval), name="approval-escalation")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[D3.5] approval escalation not started: {exc}")
+
+
+@app.on_event("startup")
+async def start_routines_tick() -> None:
+    """D3.4: nhịp routines trong tiến trình API (dev, không Celery); 0 = tắt."""
+    interval = settings.routines_tick_seconds
+    if interval <= 0:
+        return
+    import asyncio
+
+    from app.services.routines import tick_forever
+    try:
+        asyncio.create_task(tick_forever(interval), name="routines-tick")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[D3.4] routines tick not started: {exc}")
 
 
 @app.on_event("startup")

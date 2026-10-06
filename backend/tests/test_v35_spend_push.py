@@ -469,29 +469,15 @@ def test_stream_frames_terminates_and_yields_in_order():
     # việc dựng stub chính là cách che đi lỗi thật. live_channel đã được sửa
     # để scope qua project -> company, và test_org_scoping_joins_through_project
     # dưới đây kiểm chứng điều đó trên SQLite thật.
-    class _Session:
-        """Minimal session double for stream_frames.
-
-        live_channel.stream_frames() opens a session per tick via
-        session_factory(), then passes it to snapshot() → events_since() →
-        db.query(RuntimeEvent) and db.query(Task).  The double must expose
-        .query() returning a chainable no-op so the generator can run to
-        completion without hitting a real database.
-        """
-
-        def close(self):
-            pass
-
-        def query(self, *args):
-            class _Q:
-                def filter(self, *a, **kw): return self
-                def filter_by(self, **kw): return self
-                def order_by(self, *a): return self
-                def join(self, *a, **kw): return self
-                def limit(self, n): return self
-                def all(self): return []
-                def first(self): return None
-            return _Q()
+    # D0.2: phiên SQLite thật thay cho double trả rỗng mọi truy vấn.
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+    from app.db.base import Base
+    import app.models  # noqa: F401
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(bind=engine)
+    _Session = sessionmaker(bind=engine, autoflush=False)
 
     ticks = {"value": 0.0}
 

@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Project, Task
 from app.services.company_event_bus import emit_event
+from app.services import task_lifecycle as lifecycle
 from app.services.runtime_leases import store as lease_store
 
 SOURCE = "board_truth"
@@ -255,7 +256,9 @@ def archive_project(db: Session, project: Project, organization_id: int, *,
     for task in tasks:
         if task.status in OPEN_STATUSES:
             task_statuses[str(task.id)] = task.status
-            task.status = "cancelled"
+            lifecycle.transition(db, task, "cancelled", system=True, via="archive",
+                                 reason=f"project #{project.id} archived",
+                                 commit=False, emit=False)
             db.add(task)
             cancelled.append(task.id)
     # v28 records what the project was before the archive, so restoring it
