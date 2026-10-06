@@ -23,6 +23,8 @@ celery_app.conf.update(
         "v15-export-telemetry": {"task": "v15.export_telemetry", "schedule": 60.0},
         # D2.1: biến lý do đánh thức thành lượt chạy (gộp trong cửa sổ 10 giây).
         "drain-wakeups": {"task": "wakeups.drain", "schedule": 5.0},
+        # D3.5: approval quá hạn → chuyển lên quản lý (audit approval.escalated).
+        "escalate-overdue-approvals": {"task": "approvals.escalate_overdue", "schedule": 60.0},
     },
 )
 celery_app.autodiscover_tasks(["app.tasks"])

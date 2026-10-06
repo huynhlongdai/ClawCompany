@@ -127,6 +127,8 @@ def transition(db: Session, task: Task, to: str, *, reason: str = "", via: str =
     if to == "review":
         from app.services import execution_policy
         execution_policy.on_submitted(db, task, actor_member_id=actor_member_id)
+        from app.services import inbox  # D3.5: người duyệt (là người) nhận báo
+        inbox.task_review(db, task)
     return task
 
 

@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     # D3.2: một seat đang có từ số run mở này trở lên (queued/dispatched/running)
     # thì coi là đầy, không nhận thêm việc qua dispatch_policy.
     dispatch_max_open_runs: int = 2
+    # D3.5: approval chưa quyết sau chừng này giờ thì chuyển lên quản lý (có audit).
+    approval_ttl_hours: float = 24.0
+    # Quét approval quá hạn trong tiến trình API (dev, không Celery); 0 = tắt.
+    approval_escalate_seconds: float = 0
 
     # v25: reconcile (report the gap, pull pending approvals) whenever a
     # follower attaches to a session. On by default because it is a no-op

@@ -314,11 +314,11 @@ def _humans(db: Session, env: BudgetEnvelope, members: list[Member]) -> list[int
 
 
 def _inbox(db: Session, env: BudgetEnvelope, recipients: list[int], title: str, priority: str) -> list[int]:
-    from app.models.extended import InboxItem
-    items = [InboxItem(organization_id=env.organization_id, recipient_member_id=r, source="budget",
-                       title=title[:220], item_type="budget_threshold", priority=priority,
-                       related_type="budget_envelope", related_id=str(env.id)) for r in recipients]
-    db.add_all(items); db.commit()
+    from app.services import inbox  # D3.5: gộp theo phong bì, chỉ người nhận
+    kind = "budget_exhausted" if priority == "urgent" else "budget_warned"
+    items = inbox.notify(db, organization_id=env.organization_id, recipients=recipients, kind=kind,
+                         title=title, related_type="budget_envelope", related_id=str(env.id),
+                         priority=priority, source="budget")
     return [i.id for i in items]
 
 

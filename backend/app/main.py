@@ -165,6 +165,21 @@ async def start_wakeup_drain() -> None:
 
 
 @app.on_event("startup")
+async def start_approval_escalation() -> None:
+    """D3.5: quét approval quá hạn trong tiến trình API (dev, không Celery)."""
+    interval = settings.approval_escalate_seconds
+    if interval <= 0:
+        return
+    import asyncio
+
+    from app.services.inbox import escalate_forever
+    try:
+        asyncio.create_task(escalate_forever(interval), name="approval-escalation")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[D3.5] approval escalation not started: {exc}")
+
+
+@app.on_event("startup")
 async def start_orphan_sweep() -> None:
     """v22: keep taking over sessions whose follower died.
 

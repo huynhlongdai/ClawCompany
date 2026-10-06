@@ -393,6 +393,11 @@ def apply_terminal_state(db: Session, task: Task, state: ConsumerState, event: d
                              or ("missing_report" if reason == "missing_report" else ""), commit=False)
     lifecycle.transition(db, task, new_status, system=True, via="runtime",
                          reason=reason, commit=True, emit=False)
+    if new_status == "blocked":
+        # D3.5: run lỗi / thiếu báo cáo → quản lý (người) của người làm nhận báo.
+        from app.services import inbox
+        inbox.run_failed(db, task, str(event.get("errorMessage") or reason),
+                         member_id=holder.member_id if holder is not None else None)
     if holder is not None:
         # D2.3: quyết toán bằng task_runs.cost_usd (cộng từ session.message), trả
         # phần giữ thừa; rồi đối chiếu nền bằng sessions.usage của gateway.

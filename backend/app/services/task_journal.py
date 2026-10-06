@@ -116,6 +116,9 @@ def append(db: Session, task: Task, *, kind: str, summary: str,
                actor_member_id=actor_member_id,
                payload={"seq": entry.seq, "outcome": outcome, "kind": kind})
     mentioned = wake_mentions(db, task, entry, organization_id)
+    if organization_id is not None:
+        from app.services import inbox  # D3.5: @người → Hộp việc của người đó
+        inbox.mention(db, task, entry, organization_id)
     if getattr(task, "assignee_department_id", None):
         from app.services import routing
         routing.on_journal_entry(db, task, entry, mentioned)

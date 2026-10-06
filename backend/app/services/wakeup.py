@@ -357,6 +357,8 @@ async def _process(db: Session, member_id: int, items: list[Wakeup], now: dateti
         for wk in [primary, *same]:
             _close(wk, "failed", skip=why, now=now)
         db.commit(); _emit(db, primary, "wakeup.failed", why)
+        from app.services import inbox
+        inbox.run_failed(db, task, why, member_id=member_id)
         return {"member_id": member_id, "decision": "failed", "reason": why, "wakeups": [primary.id]}
 
     # Gắn follower NGAY sau chat.send, trước mọi ghi DB khác: gateway từ chối

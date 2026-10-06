@@ -34,3 +34,15 @@ def drain_wakeups():
         return asyncio.run(wakeup.drain(db, follow=False))
     finally:
         db.close()
+
+
+@celery_app.task(name="approvals.escalate_overdue")
+def escalate_overdue_approvals():
+    """D3.5: routine hệ thống — approval quá ``APPROVAL_TTL_HOURS`` chuyển lên quản lý."""
+    from app.db.session import SessionLocal
+    from app.services import inbox
+    db = SessionLocal()
+    try:
+        return inbox.escalate_overdue(db)
+    finally:
+        db.close()

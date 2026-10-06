@@ -169,3 +169,6 @@ class ApprovalOut(ORMModel):
     status: str
     evidence: str
     resolution_note: str
+    expires_at: datetime | None = None
+    escalate_to_member_id: int | None = None
+    escalated_at: datetime | None = None

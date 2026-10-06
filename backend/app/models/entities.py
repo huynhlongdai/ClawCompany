@@ -138,3 +138,7 @@ class Approval(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(24), default="pending")
     evidence: Mapped[str] = mapped_column(Text, default="")
     resolution_note: Mapped[str] = mapped_column(Text, default="")
+    # D3.5 (0025_inbox_escalation): hạn duyệt và người nhận khi quá hạn.
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    escalate_to_member_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True)
+    escalated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
