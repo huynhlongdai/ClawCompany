@@ -10,7 +10,7 @@ import {api, apiInbox, apiStrategy, apiV9, errorText} from "../lib/api";
 import {activeOrganizationId} from "../lib/auth";
 
 const GOAL_VI: Record<string, string> = {draft: "mới tạo", plan_pending: "kế hoạch chờ duyệt", plan_revision: "Nina đang sửa kế hoạch",
-  plan_rejected: "kế hoạch bị từ chối", active: "đang thực hiện"};
+  plan_rejected: "kế hoạch bị từ chối", active: "đang thực hiện", completed: "hoàn thành"};
 const PLAN_VI: Record<string, string> = {pending: "chờ duyệt", revision_requested: "đã yêu cầu sửa", approved: "đã duyệt", rejected: "từ chối"};
 
 export function StrategyConsole() {
