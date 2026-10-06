@@ -59,6 +59,8 @@ export const NAV: NavEntry[] = [
   {href: "/app/os?tab=knowledge", label: "Kiến thức", group: "team", icon: "book",
    desc: "Tài liệu, SOP và quyết định đã chốt", keywords: "knowledge sop docs"},
 
+  {href: "/app/routing", label: "Định tuyến phòng ban", group: "team", icon: "users",
+   desc: "Giao việc cho phòng, trưởng phòng chọn người", keywords: "routing department trưởng phòng giao việc"},
   {href: "/app/budgets", label: "Ngân sách", group: "control", icon: "coins",
    desc: "Hạn mức chi và sổ cái giữ chỗ", keywords: "budget cost chi phí"},
   {href: "/app/agent-tools", label: "Công cụ của agent", group: "control", icon: "shield",

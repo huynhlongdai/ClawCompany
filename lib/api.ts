@@ -304,6 +304,10 @@ export const apiV18 = {
   updateProject: (id:number, body:any) => request(`/v18/workspace/projects/${id}`, {method:"PATCH", body:JSON.stringify(body)}),
   createTask: (body:any) => request(`/v18/workspace/tasks`, {method:"POST", body:JSON.stringify(body)}),
   moveTask: (id:number, status:string) => request(`/v18/workspace/tasks/${id}/move`, {method:"POST", body:JSON.stringify({status})}),
+  // D3.1: giao việc cho phòng ban; trưởng phòng định tuyến
+  routeTask: (id:number, department_id:number, reason="") => request(`/v18/workspace/tasks/${id}/route`, {method:"POST", body:JSON.stringify({department_id, reason})}),
+  departmentRouting: (id:number) => request<any>(`/v18/workspace/departments/${id}/routing`),
+  setDepartmentGuide: (id:number, guide:string) => request(`/v18/workspace/departments/${id}/guide`, {method:"PUT", body:JSON.stringify({guide})}),
   assignTask: (id:number, assignee_member_id:number|null) => request(`/v18/workspace/tasks/${id}/assign`, {method:"POST", body:JSON.stringify({assignee_member_id})}),
   createKnowledge: (body:any) => request(`/v18/workspace/knowledge`, {method:"POST", body:JSON.stringify(body)}),
 };

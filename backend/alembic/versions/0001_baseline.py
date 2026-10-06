@@ -88,8 +88,10 @@ COLUMNS_OWNED_BY_LATER_MIGRATIONS = {
               "parent_task_id", "goal_id", "due_at",  # 0018_task_graph
               "acceptance_criteria",
               "checkout_run_id",                     # 0019_task_runs
-              "execution_policy", "execution_state"],  # 0022_execution_policy
-    "departments": ["row_revision", "status"],      # 0013, 0014
+              "execution_policy", "execution_state",  # 0022_execution_policy
+              "assignee_department_id"],             # 0024_department_routing
+    "departments": ["row_revision", "status",       # 0013, 0014
+                    "guide"],                       # 0024
 }
 
 # 0014 tự tạo index unique này; model cũng khai nó, nên create_all sẽ tạo
