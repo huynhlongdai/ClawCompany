@@ -102,7 +102,8 @@ def planning_brief(db: Session, goal: ExecutiveGoal, company_id: int | None) -> 
     lines += ["", "## Giao thức",
               f"1. Phân rã mục tiêu thành 3–{MAX_TASKS} việc. Mỗi việc: key, title, description, "
               "acceptance_criteria (bắt buộc), department_id (giao phòng — trưởng phòng chọn người) "
-              "hoặc member_id (giao thẳng), budget_usd, depends_on (danh sách key), priority.",
+              "hoặc member_id (giao thẳng), budget_usd, depends_on (danh sách key), priority, "
+              "reviewer_member_id (review chéo: người/seat khác duyệt trước khi xong).",
               f"2. Gọi `company_plan_submit` với goal_id={goal.id}, summary (vì sao chia như vậy) và tasks.",
               "3. Kế hoạch đi vào hàng duyệt. Nếu người duyệt yêu cầu sửa, ghi chú nằm trong sổ của việc này: "
               "sửa theo ghi chú rồi gọi lại `company_plan_submit`.",
@@ -188,6 +189,17 @@ def _clean(db: Session, goal: ExecutiveGoal, company_id: int | None, tasks) -> l
                 raise StrategyError("invalid_argument", f"Việc '{key}': không có thành viên #{member_id} đang làm việc")
             if dept_id is not None and m.department_id != dept_id:
                 raise StrategyError("invalid_argument", f"Việc '{key}': #{member_id} không thuộc phòng #{dept_id}")
+        reviewer = t.get("reviewer_member_id")
+        try:
+            reviewer = int(reviewer) if reviewer not in (None, "") else None
+        except (TypeError, ValueError):
+            raise StrategyError("invalid_argument", f"Việc '{key}': reviewer_member_id sai kiểu") from None
+        if reviewer is not None:
+            rv = db.get(Member, reviewer)
+            if rv is None or rv.organization_id != goal.organization_id or rv.company_id != company_id:
+                raise StrategyError("invalid_argument", f"Việc '{key}': không có reviewer #{reviewer}")
+            if member_id is not None and reviewer == member_id:
+                raise StrategyError("invalid_argument", f"Việc '{key}': người làm không tự review")
         deps = t.get("depends_on") or []
         if not isinstance(deps, list):
             raise StrategyError("invalid_argument", f"Việc '{key}': depends_on phải là danh sách key")
@@ -195,6 +207,7 @@ def _clean(db: Session, goal: ExecutiveGoal, company_id: int | None, tasks) -> l
         out.append({"key": key, "title": title[:220], "description": str(t.get("description") or "")[:4000],
                     "acceptance_criteria": ac[:2000], "department_id": dept_id, "member_id": member_id,
                     "budget_usd": round(budget, 4), "depends_on": [str(x) for x in deps],
+                    "reviewer_member_id": reviewer,
                     "priority": prio if prio in PRIORITIES else "medium"})
     for t in out:
         for k in t["depends_on"]:
@@ -379,6 +392,11 @@ def plan_apply(db: Session, a: Approval, *, actor_member_id: int | None = None) 
                     parent_task_id=parent.id if parent else None, acceptance_criteria=t["acceptance_criteria"],
                     priority=t["priority"], status="todo")
         db.add(task); db.commit(); db.refresh(task)
+        if t.get("reviewer_member_id"):
+            # Review chéo (D2.2): người khác duyệt trước khi việc được "done".
+            from app.services import execution_policy
+            execution_policy.set_policy(db, task, {"stages": [{"type": "review",
+                                                               "participants": [t["reviewer_member_id"]]}]})
         made[t["key"]] = task
     for t in plan:
         for k in t["depends_on"]:
@@ -429,6 +447,51 @@ def plan_apply(db: Session, a: Approval, *, actor_member_id: int | None = None) 
                source=SOURCE, aggregate_type="goal", aggregate_id=str(goal.id), actor_member_id=actor_member_id,
                payload=payload_ev)
     return {"applied": True, **applied}
+
+
+# ------------------------------------------------------------------ hoàn thành
+
+def goal_tasks(db: Session, goal_id: int) -> list[Task]:
+    plan_task = planning_task(db, goal_id)
+    if plan_task is None:
+        return []
+    return db.query(Task).filter(Task.goal_id == goal_id, Task.parent_task_id == plan_task.id).all()
+
+
+def on_task_closed(db: Session, task: Task) -> dict | None:
+    """Việc con của một mục tiêu đóng → cập nhật tiến độ; xong hết → mục tiêu hoàn thành
+    và báo người duyệt kế hoạch một lần (lần ping thứ hai của kịch bản G5). Không bao giờ ném."""
+    from app.services import inbox
+    try:
+        goal = db.get(ExecutiveGoal, task.goal_id)
+        if goal is None or goal.status == "completed":
+            return None
+        kids = goal_tasks(db, goal.id)
+        if not kids or task.id not in {k.id for k in kids}:
+            return None
+        live = [k for k in kids if k.status != "cancelled"]
+        done = [k for k in live if k.status == "done"]
+        goal.progress = int(round(100 * len(done) / len(live))) if live else 100
+        if live and len(done) < len(live):
+            db.commit()
+            return {"goal_id": goal.id, "progress": goal.progress}
+        goal.status = "completed"
+        db.commit()
+        plan = (db.query(Approval).filter(Approval.policy_key == policy_key(goal.id), Approval.status == "approved")
+                .order_by(Approval.id.desc()).first())
+        recipients = [plan.approver_member_id] if plan and plan.approver_member_id else [approver_for(db, goal, None)]
+        emit_event(db, organization_id=goal.organization_id, company_id=goal.company_id, event_type="goal.completed",
+                   source=SOURCE, aggregate_type="goal", aggregate_id=str(goal.id),
+                   payload={"goal_id": goal.id, "tasks": len(kids), "done": len(done)})
+        inbox.notify(db, organization_id=goal.organization_id, recipients=recipients, kind="goal_completed",
+                     title=f"Mục tiêu #{goal.id} hoàn thành: {goal.title}", related_type="goal",
+                     related_id=str(goal.id), priority="high", source="strategy",
+                     line=f"{len(done)}/{len(live)} việc xong")
+        return {"goal_id": goal.id, "progress": 100, "completed": True}
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        print(f"[D3.3] goal completion check for task #{task.id} failed: {exc}")
+        return None
 
 
 # ------------------------------------------------------------------ đọc
