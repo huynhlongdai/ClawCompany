@@ -4,16 +4,46 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api"
 // argument, nên nếu không có default chúng trả Promise<unknown> và mọi
 // setState(await api...) đều là type error. Không có contract type sinh từ
 // backend, nên any là mô tả trung thực hiện trạng, không phải cách né kiểu.
+/** M1: lỗi API mang mã + câu tiếng Việt thay vì nguyên chuỗi JSON. */
+export class ApiError extends Error {
+  status:number; code:string; requestId:string;
+  constructor(message:string, status:number, code="", requestId=""){
+    super(message); this.name="ApiError"; this.status=status; this.code=code; this.requestId=requestId;
+  }
+}
+
+export function describeError(status:number, text:string):ApiError{
+  let body:any = null;
+  try{ body = JSON.parse(text); }catch{ /* không phải JSON */ }
+  const d = body?.detail;
+  let msg = typeof d === "string" ? d
+    : Array.isArray(d) ? d.map((x:any)=>`${(x.loc||[]).slice(1).join(".")}: ${x.msg}`).join("; ")
+    : d ? JSON.stringify(d) : (text || "");
+  if(!msg){
+    msg = status===401 ? "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại."
+      : status===403 ? "Bạn không có quyền làm việc này."
+      : status===404 ? "Không tìm thấy dữ liệu."
+      : status>=500 ? "Máy chủ gặp lỗi. Thử lại sau ít giây."
+      : `Yêu cầu không hợp lệ (HTTP ${status}).`;
+  }
+  const rid = body?.request_id || "";
+  return new ApiError(rid ? `${msg} (mã yêu cầu ${rid})` : msg, status, body?.code || "", rid);
+}
+
 async function request<T = any>(path:string, init?:RequestInit):Promise<T>{
   const token = typeof window!=="undefined" ? localStorage.getItem("clawcompany_token") : null;
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {"Content-Type":"application/json", ...(token?{Authorization:`Bearer ${token}`}:{ }), ...(init?.headers||{})},
-    cache: "no-store",
-  });
+  let res:Response;
+  try{
+    res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: {"Content-Type":"application/json", ...(token?{Authorization:`Bearer ${token}`}:{ }), ...(init?.headers||{})},
+      cache: "no-store",
+    });
+  }catch{
+    throw new ApiError("Không kết nối được máy chủ API. Kiểm tra mạng hoặc dịch vụ api đang chạy.", 0, "network");
+  }
   if(!res.ok){
-    const text = await res.text();
-    throw new Error(text || `HTTP ${res.status}`);
+    throw describeError(res.status, await res.text());
   }
   return res.json();
 }
@@ -315,6 +345,8 @@ export const apiV18 = {
 export const apiV19 = {
   protocol: () => request<any>(`/v19/openclaw/protocol`),
   health: () => request<any>(`/v19/openclaw/health`),
+  doctor: () => request<any>(`/v19/openclaw/doctor`),
+  doctorAction: (method:string, path:string) => request<any>(path, {method}),
   gatewayAgents: () => request<any>(`/v19/openclaw/agents`),
   seats: () => request<any>(`/v19/openclaw/seats`),
   reconcile: () => request<any>(`/v19/openclaw/reconcile`, {method:"POST"}),

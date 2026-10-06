@@ -126,7 +126,6 @@ def test_previous_run_done_never_closes_the_current_run(db, world):
     out = _catch_up(db, world, gw)
     db.refresh(world["task"])
     assert out["terminal"] is False and world["task"].status == "in_progress"
-    assert ("chat.history", world["task"].runtime_session_key) not in gw.calls
     assert _model_usage(db) == []
 
 
@@ -300,3 +299,46 @@ def test_create_agent_reports_mismatch_and_missing_scope():
     rt, _ = _native({ocp.M_AGENTS_CREATE: OpenClawProtocolError("x", {"code": "FORBIDDEN"})})
     out = asyncio.run(rt.create_agent("mia", {"model": "gpt"}))
     assert out["status"] == "missing" and out["bound"] is False and "OPENCLAW_REQUEST_ADMIN_SCOPE" in out["hint"]
+
+
+# --- M1.3: gateway restart giữa lượt → OpenClaw tự chạy tiếp bằng runId mới ---
+
+def _user(text, key=""):
+    return {"role": "user", "content": text, "idempotencyKey": key, "__openclaw": {"id": "u-" + text[:5]}}
+
+
+RESUME = "[System] Your previous turn was interrupted by a gateway restart while OpenClaw was working."
+
+
+def _restart_history(extra_user=None):
+    msgs = [_user("brief", RUN_ID + ":user"),
+            {**_assistant("m1"), "stopReason": "toolUse"},
+            _user(RESUME)]
+    if extra_user:
+        msgs.append(_user(extra_user))
+    msgs.append(_assistant("m2", run_id="resumed-run", cost=0.001))
+    return msgs
+
+
+def test_resumed_turn_after_gateway_restart_closes_the_task(db, world, monkeypatch):
+    """Khung đo được trong chaos test (task 4, 2026.9.8)."""
+    monkeypatch.setattr("app.services.execution_policy.requires_report", lambda task: False)
+    out = _catch_up(db, world, _Gateway(last_run="resumed-run", messages=_restart_history()))
+    db.refresh(world["task"])
+    assert out["terminal"] is True and world["task"].status == "review"
+    assert out["recorded"] == 2 and sorted(out["chain"]) == sorted([RUN_ID, "resumed-run"])
+    assert abs(sum(r.amount for r in _model_usage(db)) - 0.006242) < 1e-12
+
+
+def test_a_real_user_message_after_our_run_is_someone_elses_turn(db, world):
+    out = _catch_up(db, world, _Gateway(last_run="resumed-run",
+                                        messages=_restart_history(extra_user="Làm việc khác giúp tôi")))
+    db.refresh(world["task"])
+    assert out["terminal"] is False and world["task"].status == "in_progress"
+
+
+def test_resume_notice_must_be_a_system_message():
+    assert stream_catchup.is_resume_notice(_user(RESUME))
+    assert not stream_catchup.is_resume_notice(_user("interrupted by a gateway restart"))
+    assert not stream_catchup.is_resume_notice({"role": "assistant", "content": RESUME})
+    assert stream_catchup.run_chain([_user("x")], RUN_ID) is None

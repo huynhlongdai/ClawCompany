@@ -178,7 +178,8 @@ def session_key_for_task(runtime_agent_id: str, task_id: int) -> str:
 
 def runtime_descriptor() -> dict:
     """What this deployment is actually pointed at."""
-    mode = settings.openclaw_mode.lower()
+    from app.runtime.factory import resolve_mode
+    mode = resolve_mode(settings.openclaw_mode)
     return {
         "mode": mode,
         "native": mode in ("native", "openclaw"),

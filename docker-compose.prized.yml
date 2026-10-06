@@ -6,3 +6,15 @@ services:
     environment:
       NEXT_PUBLIC_API_BASE: /api
       API_PROXY_TARGET: http://api:8000
+
+  # M1 bảo mật: DB/Redis/API chỉ nghe trên máy (web proxy /api → api:8000 trong mạng docker).
+  # Trước đó Postgres 5432 và Redis 6379 (không mật khẩu) mở ra 0.0.0.0.
+  db:
+    ports: !override
+      - "127.0.0.1:5432:5432"
+  redis:
+    ports: !override
+      - "127.0.0.1:6379:6379"
+  api:
+    ports: !override
+      - "127.0.0.1:8000:8000"

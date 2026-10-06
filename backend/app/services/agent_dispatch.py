@@ -21,6 +21,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.runtime.factory import resolve_mode
 from app.models import Agent, CustomerProjectAssignment, Member, Task
 from app.realtime import broker
 from app.runtime.factory import get_runtime
@@ -120,7 +121,7 @@ async def dispatch_task(db: Session, task: Task, *, trigger_kind: str = "manual"
 
 def follow_after_send(session_key: str | None, organization_id: int, task_id: int) -> str | None:
     """Theo dõi phiên vừa gửi. Idempotent; lỗi follow không làm hỏng lượt đã gửi."""
-    if not (session_key and settings.wakeup_follow and settings.openclaw_mode == "native"):
+    if not (session_key and settings.wakeup_follow and resolve_mode(settings.openclaw_mode) == "native"):
         return None
     try:
         from app.services.runtime_stream import supervisor

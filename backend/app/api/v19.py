@@ -143,6 +143,13 @@ def bind(body: BindIn, db: Session = Depends(get_db), principal: Principal = Dep
     }
 
 
+@router.get("/openclaw/doctor")
+async def doctor(db: Session = Depends(get_db), principal: Principal = Depends(require_scope(READ))):
+    """M1: doctor 1 nút — DB, chế độ, kết nối, model, agent↔ghế, quyền duyệt, heartbeat."""
+    from app.services import openclaw_doctor
+    return await openclaw_doctor.run(db, get_runtime(), active_org(principal))
+
+
 # --------------------------------------------------------------------------- task runs
 
 @router.post("/tasks/{task_id}/start")

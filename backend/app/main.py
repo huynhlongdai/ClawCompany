@@ -54,6 +54,7 @@ from app.api.v36 import router as v36_router
 from app.api.routines import router as routines_router
 from app.api.strategy import router as strategy_router
 from app.core.middleware import RequestContextMiddleware
+from app.core.errors import JSONErrorMiddleware
 
 # M0: Postgres chỉ được dựng schema bằng alembic. Dòng create_all này từng chạy
 # trong uvicorn --reload (bind mount) ngay khi code mới được kéo về, TRƯỚC khi
@@ -65,6 +66,8 @@ if engine.url.get_backend_name() == "sqlite":
 
 app = FastAPI(title=settings.app_name, version="1.26.0")
 app.add_middleware(RequestContextMiddleware)
+# M1: phải nằm TRONG CORS (thêm trước) để phản hồi 500 vẫn có header CORS.
+app.add_middleware(JSONErrorMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[x.strip() for x in settings.cors_origins.split(",") if x.strip()],
@@ -74,8 +77,27 @@ app.add_middleware(
 )
 
 @app.get("/health")
-def health():
-    return {"status":"ok","service":"clawcompany-api","version":"1.26.0"}
+async def health(deep: bool = False):
+    """Sống + DB đúng revision. ``?deep=1`` hỏi thêm gateway (có hạn giờ).
+
+    M1: trước đây luôn ``ok`` kể cả khi DB thiếu 4 migration — đúng lỗi box gặp.
+    """
+    from app.services import schema_status
+    from app.runtime.factory import get_runtime, resolve_mode
+    sch = schema_status.status(engine)
+    out = {"status": "ok" if sch["schema"] in ("ok", "unmanaged") else "degraded",
+           "service": "clawcompany-api", "version": "1.26.0", "schema": sch,
+           "openclaw": {"mode": settings.openclaw_mode}}
+    if deep and resolve_mode(settings.openclaw_mode) == "native":
+        import asyncio
+        from app.runtime import openclaw_protocol as ocp
+        try:
+            st = await asyncio.wait_for(get_runtime().rpc(ocp.M_STATUS, {}), timeout=5)
+            out["openclaw"].update(status="healthy", version=st.get("runtimeVersion"))
+        except Exception as exc:  # noqa: BLE001
+            out["openclaw"].update(status="unreachable", error=str(exc)[:200])
+            out["status"] = "degraded"
+    return out
 
 app.include_router(organizations_router, prefix="/api")
 app.include_router(companies_router, prefix="/api")

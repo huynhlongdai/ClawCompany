@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     # địa chỉ còn lại sẽ bị chặn CORS mà không có thông báo nào ở phía server.
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     app_version: str = "1.26.0"
-    openclaw_mode: str = "mock"  # mock | native | gateway (legacy guessed contract)
+    openclaw_mode: str = "mock"  # mock | native  ("gateway" cũ = native, M1)
     openclaw_gateway_ws: str = "ws://127.0.0.1:18789"
     openclaw_gateway_http: str = ""  # defaults to the ws url with an http scheme
     openclaw_api_token: str = ""
@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     openclaw_auto_dispatch: bool = False  # start an OpenClaw run when a task moves to in_progress
     # v21: re-attach session followers on boot for tasks still in progress.
     openclaw_resume_on_boot: bool = False
+    # M1.3: follower mất kết nối thì nối lại tối đa N lần (backoff 1,2,4…≤30s).
+    openclaw_stream_max_reconnects: int = 8  # chaos: gateway 2026.9.8 cần ~20s mới nhận kết nối lại
+    openclaw_stream_backoff_seconds: float = 1.0
     # v21: ask the gateway for operator.approvals so approvals can be answered
     # from ClawCompany. Off by default: it widens what this backend may do.
     openclaw_request_approvals_scope: bool = False
