@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import time
 import uuid
 from typing import Any, AsyncIterator
 
@@ -132,7 +133,7 @@ class NativeOpenClawRuntime(AgentRuntime):
             "params": params or {},
         }
 
-    def _connect_params(self) -> dict[str, Any]:
+    def _connect_params(self, challenge: dict | None = None) -> dict[str, Any]:
         """Params của ``connect`` theo ``ConnectParamsSchema`` (closedObject).
 
         Những chỗ bản cũ sai:
@@ -169,7 +170,46 @@ class NativeOpenClawRuntime(AgentRuntime):
             params["caps"] = caps
         if self.token:
             params["auth"] = {"token": self.token}
+        device = self._device_block(params, challenge)
+        if device:
+            params["device"] = device
         return params
+
+    def _device_block(self, params: dict[str, Any], challenge: dict | None) -> dict | None:
+        """M1.1 — ``connect.params.device`` ký trên nonce của ``connect.challenge``.
+
+        Không có challenge (gateway cũ) hoặc tắt ``openclaw_device_auth`` thì
+        không gửi: schema bắt buộc ``nonce`` nên không thể ký "khống".
+        """
+        if not settings.openclaw_device_auth or not challenge or not challenge.get("nonce"):
+            return None
+        from app.runtime import openclaw_device
+        ident = openclaw_device.load_or_create(settings.openclaw_device_identity_path or None)
+        ts = challenge.get("ts")
+        signed_at = int(ts) if isinstance(ts, (int, float)) and ts >= 0 else int(time.time() * 1000)
+        client = params["client"]
+        return ident.device_block(
+            client_id=client["id"], client_mode=client["mode"], role=params["role"],
+            scopes=list(params.get("scopes") or []), token=self.token or None,
+            nonce=str(challenge["nonce"]), signed_at_ms=signed_at,
+            platform=client.get("platform"), device_family=client.get("deviceFamily"))
+
+    async def _await_challenge(self, ws) -> dict | None:
+        """Đọc event ``connect.challenge`` gateway gửi ngay khi mở socket."""
+        if not settings.openclaw_device_auth:
+            return None
+        deadline = time.monotonic() + settings.openclaw_challenge_timeout_seconds
+        while True:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                return None
+            try:
+                frame = json.loads(await _recv(ws, timeout=left))
+            except asyncio.TimeoutError:
+                return None
+            if frame.get("type") == "event" and frame.get("event") == "connect.challenge":
+                payload = frame.get("payload")
+                return payload if isinstance(payload, dict) else None
 
     def caps(self) -> list[str]:
         """D1.1 — năng lực client khai trong ``connect.params.caps``.
@@ -192,7 +232,8 @@ class NativeOpenClawRuntime(AgentRuntime):
         chấp nhận cả hai hình dạng thay vì ghim một cái.
         """
         request_id = str(uuid.uuid4())
-        await _send(ws, json.dumps(self._request_frame("connect", self._connect_params(), request_id)))
+        challenge = await self._await_challenge(ws)
+        await _send(ws, json.dumps(self._request_frame("connect", self._connect_params(challenge), request_id)))
         # Không đọc đúng một frame rồi tin đó là hello-ok: gateway thật có thể
         # chen event/tick vào trước. Đọc tới khi thấy frame mang đúng id của
         # lời gọi connect (đo được với OpenClaw 2026.9.4).
@@ -202,7 +243,13 @@ class NativeOpenClawRuntime(AgentRuntime):
             if hello.get("id") is not None and str(hello.get("id")) != request_id:
                 continue
             if hello.get("error"):
-                raise OpenClawProtocolError(str(hello["error"]))
+                err = hello["error"] if isinstance(hello["error"], dict) else {"message": hello["error"]}
+                code = str((err.get("details") or {}).get("code") or err.get("code") or "")
+                if code in ("PAIRING_REQUIRED", "NOT_PAIRED") or "pairing required" in str(err.get("message", "")):
+                    raise OpenClawProtocolError(
+                        "Gateway chưa duyệt thiết bị ClawCompany. Trên máy gateway chạy: "
+                        "openclaw devices list → openclaw devices approve <requestId>", err)
+                raise OpenClawProtocolError(str(hello["error"]), err)
             if hello.get("ok") is False:
                 raise OpenClawProtocolError(f"gateway refused the handshake: {hello}")
             if hello.get("id") is None and hello.get("type") not in ("hello-ok", "res"):

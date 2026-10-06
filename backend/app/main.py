@@ -55,7 +55,13 @@ from app.api.routines import router as routines_router
 from app.api.strategy import router as strategy_router
 from app.core.middleware import RequestContextMiddleware
 
-Base.metadata.create_all(bind=engine)
+# M0: Postgres chỉ được dựng schema bằng alembic. Dòng create_all này từng chạy
+# trong uvicorn --reload (bind mount) ngay khi code mới được kéo về, TRƯỚC khi
+# container mới chạy ``alembic upgrade head`` → tạo sẵn bảng ``routines`` →
+# migration 0026 chết vì DuplicateTable trên box (06/10/2026). SQLite (dev/test)
+# vẫn giữ để chạy nhanh không cần alembic.
+if engine.url.get_backend_name() == "sqlite":
+    Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title=settings.app_name, version="1.26.0")
 app.add_middleware(RequestContextMiddleware)

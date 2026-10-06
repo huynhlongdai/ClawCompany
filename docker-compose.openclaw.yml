@@ -1,0 +1,31 @@
+# Gateway OpenClaw thật cho ClawCompany (thay OPENCLAW_MODE=mock).
+#   1 lần: tạo .env.openclaw có OPENCLAW_GATEWAY_TOKEN=<chuỗi ngẫu nhiên> (+ key model nếu có)
+#   docker compose --env-file .env.openclaw -f docker-compose.yml -f docker-compose.prized.yml -f docker-compose.openclaw.yml up -d
+# Gateway chỉ nằm trong mạng docker (không publish cổng); api/worker/beat gọi ws://openclaw:18789.
+x-openclaw-env: &oc-env
+  OPENCLAW_MODE: native
+  OPENCLAW_GATEWAY_WS: ws://openclaw:18789
+  OPENCLAW_API_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:?thiếu OPENCLAW_GATEWAY_TOKEN}
+  # M1.1: api/worker/beat dùng chung 1 khoá thiết bị → chỉ phải duyệt ghép đôi 1 lần
+  OPENCLAW_DEVICE_IDENTITY_PATH: /var/lib/clawcompany/openclaw-device.json
+services:
+  openclaw:
+    image: ghcr.io/openclaw/openclaw:2026.9.8
+    restart: unless-stopped
+    command: ["node", "openclaw.mjs", "gateway", "--bind", "lan", "--port", "18789"]
+    env_file: [.env.openclaw]
+    volumes:
+      - openclaw_home:/home/node/.openclaw
+  api:
+    environment: *oc-env
+    volumes: [clawcompany_device:/var/lib/clawcompany]
+    depends_on: [openclaw]
+  worker:
+    environment: *oc-env
+    volumes: [clawcompany_device:/var/lib/clawcompany]
+  beat:
+    environment: *oc-env
+    volumes: [clawcompany_device:/var/lib/clawcompany]
+volumes:
+  openclaw_home:
+  clawcompany_device:

@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     # 16 MiB khớp với checkpoint tối đa mà upstream tự đặt cho compaction.
     openclaw_max_frame_bytes: int = 16 * 1024 * 1024
     openclaw_frame_log: str = ""  # D1.1: đường dẫn jsonl ghi mọi frame WS (để trống = tắt)
+    # M1.1: ký connect.challenge bằng khoá Ed25519 (bắt buộc khi gateway không ở loopback).
+    openclaw_device_auth: bool = True
+    openclaw_device_identity_path: str = ""  # trống = ~/.clawcompany/openclaw-device.json
+    openclaw_challenge_timeout_seconds: float = 5.0
     # Múi giờ để tính những thứ theo **ngày lịch**: hạn chót dự án, lịch họp,
     # "hôm nay có gì". Rỗng nghĩa là dùng giờ hệ thống của máy chạy API.
     #
