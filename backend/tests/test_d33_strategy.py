@@ -204,6 +204,10 @@ def test_revision_loop_then_approve_creates_tasks_for_three_departments(env):
     assert out["approval_id"] == a.id and (a.status, a.revision) == ("pending", 2)
     assert a.payload["history"][0]["revision"] == 1 and "báo cáo" in a.payload["history"][0]["note"]
     assert db.query(Approval).filter(Approval.action == "strategy").count() == 1
+    reopened = db.query(InboxItem).filter(InboxItem.recipient_member_id == env["boss"].id,
+                                          InboxItem.status == "unread").all()
+    assert any("approval_pending" in (i.kinds or "") for i in reopened)     # người duyệt được báo lại
+    assert a.expires_at is not None and a.expires_at > datetime.utcnow() + timedelta(hours=23)
     # Duyệt → áp kế hoạch
     r = c.post(f"/api/approvals/{a.id}/resolve", headers=H, json={"status": "approved"})
     assert r.status_code == 200, r.text

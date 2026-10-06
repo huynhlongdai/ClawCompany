@@ -95,7 +95,7 @@ def env():
     db.close()
 
 
-def test_initialize_and_list_all_24_tools(env):
+def test_initialize_and_list_all_25_tools(env):
     k = env["key"](env["nina"])
     r = env["rpc"](k, "initialize", {"protocolVersion": "2025-03-26", "capabilities": {},
                                      "clientInfo": {"name": "openclaw"}})
@@ -107,7 +107,7 @@ def test_initialize_and_list_all_24_tools(env):
     assert n.status_code == 202
     tools = env["rpc"](k, "tools/list").json()["result"]["tools"]
     names = {t["name"] for t in tools}
-    assert len(tools) == 24 and all(n.startswith("company_") for n in names)
+    assert len(tools) == 25 and all(n.startswith("company_") for n in names)
     assert "company_task_checkout" in names
 
 
