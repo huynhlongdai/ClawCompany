@@ -47,3 +47,4 @@ toolResult thật: `clawcompany-approval-e2e\n2026-10-05T23:49:19Z` (isError=fal
 2. **Hủy lượt chạy** (`chat.abort`) trả `unauthorized` với kết nối hiện tại — chưa xử lý.
 3. Chỉ dùng `allow-once`; `allow-always` và `exec.approval.grants.revoke` (có trên gateway) chưa nối vào UI.
 4. Model giả có kịch bản; chưa thử với model thật.
+5. **Follower phải gắn vào phiên trước khi agent xin chạy lệnh.** Đo ở D1.2 (task 24, follow trễ 8 giây): gateway từ chối ngay `exec denied: Headless runs cannot wait for interactive exec approval` vì lúc đó không có client duyệt nào kết nối. Xem `cost-reconciliation.md`.
