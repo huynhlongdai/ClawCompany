@@ -714,4 +714,9 @@ export const apiInbox = {
   resolveApproval: (id: number, status: "approved" | "rejected", resolution_note = "") =>
     request<any>(`/approvals/${id}/resolve`, {method: "POST", body: JSON.stringify({status, resolution_note})}),
   markRead: (id: number) => request<any>(`/inbox/${id}/read`, {method: "POST"}),
+  // D3.5: hộp việc của tôi, gộp theo task; duyệt nhanh; chạy leo thang ngay
+  mine: (status = "open") => request<any>(`/v9/inbox/mine?status=${status}`),
+  setStatus: (id: number, status: "unread" | "read" | "done") => request<any>(`/v9/inbox/${id}/status`, {method: "POST", body: JSON.stringify({status})}),
+  quickApprovals: () => request<any>(`/v9/approvals/quick`),
+  escalateOverdue: () => request<any>(`/v9/approvals/escalate-overdue`, {method: "POST"}),
 };
