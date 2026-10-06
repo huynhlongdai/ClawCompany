@@ -219,6 +219,17 @@ def test_outside_active_hours_is_skipped(env, monkeypatch):
     night = datetime(2026, 10, 6, 16, 0)  # 23:00 giờ Việt Nam
     _drain(env, now=night, force=True)
     assert _wakes(env)[0].skip_reason == "outside_active_hours" and env["rt"].calls == []
+    # còn đêm: drain lại không xếp lại, không gọi gateway
+    _drain(env, now=night + timedelta(hours=2), force=True)
+    assert len(_wakes(env)) == 1 and env["rt"].calls == []
+    # 08:05 giờ Việt Nam: lý do cũ được xếp lại đúng một lần rồi chạy
+    morning = datetime(2026, 10, 7, 1, 5)
+    out = _drain(env, now=morning, force=True)
+    old, new = _wakes(env)
+    assert json.loads(new.payload)["requeued_from"] == old.id and new.status == "dispatched", out
+    assert len(env["rt"].calls) == 1
+    _drain(env, now=morning + timedelta(minutes=1), force=True)
+    assert len(_wakes(env)) == 2 and len(env["rt"].calls) == 1
 
 
 def test_active_hours_window_is_local_time_and_wraps_midnight():

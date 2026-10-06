@@ -281,6 +281,7 @@ async def drain(db: Session, *, now: datetime | None = None, member_id: int | No
     """Biến lý do đang chờ thành lượt chạy. Một seat → tối đa một run mỗi lần drain."""
     now = now or datetime.utcnow()
     window = settings.wakeup_window_seconds if window_seconds is None else window_seconds
+    await requeue_when_hours_open(db, now)
     q = db.query(Wakeup).filter(Wakeup.status == "queued")
     if member_id is not None:
         q = q.filter(Wakeup.member_id == member_id)
@@ -299,9 +300,29 @@ async def drain(db: Session, *, now: datetime | None = None, member_id: int | No
 
 def requeue_deferred(db: Session, member_id: int, *, after_run_id: int) -> list[Wakeup]:
     """Lượt chạy vừa xong: xếp lại các lý do đã bị bỏ vì seat bận (mỗi task một lần)."""
+    return _requeue(db, member_id, "seat_busy%", f"after-run-{after_run_id}")
+
+
+async def requeue_when_hours_open(db: Session, now: datetime) -> list[Wakeup]:
+    """Lý do bị bỏ vì ngoài giờ làm được xếp lại khi giờ làm của seat bắt đầu.
+
+    Không có bước này, việc giao lúc 23h cho seat làm 8h–20h sẽ nằm im mãi:
+    wakeup đã ``skipped`` và không sự kiện nào khác đánh thức lại."""
+    out = []
+    mids = {mid for (mid,) in db.query(Wakeup.member_id).filter(
+        Wakeup.status == "skipped", Wakeup.skip_reason == "outside_active_hours").distinct()}
+    for mid in sorted(mids):
+        agent = db.query(Agent).filter(Agent.member_id == mid).first()
+        if agent is None or not within_active_hours(await ACTIVE_HOURS_LOOKUP(agent), now):
+            continue
+        out += _requeue(db, mid, "outside_active_hours", f"hours-open-{now:%Y%m%d}")
+    return out
+
+
+def _requeue(db: Session, member_id: int, pattern: str, suffix: str) -> list[Wakeup]:
     out, seen = [], set()
     rows = (db.query(Wakeup).filter(Wakeup.member_id == member_id, Wakeup.status == "skipped",
-                                    Wakeup.skip_reason.like("seat_busy%"))
+                                    Wakeup.skip_reason.like(pattern))
             .order_by(Wakeup.id).all())
     for old in rows:
         meta = json.loads(old.payload or "{}")
@@ -309,7 +330,7 @@ def requeue_deferred(db: Session, member_id: int, *, after_run_id: int) -> list[
             continue
         seen.add(old.task_id)
         new, _ = enqueue(db, organization_id=old.organization_id, member_id=member_id, reason=old.reason,
-                         task_id=old.task_id, dedupe_key=f"{old.dedupe_key}:after-run-{after_run_id}",
+                         task_id=old.task_id, dedupe_key=f"{old.dedupe_key}:{suffix}",
                          payload={"requeued_from": old.id})
         meta["requeued_as"] = new.id
         old.payload = json.dumps(meta)
