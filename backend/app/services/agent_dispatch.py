@@ -110,7 +110,25 @@ async def dispatch_task(db: Session, task: Task, *, trigger_kind: str = "manual"
     task.runtime_task_id = run.task_id or str(task.id)
     task.runtime_run_id = run.run_id
     task.runtime_session_key = run.session_key or session_key
+    # M1: gắn follower NGAY sau chat.send cho mọi đường dispatch (v19 start,
+    # /tasks/{id}/dispatch, kéo thẻ). Trước đây chỉ wakeup và v20 move_task gắn,
+    # nên việc giao tay không bao giờ nhận sự kiện, chi phí hay trạng thái cuối:
+    # task kẹt ở in_progress dù agent đã trả lời (đo trên gateway thật, e2e4).
+    follow_after_send(task.runtime_session_key, member.organization_id, task.id)
     return await _after_run(db, task, member, agent, run, pack)
+
+
+def follow_after_send(session_key: str | None, organization_id: int, task_id: int) -> str | None:
+    """Theo dõi phiên vừa gửi. Idempotent; lỗi follow không làm hỏng lượt đã gửi."""
+    if not (session_key and settings.wakeup_follow and settings.openclaw_mode == "native"):
+        return None
+    try:
+        from app.services.runtime_stream import supervisor
+        state = supervisor.follow(session_key=session_key, organization_id=organization_id, task_id=task_id)
+        return getattr(state, "status", "following")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[M1] follow after dispatch failed: {exc}")
+        return f"error: {exc}"
 
 
 async def _run_agent(runtime, agent, task, member, pack, session_key):

@@ -8,6 +8,9 @@ x-openclaw-env: &oc-env
   OPENCLAW_API_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:?thiếu OPENCLAW_GATEWAY_TOKEN}
   # M1.1: api/worker/beat dùng chung 1 khoá thiết bị → chỉ phải duyệt ghép đôi 1 lần
   OPENCLAW_DEVICE_IDENTITY_PATH: /var/lib/clawcompany/openclaw-device.json
+  # M3: agents.create/config.* cần operator.admin; duyệt lệnh exec cần operator.approvals + cap exec-approvals
+  OPENCLAW_REQUEST_ADMIN_SCOPE: "true"
+  OPENCLAW_REQUEST_APPROVALS_SCOPE: "true"
 services:
   openclaw:
     image: ghcr.io/openclaw/openclaw:2026.9.8

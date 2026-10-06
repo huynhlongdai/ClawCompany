@@ -79,3 +79,19 @@ Sau e2e đã gắn lại seat Nina về `nina` (script e2e đổi sang `dev`). D
    nâng scope 1 lần → tạo agent nina/sophia-cmo/mia-content.
 2. **Key model** (OpenAI/Anthropic…) cho gateway để agent chạy thật lượt đầu tiên.
 3. Lỗi resume 500 (`no running event loop`), chế độ `gateway` legacy, doctor 1 nút.
+
+## M1.2 — Một lượt việc chạy trọn vòng trên gateway thật (06/10/2026)
+
+Đo trên VM: OpenClaw 2026.9.8 + provider CometAPI `comet/gpt-4.1-mini`. `tools/e2e_openclaw.py` với `E2E_EXPECT_REPLY=1`: **16/16 bước OK**, agent Nina trả lời thật.
+
+| Lỗi đo được | Nguyên nhân | Sửa |
+|---|---|---|
+| Giao việc qua `/api/v19/tasks/{id}/start` hay `/api/tasks/{id}/dispatch`: task kẹt `in_progress`, không ghi chi phí | Chỉ wakeup và kéo thẻ v20 gắn follower | `agent_dispatch.follow_after_send` ngay sau `chat.send` cho mọi đường (idempotent, chỉ ở mode native) |
+| `POST /api/v21/runtime/resume` → 500 `no running event loop` | Endpoint `def` chạy trong threadpool, `supervisor.follow` gọi `asyncio.create_task` | `async def`; hook startup `resume_openclaw_followers` cũng vậy (trước đây luôn bị bỏ qua) |
+| Resume xong task vẫn kẹt | Frame `chat final` đã trôi qua trước khi gắn | `stream_catchup`: `sessions.describe {key}` → `status=done` + `lastRunId` đúng run của task thì ghi chi phí từ `chat.history` rồi đóng lượt |
+| Roster thiếu agent mới tạo, seat bị coi là orphaned | `list_agents` chỉ suy từ `sessions.list` | Dùng `agents.list` + gộp session; `create_agent` gọi `agents.create` (cần scope `operator.admin`), kiểm `agentId` trả về |
+| Log `/api/tasks?goal_id=undefined` | `GoalsConsole` đặt `selected = r.goal` khi phản hồi thiếu goal | Chặn ở `GoalTasks` + giữ goal cũ |
+
+Chi phí khớp gateway tuyệt đối: task 6 = 12 797 in × 0,4 + 63 out × 1,6 (USD/1M) = **$0,0052196**; task 5 (bắt kịp sau resume) = **$0,005242** = `usage.cost.total` của gateway. Không ghi trùng: `__openclaw.id` trong history trùng `messageId` của `session.message`.
+
+Test: `tests/test_m12_followers.py` 22 test, mutation **10/10** bị bắt. Full pytest **969 passed, 2 skipped**. `tsc --noEmit` sạch.

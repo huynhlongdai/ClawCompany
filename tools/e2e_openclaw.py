@@ -64,30 +64,38 @@ step("v19 gateway agents", code == 200 and bool(gateway_agents),
 code, body = call("GET", "/api/v19/openclaw/seats", params={"organization_id": 1})
 seats = body.get("seats", []) if isinstance(body, dict) else body
 if isinstance(seats, dict):   # company_agent_index có thể trả dict theo agent id
-    seats = list(seats.values())
+    seats = [dict(v, runtime_agent_id=v.get("runtime_agent_id") or k) for k, v in seats.items() if isinstance(v, dict)]
 step("v19 company seats", code == 200, f"{len(seats)} ghế agent")
 
 # 3. Đối chiếu seat với roster ---------------------------------------------
 code, body = call("POST", "/api/v19/openclaw/reconcile", params={"organization_id": 1})
 step("v19 reconcile", code == 200, json.dumps(body, ensure_ascii=False)[:300])
 
-# 4. Bind một seat vào agent 'dev' của gateway ------------------------------
+# 4. Chọn seat: ưu tiên seat đã khớp roster gateway (không đổi dữ liệu thật);
+#    chỉ khi không có mới bind vào E2E_AGENT (mặc định 'dev' như gateway --dev).
+import os, time
+code, roster_body = call("GET", "/api/v19/openclaw/agents", params={"organization_id": 1})
+roster_list = roster_body.get("agents", []) if isinstance(roster_body, dict) else (roster_body or [])
+roster = {str(a.get("id")) for a in roster_list if isinstance(a, dict)}
 seat_id = None
 for entry in seats:
-    if isinstance(entry, dict):
+    if isinstance(entry, dict) and str(entry.get("runtime_agent_id") or "") in roster:
         seat_id = entry.get("member_id") or entry.get("id")
-        if seat_id:
-            break
-if seat_id:
-    code, body = call("POST", "/api/v19/openclaw/bind",
-                      params={"organization_id": 1},
-                      json={"member_id": seat_id, "runtime_agent_id": "dev"})
-    step("v19 bind seat -> agent 'dev'", code == 200,
-         json.dumps(body, ensure_ascii=False)[:300])
-    if code == 200 and isinstance(body, dict):
-        print(f"       session key: {body.get('main_session_key')}")
-else:
-    step("v19 bind seat", False, "không có ghế agent nào trong seed")
+        step("seat đã khớp roster gateway", True, f"member {seat_id} -> {entry.get('runtime_agent_id')}")
+        break
+if not seat_id:
+    for entry in seats:
+        if isinstance(entry, dict):
+            seat_id = entry.get("member_id") or entry.get("id")
+            if seat_id:
+                break
+    agent = os.environ.get("E2E_AGENT", "dev")
+    if seat_id:
+        code, body = call("POST", "/api/v19/openclaw/bind", params={"organization_id": 1},
+                          json={"member_id": seat_id, "runtime_agent_id": agent})
+        step(f"v19 bind seat -> agent '{agent}'", code == 200, json.dumps(body, ensure_ascii=False)[:300])
+    else:
+        step("v19 bind seat", False, "không có ghế agent nào trong seed")
 
 # 5. Tạo việc rồi dispatch --------------------------------------------------
 suffix = uuid.uuid4().hex[:6]
@@ -116,6 +124,19 @@ if seat_id and task_id:
     code, body = call("GET", f"/api/v19/tasks/{task_id}/transcript",
                       params={"organization_id": 1})
     step("v19 transcript", code == 200, json.dumps(body, ensure_ascii=False)[:300])
+
+    # Có key model (E2E_EXPECT_REPLY=1) thì phải thấy agent trả lời thật.
+    if os.environ.get("E2E_EXPECT_REPLY") == "1":
+        reply = ""
+        deadline = time.time() + float(os.environ.get("E2E_REPLY_TIMEOUT", "120"))
+        while time.time() < deadline and not reply:
+            time.sleep(5)
+            code, body = call("GET", f"/api/v19/tasks/{task_id}/transcript", params={"organization_id": 1})
+            for m in (body.get("messages") or []) if isinstance(body, dict) else []:
+                if isinstance(m, dict) and m.get("role") == "assistant":
+                    content = m.get("content")
+                    reply = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
+        step("agent trả lời thật (model)", bool(reply), reply[:300])
 
 # 6. Kênh live của v35 ------------------------------------------------------
 for path in ("/api/v35/live/readiness", "/api/v35/live/snapshot",

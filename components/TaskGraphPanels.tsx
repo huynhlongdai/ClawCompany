@@ -212,7 +212,9 @@ export function TaskRunsPanel({taskId, refreshKey = 0}: {taskId: number; refresh
 /* Trang Mục tiêu: những việc gắn trực tiếp vào một mục tiêu. */
 export function GoalTasks({goalId}: {goalId: number}) {
   const [rows, setRows] = useState<Row[] | null>(null);
-  useEffect(() => { setRows(null); apiTask.byGoal(goalId).then(setRows).catch(() => setRows([])); },
+  // M1: không bao giờ gọi /tasks?goal_id=undefined (422 trong log khi mục tiêu chưa có id).
+  useEffect(() => { if (!Number.isFinite(goalId)) { setRows([]); return; }
+                    setRows(null); apiTask.byGoal(goalId).then(setRows).catch(() => setRows([])); },
             [goalId]);
   if (rows === null) return <div className="v8Empty">Đang tải việc…</div>;
   if (!rows.length) return <div className="v8Empty">

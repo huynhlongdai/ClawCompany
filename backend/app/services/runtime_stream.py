@@ -166,6 +166,13 @@ async def _consume(state: ConsumerState) -> None:
             db, organization_id=state.organization_id, session_key=state.session_key,
             task_id=state.task_id, reason="follow",
         )
+        # M1: lượt đã xong trước khi ta gắn vào thì frame cuối không bao giờ tới.
+        from app.services import stream_catchup
+        caught = await stream_catchup.catch_up(db, runtime, state, apply_terminal_state)
+        if caught.get("terminal"):
+            state.status = "finished"
+            state.last_event_type = "catch_up"
+            return
         async for event in runtime.stream_run(state.session_key):
             state.events += 1
             state.last_event_type = str(event.get("type") or "")

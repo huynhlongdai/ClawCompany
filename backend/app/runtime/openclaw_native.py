@@ -295,18 +295,38 @@ class NativeOpenClawRuntime(AgentRuntime):
     # -- AgentRuntime ------------------------------------------------------
 
     async def create_agent(self, runtime_agent_id: str, config: dict) -> dict:
-        """Bind to an existing OpenClaw agent; never pretends to provision one."""
+        """Gắn seat vào agent OpenClaw; chưa có thì TẠO bằng ``agents.create``.
+
+        M3.1 (đo trên 2026.9.8): ``agents.create {name}`` cần ``operator.admin`` và
+        trả ``{ok, agentId, name, workspace}``; ``agentId`` suy từ ``name`` nên ta
+        kiểm lại cho khớp ``runtime_agent_id`` thay vì tin. Thiếu scope admin thì
+        trả ``missing`` kèm hướng dẫn, không giả vờ đã tạo.
+        """
         roster = await self.list_agents()
         known = {str(a.get("id") or a.get("agentId")) for a in roster}
-        if runtime_agent_id not in known:
+        if runtime_agent_id in known:
+            return {"id": runtime_agent_id, "status": "bound", "bound": True, "config": config}
+        params: dict[str, Any] = {"name": runtime_agent_id}
+        model = str((config or {}).get("model") or "")
+        if "/" in model:  # chỉ gửi model dạng provider/model mà gateway hiểu
+            params["model"] = model
+        try:
+            created = await self._rpc(ocp.M_AGENTS_CREATE, params)
+        except OpenClawProtocolError as exc:
             return {
-                "id": runtime_agent_id,
-                "status": "missing",
-                "bound": False,
-                "known_agents": sorted(known),
-                "hint": f"Run `openclaw agents add {runtime_agent_id}` on the gateway host, then retry.",
+                "id": runtime_agent_id, "status": "missing", "bound": False,
+                "known_agents": sorted(known), "error": exc.code or str(exc),
+                "hint": ("Gateway từ chối agents.create — bật OPENCLAW_REQUEST_ADMIN_SCOPE và duyệt "
+                         "nâng quyền (openclaw devices approve), hoặc chạy "
+                         f"`openclaw agents add {runtime_agent_id}` trên máy gateway."),
             }
-        return {"id": runtime_agent_id, "status": "bound", "bound": True, "config": config}
+        agent_id = str(created.get("agentId") or "")
+        if agent_id != runtime_agent_id:
+            return {"id": runtime_agent_id, "status": "mismatch", "bound": False,
+                    "created_agent_id": agent_id, "workspace": created.get("workspace"),
+                    "hint": "Gateway đặt agentId khác tên yêu cầu; đổi runtime_agent_id cho khớp."}
+        return {"id": agent_id, "status": "created", "bound": True,
+                "workspace": created.get("workspace"), "config": config}
 
     async def run_agent(
         self,
@@ -440,9 +460,23 @@ class NativeOpenClawRuntime(AgentRuntime):
         a dependable roster source even on gateways that do not expose an
         agent-list method to our scope set.
         """
+        agents: dict[str, dict] = {}
+        # M3.1: agents.list là roster thật (agent mới tạo chưa có session vẫn hiện).
+        # Đo trên 2026.9.8: chỉ suy từ sessions.list thì agent vừa agents.create bị
+        # coi là "không tồn tại" → seat bị đánh dấu orphaned sai.
+        try:
+            listed = await self._rpc(ocp.M_AGENTS_LIST, {})
+        except OpenClawProtocolError:
+            listed = {}
+        for row in listed.get("agents") or []:
+            if isinstance(row, dict) and row.get("id"):
+                aid = str(row["id"])
+                agents[aid] = {"id": aid, "sessions": 0, "active": False,
+                               "name": row.get("name") or (row.get("identity") or {}).get("name") or aid,
+                               "workspace": row.get("workspace"),
+                               "model": (row.get("model") or {}).get("primary") if isinstance(row.get("model"), dict) else row.get("model")}
         result = await self._rpc(ocp.M_SESSIONS_LIST, {"limit": 200})
         rows = result.get("sessions") or result.get("items") or []
-        agents: dict[str, dict] = {}
         for row in rows:
             if not isinstance(row, dict):
                 continue

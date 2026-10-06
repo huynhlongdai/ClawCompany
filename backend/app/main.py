@@ -134,7 +134,7 @@ app.include_router(strategy_router, prefix="/api")
 
 
 @app.on_event("startup")
-def resume_openclaw_followers() -> None:
+async def resume_openclaw_followers() -> None:
     """v21: re-attach session followers for work that was mid-run on restart.
 
     Opt-in, because attaching followers on boot starts outbound gateway
