@@ -238,12 +238,35 @@ const WAKE_STATUS_VI: Record<string, {text: string; cls: string}> = {
   failed: {text: "lỗi", cls: "high"},
 };
 
+// Mã lý do giữ nguyên (để tra log/API), chỉ thêm câu tiếng Việt đứng trước.
+const SKIP_VI: [string, string][] = [
+  ["seat_busy", "Seat đang bận một lượt khác — sẽ tự xếp lại khi lượt đó xong"],
+  ["budget", "Hết ngân sách"], ["outside_active_hours", "Ngoài giờ làm của agent"],
+  ["seat_inactive", "Seat đang tắt"], ["not_an_agent_seat", "Seat không phải agent"],
+  ["not_assignee", "Người được nhắc không phải người nhận việc"],
+  ["task_status", "Việc không ở trạng thái chạy được"], ["dispatch_error", "Không gửi được cho agent"],
+  ["runtime_error", "Gateway lỗi"],
+];
+function skipText(code: string): string {
+  const hit = SKIP_VI.find(([k]) => code.startsWith(k));
+  return hit ? `${hit[1]} (${code})` : code;
+}
+
 export function TaskWakeupsPanel({taskId, refreshKey = 0}: {taskId: number; refreshKey?: number}) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState("");
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     apiTask.wakeups(taskId).then(setRows).catch(e => setError(errorText(e)));
-  }, [taskId, refreshKey]);
+  }, [taskId, refreshKey, tick]);
+  // Còn dòng "đang chờ gộp" thì hỏi lại sau 4 giây: drain chạy ở backend, panel
+  // không tự biết khi nào nó xử lý xong. Hết dòng chờ thì thôi hỏi.
+  const pending = (rows || []).some(w => w.status === "queued");
+  useEffect(() => {
+    if (!pending) return;
+    const t = setTimeout(() => setTick(x => x + 1), 4000);
+    return () => clearTimeout(t);
+  }, [pending, tick]);
   const list = rows || [];
   return <div className="panel" data-testid="task-wakeups">
     <div className="panelHead">
@@ -267,7 +290,7 @@ export function TaskWakeupsPanel({taskId, refreshKey = 0}: {taskId: number; refr
               {when(w.created_at)}{w.run_id ? ` · lượt #${w.run_id}` : ""}
             </small>
           </div>
-          {w.skip_reason && <div style={{marginTop: 3}}>Lý do: {w.skip_reason}</div>}
+          {w.skip_reason && <div style={{marginTop: 3}}>Lý do: {skipText(w.skip_reason)}</div>}
           {w.coalesced_into_id && <div style={{marginTop: 3, color: "var(--muted)"}}>
             Gộp cùng lượt với lý do #{w.coalesced_into_id} (trong cửa sổ 10 giây).
           </div>}
