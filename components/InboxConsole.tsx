@@ -35,7 +35,27 @@ function Section({title, count, icon, children, empty}: {
   </section>;
 }
 
+/* D1.1 — hàng sinh từ gateway OpenClaw có evidence là JSON (lệnh, thư mục,
+   hạn). Bản trước in nguyên khối JSON làm tiêu đề. */
+function gatewayRequest(a: any): {command: string; cwd?: string; host?: string; expires?: number} | null {
+  if (!String(a.policy_key || "").startsWith("openclaw:")) return null;
+  try {
+    const ev = JSON.parse(a.evidence || "{}");
+    const req = ev?.event?.request || {};
+    const command = ev?.command || req.command || "";
+    return command ? {command, cwd: ev?.cwd || req.cwd, host: ev?.host || req.host,
+                      expires: ev?.expires_at_ms || ev?.event?.expiresAtMs} : null;
+  } catch { return null; }
+}
+
+function plainEvidence(a: any): string {
+  const t = String(a.evidence || "").trim();
+  return t && !t.startsWith("{") ? t : a.action;
+}
+
 function ApprovalRow({a, who, onDone}: {a: any; who: string; onDone: (id: number) => void}) {
+  const gw = gatewayRequest(a);
+  const [notice, setNotice] = useState<string | null>(null);
   const [mode, setMode] = useState<null | "approved" | "rejected">(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -47,11 +67,22 @@ function ApprovalRow({a, who, onDone}: {a: any; who: string; onDone: (id: number
     if (mode === "rejected" && !note.trim()) { setErr("Ghi lý do từ chối để người gửi biết cần sửa gì."); return; }
     setBusy(true); setErr(null);
     try {
-      await apiInbox.resolveApproval(a.id, mode, note.trim());
+      const res: any = await apiInbox.resolveApproval(a.id, mode, note.trim());
+      const note_ = String(res?.resolution_note || "");
+      if (gw && note_.includes("recorded locally only")) {
+        // Quyết định đã ghi nhưng không tới được gateway: nói thẳng, lệnh của agent vẫn đang chờ.
+        setNotice("Đã ghi quyết định nhưng chưa gửi được tới OpenClaw — lệnh của agent vẫn đang chờ. "
+                  + (note_.match(/\((.*)\)\]?$/)?.[1] || ""));
+        setMode(null);
+        refreshCounts();
+        return;
+      }
       onDone(a.id);
       refreshCounts();
     } catch (e: any) {
-      setErr(String(e?.message || e).includes("403") ? "Tài khoản này không có quyền duyệt (cần vai trò quản lý)." : "Không gửi được quyết định. Thử lại.");
+      const msg = String(e?.message || e);
+      setErr(msg.includes("403") ? "Tài khoản này không có quyền duyệt (cần vai trò quản lý)."
+        : msg.includes("already") ? "Yêu cầu này đã được quyết định ở nơi khác." : "Không gửi được quyết định. Thử lại.");
     } finally { setBusy(false); }
   };
 
@@ -59,12 +90,18 @@ function ApprovalRow({a, who, onDone}: {a: any; who: string; onDone: (id: number
     <span className="ui-row-icon is-waiting"><Icon name="shield" size={16}/></span>
     <div className="ui-row-body">
       <div className="ui-row-title">
-        <b>{a.evidence || a.action}</b>
+        <b>{gw ? "Agent xin chạy lệnh trên máy chủ OpenClaw" : plainEvidence(a)}</b>
         <span className={"ui-status " + risk.cls}>{risk.label}</span>
       </div>
+      {gw && <pre className="ui-mono" data-testid="approval-command" style={{margin: "6px 0", padding: "8px 10px",
+        background: "var(--paper-2, #efeee9)", borderRadius: 8, whiteSpace: "pre-wrap", fontSize: 12.5}}>{gw.command}</pre>}
       <p className="ui-row-meta">
-        <code>{a.action}</code><span>·</span><span>{who} gửi</span><span>·</span><span className="ui-mono">#{a.id}</span>
+        {gw ? <>{gw.cwd && <><span>thư mục <code>{gw.cwd}</code></span><span>·</span></>}
+                {gw.expires && <><span>hết hạn {new Date(gw.expires).toLocaleTimeString("vi-VN", {hour: "2-digit", minute: "2-digit"})}</span><span>·</span></>}</>
+            : <><code>{a.action}</code><span>·</span></>}
+        <span>{who} gửi</span><span>·</span><span className="ui-mono">#{a.id}</span>
       </p>
+      {notice && <p className="ui-inline-error" role="status" data-testid="approval-notice">{notice}</p>}
       {mode && <div className="ui-confirm">
         <label htmlFor={"note-" + a.id}>{mode === "approved" ? "Ghi chú (không bắt buộc)" : "Lý do từ chối"}</label>
         <textarea id={"note-" + a.id} rows={2} value={note} onChange={e => setNote(e.target.value)} autoFocus

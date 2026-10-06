@@ -1,0 +1,8 @@
+OK   bind seat → agent 'dev'
+      {'agent_id': 1, 'member_id': 2, 'runtime_agent_id': 'dev', 'main_session_key': 'agent:dev:main'}
+OK   start task (chat.send)
+      {'task_id': 18, 'status': 'in_progress', 'run_id': 'clawcompany:agent:dev:company-task-18:task-18:14397e575932', 'session_key': 'agent:dev:company-task-18'}
+OK   follow session
+      {'session_key': 'agent:dev:company-task-18', 'task_id': 18, 'organization_id': 1, 'started_at': '2026-10-05T23:52:06.846995', 'events': 0, 'approvals': 0, 'last_event_type': '', 'status': 'running', 'error': '', 'lease_backend': 'memory'}
+LỖI hàng approvals từ exec.approval.requested
+{"mode": "inbox", "steps": [{"step": "bind seat → agent 'dev'", "ok": true, "detail": {"agent_id": 1, "member_id": 2, "runtime_agent_id": "dev", "main_session_key": "agent:dev:main"}}, {"step": "start task (chat.send)", "ok": true, "detail": {"task_id": 18, "status": "in_progress", "run_id": "clawcompany:agent:dev:company-task-18:task-18:14397e575932", "session_key": "agent:dev:company-task-18"}}, {"step": "follow session", "ok": true, "detail": {"session_key": "agent:dev:company-task-18", "task_id": 18, "organization_id": 1, "started_at": "2026-10-05T23:52:06.846995", "events": 0, "approvals": 0, "last_event_type": "", "status": "running", "error": "", "lease_backend": "memory"}}, {"step": "hàng approvals từ exec.approval.requested", "ok": false, "detail": null}], "task_id": 18, "session_key": "agent:dev:company-task-18"}

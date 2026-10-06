@@ -26,10 +26,32 @@ def create_approval(payload: ApprovalCreate, principal: Principal = Depends(requ
     return obj
 
 @router.post("/{approval_id}/resolve", response_model=ApprovalOut)
-def resolve_approval(approval_id: int, payload: ApprovalResolve, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+async def resolve_approval(approval_id: int, payload: ApprovalResolve, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    """Nút Duyệt/Từ chối của Hộp việc.
+
+    D1.1: hàng sinh từ gateway (``policy_key`` ``openclaw:...``) phải đi qua
+    ``approval_bridge.decide`` để quyết định tới được ``exec.approval.resolve``.
+    Bản trước chỉ đổi cột status, nên lệnh của agent treo tới khi hết hạn dù
+    Hộp việc báo "đã duyệt" (đo trên gateway thật, xem _reports/approval-e2e.md).
+    """
+    from fastapi import HTTPException
     obj = db.get(Approval, approval_id)
-    if not obj: from fastapi import HTTPException; raise HTTPException(404, "Approval not found")
+    if not obj: raise HTTPException(404, "Approval not found")
     enforce_org(obj.organization_id, principal)
+    if (obj.policy_key or "").startswith("openclaw:"):
+        from app.services import approval_bridge
+        if payload.status not in ("approved", "rejected", "denied"):
+            raise HTTPException(422, "OpenClaw approvals take approved or rejected")
+        try:
+            await approval_bridge.decide(db, obj, decision="approved" if payload.status == "approved" else "denied",
+                                         note=payload.resolution_note or "", actor_member_id=principal.member_id)
+        except approval_bridge.ApprovalBridgeError as exc:
+            raise HTTPException(409, str(exc))
+        db.refresh(obj)
+        return obj
     obj.status = payload.status; obj.resolution_note = payload.resolution_note
     db.add(obj); db.commit(); db.refresh(obj)
+    from app.services.runtime_stream import _audit
+    _audit(db, obj, "approval.decided", actor_member_id=principal.member_id, actor_name="human",
+           result=payload.status, payload={"decision": payload.status, "policy_key": obj.policy_key})
     return obj

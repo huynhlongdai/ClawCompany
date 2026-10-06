@@ -87,6 +87,18 @@ def upstream_readiness() -> dict:
         "note_delivered_upstream": False,
         "scope": ocp.SCOPE_APPROVALS if settings.openclaw_request_approvals_scope else "",
         "mode": settings.openclaw_mode,
+        # D1.1 — đo trên gateway 2026.9.8: client không có danh tính thiết bị
+        # chỉ nhận được thẻ duyệt khi có operator.admin (isApprovalRecordVisibleToClient).
+        # Thiếu nó, gateway coi lượt là "headless" và TỪ CHỐI lệnh ngay, nên
+        # không có gì để duyệt. Báo ra thay vì để người vận hành tự đoán.
+        "card_delivery": {
+            "ready": bool(settings.openclaw_request_approvals_scope and settings.openclaw_request_admin_scope),
+            "needs": [x for x, on in (("OPENCLAW_REQUEST_APPROVALS_SCOPE", settings.openclaw_request_approvals_scope),
+                                      ("OPENCLAW_REQUEST_ADMIN_SCOPE", settings.openclaw_request_admin_scope)) if not on],
+            "why": "Gateway chỉ gửi exec.approval.requested tới client khai caps exec-approvals và "
+                   "thấy được bản ghi duyệt; client backend không ghép cặp thiết bị cần operator.admin. "
+                   "Thiếu thì lệnh cần duyệt bị từ chối ngay (\"Headless runs cannot wait\").",
+        },
         "hint": (
             "Turn on OPENCLAW_REQUEST_APPROVALS_SCOPE so the handshake asks for "
             f"{ocp.SCOPE_APPROVALS}; without it the gateway rejects the reply."
@@ -117,6 +129,25 @@ async def decide(
     readiness = upstream_readiness()
     delivered, delivery_error, upstream = False, "", None
 
+    # D1.1: ghi quyết định của người TRƯỚC khi gửi lên gateway. Đo trên gateway
+    # thật: frame ``exec.approval.resolved`` về tới follower trước khi lời gọi
+    # ``exec.approval.resolve`` trả lời, nên nếu ghi sau thì follower thấy hàng
+    # còn pending và gán quyết định cho "OpenClaw", còn audit ra sai thứ tự
+    # (resolved trước decided).
+    from app.services.runtime_stream import _audit
+    approval.status = LOCAL_STATUS[decision]
+    approval.resolution_note = f"{note} [sending to OpenClaw]".strip()
+    if actor_member_id is not None and approval.approver_member_id is None:
+        approval.approver_member_id = actor_member_id
+    db.add(approval)
+    db.commit()
+    _audit(db, approval, "approval.decided", result=LOCAL_STATUS[decision],
+           actor_member_id=actor_member_id,
+           actor_name="human" if actor_member_id is None else f"member:{actor_member_id}",
+           payload={"decision": decision, "upstream_decision": DECISIONS[decision],
+                    "method": readiness.get("method"), "request_id": request_id,
+                    "session_key": session_key, "upstream_ready": readiness["ready"]})
+
     if readiness["ready"]:
         runtime = get_runtime()
         responder = getattr(runtime, "respond_approval", None)
@@ -138,13 +169,17 @@ async def decide(
     else:
         delivery_error = "Upstream reply not configured: " + ", ".join(readiness["missing"])
 
-    approval.status = LOCAL_STATUS[decision]
-    approval.resolution_note = _note(note, delivered, delivery_error)
-    if actor_member_id is not None and approval.approver_member_id is None:
-        approval.approver_member_id = actor_member_id
+    db.refresh(approval)  # follower có thể đã ghi "[gateway: ...]" trong lúc chờ
+    confirmed = " [gateway:" in (approval.resolution_note or "")
+    gateway_suffix = approval.resolution_note[approval.resolution_note.index(" [gateway:"):] if confirmed else ""
+    approval.resolution_note = _note(note, delivered, delivery_error) + gateway_suffix
     db.add(approval)
     db.commit()
     db.refresh(approval)
+    if not delivered:
+        _audit(db, approval, "approval.relay_failed", result="recorded_only",
+               actor_member_id=actor_member_id, actor_name="clawcompany",
+               payload={"request_id": request_id, "delivery_error": delivery_error})
 
     emit_event(
         db,

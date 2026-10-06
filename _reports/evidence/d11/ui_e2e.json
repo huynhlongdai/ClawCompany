@@ -1,0 +1,16 @@
+{
+ "task_id": 19,
+ "approval_id": 7,
+ "command_shown": "echo clawcompany-approval-e2e && date -u +%Y-%m-%dT%H:%M:%SZ",
+ "card_gone": true,
+ "task_status": "review",
+ "errors": [],
+ "exec_result": [
+  "[{\"type\": \"text\", \"text\": \"clawcompany-approval-e2e\\n2026-10-05T23:57:42Z\"}]"
+ ],
+ "audit": [
+  "approval.requested",
+  "approval.decided",
+  "approval.resolved"
+ ]
+}

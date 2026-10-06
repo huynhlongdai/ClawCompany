@@ -84,18 +84,26 @@ step(f"duyệt trong Hộp việc ({status})", code == 200, res)
 final = None
 deadline = time.time() + 90
 while time.time() < deadline:
-    _, t = call("GET", f"/api/tasks/{tid}/graph")
-    st = ((t or {}).get("task") or {}).get("status") if isinstance(t, dict) else None
+    _, rows_ = call("GET", "/api/tasks")
+    st = next((x.get("status") for x in rows_ if x.get("id") == tid), None) if isinstance(rows_, list) else None
     if st in ("review", "done", "blocked", "cancelled"):
         final = st
         break
     time.sleep(2)
 out["elapsed_after_decision_s"] = round(time.time() - t0, 1)
+_, runs = call("GET", f"/api/tasks/{tid}/runs")
+out["runs"] = [{k: r.get(k) for k in ("id", "status", "started_at", "ended_at", "error_reason")}
+               for r in (runs or {}).get("runs", [])] if isinstance(runs, dict) else runs
 step("task kết thúc lượt chạy", final is not None, f"status={final} sau {out['elapsed_after_decision_s']}s")
 
 _, tr = call("GET", f"/api/v19/tasks/{tid}/transcript", params={"organization_id": 1})
-text = json.dumps(tr, ensure_ascii=False)
-ran = "clawcompany-approval-e2e" in text
+msgs = (tr or {}).get("messages") or [] if isinstance(tr, dict) else []
+results = [m for m in msgs if m.get("role") == "toolResult" and m.get("toolName") == "exec"]
+text = json.dumps(results, ensure_ascii=False)
+# Kết quả tool (không phải đối số lời gọi) phải chứa dòng in ra của lệnh.
+ran = any(not m.get("isError") and "clawcompany-approval-e2e" in json.dumps(m.get("content"), ensure_ascii=False)
+          for m in results)
+out["exec_results"] = [json.dumps(m.get("content"), ensure_ascii=False)[:400] for m in results]
 step("lệnh đã chạy (kết quả trong transcript)" if MODE == "inbox" else "lệnh KHÔNG chạy",
      ran if MODE == "inbox" else not ran, text[:300])
 

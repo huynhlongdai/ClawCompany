@@ -57,6 +57,10 @@ RUN_OUTCOME = {"review": "completed", "blocked": "failed", "todo": "cancelled"}
 TERMINAL_STATUS = {
     "complete": "review",
     "completed": "review",
+    # D1.1: gateway 2026.9.8 kết thúc lượt bằng ``chat`` state ``final`` (đo
+    # được). Thiếu khoá này thì follower không bao giờ dừng và việc kẹt ở
+    # in_progress dù agent đã trả lời xong.
+    "final": "review",
     "error": "blocked",
     "aborted": "todo",
     "cancelled": "todo",
@@ -226,17 +230,60 @@ def handle_event(db: Session, state: ConsumerState, event: dict) -> None:
         apply_terminal_state(db, task, state, event)
 
 
+# D1.1 — quyết định gateway dùng (allow-once/allow-always/deny) và từ cũ.
+_ALLOW_WORDS = ("approve", "approved", "allow", "allow-once", "allow-always", "allowed")
+_DENY_WORDS = ("deny", "denied", "reject", "rejected")
+
+
+def _approval_request(raw: dict) -> dict:
+    """``exec.approval.requested`` thật (2026.9.8) để lệnh trong ``request``:
+    ``{id, request: {command, cwd, host, agentId, sessionKey, runId,
+    commandAnalysis, allowedDecisions...}, createdAtMs, expiresAtMs}``.
+    Bản trước đọc ``raw.command`` ở cấp ngoài nên mọi hàng ghi "action"."""
+    req = raw.get("request") if isinstance(raw.get("request"), dict) else {}
+    return req
+
+
+def _resolution_decision(raw: dict) -> str:
+    for source in (raw, raw.get("resolution") if isinstance(raw.get("resolution"), dict) else {},
+                   raw.get("record") if isinstance(raw.get("record"), dict) else {}):
+        value = source.get("decision") or source.get("result") or source.get("outcome")
+        if value:
+            return str(value).lower()
+    return ""
+
+
+def _audit(db: Session, approval: Approval, action: str, *, result: str = "success",
+           actor_member_id: int | None = None, actor_name: str = "openclaw", payload: dict | None = None,
+           once: bool = False) -> None:
+    from app.models import AuditEvent
+    from app.services.audit import log_event
+    if once and db.query(AuditEvent).filter(
+            AuditEvent.organization_id == approval.organization_id, AuditEvent.action == action,
+            AuditEvent.object_type == "approval", AuditEvent.object_id == str(approval.id)).first():
+        return
+    log_event(db, approval.organization_id, action, object_type="approval", object_id=str(approval.id),
+              actor_member_id=actor_member_id, actor_name=actor_name, result=result,
+              risk=approval.risk or "medium", payload=payload or {})
+
+
 def record_approval(db: Session, state: ConsumerState, event: dict, member: Member | None = None) -> Approval | None:
     """Turn a gateway permission prompt into a row in the company queue.
 
-    Resolution events update the matching pending row instead of creating a
-    second one, so the queue does not fill with duplicates when the operator
-    answers in the OpenClaw UI.
+    Resolution events update the matching row instead of creating a second
+    one. D1.1: the resolved frame is recognised by its family as well as by a
+    decision word, because the real decision words are ``allow-once`` /
+    ``allow-always`` / ``deny`` — the old word list missed ``allow-once``, so a
+    resolution for a row we had already decided fell through and minted a
+    duplicate pending row. Each of the three milestones (requested → decided
+    → resolved by the gateway) writes one ``audit_events`` row.
     """
     raw = event.get("raw") if isinstance(event.get("raw"), dict) else {}
     request_id = str(raw.get("id") or raw.get("approvalId") or raw.get("requestId") or "")
     policy_key = f"openclaw:{state.session_key}:{request_id}" if request_id else f"openclaw:{state.session_key}"
-    decision = str(raw.get("decision") or raw.get("result") or "").lower()
+    family = str(event.get("family") or "")
+    decision = _resolution_decision(raw)
+    is_resolution = family == ocp.E_EXEC_APPROVAL_RESOLVED or decision.startswith(_ALLOW_WORDS + _DENY_WORDS)
 
     existing = (
         db.query(Approval)
@@ -245,30 +292,46 @@ def record_approval(db: Session, state: ConsumerState, event: dict, member: Memb
         .first()
     )
 
-    if decision in ("approve", "approved", "allow", "deny", "denied", "reject", "rejected"):
+    if is_resolution:
         if existing is None:
             return None
-        existing.status = "approved" if decision.startswith(("approve", "allow")) else "rejected"
-        existing.resolution_note = f"Resolved in OpenClaw: {decision}"
+        allowed = decision.startswith(_ALLOW_WORDS)
+        if existing.status == "pending":
+            existing.status = "approved" if allowed else "rejected"
+            existing.resolution_note = f"Resolved in OpenClaw: {decision or 'resolved'}"
+        elif "[gateway:" not in (existing.resolution_note or ""):
+            existing.resolution_note = f"{existing.resolution_note or ''} [gateway: {decision or 'resolved'}]".strip()
         db.add(existing)
         db.commit()
         db.refresh(existing)
+        _audit(db, existing, "approval.resolved", result="allowed" if allowed else "denied", once=True,
+               payload={"decision": decision, "request_id": request_id, "session_key": state.session_key,
+                        "status": existing.status})
         return existing
 
-    if existing is not None and existing.status == "pending":
-        return existing  # idempotent: the gateway may re-announce a pending prompt
+    if existing is not None:
+        return existing  # idempotent: the gateway may re-announce a prompt (backfill, reconnect)
 
-    tool = str(raw.get("tool") or raw.get("toolName") or raw.get("command") or "action")
+    req = _approval_request(raw)
+    command = str(req.get("command") or raw.get("command") or "")
+    tool = str(raw.get("tool") or raw.get("toolName") or ("exec" if command else "action"))
+    risk_kinds = ((req.get("commandAnalysis") or {}).get("riskKinds") or []) if isinstance(
+        req.get("commandAnalysis"), dict) else []
+    risk = str(raw.get("risk") or ("high" if risk_kinds or (tool in ocp.HTTP_DENIED_TOOLS and not command)
+                                   else "medium"))
+    action = f"Chạy lệnh: {command}" if command else f"OpenClaw agent requests: {tool}"
     approval = Approval(
         organization_id=state.organization_id,
         company_id=member.company_id if member is not None else None,
         requester_member_id=member.id if member is not None else None,
-        action=f"OpenClaw agent requests: {tool}"[:220],
-        risk=str(raw.get("risk") or ("high" if tool in ocp.HTTP_DENIED_TOOLS else "medium"))[:24],
+        action=action[:220],
+        risk=risk[:24],
         policy_key=policy_key[:120],
         status="pending",
         evidence=json.dumps(
-            {"session_key": state.session_key, "task_id": state.task_id, "event": raw},
+            {"session_key": state.session_key, "task_id": state.task_id, "event": raw,
+             "command": command, "cwd": req.get("cwd"), "host": req.get("host"),
+             "expires_at_ms": raw.get("expiresAtMs")},
             ensure_ascii=False, default=str,
         ),
     )
@@ -279,8 +342,14 @@ def record_approval(db: Session, state: ConsumerState, event: dict, member: Memb
         db, organization_id=state.organization_id, event_type="openclaw.approval.requested",
         source=SOURCE, company_id=approval.company_id, aggregate_type="approval",
         aggregate_id=str(approval.id),
-        payload={"session_key": state.session_key, "task_id": state.task_id, "tool": tool},
+        payload={"session_key": state.session_key, "task_id": state.task_id, "tool": tool,
+                 "command": command},
     )
+    _audit(db, approval, "approval.requested", actor_member_id=member.id if member is not None else None,
+           actor_name=member.name if member is not None else "openclaw",
+           payload={"command": command, "tool": tool, "request_id": request_id,
+                    "session_key": state.session_key, "task_id": state.task_id,
+                    "cwd": req.get("cwd"), "expires_at_ms": raw.get("expiresAtMs")})
     return approval
 
 
