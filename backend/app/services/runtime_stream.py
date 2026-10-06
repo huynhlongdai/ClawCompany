@@ -38,6 +38,7 @@ from app.services.company_event_bus import emit_event
 from app.services import runtime_gap
 from app.services import task_lifecycle as lifecycle
 from app.services import stream_reconcile
+from app.services import cost_ledger
 from app.services.runtime_events import persist_runtime_event
 from app.services.runtime_leases import store as lease_store
 from app.services.stream_registry import registry
@@ -221,6 +222,12 @@ def handle_event(db: Session, state: ConsumerState, event: dict) -> None:
         task_id=state.task_id,
         session_key=state.session_key,
     )
+
+    # D1.2: tiền model đi kèm session.message của assistant; ghi một lần theo messageId.
+    if str(event.get("family") or "") == "session.message" and isinstance(event.get("raw"), dict):
+        cost_ledger.record_message_usage(
+            db, organization_id=state.organization_id, task=task, agent_id=agent_id,
+            session_key=state.session_key, raw=event["raw"])
 
     if str(event.get("family") or "") in ocp.APPROVAL_EVENTS:
         state.approvals += 1

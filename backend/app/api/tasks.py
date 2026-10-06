@@ -10,6 +10,8 @@ from app.schemas import TaskCreate, TaskOut
 from app.services.tasks import dispatch_task
 from app.services import agent_dispatch, handoff_dispatch, task_graph, task_journal, work_context
 from app.services import task_lifecycle
+from app.services import cost_ledger
+from app.runtime.factory import get_runtime
 from app.services.artifacts import handoff_artifact, register_artifact
 from app.core.authz import Principal, get_principal, require_role, require_human
 from app.core.tenancy import active_org, ensure_project, ensure_member, ensure_task
@@ -35,6 +37,18 @@ def create_task(payload: TaskCreate, principal: Principal = Depends(require_role
     obj = Task(**payload.model_dump())
     db.add(obj); db.commit(); db.refresh(obj)
     return obj
+
+@router.get("/cost-reconciliation")
+async def cost_reconciliation(task_id: int | None = None, limit: int = 20,
+                              principal: Principal = Depends(require_role("admin")),
+                              db: Session = Depends(get_db)):
+    """D1.2: so ``usage_events`` (model_usage) của từng phiên task với ``sessions.usage`` của gateway."""
+    org_id = active_org(principal)
+    if task_id is not None:
+        ensure_task(db, task_id, principal)
+    return await cost_ledger.reconcile(db, get_runtime(), organization_id=org_id,
+                                       task_ids=[task_id] if task_id else None, limit=limit)
+
 
 @router.post("/{task_id}/dispatch", response_model=TaskOut)
 async def dispatch(task_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):

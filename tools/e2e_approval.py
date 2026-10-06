@@ -23,6 +23,8 @@ import httpx
 MODE = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else "inbox"
 BASE = sys.argv[sys.argv.index("--base") + 1] if "--base" in sys.argv else "http://127.0.0.1:8000"
 SEAT = int(sys.argv[sys.argv.index("--seat") + 1]) if "--seat" in sys.argv else 2
+# D1.2: --late N = đợi N giây rồi mới follow (mô phỏng follower bám muộn / API khởi động lại).
+LATE = float(sys.argv[sys.argv.index("--late") + 1]) if "--late" in sys.argv else 0.0
 c = httpx.Client(base_url=BASE, timeout=60)
 tok = c.post("/api/auth/login", json={"email": "admin@clawcompany.local",
                                        "password": "ChangeMe123!"}).json()["access_token"]
@@ -57,6 +59,8 @@ call("POST", f"/api/v18/workspace/tasks/{tid}/assign", json={"assignee_member_id
 code, started = call("POST", f"/api/v19/tasks/{tid}/start", params={"organization_id": 1})
 step("start task (chat.send)", code == 200, started)
 session = (started or {}).get("session_key") if isinstance(started, dict) else None
+if LATE:
+    time.sleep(LATE)
 code, fol = call("POST", f"/api/v20/tasks/{tid}/follow", json={"session_key": session})
 step("follow session", code == 200, fol)
 

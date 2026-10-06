@@ -77,7 +77,10 @@ class H(BaseHTTPRequestHandler):
                          "stream": bool(body.get("stream")), "reply": reply})
         cid, now = "chatcmpl-" + uuid.uuid4().hex[:10], int(time.time())
         finish = "tool_calls" if "tool_calls" in reply else "stop"
-        usage = {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120}
+        # D1.2: token ước lượng từ độ dài thật (≈4 ký tự/token) để mỗi lượt có số khác nhau.
+        pt = max(1, len(json.dumps(msgs, ensure_ascii=False)) // 4 + len(json.dumps(body.get("tools") or [])) // 4)
+        ct = max(1, len(json.dumps(reply, ensure_ascii=False)) // 4)
+        usage = {"prompt_tokens": pt, "completion_tokens": ct, "total_tokens": pt + ct}
         if not body.get("stream"):
             msg = {"role": "assistant", "content": reply.get("content")}
             if "tool_calls" in reply:

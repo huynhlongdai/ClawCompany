@@ -1,0 +1,126 @@
+{
+ "session_key": "agent:dev:company-task-20",
+ "session_messages": [
+  {
+   "type": "event",
+   "event": "session.message",
+   "payload": {
+    "sessionKey": "agent:dev:company-task-20",
+    "messageId": "1cb64ed5-856e-4dcb-be29-48bb49225206",
+    "messageSeq": 1,
+    "message": {
+     "role": "user"
+    }
+   }
+  },
+  {
+   "type": "event",
+   "event": "session.message",
+   "payload": {
+    "sessionKey": "agent:dev:company-task-20",
+    "messageId": "e73bc779-e5c0-47ee-9f29-6cd7e7424fbb",
+    "messageSeq": 2,
+    "message": {
+     "role": "assistant",
+     "model": "approval-e2e",
+     "provider": "scripted",
+     "api": "openai-completions",
+     "stopReason": "toolUse",
+     "usage": {
+      "input": 10900,
+      "output": 47,
+      "totalTokens": 10947,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "cost": {
+       "input": 0.0327,
+       "output": 0.000705,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0.033405
+      }
+     },
+     "responseId": "chatcmpl-e126b7c88a"
+    }
+   }
+  },
+  {
+   "type": "event",
+   "event": "session.message",
+   "payload": {
+    "sessionKey": "agent:dev:company-task-20",
+    "messageId": "95d71c6b-a3f9-4ab1-8d48-7aec3cb8371b",
+    "messageSeq": 4,
+    "runId": "clawcompany:agent:dev:company-task-20:task-20:dc9334273ccc",
+    "message": {
+     "role": "assistant",
+     "model": "approval-e2e",
+     "provider": "scripted",
+     "api": "openai-completions",
+     "stopReason": "stop",
+     "usage": {
+      "input": 10986,
+      "output": 21,
+      "totalTokens": 11007,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "cost": {
+       "input": 0.032958,
+       "output": 0.000315,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0.033273000000000004
+      }
+     },
+     "responseId": "chatcmpl-f8c4f606f5"
+    }
+   }
+  }
+ ],
+ "sessions_usage": {
+  "sessions": [
+   {
+    "key": "agent:dev:company-task-20",
+    "agentId": "dev",
+    "modelProvider": "scripted",
+    "model": "approval-e2e",
+    "usage": {
+     "input": 21886,
+     "output": 68,
+     "cacheRead": 0,
+     "cacheWrite": 0,
+     "totalTokens": 21954,
+     "totalCost": 0.066678,
+     "inputCost": 0.065658,
+     "outputCost": 0.00102,
+     "missingCostEntries": 0,
+     "messageCounts": {
+      "total": 3,
+      "user": 1,
+      "assistant": 2,
+      "toolCalls": 1,
+      "toolResults": 1,
+      "errors": 0
+     }
+    }
+   }
+  ],
+  "totals": {
+   "input": 21886,
+   "output": 68,
+   "cacheRead": 0,
+   "cacheWrite": 0,
+   "totalTokens": 21954,
+   "totalCost": 0.066678,
+   "inputCost": 0.065658,
+   "outputCost": 0.00102,
+   "cacheReadCost": 0,
+   "cacheWriteCost": 0,
+   "missingCostEntries": 0
+  },
+  "cacheStatus": {
+   "status": "fresh"
+  }
+ },
+ "source": "OpenClaw 2026.9.8, frames_cost.jsonl + sessions.usage RPC, model scripted/approval-e2e giá 3/15 USD per 1M"
+}
