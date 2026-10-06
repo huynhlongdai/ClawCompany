@@ -84,6 +84,10 @@ export const apiV9 = {
   saveAutonomyPolicy: (payload:Record<string,unknown>) => request(`/v9/autonomy-policy`, {method:"PUT", body:JSON.stringify(payload)}),
   budgets: () => request(`/v9/budgets`),
   budget: (id:number) => request(`/v9/budgets/${id}`),
+  // D2.3: phạm vi + nấc + chi tiêu thật theo seat/task/dự án; override có audit
+  budgetsOverview: () => request(`/v9/budgets-overview`),
+  createBudget: (payload:Record<string,unknown>) => request(`/v9/budgets`, {method:"POST", body:JSON.stringify(payload)}),
+  overrideBudget: (id:number,payload:Record<string,unknown>) => request(`/v9/budgets/${id}/override`, {method:"POST", body:JSON.stringify(payload)}),
   memorySearch: (q:string="",companyId?:number) => request(`/v9/memory/search?q=${encodeURIComponent(q)}${companyId?`&company_id=${companyId}`:""}`),
   createMemory: (payload:Record<string,unknown>) => request(`/v9/memory`, {method:"POST", body:JSON.stringify(payload)}),
   recurringOperations: () => request(`/v9/recurring-operations`),
