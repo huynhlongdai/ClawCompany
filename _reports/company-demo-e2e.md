@@ -35,3 +35,8 @@ Gateway OpenClaw chạy được agent thật, một trong hai:
 - local: sửa agent `dev` (`openclaw doctor --force` — cần anh đồng ý), hoặc
 - box Prized: chuyển `OPENCLAW_MODE` khỏi `mock`, cấp API key model, bind 7 seat (Nina, 3 trưởng phòng, 3 nhân viên), bật `WAKEUP_DRAIN_SECONDS`.
 Ước tính ~10 lượt agent (+ vòng sửa/review) trong trần $20 của mục tiêu.
+
+## Kiểm chứng
+- `tests/test_g5_company_demo.py`: 1 test kịch bản đầy đủ (pass).
+- `tools/mutate_g5.py`: **5/5** đột biến bị bắt (reviewer agent vẫn ping người, mất review chéo, không báo hoàn thành, hoàn thành sớm, lifecycle không gọi kiểm hoàn thành).
+- Full pytest: **936 passed, 2 skipped**.
