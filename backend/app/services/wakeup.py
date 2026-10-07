@@ -391,7 +391,7 @@ async def drain(db: Session, *, now: datetime | None = None, member_id: int | No
     now = now or datetime.utcnow()
     window = settings.wakeup_window_seconds if window_seconds is None else window_seconds
     await requeue_when_hours_open(db, now)
-    q = db.query(Wakeup).filter(Wakeup.status == "queued")
+    q = db.query(Wakeup).filter(Wakeup.status == "queued", _claimable(now))
     if member_id is not None:
         q = q.filter(Wakeup.member_id == member_id)
     groups: dict[int, list[Wakeup]] = {}
@@ -403,8 +403,58 @@ async def drain(db: Session, *, now: datetime | None = None, member_id: int | No
         if not force and oldest > now - timedelta(seconds=window):
             out.append({"member_id": mid, "decision": "waiting", "wakeups": [w.id for w in items]})
             continue
-        out.append(await _process(db, mid, items, now, follow, prefer))
+        mine = _claim(db, items, now)
+        if not mine:
+            out.append({"member_id": mid, "decision": "claimed_elsewhere", "wakeups": [w.id for w in items]})
+            continue
+        try:
+            out.append(await _process(db, mid, mine, now, follow, prefer))
+        finally:
+            _unclaim(db, mine)
     return out
+
+
+# M4a — gate thật: Celery chạy 4 tiến trình, beat drain mỗi 5 giây. Một lượt review
+# (phòng họp) mất ~40 giây, wakeup vẫn ``queued`` suốt lúc đó nên tiến trình khác bốc
+# lại ĐÚNG wakeup ấy, chạy review lần hai (việc #26: hai drain cùng chốt, một cái 409,
+# side-peek thiếu phòng review). Nay mỗi drain giành wakeup bằng một UPDATE có điều
+# kiện (``processed_at`` làm dấu giữ chỗ); giữ chỗ quá hạn thì coi như tiến trình đã chết.
+CLAIM_TTL_SECONDS = 900
+
+
+def _claimable(now: datetime):
+    from sqlalchemy import or_
+    return or_(Wakeup.processed_at.is_(None), Wakeup.processed_at < now - timedelta(seconds=CLAIM_TTL_SECONDS))
+
+
+def _claim(db: Session, items: list[Wakeup], now: datetime) -> list[Wakeup]:
+    mine = []
+    for wk in items:
+        n = (db.query(Wakeup).filter(Wakeup.id == wk.id, Wakeup.status == "queued", _claimable(now))
+             .update({Wakeup.processed_at: now}, synchronize_session=False))
+        db.commit()
+        if n:
+            mine.append(wk)
+    for wk in items:
+        db.refresh(wk)
+    return mine
+
+
+def _unclaim(db: Session, items: list[Wakeup]) -> None:
+    """Wakeup còn ``queued`` sau lượt này (seat chỉ chạy một việc mỗi drain) → trả chỗ."""
+    ids = [w.id for w in items]
+    for attempt in (1, 2):
+        try:
+            (db.query(Wakeup).filter(Wakeup.id.in_(ids), Wakeup.status == "queued")
+             .update({Wakeup.processed_at: None}, synchronize_session=False))
+            db.commit()
+            for wk in items:
+                db.refresh(wk)
+            return
+        except Exception as exc:  # noqa: BLE001 - trả chỗ hỏng thì hết hạn sau CLAIM_TTL_SECONDS
+            db.rollback()
+            if attempt == 2:
+                print(f"[M4a] unclaim wakeups failed: {exc}")
 
 
 def requeue_deferred(db: Session, member_id: int, *, after_run_id: int) -> list[Wakeup]:

@@ -32,7 +32,7 @@ from websockets.exceptions import WebSocketException
 
 from app.core.config import settings
 from app.db.session import SessionLocal
-from app.models import Agent, Approval, Member, Task
+from app.models import Agent, Approval, Member, RuntimeEvent, Task, TaskRun
 from app.realtime import broker
 from app.runtime import openclaw_protocol as ocp
 from app.runtime.factory import get_runtime
@@ -87,6 +87,7 @@ class ConsumerState:
     error: str = ""
     lease_backend: str = ""  # v21: "redis" (shared) or "memory" (this process only)
     reconnects: int = 0  # M1.3: số lần nối lại sau khi mất kết nối
+    last_reply: str = ""  # M4a: câu trả lời cuối của agent trong lượt (từ session.message)
 
     def public(self) -> dict:
         return {
@@ -275,6 +276,11 @@ def handle_event(db: Session, state: ConsumerState, event: dict) -> None:
             db, organization_id=state.organization_id, task=task, agent_id=agent_id,
             session_key=state.session_key, raw=event["raw"], run=route_run)
 
+    if str(event.get("family") or "") == "session.message" and isinstance(event.get("raw"), dict):
+        text = assistant_text(event["raw"])
+        if text:
+            state.last_reply = text
+
     if str(event.get("family") or "") in ocp.APPROVAL_EVENTS:
         state.approvals += 1
         record_approval(db, state, event, member=member)
@@ -408,6 +414,60 @@ def record_approval(db: Session, state: ConsumerState, event: dict, member: Memb
     return approval
 
 
+def assistant_text(raw: dict) -> str:
+    """Chữ của một ``session.message`` assistant (content là chuỗi hoặc danh sách phần)."""
+    msg = raw.get("message") if isinstance(raw.get("message"), dict) else None
+    if not msg or msg.get("role") != "assistant":
+        return ""
+    c = msg.get("content")
+    if isinstance(c, str):
+        return c.strip()
+    parts = []
+    if isinstance(c, list):
+        for p in c:
+            if isinstance(p, dict) and p.get("type") in ("text", "output_text") and isinstance(p.get("text"), str):
+                parts.append(p["text"])
+            elif isinstance(p, str):
+                parts.append(p)
+    if not parts and isinstance(msg.get("text"), str):
+        parts.append(msg["text"])
+    return "\n".join(x for x in parts if x).strip()
+
+
+def last_reply_from_db(db: Session, session_key: str, since: datetime | None) -> str:
+    """Follower gắn muộn / tiến trình khác: đọc lại session.message đã lưu của phiên."""
+    q = db.query(RuntimeEvent).filter(RuntimeEvent.runtime_session_key == session_key)
+    if since is not None:
+        q = q.filter(RuntimeEvent.created_at >= since)
+    for row in q.order_by(RuntimeEvent.id.desc()).limit(50).all():
+        try:
+            ev = json.loads(row.event_json or "{}")
+        except ValueError:
+            continue
+        if str(ev.get("family") or "") == "session.message" and isinstance(ev.get("raw"), dict):
+            text = assistant_text(ev["raw"])
+            if text:
+                return text
+    return ""
+
+
+def record_final_reply(db: Session, task: Task, run: TaskRun, state: ConsumerState) -> bool:
+    from app.services import task_journal
+    text = state.last_reply or last_reply_from_db(db, state.session_key, run.started_at)
+    if not text or not run.member_id:
+        return False
+    first = next((ln.strip() for ln in text.splitlines() if ln.strip()), text.strip())
+    try:
+        task_journal.append(db, task, kind="result", actor_member_id=run.member_id,
+                            summary=("Kết quả: " + first)[:390], detail=text[:20000], outcome="success",
+                            runtime_run_id=run.runtime_run_id or "", runtime_session_key=state.session_key)
+    except Exception as exc:  # noqa: BLE001 — ghi sổ hỏng không được chặn kết thúc lượt
+        print(f"[M4a] record final reply for task #{task.id} failed: {exc}")
+        db.rollback()
+        return False
+    return True
+
+
 def apply_terminal_state(db: Session, task: Task, state: ConsumerState, event: dict) -> Task:
     """Move the task when its run ends, staying inside the board vocabulary."""
     upstream_state = str(event.get("state") or "")
@@ -421,6 +481,11 @@ def apply_terminal_state(db: Session, task: Task, state: ConsumerState, event: d
         # D2.2: báo cáo là bắt buộc. Run xong mà người làm chưa ghi comment nào
         # vào sổ thì việc không được đi tiếp sang review.
         from app.services import execution_policy
+        # M4a: câu trả lời cuối của agent CHÍNH LÀ báo cáo khi agent không có tool
+        # ghi sổ (gateway thật chưa nối MCP company_*: mọi việc có review chéo đều
+        # kẹt "thiếu báo cáo"). Ghi nó thành mục ``result`` của người làm.
+        if holder is not None and not execution_policy.has_report(db, task, holder):
+            record_final_reply(db, task, holder, state)
         if execution_policy.requires_report(task) and not execution_policy.has_report(db, task, holder):
             new_status, reason = "blocked", "missing_report"
             execution_policy.flag_missing_report(db, task, holder)

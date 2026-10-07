@@ -88,8 +88,9 @@ def guard_done(task: Task) -> None:
     stages = task.execution_policy["stages"]
     idx = int(st.get("stage_index") or 0)
     raise PolicyError(409, "execution_policy_pending",
-                      f"Task #{task.id} còn chặng {min(idx, len(stages) - 1) + 1}/{len(stages)} "
-                      f"({stages[min(idx, len(stages) - 1)]['type']}) chưa qua",
+                      f"Việc #{task.id} còn chặng {min(idx, len(stages) - 1) + 1}/{len(stages)} "
+                      f"({'review' if stages[min(idx, len(stages) - 1)]['type'] == 'review' else 'phê duyệt'}) chưa qua"
+                      " — chuyển sang Chờ duyệt để reviewer quyết, không đánh dấu Xong thẳng được",
                       stage_index=idx, state=st.get("status") or "not_started")
 
 

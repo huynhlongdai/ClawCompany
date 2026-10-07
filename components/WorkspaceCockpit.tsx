@@ -351,7 +351,7 @@ function WorkspaceCockpitInner() {
           <div className="panel">
             <div className="panelHead">
               <div><b>Nhiệm vụ cần chú ý</b></div>
-              <Link className="v8Ghost" href="/app/flow">Mở bảng việc →</Link>
+              <Link className="v8Ghost" href="/app/work">Mở Công việc →</Link>
             </div>
             <table className="dataTable">
               <thead><tr><th>Nhiệm vụ</th><th>Người / Agent</th><th>Ưu tiên</th><th>Trạng thái</th></tr></thead>

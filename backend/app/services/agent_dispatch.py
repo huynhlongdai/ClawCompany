@@ -48,18 +48,18 @@ class DispatchConflict(DispatchError):
 def resolve_seat(db: Session, task: Task) -> tuple[Member, Agent]:
     """Find the agent seat responsible for a task, with explicit failures."""
     if not task.assignee_member_id:
-        raise DispatchError("Task has no assignee")
+        raise DispatchError("Việc chưa có người nhận — giao cho một agent trước")
     member = db.get(Member, task.assignee_member_id)
     if member is None:
-        raise DispatchError("Assignee not found")
+        raise DispatchError("Không thấy người nhận việc")
     if member.member_type != "agent":
-        raise DispatchError("Assignee is a human member, not an AI agent")
+        raise DispatchError("Người nhận là người, không phải agent — họ tự làm trên app")
     agent = db.query(Agent).filter(Agent.member_id == member.id).first()
     if agent is None:
-        raise DispatchError("Member has no agent record")
+        raise DispatchError("Ghế này chưa có hồ sơ agent — tuyển lại trong Đội ngũ")
     if not agent.runtime_agent_id:
         raise DispatchError(
-            "Agent seat is not bound to an OpenClaw agentId. Bind it with POST /api/v19/openclaw/bind."
+            "Agent chưa gắn với agent nào trên gateway OpenClaw — mở hồ sơ agent, bấm Đồng bộ lại"
         )
     # M3: seat tạm dừng / đã nghỉ / chưa có trên gateway không nhận lượt mới.
     from app.services.agent_hr import BLOCKED_LIFECYCLES, LIFECYCLE_VI

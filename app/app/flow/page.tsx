@@ -1,10 +1,10 @@
 "use client";
-import {AuthGate} from "@/components/AuthGate";
-import {AppShell} from "@/components/AppShell";
-import {WorkFlowBoard} from "@/components/WorkFlowBoard";
+import {useEffect} from "react";
+import {useRouter} from "next/navigation";
 
-export default function Page(){
-  return <AuthGate><AppShell title="Bảng việc" subtitle="">
-    <WorkFlowBoard/>
-  </AppShell></AuthGate>;
+/* M4a: "Bảng việc" cũ gộp vào Công việc (kiểu xem Bảng). Giữ đường cũ để link/bookmark không gãy. */
+export default function Page() {
+  const router = useRouter();
+  useEffect(() => { router.replace("/app/work?view=board"); }, [router]);
+  return null;
 }

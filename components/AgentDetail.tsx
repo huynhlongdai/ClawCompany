@@ -100,7 +100,7 @@ export function AgentDetail({memberId}: {memberId: number}) {
       <div className="panel">
         <div className="panelHead">
           <div><b>Nhiệm vụ của agent này</b></div>
-          <Link className="v8Ghost" href="/app/os?tab=tasks">Bảng việc →</Link>
+          <Link className="v8Ghost" href="/app/work">Công việc →</Link>
         </div>
         <table className="dataTable">
           <thead><tr><th>Nhiệm vụ</th><th>Dự án</th><th>Ưu tiên</th><th>Trạng thái</th></tr></thead>

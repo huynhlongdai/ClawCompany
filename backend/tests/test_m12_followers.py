@@ -342,3 +342,40 @@ def test_resume_notice_must_be_a_system_message():
     assert not stream_catchup.is_resume_notice(_user("interrupted by a gateway restart"))
     assert not stream_catchup.is_resume_notice({"role": "assistant", "content": RESUME})
     assert stream_catchup.run_chain([_user("x")], RUN_ID) is None
+
+
+# --- M4a: lượt xong trước khi follower nghe kịp → báo cáo lấy từ chat.history ---
+
+def _texted(msg_id, text, run_id=RUN_ID):
+    return {**_assistant(msg_id, run_id=run_id), "content": [{"type": "text", "text": text}]}
+
+
+def test_catch_up_records_the_final_reply_as_the_report(db, world):
+    """Gate thật M4a (việc #12): không có session.message nào trên stream, việc kẹt
+    'thiếu báo cáo'. Câu trả lời cuối trong chat.history của lượt là báo cáo."""
+    from app.models import TaskJournalEntry
+    db.add(TaskRun(organization_id=world["org"].id, task_id=world["task"].id, member_id=world["nina"].id, runtime_run_id=RUN_ID,
+                   status="running"))
+    db.commit()
+    msgs = [_texted("old", "câu trả lời lượt trước", run_id="older-run"),
+            _user("brief", RUN_ID + ":user"),
+            {**_texted("m1", "đang làm"), "stopReason": "toolUse"},
+            _texted("m2", "Đã xong: kế hoạch 3 bước")]
+    out = _catch_up(db, world, _Gateway(messages=msgs))
+    db.refresh(world["task"])
+    assert out["terminal"] is True and out["reply"] is True
+    assert world["task"].status == "review"
+    rows = db.query(TaskJournalEntry).filter(TaskJournalEntry.task_id == world["task"].id,
+                                             TaskJournalEntry.kind == "result").all()
+    assert len(rows) == 1 and rows[0].detail == "Đã xong: kế hoạch 3 bước"
+
+
+def test_chain_reply_ignores_other_turns_in_the_same_session():
+    msgs = [_texted("a", "của lượt khác", run_id="older-run"),
+            _user("brief", RUN_ID + ":user"),
+            _texted("b", "của lượt này"),
+            _texted("c", "lượt khác chen vào", run_id="other-run"),
+            _user("Làm việc khác giúp tôi"),
+            {"role": "assistant", "content": "trả lời người khác"}]
+    assert stream_catchup.chain_reply(msgs, {RUN_ID}, RUN_ID) == "của lượt này"
+    assert stream_catchup.chain_reply([_texted("a", "x", run_id="older-run")], {RUN_ID}, RUN_ID) == ""

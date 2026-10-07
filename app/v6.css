@@ -229,7 +229,7 @@
 .ui-seg{display:inline-flex;padding:2px;border-radius:10px;background:var(--sunken)}
 .ui-seg button{height:28px;padding:0 10px;border:0;border-radius:8px;background:transparent;font-size:13px;color:var(--muted)}
 .ui-seg button:hover{color:var(--ink)}
-.ui-seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);font-weight:500;box-shadow:var(--hairline)}
+.ui-seg button[aria-pressed="true"],.ui-seg button[aria-selected="true"]{background:var(--card);color:var(--ink);font-weight:500;box-shadow:var(--hairline)}
 .ui-chips{display:flex;flex-wrap:wrap;gap:6px}
 .ui-chip{height:28px;padding:0 10px;border:0;border-radius:100px;background:var(--card);box-shadow:var(--hairline);font-size:13px;color:var(--ink-2)}
 .ui-chip:hover{color:var(--ink)}
@@ -424,3 +424,112 @@
 .hrPanel select,.hrPanel input,.hrWizard select,.hrWizard input,.hrWizard textarea,.hrConfirm select,.hrConfirm input{width:100%;max-width:100%}
 .hrWizard textarea{height:auto;padding:8px 12px;line-height:18px;resize:vertical}
 .hrPanel .tmRow,.hrWizard .tmRow{flex-wrap:wrap}
+
+/* ==========================================================================
+   M4a — Công việc: danh sách, bảng, side-peek, tạo việc (.wk*)
+   ========================================================================== */
+.wkPage{display:flex;flex-direction:column;gap:12px;min-width:0}
+.wkCost{display:inline-flex;align-items:center;gap:4px;margin-inline-start:auto;color:var(--ink-2)}
+.wkToolbar{flex-wrap:wrap;gap:8px}
+.wkToolbar .ui-seg button{display:inline-flex;align-items:center;gap:5px}
+.wkSearch{display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:10px;background:var(--card);box-shadow:var(--hairline);color:var(--muted);flex:1 1 200px;max-width:320px}
+.wkSearch input{border:0;outline:0;background:transparent;font:inherit;font-size:13px;color:var(--ink);width:100%;min-width:0}
+.wkSelect{height:32px;padding:0 8px;border:0;border-radius:10px;background:var(--card);box-shadow:var(--hairline);font:inherit;font-size:13px;color:var(--ink-2);max-width:200px}
+.wkNew{margin-inline-start:auto}
+.wkNew kbd{font:inherit;font-size:11px;opacity:.6;padding:0 4px;border-radius:4px;box-shadow:inset 0 0 0 1px currentColor}
+.wkList{display:flex;flex-direction:column;gap:14px}
+.wkGroup{display:flex;flex-direction:column;background:var(--card);border-radius:14px;box-shadow:var(--hairline);overflow:hidden}
+.wkGroupHead{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--sunken)}
+.wkGroupHead h2{margin:0;font-size:13px;font-weight:550}
+.wkRow{display:grid;grid-template-columns:22px 52px minmax(0,1fr) auto auto 150px 64px 78px;align-items:center;gap:10px;width:100%;
+  min-height:40px;padding:6px 14px;border:0;border-top:1px solid var(--line-soft);background:transparent;text-align:start;font:inherit;font-size:13.5px;color:var(--ink);cursor:pointer}
+.wkGroupHead + .wkRow{border-top:0}
+.wkRow:hover{background:var(--sunken)}
+.wkRow.is-sel{box-shadow:inset 2px 0 0 var(--ink)}
+.wkRow.is-open{background:var(--st-running-soft)}
+.wkId{color:var(--muted);font-size:12px}
+.wkTitle{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.wkBadges{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}
+.wkMeta{font-size:12px;color:var(--muted)}
+.wkDept{padding:0 6px;border-radius:6px;background:var(--sunken)}
+.wkWho{display:inline-flex;align-items:center;gap:6px;min-width:0;font-size:12.5px;color:var(--ink-2);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.wkCostCell{font-size:12px;color:var(--ink-2);text-align:end}
+.wkWhen{font-size:12px;color:var(--muted);text-align:end}
+.wkBadge{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:100px;background:var(--sunken);font-size:11.5px;color:var(--ink-2);white-space:nowrap}
+.wkBadge.is-review{background:var(--st-review-soft);color:var(--st-review)}
+.wkBadge.is-failed{background:var(--st-failed-soft);color:var(--st-failed)}
+.wkBadge.is-blocked{background:var(--st-blocked-soft);color:var(--st-blocked)}
+.wkBadge.is-overdue{background:var(--st-waiting-soft);color:var(--st-waiting)}
+.wkBadge.is-running{background:var(--st-running-soft);color:var(--st-running)}
+.wkPrio{display:inline-flex;align-items:flex-end;gap:1.5px;width:14px;height:12px;flex:none}
+.wkPrio i{display:block;width:3px;border-radius:1px;background:var(--line-soft)}
+.wkPrio i:nth-child(1){height:5px}.wkPrio i:nth-child(2){height:8px}.wkPrio i:nth-child(3){height:11px}
+.wkPrio i.on{background:var(--ink-2)}
+.wkPrio.is-urgent{align-items:center;justify-content:center;border-radius:3px;background:var(--st-failed);color:#fff;font-size:10px;width:13px;height:13px}
+.wkPrio.is-urgent b{font-weight:700}
+.wkBoard .ui-card .wkBadges{justify-content:flex-start}
+.wkCardOpen{border:0;background:transparent;padding:0;text-align:start;font:inherit;font-size:13.5px;font-weight:500;cursor:pointer}
+
+/* side-peek */
+.wkPeekWrap{position:fixed;inset:0;z-index:50;background:transparent}
+.wkPeek{position:absolute;top:0;right:0;bottom:0;width:min(600px,100vw);display:flex;flex-direction:column;background:var(--paper);
+  box-shadow:var(--sh-pop);outline:0;animation:wkIn var(--dur-2) var(--ease-out)}
+@keyframes wkIn{from{transform:translateX(24px);opacity:.4}to{transform:none;opacity:1}}
+.wkPeekHead{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line-soft);font-size:12.5px;color:var(--muted)}
+.wkCrumb{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.wkGrow{flex:1}
+.wkPeekBody{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:14px 18px 40px}
+.wkTitleEdit{width:100%;border:0;outline:0;background:transparent;font:inherit;font-size:19px;font-weight:600;letter-spacing:-.01em;color:var(--ink);padding:4px 0;border-bottom:1px solid transparent}
+.wkTitleEdit:focus{border-bottom-color:var(--line-soft)}
+.wkProps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
+.wkProps label,.wkWide,.wkDesc label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.wkProps select,.wkProps input,.wkWide select,.wkWide textarea,.wkDesc textarea,.wkDecide textarea,.wkPick select{height:32px;padding:0 8px;border:0;border-radius:9px;background:var(--card);box-shadow:var(--hairline);font:inherit;font-size:13px;color:var(--ink);min-width:0}
+.wkWide textarea,.wkDesc textarea,.wkDecide textarea{height:auto;padding:8px;resize:vertical;line-height:19px}
+.wkWarn{margin:0;padding:8px 10px;border-radius:10px;background:var(--st-waiting-soft);color:var(--st-waiting);font-size:12.5px}
+.wkTotals{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:10px 12px;border-radius:12px;background:var(--card);box-shadow:var(--hairline);font-size:12.5px;color:var(--muted)}
+.wkTotals b{color:var(--ink);font-size:14px;margin-inline-end:2px}
+.wkTotals .ui-btn{display:inline-flex;gap:5px}
+.wkMsg{margin:0;padding:8px 10px;border-radius:10px;background:var(--sunken);font-size:12.5px;color:var(--ink-2)}
+.wkTabs{align-self:flex-start}
+.wkTimeline{list-style:none;margin:0;padding:0 0 0 4px;display:flex;flex-direction:column}
+.wkEv{position:relative;display:grid;grid-template-columns:14px minmax(0,1fr) auto;gap:10px;align-items:start;padding:6px 0;font-size:12.5px;color:var(--ink-2)}
+.wkEv::before{content:"";position:absolute;left:4.5px;top:0;bottom:0;width:1px;background:var(--line-soft)}
+.wkEv time{font-size:11.5px;color:var(--muted);white-space:nowrap}
+.wkDot{position:relative;z-index:1;width:10px;height:10px;margin-top:4px;border-radius:50%;background:var(--paper);box-shadow:inset 0 0 0 2px var(--st-backlog)}
+.wkDot.is-completed{box-shadow:none;background:var(--st-done)}
+.wkDot.is-failed{box-shadow:none;background:var(--st-failed)}
+.wkDot.is-running,.wkDot.is-dispatched,.wkDot.is-queued{box-shadow:none;background:var(--st-running)}
+.wkDot.is-review{box-shadow:none;background:var(--st-review)}
+.wkEv.is-event{color:var(--muted)}
+.wkRunCard{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border-radius:10px;background:var(--card);box-shadow:var(--hairline)}
+.wkRunHead{display:flex;align-items:center;flex-wrap:wrap;gap:6px;color:var(--ink)}
+.wkMuted{color:var(--muted);font-size:12px}
+.wkRunErr{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin:2px 0 0;padding:6px 8px;border-radius:8px;background:var(--st-failed-soft);color:var(--st-failed);font-size:12px}
+.wkRunEntry{padding:4px 0 0;border-top:1px dashed var(--line-soft);font-size:12.5px;color:var(--ink-2)}
+.wkEv details summary{cursor:pointer;font-size:11.5px;color:var(--muted)}
+.wkEv pre{white-space:pre-wrap;word-break:break-word;margin:4px 0 0;font-family:var(--font-mono);font-size:11.5px;max-height:240px;overflow:auto}
+.wkReview{display:flex;flex-direction:column;gap:10px}
+.wkReviewState{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:12px;background:var(--card);box-shadow:var(--hairline);font-size:13px}
+.wkReviewState > div{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.wkLabel{min-width:96px;font-size:12px;color:var(--muted)}
+.wkDecide{display:flex;flex-direction:column;gap:8px}
+.wkPick{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.wkDesc{display:flex;flex-direction:column;gap:10px;align-items:stretch}
+.wkDesc .ui-btn{align-self:flex-start}
+
+/* tạo việc */
+.wkModalWrap{position:fixed;inset:0;z-index:55;display:grid;place-items:start center;padding:8vh 12px 12px;background:rgba(20,20,20,.28);overflow-y:auto}
+.wkModal{width:min(640px,100%);display:flex;flex-direction:column;gap:12px;padding:18px;border-radius:16px;background:var(--paper);box-shadow:var(--sh-pop)}
+.wkModal h2{margin:0;font-size:15px;font-weight:600}
+.wkCheck{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2)}
+
+@media (max-width:1100px){.wkRow{grid-template-columns:22px 48px minmax(0,1fr) auto 130px 60px}.wkMeta,.wkWhen{display:none}}
+@media (max-width:720px){
+  .wkRow{grid-template-columns:18px minmax(0,1fr) auto;grid-template-areas:"p t c" "p b w";row-gap:4px;padding:8px 12px}
+  .wkRow .wkPrio{grid-area:p}.wkRow .wkTitle{grid-area:t;white-space:normal}.wkRow .wkBadges{grid-area:b;justify-content:flex-start}
+  .wkRow .wkWho{grid-area:w;justify-self:end}.wkRow .wkCostCell{grid-area:c}.wkRow .wkId{display:none}
+  .wkProps{grid-template-columns:minmax(0,1fr)}
+  .wkPeek{width:100vw}
+  .wkSearch{max-width:none;flex-basis:100%}
+  .wkNew{margin-inline-start:0}
+}
