@@ -6,7 +6,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api"
 // backend, nên any là mô tả trung thực hiện trạng, không phải cách né kiểu.
 /** M1: lỗi API mang mã + câu tiếng Việt thay vì nguyên chuỗi JSON. */
 export class ApiError extends Error {
-  status:number; code:string; requestId:string;
+  status:number; code:string; requestId:string; detail?:any;
   constructor(message:string, status:number, code="", requestId=""){
     super(message); this.name="ApiError"; this.status=status; this.code=code; this.requestId=requestId;
   }
@@ -16,8 +16,11 @@ export function describeError(status:number, text:string):ApiError{
   let body:any = null;
   try{ body = JSON.parse(text); }catch{ /* không phải JSON */ }
   const d = body?.detail;
+  // Lỗi có cấu trúc {error, message, ...}: hiện câu `message` (tiếng Việt), giữ mã ở `code`.
+  // Trước M4a nhánh này JSON.stringify cả object, nên người dùng thấy chuỗi JSON thô.
   let msg = typeof d === "string" ? d
     : Array.isArray(d) ? d.map((x:any)=>`${(x.loc||[]).slice(1).join(".")}: ${x.msg}`).join("; ")
+    : d && typeof d.message === "string" ? d.message
     : d ? JSON.stringify(d) : (text || "");
   if(!msg){
     msg = status===401 ? "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại."
@@ -27,7 +30,10 @@ export function describeError(status:number, text:string):ApiError{
       : `Yêu cầu không hợp lệ (HTTP ${status}).`;
   }
   const rid = body?.request_id || "";
-  return new ApiError(rid ? `${msg} (mã yêu cầu ${rid})` : msg, status, body?.code || "", rid);
+  const err = new ApiError(rid ? `${msg} (mã yêu cầu ${rid})` : msg, status,
+    body?.code || (d && typeof d === "object" && !Array.isArray(d) ? d.error || "" : ""), rid);
+  if(d && typeof d === "object" && !Array.isArray(d)) err.detail = d;
+  return err;
 }
 
 async function request<T = any>(path:string, init?:RequestInit):Promise<T>{
@@ -812,4 +818,24 @@ export const apiAgentsHR = {
     remove_from_gateway?: boolean; reason?: string}) =>
     request<any>(`/agents/${agentId}/lifecycle`, {method: "POST", body: JSON.stringify(body)}),
   tools: (agentId: number) => request<any>(`/agents/${agentId}/tools`),
+};
+
+// M4a — Công việc & lượt chạy (/api/work): danh sách, bảng, side-peek, review chéo, chạy ngay.
+export const apiWork = {
+  meta: () => request<any>(`/work/meta`),
+  list: (params: Record<string, string | number | undefined | null> = {}) => {
+    const q = Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== "")
+      .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join("&");
+    return request<any>(`/work/tasks${q ? `?${q}` : ""}`);
+  },
+  get: (id: number) => request<any>(`/work/tasks/${id}`),
+  create: (body: any) => request<any>(`/work/tasks`, {method: "POST", body: JSON.stringify(body)}),
+  update: (id: number, body: any) => request<any>(`/work/tasks/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  move: (id: number, status: string, expected_revision?: string) =>
+    request<any>(`/work/tasks/${id}/move`, {method: "POST", body: JSON.stringify({status, expected_revision})}),
+  reviewers: (id: number, reviewer_member_ids: number[]) =>
+    request<any>(`/work/tasks/${id}/reviewers`, {method: "PUT", body: JSON.stringify({reviewer_member_ids})}),
+  decide: (id: number, decision: "approve" | "revise", note = "") =>
+    request<any>(`/work/tasks/${id}/review`, {method: "POST", body: JSON.stringify({decision, note})}),
+  run: (id: number) => request<any>(`/work/tasks/${id}/run`, {method: "POST"}),
 };

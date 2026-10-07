@@ -44,6 +44,8 @@ TASK_TRANSITIONS: dict[str, tuple[str, ...]] = {
 # Vào những trạng thái này nghĩa là "đang làm/đã xong" — không được khi việc
 # mình chờ còn chưa xong.
 GATED_BY_BLOCKERS = ("in_progress", "review", "done")
+STATUS_VI = {"backlog": "Tồn đọng", "todo": "Cần làm", "in_progress": "Đang làm", "review": "Chờ duyệt",
+             "blocked": "Bị chặn", "done": "Xong", "cancelled": "Đã huỷ"}
 NEEDS_ASSIGNEE = ("in_progress", "review")
 
 
@@ -67,21 +69,27 @@ def check(db: Session, task: Task, to: str) -> None:
     from app.services import task_graph  # tránh vòng import
 
     if to not in TASK_STATUSES:
-        raise HTTPException(400, f"status must be one of: {', '.join(TASK_STATUSES)}")
+        raise HTTPException(400, {"error": "invalid_status", "allowed": list(TASK_STATUSES),
+                                  "message": "Trạng thái phải là một trong: "
+                                             + ", ".join(STATUS_VI[s] for s in TASK_STATUSES)})
     current = task.status or "backlog"
     allowed = TASK_TRANSITIONS.get(current, ())
     if to not in allowed:
-        raise HTTPException(409, f"Cannot move a task from '{current}' to '{to}'. "
-                                 f"Allowed: {', '.join(allowed) or 'none'}")
+        raise HTTPException(409, {"error": "invalid_transition", "from": current, "to": to, "allowed": list(allowed),
+                                  "message": f"Không chuyển thẳng từ '{STATUS_VI.get(current, current)}' sang "
+                                             f"'{STATUS_VI.get(to, to)}'. Từ đây chỉ sang được: "
+                                             + (", ".join(STATUS_VI[a] for a in allowed) or "không trạng thái nào")})
     if to in NEEDS_ASSIGNEE and task.assignee_member_id is None:
-        raise HTTPException(400, "Assign the task before moving it into progress")
+        raise HTTPException(400, {"error": "needs_assignee",
+                                  "message": f"Giao việc cho một người hoặc agent trước rồi mới chuyển sang "
+                                             f"'{STATUS_VI[to]}'"})
     if to in GATED_BY_BLOCKERS:
         open_ = task_graph.open_blockers(db, task.id)
         if open_:
             ids = ", ".join(f"#{t.id}" for t in open_)
             raise HTTPException(409, {"error": "blocked_by_open_tasks",
                                       "blocked_by": [t.id for t in open_],
-                                      "message": f"Task còn bị chặn bởi {ids} chưa xong"})
+                                      "message": f"Việc còn chờ {ids} chưa xong — xong việc đó trước, hoặc bỏ liên kết chặn"})
 
 
 def transition(db: Session, task: Task, to: str, *, reason: str = "", via: str = "api",
@@ -92,17 +100,19 @@ def transition(db: Session, task: Task, to: str, *, reason: str = "", via: str =
     current = task.status or "backlog"
     if to == current:
         return task
-    if to == "done":
-        # D2.2: chốt duy nhất cho mọi đường (API cũ/mới, tool của agent, hệ thống).
-        from app.services import execution_policy
-        execution_policy.guard_done(task)
+    # M4a: kiểm bảng chuyển TRƯỚC chốt policy — kéo "Cần làm → Xong" phải được
+    # bảo là không có đường đó, không phải "còn chặng review chưa qua".
     if system:
         if to not in TASK_STATUSES:
-            raise HTTPException(400, f"status must be one of: {', '.join(TASK_STATUSES)}")
+            raise HTTPException(400, {"error": "invalid_status", "message": "Trạng thái không hợp lệ"})
         if not reason:
             raise ValueError("system transitions must say why")
     else:
         check(db, task, to)
+    if to == "done":
+        # D2.2: chốt duy nhất cho mọi đường (API cũ/mới, tool của agent, hệ thống).
+        from app.services import execution_policy
+        execution_policy.guard_done(task)
     trail = write_trail.start("task", task)
     task.status = to
     db.add(task)

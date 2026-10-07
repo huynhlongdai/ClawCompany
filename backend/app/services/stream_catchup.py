@@ -96,6 +96,31 @@ def history_usage_raw(msg: dict, session_key: str) -> dict | None:
             "sessionKey": session_key, "message": msg}
 
 
+def chain_reply(messages: list, chain: set[str], run_id: str) -> str:
+    """M4a: chữ assistant cuối cùng thuộc lượt của task (gate thật: lượt xong trước khi
+    follower nghe kịp → không có ``session.message`` nào trên stream, báo cáo chỉ còn ở
+    ``chat.history``). Không lấy câu trả lời của lượt khác cùng phiên."""
+    from app.services.runtime_stream import assistant_text
+    last, inside = "", False
+    for msg in messages or []:
+        if not isinstance(msg, dict):
+            continue
+        meta = msg.get("__openclaw") if isinstance(msg.get("__openclaw"), dict) else {}
+        rid = str(meta.get("runId") or "")
+        key = str(msg.get("idempotencyKey") or meta.get("idempotencyKey") or "")
+        if rid in chain or (run_id and key.startswith(run_id)):
+            inside = True
+        elif rid:
+            inside = False
+        elif msg.get("role") == "user" and not is_resume_notice(msg):
+            inside = False
+        if inside and msg.get("role") == "assistant":
+            text = assistant_text({"message": msg})
+            if text:
+                last = text
+    return last
+
+
 async def catch_up(db: Session, runtime, state, apply_terminal) -> dict:
     """Trả ``{"terminal": bool, "recorded": n, ...}``; ``terminal`` thì follower dừng."""
     out = {"terminal": False, "recorded": 0, "status": "", "skipped": ""}
@@ -133,6 +158,10 @@ async def catch_up(db: Session, runtime, state, apply_terminal) -> dict:
                     agent_id=agent.id if agent else None,
                     session_key=state.session_key, raw=raw) is not None:
                 out["recorded"] += 1
+        reply = chain_reply(messages, chain, task.runtime_run_id)
+        if reply and not getattr(state, "last_reply", ""):
+            state.last_reply = reply
+        out["reply"] = bool(reply)
         apply_terminal(db, task, state, {"state": terminal, "terminal": True,
                                          "type": "chat", "source": "catch_up"})
         out["terminal"] = True

@@ -102,7 +102,7 @@ export function TaskDetail({taskId}: {taskId: number}) {
             {owner ? ` · đang thuộc ${owner.name}` : " · chưa có người nhận"}
           </small>
         </div>
-        <Link href="/app/os?tab=tasks">Về bảng việc →</Link>
+        <Link href={`/app/work?peek=${taskId}`}>Về Công việc →</Link>
       </div>
 
       {task?.description && <p style={{margin: "4px 0 12px", fontSize: 13.5}}>

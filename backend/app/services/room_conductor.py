@@ -223,6 +223,38 @@ def next_speaker(db: Session, room: CollaborationRoom) -> tuple[RoomParticipant 
     return min(agents, key=lambda p: (spoken.get(p.member_id, -1), p.seat_order, p.id)), ""
 
 
+def _review_task(db: Session, room: CollaborationRoom) -> Task | None:
+    key = room.room_key or ""
+    if not key.startswith("review-t"):
+        return None
+    try:
+        task_id = int(key[len("review-t"):].split("-", 1)[0])
+    except ValueError:
+        return None
+    task = db.get(Task, task_id)
+    if task is None:
+        return None
+    project = db.get(Project, task.project_id) if task.project_id else None
+    from app.models import Company
+    company = db.get(Company, project.company_id) if project else None
+    return task if company is not None and company.organization_id == room.organization_id else None
+
+
+def _latest_result(db: Session, task: Task, limit_chars: int = 6_000) -> str:
+    from app.models import TaskJournalEntry
+    st = task.execution_state or {}
+    doer = st.get("doer_member_id") or task.assignee_member_id
+    q = db.query(TaskJournalEntry).filter(TaskJournalEntry.task_id == task.id,
+                                          TaskJournalEntry.kind.in_(("result", "note", "decision")))
+    if doer:
+        q = q.filter(TaskJournalEntry.actor_member_id == doer)
+    entry = q.order_by(TaskJournalEntry.seq.desc()).first()
+    if entry is None:
+        return ""
+    text = (entry.detail or entry.summary or "").strip()
+    return text[:limit_chars] + ("\n…(đã cắt)" if len(text) > limit_chars else "")
+
+
 def build_turn_prompt(db: Session, room: CollaborationRoom,
                       speaker: RoomParticipant, *, chair: RoomParticipant | None) -> str:
     """Prompt cho một lượt nói.
@@ -276,7 +308,18 @@ def build_turn_prompt(db: Session, room: CollaborationRoom,
 
     # Gói ngữ cảnh công việc: chỉ khi phòng gắn với dự án, và lấy task đang mở
     # đầu tiên làm điểm neo. Không có dự án thì không bịa ra.
-    if room.project_id:
+    # M4a: phòng review (``review-t{id}-…``) neo vào ĐÚNG việc đang review và đưa
+    # nguyên văn kết quả người làm nộp. Trước đây neo vào "task mở đầu tiên của dự
+    # án" (sắp theo chuỗi priority) — dự án có nhiều việc thì reviewer chấm nhầm việc.
+    review_task = _review_task(db, room)
+    if review_task is not None:
+        pack = work_context.build_pack(db, review_task, organization_id=room.organization_id,
+                                       budget_chars=2_500)
+        parts.append("## Việc đang review\n" + pack["text"])
+        result = _latest_result(db, review_task)
+        if result:
+            parts.append("## Kết quả người làm đã nộp (nguyên văn)\n" + result)
+    elif room.project_id:
         task = db.execute(
             select(Task).where(Task.project_id == room.project_id,
                                Task.status.notin_(["done", "cancelled", "archived"]))

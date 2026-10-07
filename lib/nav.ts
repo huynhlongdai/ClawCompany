@@ -37,8 +37,9 @@ export const NAV: NavEntry[] = [
   {href: "/app/os", label: "Tổng quan", group: "top", icon: "home",
    desc: "Ai đang làm gì, cái gì cần anh, số liệu chính", keywords: "home trang chủ dashboard"},
 
-  {href: "/app/flow", label: "Bảng việc", group: "work", icon: "board",
-   desc: "Kanban theo vòng đời nhiệm vụ — kéo thả hoặc dùng nút ba chấm để chuyển trạng thái", keywords: "kanban task nhiệm vụ board flow"},
+  {href: "/app/work", label: "Công việc", group: "work", icon: "check",
+   desc: "Danh sách & bảng việc, lượt chạy kèm chi phí, review chéo — kéo thả hoặc ba chấm để chuyển trạng thái",
+   keywords: "kanban task nhiệm vụ board flow bảng việc list danh sách lượt chạy run review"},
   {href: "/app/os?tab=projects", label: "Dự án", group: "work", icon: "layers", countKey: "projects_active",
    desc: "Dự án, tiến độ và hạn chót", keywords: "project"},
   {href: "/app/goals", label: "Mục tiêu", group: "work", icon: "target",
@@ -140,7 +141,7 @@ export function matchNav(pathname: string, tab: string): NavEntry | undefined {
   });
   if (exact) return exact;
   if (pathname === "/app/os") return NAV.find(n => n.href === "/app/os");
-  if (pathname.startsWith("/app/tasks/")) return NAV.find(n => n.href === "/app/flow");
+  if (pathname.startsWith("/app/tasks/") || pathname.startsWith("/app/flow")) return NAV.find(n => n.href === "/app/work");
   if (pathname.startsWith("/app/agents/")) return NAV.find(n => n.href === "/app/os?tab=agents");
   return NAV.find(n => n.href.split("?")[0] === pathname);
 }

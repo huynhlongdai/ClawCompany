@@ -54,6 +54,7 @@ from app.api.v36 import router as v36_router
 from app.api.routines import router as routines_router
 from app.api.strategy import router as strategy_router
 from app.api.team import router as team_router  # M2
+from app.api.work import router as work_router, successor as work_successor  # M4a
 from app.core.middleware import RequestContextMiddleware
 from app.core.errors import JSONErrorMiddleware
 
@@ -155,6 +156,18 @@ app.include_router(v36_router, prefix="/api")
 app.include_router(routines_router, prefix="/api")
 app.include_router(strategy_router, prefix="/api")
 app.include_router(team_router, prefix="/api")
+app.include_router(work_router, prefix="/api")
+
+
+@app.middleware("http")
+async def _work_deprecations(request, call_next):
+    """M4a: đường cũ của màn hình việc → header Deprecation + Link tới /api/work."""
+    response = await call_next(request)
+    nxt = work_successor(request.url.path)
+    if nxt:
+        response.headers["Deprecation"] = "true"
+        response.headers["Link"] = f'<{nxt}>; rel="successor-version"'
+    return response
 
 
 @app.on_event("startup")
