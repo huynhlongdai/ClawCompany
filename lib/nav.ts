@@ -54,6 +54,8 @@ export const NAV: NavEntry[] = [
   {href: "/app/routines", label: "Việc định kỳ", group: "work", icon: "zap",
    desc: "Routine theo lịch / webhook, chạy bù, tự dừng khi lỗi", keywords: "routine cron lịch webhook định kỳ"},
 
+  {href: "/app/team", label: "Đội ngũ", group: "team", icon: "users",
+   desc: "Sơ đồ tổ chức, mời người, phân quyền, trưởng phòng, mẫu công ty", keywords: "team org chart sơ đồ mời invite quyền role csv mẫu"},
   {href: "/app/os?tab=agents", label: "Nhân sự AI", group: "team", icon: "sparkle", countKey: "agents",
    desc: "Seat agent, model, trạng thái runtime", keywords: "agent seat ai"},
   {href: "/app/os?tab=people", label: "Con người", group: "team", icon: "users", countKey: "humans",

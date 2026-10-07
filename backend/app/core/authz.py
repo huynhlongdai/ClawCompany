@@ -45,7 +45,23 @@ def get_principal(
     user = db.get(User, int(claims["sub"]))
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive user")
-    return Principal(user.id, claims.get("org_id"), claims.get("role", "member"), "jwt", [], user.member_id)
+    org_id = claims.get("org_id")
+    role = claims.get("role", "member")
+    # M2: quyền là dữ liệu sống. Có dòng UserOrganizationAccess thì role lấy từ
+    # DB mỗi request — đổi/thu quyền có hiệu lực ngay, không đợi token hết hạn.
+    # Không có dòng (token phát hành trực tiếp, superuser) thì giữ role trong JWT.
+    if org_id is not None and not user.is_superuser:
+        from app.models import UserOrganizationAccess
+        access = db.query(UserOrganizationAccess).filter(
+            UserOrganizationAccess.user_id == user.id,
+            UserOrganizationAccess.organization_id == int(org_id),
+        ).first()
+        if access is not None:
+            if (access.status or "active") != "active":
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                    detail="Quyền truy cập tổ chức này đã bị thu hồi")
+            role = access.role
+    return Principal(user.id, org_id, role, "jwt", [], user.member_id)
 
 
 

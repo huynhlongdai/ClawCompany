@@ -53,6 +53,7 @@ from app.api.v35 import router as v35_router
 from app.api.v36 import router as v36_router
 from app.api.routines import router as routines_router
 from app.api.strategy import router as strategy_router
+from app.api.team import router as team_router  # M2
 from app.core.middleware import RequestContextMiddleware
 from app.core.errors import JSONErrorMiddleware
 
@@ -153,6 +154,7 @@ app.include_router(v35_router, prefix="/api")
 app.include_router(v36_router, prefix="/api")
 app.include_router(routines_router, prefix="/api")
 app.include_router(strategy_router, prefix="/api")
+app.include_router(team_router, prefix="/api")
 
 
 @app.on_event("startup")

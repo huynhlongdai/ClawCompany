@@ -65,10 +65,24 @@ async def provision_agent(
             "skills": manifest.get("skills", []), "tools": manifest.get("tools", []),
             "channels": manifest.get("channels", []), "policy": manifest.get("policy", {}),
         }
-        runtime_result = await get_runtime().create_agent(runtime_agent_id, runtime_config)
-        agent.lifecycle = "active"
-        job.status = "ready"; job.completed_at = datetime.utcnow()
+        runtime_result = await get_runtime().create_agent(runtime_agent_id, runtime_config) or {}
+        job.completed_at = datetime.utcnow()
         job.result_json = json.dumps({"agent_id": agent.id, "member_id": member.id, "runtime": runtime_result}, ensure_ascii=False, default=str)
+        if runtime_result.get("bound") is False:
+            # M2: gateway trả missing/mismatch → agent CHƯA tồn tại trên runtime.
+            # Không đánh dấu active/ready (trước đây vẫn báo xong); để ghế chờ
+            # gắn runtime kèm hướng dẫn, dispatch sẽ không chọn nhầm.
+            agent.lifecycle = "runtime_missing"
+            member.status = "pending_runtime"
+            job.status = "needs_runtime"
+            job.error = str(runtime_result.get("hint") or runtime_result.get("error") or runtime_result.get("status") or "runtime chưa có agent")
+            db.add_all([agent, member, job]); db.commit(); db.refresh(job)
+            log_event(db, organization_id, "agent.hire.unbound", "agents", agent.id, actor_name="provisioning",
+                      result="partial", payload={"job_id": job.id, "runtime_agent_id": runtime_agent_id,
+                                                 "runtime_status": runtime_result.get("status")})
+            return job
+        agent.lifecycle = "active"
+        job.status = "ready"
         db.add_all([agent, job]); db.commit(); db.refresh(job)
         log_event(db, organization_id, "agent.hire", "agents", agent.id, actor_name="provisioning", payload={"job_id": job.id, "runtime_agent_id": runtime_agent_id})
         return job

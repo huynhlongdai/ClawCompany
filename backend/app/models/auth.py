@@ -21,6 +21,9 @@ class UserOrganizationAccess(Base):
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
     role: Mapped[str] = mapped_column(String(80), default="member")
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    # M2 (0028): thu hồi quyền = status "revoked" (giữ dòng để token cũ bị chặn
+    # ngay, không phải đợi JWT hết hạn).
+    status: Mapped[str] = mapped_column(String(24), default="active")
 
 class APIKey(Base):
     __tablename__ = "api_keys"
