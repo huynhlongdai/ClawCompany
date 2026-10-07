@@ -378,3 +378,49 @@
 .tmRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px}
 .tmRow input{flex:1;min-width:180px;height:30px;border-radius:8px;border:1px solid var(--line-soft,#e4e2dd);padding:0 8px}
 .tmResult,.tmReport{display:flex;flex-direction:column;gap:4px;margin-top:10px;font-size:13px}
+/* M3 — Nhân sự AI */
+.hrWrap{display:grid;gap:12px}
+.hrScroll{overflow-x:auto}
+.hrScroll .tmTable th{font-size:11.5px;font-weight:600;color:var(--muted);text-align:left;padding:4px;border-bottom:1px solid var(--line-soft,#eee)}
+.hrSteps{display:flex;gap:6px;flex-wrap:wrap;list-style:none;padding:0;margin:4px 0 12px}
+.hrSteps li{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);padding:4px 10px 4px 4px;border-radius:100px;background:var(--sunken,#efede8)}
+.hrSteps li span{width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;background:var(--card,#fff);font-size:11px}
+.hrSteps li.is-on{background:var(--ink,#1d201d);color:var(--paper,#fff)}
+.hrSteps li.is-on span{background:var(--paper,#fff);color:var(--ink,#1d201d)}
+.hrSteps li.is-done{color:var(--st-done)}
+.hrPersona{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.hrPersona button{display:flex;flex-direction:column;gap:3px;text-align:left;padding:10px;border-radius:12px;border:1px solid var(--line-soft,#e4e2dd);background:var(--card,#fff);cursor:pointer;font:inherit}
+.hrPersona button small{color:var(--muted);font-size:12px;line-height:16px}
+.hrPersona button.is-on{border-color:var(--ink,#1d201d);box-shadow:0 0 0 1px var(--ink,#1d201d)}
+.hrSummary{font-size:13px;padding:10px;border-radius:10px;background:var(--sunken,#efede8);overflow-wrap:anywhere}
+.hrResult{display:grid;gap:8px}
+.hrFiles{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:0;font-size:13px}
+.hrFiles li{padding:3px 10px;border-radius:100px;background:var(--sunken,#efede8)}
+.hrFiles .is-ok{color:var(--st-done);margin-right:4px}
+.hrPanel{display:grid;gap:12px;margin-bottom:16px}
+.hrWarn{color:var(--st-waiting)}
+.hrFacts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;font-size:13px;margin:4px 0 10px}
+.hrFacts dt{color:var(--muted)}
+.hrFacts dd{margin:0;overflow-wrap:anywhere}
+.hrDanger{color:var(--st-blocked,#b42318)}
+.ui-btn.hrDangerFill{background:var(--st-blocked,#b42318);color:#fff}
+.hrConfirm{margin-top:10px;padding:12px;border-radius:12px;background:var(--st-blocked-soft,#fdecea)}
+.hrConfirm small{color:var(--ink-2);line-height:17px}
+.hrCheck{display:flex !important;flex-direction:row !important;align-items:center;gap:6px;font-size:13px}
+.hrCheck input{width:auto !important;min-width:0}
+.hrLinkBtn{border:0;background:none;padding:0;color:var(--ink-2);text-decoration:underline;font:inherit;font-size:12px;cursor:pointer}
+.hrDiff{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.hrDiff pre{font-size:11.5px;line-height:16px;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow:auto;background:var(--sunken,#efede8);padding:8px;border-radius:8px;margin:4px 0 0}
+.hrDiff pre span{display:block}
+.hrDiff .is-gone{background:#fde2e1}
+.hrDiff .is-added{background:#dff3e4}
+@media (max-width:720px){.hrDiff{grid-template-columns:minmax(0,1fr)}}
+.hrPanel .v9Grid2>*,.hrPanel section,.hrWizard{min-width:0}
+.hrPanel .v8CardHead,.hrWizard .v8CardHead{flex-wrap:wrap;gap:8px}
+.hrPanel .v8CardHead>div,.hrWizard .v8CardHead>div{min-width:0}
+.hrPanel .v9Form,.hrWizard .v9Form{display:grid;gap:10px;align-items:stretch}
+.hrPanel .v9FormRow{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.hrPanel label,.hrWizard label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);min-width:0}
+.hrPanel select,.hrPanel input,.hrWizard select,.hrWizard input,.hrWizard textarea,.hrConfirm select,.hrConfirm input{width:100%;max-width:100%}
+.hrWizard textarea{height:auto;padding:8px 12px;line-height:18px;resize:vertical}
+.hrPanel .tmRow,.hrWizard .tmRow{flex-wrap:wrap}

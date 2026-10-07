@@ -79,7 +79,9 @@ def reconcile(db: Session, organization_id: int, gateway_agents: list[dict]) -> 
     changed = 0
     for item in orphaned:
         agent = db.get(Agent, item["agent_id"])
-        if agent is not None and agent.lifecycle != "detached":
+        # M3: "paused"/"retired" là quyết định của người — không ghi đè (nếu không,
+        # lần khớp lại sau đó sẽ âm thầm chuyển seat tạm dừng thành "active").
+        if agent is not None and agent.lifecycle not in ("detached", "paused", "retired"):
             agent.lifecycle = "detached"
             db.add(agent)
             changed += 1

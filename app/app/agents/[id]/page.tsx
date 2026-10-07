@@ -2,12 +2,16 @@ import {AuthGate} from "../../../../components/AuthGate";
 import {V17AppShell} from "../../../../components/V17AppShell";
 import {AgentDetail} from "../../../../components/AgentDetail";
 import {SeatProfileByMember} from "../../../../components/SeatProfile";
+import {AgentHRPanel} from "../../../../components/AgentHR";
 
 /* Chi tiết một nhân sự AI.
 
    WP-2.1/2.2 thêm khối "hồ sơ" lên trên: sáu tab đọc/ghi được danh tính, tính
    cách, mô tả công việc, năng lực, quyền và hạn mức — ghi thẳng vào gateway
    OpenClaw qua agents.files.set và config.patch.
+
+   M3 thêm khối "nhân sự" trên cùng: sửa hồ sơ ghi 2 chiều, vòng đời, lệch &
+   đồng bộ lại, quyền tool theo ghế.
 
    Khối cũ (AgentDetail: nhiệm vụ đang giữ, trạng thái runtime, kỹ năng) giữ
    nguyên bên dưới. Hai khối trả lời hai câu khác nhau: "nhân viên này được
@@ -19,6 +23,7 @@ export default function Page({params}: {params: {id: string}}) {
                  subtitle="Danh tính, tính cách, mô tả công việc, năng lực, quyền và hạn mức — ghi trực tiếp vào gateway OpenClaw">
       {Number.isFinite(memberId)
         ? <>
+            <AgentHRPanel memberId={memberId}/>
             <SeatProfileByMember memberId={memberId}/>
             <AgentDetail memberId={memberId}/>
           </>

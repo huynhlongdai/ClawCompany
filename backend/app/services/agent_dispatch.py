@@ -61,6 +61,10 @@ def resolve_seat(db: Session, task: Task) -> tuple[Member, Agent]:
         raise DispatchError(
             "Agent seat is not bound to an OpenClaw agentId. Bind it with POST /api/v19/openclaw/bind."
         )
+    # M3: seat tạm dừng / đã nghỉ / chưa có trên gateway không nhận lượt mới.
+    from app.services.agent_hr import BLOCKED_LIFECYCLES, LIFECYCLE_VI
+    if agent.lifecycle in BLOCKED_LIFECYCLES:
+        raise DispatchError(f"{member.name} {LIFECYCLE_VI[agent.lifecycle]} — không giao lượt chạy mới")
     return member, agent
 
 

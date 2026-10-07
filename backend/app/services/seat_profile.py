@@ -207,7 +207,7 @@ class SeatProfileService:
         # không ai cập nhật lại, nên mọi báo cáo chi phí dựa vào nó đều đang nói
         # về một model không chạy. Nói ra chỗ lệch, đừng chọn hộ bên nào đúng.
         db_model = (agent.model or "").strip()
-        live_model = str((profile.get("config") or {}).get("effective", {}).get("model") or "").strip()
+        live_model = model_str((profile.get("config") or {}).get("effective", {}).get("model"))
         profile["model_drift"] = {
             "db": db_model, "gateway": live_model,
             "match": (not db_model or not live_model or db_model == live_model),
@@ -441,6 +441,15 @@ class SeatProfileService:
                 allow_restart=allow_restart, dry_run=dry_run)
         except ConfigError as exc:
             raise SeatError(exc.reason, str(exc), **exc.details) from exc
+
+
+def model_str(value: Any) -> str:
+    """``model`` trong config là chuỗi (riêng seat) hoặc ``{primary, fallbacks}``
+    (thừa hưởng agents.defaults — đúng trường hợp agent vừa ``agents.create``).
+    So sánh trên dạng thô thì luôn "lệch" giả."""
+    if isinstance(value, dict):
+        value = value.get("primary")
+    return str(value or "").strip()
 
 
 def _looks_like_sample(name: str, content: str) -> bool:
