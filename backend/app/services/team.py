@@ -258,10 +258,15 @@ def accept_invitation(db: Session, token: str, *, password: str, display_name: s
         if mine and mine.organization_id == inv.organization_id:
             member = mine
     if member is None:
+        # chưa chọn người quản lý → báo cáo trưởng phòng (nếu phòng có)
+        manager_id = inv.manager_member_id
+        if manager_id is None and inv.department_id:
+            dept = db.get(Department, inv.department_id)
+            manager_id = dept.head_member_id if dept else None
         member = Member(organization_id=inv.organization_id, company_id=inv.company_id,
                         department_id=inv.department_id, name=user.display_name or inv.email,
                         member_type="human", role=inv.job_title or ROLE_VI.get(inv.role, inv.role),
-                        manager_id=inv.manager_member_id, status="active")
+                        manager_id=manager_id, status="active")
         db.add(member); db.flush()
     if user.member_id is None:
         taken = db.query(User).filter(User.member_id == member.id, User.id != user.id).first()

@@ -342,7 +342,7 @@
 .tmInline select{height:28px;border-radius:8px;border:1px solid var(--line-soft,#e4e2dd);background:var(--card,#fff);font-size:13px;padding:0 6px}
 .tmTree{overflow-x:auto;padding:8px 0 16px}
 .tmTree ul{display:flex;justify-content:center;padding:18px 0 0;margin:0;position:relative}
-.tmTree>ul{padding-top:0}
+.tmTree>ul{padding-top:0;width:max-content;min-width:100%}
 .tmTree li{list-style:none;position:relative;padding:18px 6px 0;display:flex;flex-direction:column;align-items:center}
 .tmTree>ul>li{padding-top:0}
 .tmTree li::before,.tmTree li::after{content:"";position:absolute;top:0;right:50%;width:50%;height:18px;border-top:1px solid #c9c6bf}

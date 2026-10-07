@@ -44,9 +44,9 @@ function flatten(tree: any[]): any[] {
 export function TeamConsole() {
   const router = useRouter(); const params = useSearchParams();
   const tab = (params.get("tab") as Tab) || "chart";
-  const setTab = (t: Tab) => router.replace(`/app/team?tab=${t}`);
+  const [companyId, setCompanyId] = useState<number | null>(Number(params.get("company")) || null);
+  const setTab = (t: Tab) => router.replace(`/app/team?tab=${t}${companyId ? `&company=${companyId}` : ""}`);
   const [me, setMe] = useState<any>(null), [chart, setChart] = useState<any>(null), [people, setPeople] = useState<any>(null);
-  const [companyId, setCompanyId] = useState<number | null>(null);
   const [error, setError] = useState(""), [note, setNote] = useState(""), [busy, setBusy] = useState(false);
   const caps = me?.capabilities || {};
 

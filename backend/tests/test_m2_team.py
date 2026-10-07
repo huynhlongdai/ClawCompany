@@ -190,6 +190,16 @@ def test_invite_accept_creates_user_member_and_role(env):
     assert env.c.post("/api/team/invitations/accept", json={"token": raw, "password": "Matkhau123"}).status_code == 410
 
 
+def test_invite_without_manager_reports_to_department_head(env):
+    d = _dept(env, "Kho")
+    head = Member(organization_id=env.org.id, company_id=env.co.id, department_id=d.id, name="Trưởng kho", member_type="agent", status="active")
+    env.db.add(head); env.db.commit(); d.head_member_id = head.id; env.db.commit()
+    raw = env.c.post("/api/team/invitations", json={"email": "k@x.vn", "department_id": d.id}, headers=env.tok("admin")).json()["token"]
+    body = env.c.post("/api/team/invitations/accept", json={"token": raw, "password": "Matkhau123"}).json()
+    env.db.expire_all()
+    assert env.db.get(Member, body["member_id"]).manager_id == head.id
+
+
 def test_invite_expired_revoked_and_wrong_token(env):
     h = env.tok("admin")
     raw = env.c.post("/api/team/invitations", json={"email": "e@x.vn"}, headers=h).json()["token"]
