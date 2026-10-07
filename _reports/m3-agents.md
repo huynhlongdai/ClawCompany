@@ -27,7 +27,7 @@ wizard trên UI (ảnh `hire-result`) có trong `agents.list`, tên tiếng Vi�
 ## Kiểm chứng
 - `tests/test_m3_agents.py` **17 passed**; full pytest **1042 passed, 2 skipped**; `tsc --noEmit` sạch.
 - Mutation **15/15 bị bắt**: drift không so hash, bỏ chốt "sửa trên gateway", bỏ chốt "đã chỉnh tay", không nhận IDENTITY do `agents.update`, dispatch không chặn, nghỉ không xoá phiên phụ / không xoá agent / không chuyển người báo cáo / không khoá API key / không trả việc về phòng, đẩy lên ghi mù, không mặc định trưởng phòng, đối chiếu roster ghi đè paused, `PUT /files` không lưu mốc, MEMORY tính là lệch.
-- Gate VM (`GATE_PASSWORD=… python3 tools/gate_m3.py`): xem `GATE_LOG`.
+- Gate VM (`GATE_PASSWORD=… python3 tools/gate_m3.py`): **27/27 × 3 lần** trên commit cuối (b9ce2f6) và bản trước đó; lần chạy đầu 25/27 lộ lỗi IDENTITY.md ở mục trên.
 
 ## Còn lại / ghi chú
 - `tools.effective` của gateway cần `sessionKey` → quyền tool theo ghế hiện là lớp ClawCompany (lớp 2); lớp `tools.allow/deny` của gateway vẫn sửa ở tab Quyền của hồ sơ.
