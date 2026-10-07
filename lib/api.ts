@@ -797,3 +797,19 @@ export const apiTeam = {
   importCsv: (company_id: number, csv_text: string, dry_run: boolean) =>
     request<any>(`/team/import-csv`, {method: "POST", body: JSON.stringify({company_id, csv_text, dry_run})}),
 };
+
+// M3: Nhân sự AI — tuyển (wizard), sửa hồ sơ 2 chiều, lệch & đồng bộ lại, vòng đời, quyền tool theo seat.
+// agentId ở đây là id của bảng agents (seat), không phải member id.
+export const apiAgentsHR = {
+  roster: (companyId?: number | null) => request<any>(`/agents/roster${companyId ? `?company_id=${companyId}` : ""}`),
+  options: () => request<any>(`/agents/hire/options`),
+  hire: (body: any) => request<any>(`/agents/hire`, {method: "POST", body: JSON.stringify(body)}),
+  update: (agentId: number, body: any) => request<any>(`/agents/${agentId}/hr`, {method: "PATCH", body: JSON.stringify(body)}),
+  drift: (agentId: number) => request<any>(`/agents/${agentId}/drift`),
+  resync: (agentId: number, body: {direction: "push" | "pull"; files?: string[]; fields?: string[]}) =>
+    request<any>(`/agents/${agentId}/resync`, {method: "POST", body: JSON.stringify(body)}),
+  lifecycle: (agentId: number, body: {action: "pause" | "resume" | "retire"; reassign_to_member_id?: number | null;
+    remove_from_gateway?: boolean; reason?: string}) =>
+    request<any>(`/agents/${agentId}/lifecycle`, {method: "POST", body: JSON.stringify(body)}),
+  tools: (agentId: number) => request<any>(`/agents/${agentId}/tools`),
+};

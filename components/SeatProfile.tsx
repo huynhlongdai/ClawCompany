@@ -157,9 +157,9 @@ export function SeatProfile({agentId}: {agentId: number}) {
         <Kpi label="Seat runtime" value={data.runtime_agent_id || "—"} icon="mesh" source="db"/>
         <Kpi label="Vòng đời" value={seat.lifecycle || "—"} icon="check" source="db"/>
         <Kpi label="Model đang chạy"
-             value={data.config?.effective?.model || seat.model_recorded_in_db || "—"}
+             value={modelOf(data.config?.effective?.model) || seat.model_recorded_in_db || "—"}
              icon="sparkle"
-             source={data.config?.effective?.model ? "gateway" : "db"}/>
+             source={modelOf(data.config?.effective?.model) ? "gateway" : "db"}/>
         <Kpi label="Chi phí 30 ngày"
              value={seat.cost_30d != null ? `$${Number(seat.cost_30d).toFixed(2)}` : "—"}
              icon="chart" source="db" note={seat.cost_source}/>
@@ -327,6 +327,7 @@ function ConfigTab({agentId, tab, config, onSaved}:
     const parts = key.split(".");
     let cursor: any = effective;
     for (const p of parts) cursor = cursor?.[p];
+    if (key === "model") cursor = modelOf(cursor);
     return cursor === undefined || cursor === null ? "" : String(cursor);
   }
 
@@ -403,4 +404,12 @@ function ConfigTab({agentId, tab, config, onSaved}:
       {msg && <small>{msg}</small>}
     </div>
   </div>;
+}
+
+/* M3: model thừa hưởng từ agents.defaults có dạng {primary, fallbacks}; model
+   riêng của seat là chuỗi. Agent tạo bằng agents.create rơi vào dạng đầu — render
+   thẳng object làm cả trang hồ sơ sập ("Objects are not valid as a React child"). */
+function modelOf(v: any): string {
+  if (v && typeof v === "object") return String(v.primary || "");
+  return v ? String(v) : "";
 }

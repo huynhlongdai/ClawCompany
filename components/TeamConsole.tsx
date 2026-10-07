@@ -8,9 +8,10 @@ import {useRouter, useSearchParams} from "next/navigation";
 import {AuthGate} from "./AuthGate";
 import {V17AppShell} from "./V17AppShell";
 import {apiTeam, errorText} from "../lib/api";
+import {AgentHRTab} from "./AgentHR";
 
-type Tab = "chart" | "people" | "departments" | "build";
-const TABS: [Tab, string][] = [["chart", "Sơ đồ"], ["people", "Người & quyền"], ["departments", "Phòng ban"], ["build", "Tạo công ty & CSV"]];
+type Tab = "chart" | "people" | "departments" | "ai" | "build";
+const TABS: [Tab, string][] = [["chart", "Sơ đồ"], ["people", "Người & quyền"], ["departments", "Phòng ban"], ["ai", "Nhân sự AI"], ["build", "Tạo công ty & CSV"]];
 const ROLE_VI: Record<string, string> = {guest: "Khách", member: "Thành viên", manager: "Quản lý", admin: "Quản trị", owner: "Chủ sở hữu"};
 const CSV_SAMPLE = `tên,loại,chức danh,phòng ban,quản lý,email,trưởng phòng
 Hà,người,Giám đốc,Ban điều hành,,ha@congty.vn,x
@@ -87,6 +88,7 @@ export function TeamConsole() {
     {tab === "chart" && <ChartTab chart={chart}/>}
     {tab === "people" && <PeopleTab me={me} people={people} chart={chart} busy={busy} act={act}/>}
     {tab === "departments" && <DepartmentsTab chart={chart} members={members} caps={caps} busy={busy} act={act}/>}
+    {tab === "ai" && <AgentHRTab companyId={companyId} caps={caps}/>}
     {tab === "build" && <BuildTab chart={chart} caps={caps} busy={busy} act={act} onCompany={(id: number) => { setCompanyId(id); load(id); setTab("chart"); }}/>}
   </V17AppShell></AuthGate>;
 }
