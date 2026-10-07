@@ -774,3 +774,26 @@ export const apiStrategy = {
   requestRevision: (approvalId: number, note: string) =>
     request<any>(`/strategy/plans/${approvalId}/request-revision`, {method: "POST", body: JSON.stringify({note})}),
 };
+
+// M2: Đội ngũ — sơ đồ tổ chức, người & quyền, lời mời, trưởng phòng, mẫu công ty, CSV
+export const apiTeam = {
+  me: () => request<any>(`/team/me`),
+  people: () => request<any>(`/team/people`),
+  invite: (body: any) => request<any>(`/team/invitations`, {method: "POST", body: JSON.stringify(body)}),
+  revokeInvite: (id: number) => request<any>(`/team/invitations/${id}`, {method: "DELETE"}),
+  lookupInvite: (token: string) => request<any>(`/team/invitations/lookup?token=${encodeURIComponent(token)}`),
+  acceptInvite: (token: string, password: string, display_name = "") =>
+    request<any>(`/team/invitations/accept`, {method: "POST", body: JSON.stringify({token, password, display_name})}),
+  setRole: (userId: number, role: string) => request<any>(`/team/access/${userId}`, {method: "PATCH", body: JSON.stringify({role})}),
+  revokeAccess: (userId: number) => request<any>(`/team/access/${userId}`, {method: "DELETE"}),
+  orgChart: (companyId?: number | null) => request<any>(`/team/org-chart${companyId ? `?company_id=${companyId}` : ""}`),
+  setHead: (departmentId: number, member_id: number | null) =>
+    request<any>(`/team/departments/${departmentId}/head`, {method: "PUT", body: JSON.stringify({member_id})}),
+  setManager: (memberId: number, manager_id: number | null) =>
+    request<any>(`/team/members/${memberId}/manager`, {method: "PUT", body: JSON.stringify({manager_id})}),
+  templates: () => request<any>(`/team/templates`),
+  fromTemplate: (template_key: string, company_name: string) =>
+    request<any>(`/team/companies/from-template`, {method: "POST", body: JSON.stringify({template_key, company_name})}),
+  importCsv: (company_id: number, csv_text: string, dry_run: boolean) =>
+    request<any>(`/team/import-csv`, {method: "POST", body: JSON.stringify({company_id, csv_text, dry_run})}),
+};

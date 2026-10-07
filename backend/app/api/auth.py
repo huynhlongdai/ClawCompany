@@ -27,7 +27,10 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(401, "Invalid credentials")
-    accesses = db.query(UserOrganizationAccess).filter(UserOrganizationAccess.user_id == user.id).all()
+    if not user.is_active:
+        raise HTTPException(401, "Invalid credentials")
+    accesses = [x for x in db.query(UserOrganizationAccess).filter(UserOrganizationAccess.user_id == user.id).all()
+                if (x.status or "active") == "active"]
     access = None
     if payload.organization_id:
         access = next((x for x in accesses if x.organization_id == payload.organization_id), None)
@@ -55,8 +58,13 @@ def grant_organization_access(payload: OrganizationAccessGrant, principal: Princ
         UserOrganizationAccess.user_id == payload.user_id,
         UserOrganizationAccess.organization_id == payload.organization_id,
     ).first()
+    # M2: cùng luật với /api/team — không cấp vượt quyền mình (admin không cấp owner),
+    # không đụng người cao quyền hơn, không hạ owner cuối.
+    from app.services import team as team_svc
+    team_svc.check_role_change(db, principal, target_user_id=payload.user_id, current=item, new_role=payload.role)
     if item:
         item.role = payload.role
+        item.status = "active"
         item.is_default = payload.is_default
     else:
         item = UserOrganizationAccess(**payload.model_dump())
