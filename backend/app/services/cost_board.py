@@ -25,6 +25,9 @@ from app.services.work_board import WorkError
 UI_SCOPES = {"company": "Công ty", "department": "Phòng ban", "team": "Nhóm", "member": "Agent"}
 
 
+LEGACY_SCOPES = {"project": "Dự án", "goal": "Mục tiêu"}   # phong bì D2.3/v9 cũ: chỉ hiển thị, không tạo mới ở đây
+
+
 def scope_name(db: Session, env: BudgetEnvelope) -> str:
     st, sid = budget_scope.scope_of(env)
     if st == "company":
@@ -40,6 +43,14 @@ def scope_name(db: Session, env: BudgetEnvelope) -> str:
         from app.models.v16 import AgentTeam
         t = db.get(AgentTeam, sid) if sid else None
         return t.name if t else f"Nhóm #{sid}"
+    if st == "project":
+        from app.models import Project
+        p = db.get(Project, sid) if sid else None
+        return p.name if p else f"Dự án #{sid}"
+    if st == "goal":
+        from app.models import ExecutiveGoal
+        g = db.get(ExecutiveGoal, sid) if sid else None
+        return getattr(g, "title", None) or getattr(g, "name", None) or f"Mục tiêu #{sid}"
     return f"{st} #{sid}"
 
 
@@ -49,7 +60,7 @@ def budget_row(db: Session, env: BudgetEnvelope) -> dict:
     waiting = (db.query(Approval.id).filter(Approval.organization_id == env.organization_id,
                                             Approval.policy_key.like(f"{budget_scope.SOFT_PREFIX}e{env.id}:t%"),
                                             Approval.status == "pending").count())
-    return {**budget_scope.public(env), "scope_vi": UI_SCOPES.get(st, st), "scope_name": scope_name(db, env),
+    return {**budget_scope.public(env), "scope_vi": UI_SCOPES.get(st) or LEGACY_SCOPES.get(st, st), "scope_name": scope_name(db, env),
             "pending_approvals": waiting,
             "levels": [{"key": "warned", "pct": env.warn_pct or 80, "label": "Cảnh báo"},
                        *([{"key": "soft_stopped", "pct": env.soft_stop_pct, "label": "Dừng mềm (cần duyệt)"}]

@@ -839,3 +839,31 @@ export const apiWork = {
     request<any>(`/work/tasks/${id}/review`, {method: "POST", body: JSON.stringify({decision, note})}),
   run: (id: number) => request<any>(`/work/tasks/${id}/run`, {method: "POST"}),
 };
+
+// M4b — Hộp việc & phê duyệt một chạm (/api/inbox), Chi phí & ngân sách 3 nấc (/api/costs).
+const qs = (params: Record<string, string | number | undefined | null>) => {
+  const q = Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== "")
+    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join("&");
+  return q ? `?${q}` : "";
+};
+export const apiInboxHub = {
+  items: (params: Record<string, string | number | undefined | null> = {}) => request<any>(`/inbox/items${qs(params)}`),
+  summary: () => request<any>(`/inbox/summary`),
+  setStatus: (id: number, status: "unread" | "read" | "done") =>
+    request<any>(`/inbox/items/${id}/status`, {method: "POST", body: JSON.stringify({status})}),
+  readAll: () => request<any>(`/inbox/items/read-all`, {method: "POST"}),
+  decide: (id: number, body: {decision: "approve" | "reject"; note?: string; expected_revision?: number;
+    grant_scope?: "task" | "seat" | "department"}) =>
+    request<any>(`/inbox/approvals/${id}/decide`, {method: "POST", body: JSON.stringify(body)}),
+  escalate: () => request<any>(`/inbox/escalate`, {method: "POST"}),
+};
+export const apiCosts = {
+  overview: (days = 30) => request<any>(`/costs/overview?days=${days}`),
+  budgets: () => request<any>(`/costs/budgets`),
+  budget: (id: number) => request<any>(`/costs/budgets/${id}`),
+  create: (body: any) => request<any>(`/costs/budgets`, {method: "POST", body: JSON.stringify(body)}),
+  update: (id: number, body: any) => request<any>(`/costs/budgets/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  override: (id: number, body: {reason: string; add_usd?: number; amount_limit?: number}) =>
+    request<any>(`/costs/budgets/${id}/override`, {method: "POST", body: JSON.stringify(body)}),
+  archive: (id: number) => request<any>(`/costs/budgets/${id}`, {method: "DELETE"}),
+};

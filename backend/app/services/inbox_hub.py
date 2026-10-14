@@ -144,7 +144,9 @@ def approval_card(db: Session, a: Approval, principal: Principal, names: dict[in
         "escalate_to": esc_to,
         # Quá hạn mà không có cấp trên: leo thang không làm được gì — nói thẳng thay vì im lặng.
         "escalation_blocked": overdue and not gateway and not esc_id,
-        "deadline_vi": "" if gateway and left is None else deadline_vi(left, esc_to, bool(a.escalated_at)),
+        "deadline_vi": ("" if left is None else "Quá hạn — gateway sẽ tự huỷ lệnh này nếu chưa có quyết định"
+                        if overdue else deadline_vi(left, None, False)) if gateway
+                       else deadline_vi(left, esc_to, bool(a.escalated_at)),
         "reject_needs_note": True,
         "grant_scopes": ["task", "seat", "department"] if kind == "budget" else [],
         "created_at": a.created_at.isoformat() if a.created_at else None,

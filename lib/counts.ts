@@ -3,7 +3,7 @@
    Vỏ ứng dụng nằm trong từng trang (không nằm trong layout), nên mỗi lần
    chuyển trang nó mount lại. Giữ kết quả 30 giây ở cấp module để chuyển trang
    không bắn lại ba request và số không nhấp nháy về rỗng. */
-import {api, apiV17} from "./api";
+import {api, apiInboxHub, apiV17} from "./api";
 
 export type Counts = Record<string, number>;
 
@@ -28,6 +28,8 @@ async function load(): Promise<Counts> {
   const stuck = tasks.status === "fulfilled" && Array.isArray(tasks.value)
     ? tasks.value.filter((t: any) => t.status === "blocked" || t.status === "review").length : 0;
   if (approvals.status === "fulfilled" || tasks.status === "fulfilled") out.inbox = pending + stuck;
+  /* M4b: số trên chuông lấy đúng số "cần anh ra tay" của Hộp việc (duyệt + xem) — cùng nguồn với trang. */
+  try { out.inbox = Number((await apiInboxHub.summary())?.need_action ?? out.inbox); } catch { /* giữ số cũ */ }
   if (overview.status === "fulfilled") orgName = (overview.value as any)?.organization?.name || orgName;
   return out;
 }

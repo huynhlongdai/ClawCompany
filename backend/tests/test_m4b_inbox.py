@@ -299,6 +299,10 @@ def test_gateway_approval_goes_through_the_bridge_once(env, monkeypatch):
                  evidence=json.dumps({"command": "rm -rf build"}))
     card = cards(feed(env, "hung"), "approvals")[0]["approval"]
     assert card["kind"] == "gateway" and card["summary"] == "rm -rf build"
+    a.expires_at = datetime.utcnow() - timedelta(minutes=1); env.db.commit()
+    card = cards(feed(env, "hung"), "approvals")[0]["approval"]
+    assert card["deadline_vi"] == "Quá hạn — gateway sẽ tự huỷ lệnh này nếu chưa có quyết định"
+    assert card["escalation_blocked"] is False                 # gateway không leo thang, không báo "không có cấp trên"
     out = decide(env, "hung", a.id)
     assert out["status"] == "approved" and out["delivered"] is True
     assert env.rt.approvals == [{"request_id": "req-77", "decision": "allow-once"}]
