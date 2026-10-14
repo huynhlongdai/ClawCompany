@@ -36,7 +36,7 @@ export function GoalsConsole() {
   const load = useCallback(async () => {
     setLoadErr(null);
     const [g, c, cy] = await Promise.allSettled([apiV9.goals(), api.companies(org), apiV9.cycles()]);
-    if (g.status === "fulfilled") setGoals((g.value as any[]) || []); else { setLoadErr(g.reason); setGoals([]); }
+    if (g.status === "fulfilled") { const list = (g.value as any[]) || []; setGoals(list); setSelected((s: any) => s ?? list[0] ?? null); } else { setLoadErr(g.reason); setGoals([]); }
     if (c.status === "fulfilled") setCompanies((c.value as any[]) || []);
     if (cy.status === "fulfilled") setCycles((cy.value as any[]) || []);
   }, [org]);

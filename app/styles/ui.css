@@ -90,7 +90,7 @@
 .ui-section-head .ui-link{margin-left:auto}
 .ui-link{color:var(--accent-text);font-weight:var(--fw-medium);font-size:var(--fs-13);text-decoration:none;display:inline-flex;align-items:center;gap:4px}
 .ui-link:hover{text-decoration:underline}
-.ui-grid{display:grid;gap:var(--sp-4);min-width:0}
+.ui-grid{display:grid;gap:var(--sp-4);min-width:0;align-items:start}
 .ui-grid.is-2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .ui-grid.is-3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .ui-grid.is-side{grid-template-columns:minmax(0,1fr) 360px}
@@ -237,11 +237,14 @@ details > pre{margin-top:6px;padding:10px;border-radius:var(--radius-sm);backgro
 
 /* ================================================================ SHELL */
 .ui-app{display:grid;grid-template-columns:var(--sidebar-w) minmax(0,1fr);min-height:100dvh;background:var(--bg)}
+/* đường kẻ sidebar kéo hết chiều cao trang (sidebar sticky chỉ cao bằng màn hình) */
+@media (min-width:901px){.ui-app{background:linear-gradient(to right,transparent calc(var(--sidebar-w) - 1px),var(--border) calc(var(--sidebar-w) - 1px),var(--border) var(--sidebar-w),transparent var(--sidebar-w)) var(--bg)}}
 .ui-skip{position:absolute;left:-9999px;top:8px;z-index:100;background:var(--text);color:var(--bg);padding:8px 12px;border-radius:8px;text-decoration:none}
 .ui-skip:focus{left:12px}
 
 .ui-side{position:sticky;top:0;height:100dvh;display:flex;flex-direction:column;gap:4px;padding:10px 10px 12px;
   border-right:1px solid var(--border);background:var(--bg);overflow-y:auto;scrollbar-width:thin;z-index:var(--z-nav)}
+@media (min-width:901px){.ui-side{border-right-color:transparent}}
 .ui-switch{position:relative}
 .ui-switch-btn{display:flex;align-items:center;gap:10px;width:100%;padding:6px 8px;border:0;border-radius:var(--radius-sm);background:transparent;text-align:left}
 .ui-switch-btn:hover{background:var(--hover)}
