@@ -268,7 +268,7 @@ function Lifecycle({seat, all, canEdit, busy, act}: any) {
       {lc === "paused" ? <button className="ui-btn is-primary" disabled={busy} data-testid="hr-resume"
           onClick={() => act(() => apiAgentsHR.lifecycle(seat.agent_id, {action: "resume"}), said)}>{tr("agentHr.tiep_tuc")}</button>
         : <button className="ui-btn is-sm" disabled={busy} data-testid="hr-pause"
-          onClick={() => act(() => apiAgentsHR.lifecycle(seat.agent_id, {action: "pause"}), said)}>{tr("agentHr.tam_dung")}</button>}
+          onClick={() => act(() => apiAgentsHR.lifecycle(seat.agent_id, {action: "pause"}), said)}>{tr("agentHr.tam_dung_nut")}</button>}
       <button className="ui-btn is-sm is-danger" disabled={busy} onClick={() => setRetire(!retire)} data-testid="hr-retire-open">{tr("agentHr.cho_nghi_viec")}</button>
     </div>}
     {retire && lc !== "retired" && <div className="hrConfirm ui-form" data-testid="hr-retire-confirm">

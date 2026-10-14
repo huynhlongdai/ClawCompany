@@ -57,7 +57,7 @@ export const SECTIONS: NavSection[] = lazy(() => ([
    desc: tr("nav.ket_noi_openclaw_ky_nang"),
    keywords: tr("nav.settings_cai_dat_openclaw_gateway"),
    owns: ["/app/settings", "/app/openclaw", "/app/agent-tools", "/app/secrets"],
-   tabs: [{href: "/app/settings", label: "Chung"}, {href: "/app/openclaw", label: "OpenClaw"}, {href: "/app/agent-tools", label: tr("nav.ky_nang_cong_cu")},
+   tabs: [{href: "/app/settings", label: tr("nav.chung")}, {href: "/app/openclaw", label: "OpenClaw"}, {href: "/app/agent-tools", label: tr("nav.ky_nang_cong_cu")},
           {href: "/app/secrets", label: tr("nav.bi_mat")}, {href: "/app/team?tab=people&from=settings", label: tr("nav.thanh_vien")},
           {href: "/app/settings/lab", label: tr("nav.phong_thi_nghiem")}]},
 ]));

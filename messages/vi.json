@@ -130,7 +130,8 @@
   "chinh_sach_tu_chu_van": "Chính sách tự chủ & vận hành",
   "mo_phong": "Mô phỏng",
   "thu_neu_thi_truoc_khi": "Thử “nếu… thì” trước khi đổi công ty thật",
-  "dieu_hanh_doi_cu": "Điều hành đời cũ"
+  "dieu_hanh_doi_cu": "Điều hành đời cũ",
+  "chung": "Chung"
  },
  "shell": {
   "cong_ty": "{p0} · {p1} công ty",
@@ -446,7 +447,14 @@
   "dang_tai": "Đang tải…",
   "yeu_cau_dang_cho_anh": "{p0} yêu cầu đang chờ anh",
   "khong_co_gi_cho_anh": "Không có gì chờ anh duyệt.",
-  "hop_viec": "Hộp việc →"
+  "hop_viec": "Hộp việc →",
+  "xong": "Xong",
+  "leo_thang_ngay": "Leo thang ngay",
+  "nhom_approvals": "Cần anh duyệt",
+  "nhom_review": "Cần anh xem",
+  "nhom_budget": "Ngân sách",
+  "nhom_lessons": "Bài học đề xuất",
+  "nhom_updates": "Thông báo"
  },
  "work": {
   "tam_dung": "tạm dừng",
@@ -607,7 +615,9 @@
   "cong_ty": "Công ty",
   "tien_do": "Tiến độ",
   "viec_xong": "Việc xong",
-  "han_chot_2": "Hạn chót {p0}"
+  "han_chot_2": "Hạn chót {p0}",
+  "xong": "xong",
+  "xong_hoa": "Xong"
  },
  "task": {
   "bat_tay_lam": "Bắt tay làm",
@@ -1269,7 +1279,8 @@
   "dang_chay_hau_to": " · đang chạy",
   "xong": "Xong",
   "ghi_hau_to": " · ghi",
-  "cho_nghi_viec_ten": "Cho {p0} nghỉ việc?"
+  "cho_nghi_viec_ten": "Cho {p0} nghỉ việc?",
+  "tam_dung_nut": "Tạm dừng"
  },
  "seat": {
   "ho_so": "Hồ sơ",

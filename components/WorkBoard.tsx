@@ -11,6 +11,7 @@ import {EmptyState, ErrorBanner} from "./ui/EmptyState";
 import {SkeletonRows} from "./ui/Skeleton";
 import {ProjectsView} from "./work/ProjectsView";
 import {t as tr, lazy, intlLocale} from "../lib/i18n";
+import {viStatus} from "../lib/labels";
 
 type Who = {id: number; name: string; type: string; role?: string; lifecycle?: string | null} | null;
 export type WorkItem = {
@@ -84,6 +85,11 @@ function Badges({t}: {t: WorkItem}) {
 }
 
 // ------------------------------------------------------------------ trang chính
+
+/* Nhãn trạng thái theo ngôn ngữ (backend trả status_vi tiếng Việt cố định). */
+const LABEL: Record<string, string> = lazy(() => ({backlog: tr("work.ton_dong"), todo: tr("work.can_lam"), in_progress: tr("work.dang_lam_2"), review: tr("work.cho_duyet_2"), blocked: tr("work.bi_chan_2"), done: tr("work.xong_hoa"), cancelled: tr("work.da_huy")}));
+const statusLabel = (t: {status: string; status_vi?: string}) => LABEL[t.status] || t.status_vi || t.status;
+const prioLabel = (p: {key: string; label: string}) => ({urgent: 1, high: 1, medium: 1, low: 1} as any)[p.key] ? viStatus(p.key) : p.label;
 
 export function WorkBoard() {
   const sp = useSearchParams();
@@ -171,7 +177,7 @@ function WorkTasks() {
       <span><b className="ui-num">{counts.review || 0}</b> {tr("work.cho_duyet")}</span>
       <span className={counts.blocked ? "is-blocked" : ""}><b className="ui-num">{counts.blocked || 0}</b> {tr("work.bi_chan")}</span>
       <span><b className="ui-num">{(counts.todo || 0) + (counts.backlog || 0)}</b> {tr("work.chua_lam")}</span>
-      <span><b className="ui-num">{counts.done || 0}</b> xong</span>
+      <span><b className="ui-num">{counts.done || 0}</b> {tr("work.xong")}</span>
       <span className="wkCost" title={tr("work.tong_chi_phi_luot_chay")}>
         <Icon name="coins" size={13}/>{money(items.reduce((s, t) => s + (t.runs.cost_usd || 0), 0))}</span>
     </div>
@@ -191,7 +197,7 @@ function WorkTasks() {
         <option value="">{tr("work.moi_phong")}</option>{depts.map(d => <option key={d.id} value={String(d.id)}>{d.name}</option>)}</select>}
       <select value={prio} onChange={e => setPrio(e.target.value)} aria-label={tr("work.uu_tien_2")} className="wkSelect">
         <option value="">{tr("work.moi_uu_tien")}</option><option value="urgent,high">{tr("work.khan_cao")}</option>
-        {(meta?.priorities || []).map((p: any) => <option key={p.key} value={p.key}>{p.label}</option>)}</select>
+        {(meta?.priorities || []).map((p: any) => <option key={p.key} value={p.key}>{prioLabel(p)}</option>)}</select>
       {view === "list" && <button className="ui-chip" aria-pressed={showDone} onClick={() => setShowDone(v => !v)}>{tr("work.hien_viec_da_xong")}</button>}
       {filtered && <button className="ui-btn is-ghost is-sm" onClick={() => { setAssignee(""); setDept(""); setPrio(""); setQ(""); }}>{tr("work.bo_loc")}</button>}
       {meta?.caps?.create && <button className="ui-btn is-primary wkNew" onClick={() => setCreating(true)} data-testid="wk-new">
@@ -224,7 +230,7 @@ function ListView({items, sel, setSel, open, active}: {items: WorkItem[]; sel: n
   let idx = -1;
   return <div className="wkList" role="list" data-testid="wk-list">
     {groups.map(g => <section key={g.s} className="wkGroup">
-      <header className="wkGroupHead"><span className={"ui-sdot is-" + g.s}/><h2>{g.rows[0].status_vi}</h2><span className="ui-num">{g.rows.length}</span></header>
+      <header className="wkGroupHead"><span className={"ui-sdot is-" + g.s}/><h2>{statusLabel(g.rows[0])}</h2><span className="ui-num">{g.rows.length}</span></header>
       {g.rows.map(t => { idx += 1; const i = idx;
         return <button key={t.id} role="listitem" className={"wkRow" + (i === sel ? " is-sel" : "") + (active === t.id ? " is-open" : "")}
                        onClick={() => { setSel(i); open(t.id); }} data-testid={`wk-row-${t.id}`}>
@@ -244,7 +250,6 @@ function ListView({items, sel, setSel, open, active}: {items: WorkItem[]; sel: n
 function BoardView({items, move, open}: {items: WorkItem[]; move: (t: WorkItem, s: string) => void; open: (id: number) => void}) {
   const [drag, setDrag] = useState<number | null>(null), [over, setOver] = useState<string | null>(null);
   const [menu, setMenu] = useState<{t: WorkItem; r: DOMRect} | null>(null);
-  const LABEL: Record<string, string> = {backlog: tr("work.ton_dong"), todo: tr("work.can_lam"), in_progress: tr("work.dang_lam_2"), review: tr("work.cho_duyet_2"), blocked: tr("work.bi_chan_2"), done: "Xong", cancelled: tr("work.da_huy")};
   return <div className="ui-board wkBoard" data-testid="wk-board">
     {BOARD.map(s => { const rows = items.filter(t => t.status === s);
       return <section key={s} className={"ui-col" + (over === s ? " is-over" : "") + (rows.length ? "" : " is-empty")}
@@ -352,10 +357,10 @@ export function TaskPeek({id, meta, onClose, onChanged}: {id: number; meta: any;
         <div className="wkProps">
           <label>{tr("work.trang_thai")}<select value={t.status} disabled={busy} data-testid="wk-peek-status"
             onChange={e => act(() => apiWork.move(id, e.target.value, t.revision))}>
-            <option value={t.status}>{t.status_vi}</option>
+            <option value={t.status}>{statusLabel(t)}</option>
             {t.next.map((n: any) => <option key={n.key} value={n.key}>→ {n.label}</option>)}</select></label>
           <label>{tr("work.uu_tien_2")}<select value={t.priority} disabled={busy} onChange={e => patch({priority: e.target.value})}>
-            {(meta?.priorities || []).map((p: any) => <option key={p.key} value={p.key}>{p.label}</option>)}</select></label>
+            {(meta?.priorities || []).map((p: any) => <option key={p.key} value={p.key}>{prioLabel(p)}</option>)}</select></label>
           <label>{tr("work.nguoi_nhan")}<select value={t.assignee?.id || ""} disabled={busy} data-testid="wk-peek-assignee"
             onChange={e => patch({assignee_member_id: e.target.value ? Number(e.target.value) : null})}>
             <option value="">{t.routed_to_department ? tr("work.cho_truong_phong_2", {p0: t.department?.name || ""}) : tr("work.chua_giao")}</option>
@@ -536,7 +541,7 @@ function CreateTask({meta, onClose, onCreated}: {meta: any; onClose: () => void;
             .map(d => <option key={d.id} value={`d:${d.id}`}>{tr("work.phong")} {d.name}</option>)}</optgroup>}
         </select></label>
         <label>{tr("work.uu_tien_2")}<select value={f.priority} onChange={e => set("priority", e.target.value)}>
-          {(meta.priorities || []).map((p: any) => <option key={p.key} value={p.key}>{p.label}</option>)}</select></label>
+          {(meta.priorities || []).map((p: any) => <option key={p.key} value={p.key}>{prioLabel(p)}</option>)}</select></label>
         <label>{tr("work.han_chot")}<input type="date" value={f.due_at} onChange={e => set("due_at", e.target.value)}/></label>
       </div>
       {meta.caps?.set_reviewers && <label className="wkWide">{tr("work.review_cheo_nguoi_duyet_truoc")}

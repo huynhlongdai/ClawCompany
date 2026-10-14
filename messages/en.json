@@ -130,7 +130,8 @@
   "chinh_sach_tu_chu_van": "Autonomy & operations policy",
   "mo_phong": "Simulation",
   "thu_neu_thi_truoc_khi": "Try “what if” before changing the real company",
-  "dieu_hanh_doi_cu": "Legacy control"
+  "dieu_hanh_doi_cu": "Legacy control",
+  "chung": "General"
  },
  "shell": {
   "cong_ty": "{p0} · {p1} companies",
@@ -446,7 +447,14 @@
   "dang_tai": "Loading…",
   "yeu_cau_dang_cho_anh": "{p0} requests waiting on you",
   "khong_co_gi_cho_anh": "Nothing awaits your approval.",
-  "hop_viec": "Inbox →"
+  "hop_viec": "Inbox →",
+  "xong": "Done",
+  "leo_thang_ngay": "Escalate now",
+  "nhom_approvals": "Needs your approval",
+  "nhom_review": "Needs your review",
+  "nhom_budget": "Budget",
+  "nhom_lessons": "Suggested lessons",
+  "nhom_updates": "Notifications"
  },
  "work": {
   "tam_dung": "paused",
@@ -607,7 +615,9 @@
   "cong_ty": "Company",
   "tien_do": "Progress",
   "viec_xong": "Tasks done",
-  "han_chot_2": "Deadline {p0}"
+  "han_chot_2": "Deadline {p0}",
+  "xong": "done",
+  "xong_hoa": "Done"
  },
  "task": {
   "bat_tay_lam": "Started",
@@ -1127,7 +1137,7 @@
   "bad_id": "The agent ID in the link is not valid. Open the agent from Team › Agents."
  },
  "agentHr": {
-  "dang_lam": "In progress",
+  "dang_lam": "Active",
   "tam_dung": "Paused",
   "da_nghi": "Retired",
   "cho_gateway": "Waiting for gateway",
@@ -1269,7 +1279,8 @@
   "dang_chay_hau_to": " · running",
   "xong": "Done",
   "ghi_hau_to": " · writes",
-  "cho_nghi_viec_ten": "Retire {p0}?"
+  "cho_nghi_viec_ten": "Retire {p0}?",
+  "tam_dung_nut": "Pause"
  },
  "seat": {
   "ho_so": "Profile",

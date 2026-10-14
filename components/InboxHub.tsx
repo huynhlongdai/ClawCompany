@@ -112,9 +112,15 @@ function NoticeCard({c, onChange}: {c: Card; onChange: (msg?: string) => void}) 
     {err && <p className="ui-inline-error" role="alert">{err}</p>}
     {c.id && <div className="ibx-actions">
       {c.status === "unread" && <button className="ibx-btn is-ghost" disabled={busy} onClick={() => mark("read")}>{t("inbox.da_doc")}</button>}
-      <button className="ibx-btn is-ghost" disabled={busy} onClick={() => mark("done")}>Xong</button>
+      <button className="ibx-btn is-ghost" disabled={busy} onClick={() => mark("done")}>{t("inbox.xong")}</button>
     </div>}
   </article>;
+}
+
+/* Tên nhóm theo ngôn ngữ (backend trả nhãn tiếng Việt cố định; khoá nhóm là id ổn định). */
+const GROUP_KEYS = ["approvals", "review", "budget", "lessons", "updates"] as const;
+function groupLabel(g: {key: string; label: string}) {
+  return (GROUP_KEYS as readonly string[]).includes(g.key) ? t(`inbox.nhom_${g.key}` as any) : g.label;
 }
 
 export function InboxHub() {
@@ -160,13 +166,13 @@ export function InboxHub() {
       <div className="ui-seg ibx-tabs" role="tablist" aria-label={t("inbox.nhom")}>
         <button role="tab" aria-selected={!group} onClick={() => setGroup("")}>{t("inbox.tat_ca")}{counts ? ` ${counts.open}` : ""}</button>
         {(data?.groups || []).map((g: any) => <button key={g.key} role="tab" aria-selected={group === g.key}
-          onClick={() => setGroup(g.key)}><Icon name={GROUP_ICON[g.key] || "inbox"} size={14}/>{g.label}
+          onClick={() => setGroup(g.key)}><Icon name={GROUP_ICON[g.key] || "inbox"} size={14}/>{groupLabel(g)}
           {counts?.by_group?.[g.key] ? <i className="ui-count">{counts.by_group[g.key]}</i> : null}</button>)}
       </div>
       <div className="ibx-tools">
         <button className="ui-btn is-ghost is-sm" disabled={busy || !counts?.unread} onClick={readAll}>{t("inbox.doc_het")}</button>
         {data?.caps?.escalate && <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={escalate}
-          title={t("inbox.chuyen_cac_yeu_cau_qua")}>Leo thang ngay</button>}
+          title={t("inbox.chuyen_cac_yeu_cau_qua")}>{t("inbox.leo_thang_ngay")}</button>}
       </div>
     </div>
 
@@ -181,7 +187,7 @@ export function InboxHub() {
     </EmptyState>}
 
     {data && total > 0 && groups.filter(g => g.items.length).map(g => <section key={g.key} className="ibx-group">
-      <h2><Icon name={GROUP_ICON[g.key] || "inbox"} size={16}/>{g.label}<span className="ui-num">{g.items.length}</span></h2>
+      <h2><Icon name={GROUP_ICON[g.key] || "inbox"} size={16}/>{groupLabel(g)}<span className="ui-num">{g.items.length}</span></h2>
       <div className="ibx-list">{g.items.map((c: Card) => c.approval && c.approval.status === "pending"
         ? <ApprovalCard key={c.key} c={c} onDone={(m, reload) => after(m)}/>
         : <NoticeCard key={c.key} c={c} onChange={m => after(m)}/>)}</div>

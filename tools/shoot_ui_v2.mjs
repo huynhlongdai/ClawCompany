@@ -93,6 +93,7 @@ const shootOne = async (ctx, name, url, opts = {}) => {
     const last = cards[cards.length - 1]; if (!nav || !last) return "không đo được";
     return Math.round(last.getBoundingClientRect().bottom - nav.getBoundingClientRect().top); // > 0 = bị che
   });
+  if (navCover !== null) { await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(300); } // ảnh fullPage chụp từ đỉnh (thanh trên sticky không lơ lửng giữa ảnh)
   await pg.screenshot({path: `${OUT}/${name}${tag}.jpg`, type: "jpeg", quality: 70, fullPage: opts.full !== false});
   const h1 = await pg.evaluate(() => (document.querySelector("h1")?.textContent || "").trim().slice(0, 80));
   rep[name + tag] = {overflow_x: ov, errors: errs, english, btn_overflow: btnOverflow, html_lang: htmlLang, h1, ...(navCover !== null ? {inbox_last_card_under_nav_px: navCover} : {})};
