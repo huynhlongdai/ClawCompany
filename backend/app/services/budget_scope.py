@@ -18,8 +18,14 @@ Vòng đời tiền của một lượt chạy (``task_runs``), dùng lại ``se
 3. Run lỗi → giải phóng phần còn giữ (vẫn tính phần đã tiêu thật).
 
 Nấc: ≥ ``warn_pct`` → ``warned``: inbox cho người phụ trách + luật "chỉ làm
-việc critical" ở khối 6. ≥ 100% → ``exhausted``: seat ``paused``, task mở của
-seat ``blocked`` lý do ``budget``. Mở lại chỉ qua ``override`` (có audit).
+việc critical" ở khối 6. ≥ ``soft_stop_pct`` (M4b, tuỳ chọn) → ``soft_stopped``:
+mỗi việc trong phạm vi muốn chạy lượt mới phải có phê duyệt
+``budget_soft:e<phong bì>:t<việc>`` (cổng tự tạo phê duyệt, gửi quản lý người
+của seat; duyệt → đánh thức lại, từ chối → việc không được chạy nữa ở nấc này).
+≥ 100% → ``exhausted`` (dừng cứng): seat ``paused``, task mở của seat
+``blocked`` lý do ``budget``. Mở lại chỉ qua ``override`` (có audit).
+Rời nấc dừng mềm (nâng hạn mức / override) thì mọi phê duyệt chi tiếp của
+phong bì hết hiệu lực (``expired``) — lần sau chạm lại nấc phải duyệt lại.
 """
 from __future__ import annotations
 
@@ -35,6 +41,11 @@ from app.models import BudgetEnvelope, BudgetLedgerEntry, Member, Task, TaskRun
 from app.services import budget as budget_svc
 
 SCOPES = ("company", "department", "member", "project", "goal")
+LEVELS = ("ok", "warned", "soft_stopped", "exhausted")
+LEVEL_ORDER = {k: i for i, k in enumerate(LEVELS)}
+LEVEL_VI = {"ok": "Trong hạn mức", "warned": "Cảnh báo", "soft_stopped": "Dừng mềm — cần duyệt để chi tiếp",
+            "exhausted": "Dừng cứng — đã hết hạn mức"}
+SOFT_PREFIX = "budget_soft:"
 SRC = "task_run"            # giữ chỗ / quyết toán từ phần đã giữ / giải phóng
 SRC_EXTRA = "task_run_extra"  # tiêu vượt phần giữ, hoặc điều chỉnh theo gateway
 BLOCKABLE = ("todo", "in_progress")
@@ -108,7 +119,114 @@ def gate(db: Session, member: Member, task, amount: float | None = None) -> tupl
         ok, msg = budget_svc.can_reserve(env, amount)
         if not ok:
             return f"budget: {env.name}: {msg}", envs, amount
+    for env in envs:   # M4b: dừng mềm — chỉ xét sau dừng cứng (lý do hết tiền quan trọng hơn)
+        if (env.threshold_state or "ok") == "soft_stopped":
+            why = soft_gate(db, env, member, task)
+            if why:
+                return why, envs, amount
     return "", envs, amount
+
+
+# ------------------------------------------------------------------ M4b: dừng mềm
+
+
+def soft_key(env_id: int, task_id: int) -> str:
+    return f"{SOFT_PREFIX}e{env_id}:t{task_id}"
+
+
+def parse_soft_key(key: str) -> tuple[int, int] | None:
+    import re
+    m = re.match(r"^budget_soft:e(\d+):t(\d+)$", key or "")
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def soft_gate(db: Session, env: BudgetEnvelope, member: Member, task) -> str:
+    """Phong bì ở nấc dừng mềm: cho chạy nếu việc đã có phê duyệt chi tiếp còn hiệu lực.
+
+    Chưa có → tạo MỘT phê duyệt đang chờ (không tạo trùng mỗi lần drain) và chặn.
+    Đã bị từ chối → chặn, không hỏi lại tới khi phong bì rời nấc này."""
+    from app.models import Approval
+    if not isinstance(task, Task):
+        return f"budget_approval: {env.name}: đã chạm nấc dừng mềm ({pct(env):.0f}%) — cần duyệt chi tiếp"
+    key = soft_key(env.id, task.id)
+    latest = (db.query(Approval).filter(Approval.organization_id == env.organization_id,
+                                        Approval.policy_key == key)
+              .order_by(Approval.id.desc()).first())
+    if latest is not None and latest.status == "approved":
+        return ""
+    if latest is not None and latest.status in ("rejected", "denied"):
+        return (f"budget_rejected: {env.name}: chi tiếp cho việc #{task.id} đã bị từ chối "
+                f"(phê duyệt #{latest.id})")
+    if latest is None or latest.status != "pending":
+        latest = _request_soft_approval(db, env, member, task, key)
+    return (f"budget_approval: {env.name}: đã dùng {pct(env):.0f}% (nấc dừng mềm {env.soft_stop_pct}%) — "
+            f"chờ duyệt chi tiếp (phê duyệt #{latest.id})")
+
+
+def soft_approver(db: Session, env: BudgetEnvelope, member: Member) -> int | None:
+    from app.services import inbox
+    got = inbox.human_recipients(db, member.id)
+    if got:
+        return got[0]
+    humans = _humans(db, env, [member])
+    return humans[0] if humans else None
+
+
+def _request_soft_approval(db: Session, env: BudgetEnvelope, member: Member, task: Task, key: str):
+    from app.models import Approval
+    a = Approval(organization_id=env.organization_id, company_id=member.company_id or env.company_id,
+                 requester_member_id=member.id, approver_member_id=soft_approver(db, env, member),
+                 action=f"Chi tiếp ngân sách '{env.name}' cho việc #{task.id}: {task.title}"[:220],
+                 risk="high", policy_key=key, status="pending",
+                 evidence=json.dumps({"task_id": task.id, "budget_id": env.id, "pct": pct(env),
+                                      "soft_stop_pct": env.soft_stop_pct, "spent_usd": round(env.amount_spent or 0, 6),
+                                      "limit_usd": env.amount_limit, "member_id": member.id,
+                                      "summary": f"{member.name} muốn chạy tiếp việc #{task.id} khi ngân sách "
+                                                 f"'{env.name}' đã dùng {pct(env):.0f}% hạn mức"},
+                                     ensure_ascii=False))
+    db.add(a); db.commit(); db.refresh(a)
+    return a
+
+
+def expire_soft_grants(db: Session, env: BudgetEnvelope, why: str) -> list[int]:
+    """Phê duyệt chi tiếp (đã duyệt hoặc đang chờ) của phong bì hết hiệu lực."""
+    from app.models import Approval
+    rows = (db.query(Approval).filter(Approval.organization_id == env.organization_id,
+                                      Approval.policy_key.like(f"{SOFT_PREFIX}e{env.id}:t%"),
+                                      Approval.status.in_(("approved", "pending"))).all())
+    for a in rows:
+        a.status = "expired"
+        a.resolution_note = ((a.resolution_note or "") + f" [hết hiệu lực: {why}]").strip()
+        db.add(a)
+    if rows:
+        db.commit()
+    return [a.id for a in rows]
+
+
+def on_soft_decision(db: Session, approval) -> dict:
+    """Duyệt chi tiếp → đánh thức lại seat trên đúng việc đó."""
+    from app.services import wakeup
+    parsed = parse_soft_key(approval.policy_key or "")
+    if parsed is None or approval.status != "approved":
+        return {"woken": None}
+    task = db.get(Task, parsed[1])
+    if task is None:
+        return {"woken": None}
+    wk = wakeup.enqueue_for_task(db, task, "approval_resolved", member_id=approval.requester_member_id,
+                                 dedupe_key=f"budget_soft:a{approval.id}",
+                                 payload={"approval_id": approval.id, "budget_id": parsed[0]})
+    return {"woken": wk.id if wk is not None else None}
+
+
+def level_of(env: BudgetEnvelope, p: float | None = None) -> str:
+    p = pct(env) if p is None else p
+    if p >= 100 - EPS:
+        return "exhausted"
+    if env.soft_stop_pct and p >= float(env.soft_stop_pct) - EPS:
+        return "soft_stopped"
+    if p >= float(env.warn_pct or 80):
+        return "warned"
+    return "ok"
 
 
 def hold(db: Session, envs: list, amount: float, key: str, memo: str) -> list[int]:
@@ -261,16 +379,20 @@ def _spent_any(db: Session, key: str) -> float:
 def check_thresholds(db: Session, env: BudgetEnvelope) -> dict:
     p = pct(env)
     state = env.threshold_state or "ok"
-    new = "exhausted" if p >= 100 - EPS else ("warned" if p >= float(env.warn_pct or 80) else "ok")
+    new = level_of(env, p)
     if new == state:
         return {"state": state, "pct": p, "changed": False}
     env.threshold_state = new
     db.add(env); db.commit()
     acted: dict = {}
+    if state == "soft_stopped" and LEVEL_ORDER[new] < LEVEL_ORDER[state]:
+        acted["expired_approvals"] = expire_soft_grants(db, env, "phong bì rời nấc dừng mềm")
     if new == "warned" and state == "ok":
-        acted = _on_warned(db, env, p)
+        acted = {**acted, **_on_warned(db, env, p)}
+    elif new == "soft_stopped" and LEVEL_ORDER[state] < LEVEL_ORDER[new]:
+        acted = {**acted, **_on_soft_stopped(db, env, p)}
     elif new == "exhausted":
-        acted = _on_exhausted(db, env, p)
+        acted = {**acted, **_on_exhausted(db, env, p)}
     return {"state": new, "pct": p, "changed": True, **acted}
 
 
@@ -314,9 +436,10 @@ def _humans(db: Session, env: BudgetEnvelope, members: list[Member]) -> list[int
     return sorted(ids)
 
 
-def _inbox(db: Session, env: BudgetEnvelope, recipients: list[int], title: str, priority: str) -> list[int]:
+def _inbox(db: Session, env: BudgetEnvelope, recipients: list[int], title: str, priority: str,
+           kind: str | None = None) -> list[int]:
     from app.services import inbox  # D3.5: gộp theo phong bì, chỉ người nhận
-    kind = "budget_exhausted" if priority == "urgent" else "budget_warned"
+    kind = kind or ("budget_exhausted" if priority == "urgent" else "budget_warned")
     items = inbox.notify(db, organization_id=env.organization_id, recipients=recipients, kind=kind,
                          title=title, related_type="budget_envelope", related_id=str(env.id),
                          priority=priority, source="budget")
@@ -338,6 +461,15 @@ def _on_warned(db: Session, env: BudgetEnvelope, p: float) -> dict:
     title = f"Ngân sách '{env.name}' đã dùng {p:.0f}% — seat chỉ làm việc critical"
     inbox = _inbox(db, env, _humans(db, env, members), title, "high")
     _event(db, env, "budget.warned", {"pct": p, "inbox": inbox})
+    return {"inbox": inbox}
+
+
+def _on_soft_stopped(db: Session, env: BudgetEnvelope, p: float) -> dict:
+    members = _scope_members(db, env)
+    title = (f"Ngân sách '{env.name}' đã dùng {p:.0f}% — chạm nấc dừng mềm {env.soft_stop_pct}%: "
+             "lượt chạy mới cần anh duyệt")
+    inbox = _inbox(db, env, _humans(db, env, members), title, "high", kind="budget_soft_stopped")
+    _event(db, env, "budget.soft_stopped", {"pct": p, "soft_stop_pct": env.soft_stop_pct, "inbox": inbox})
     return {"inbox": inbox}
 
 
@@ -383,8 +515,9 @@ def override(db: Session, env: BudgetEnvelope, *, actor_member_id: int | None, a
     if env.status == "exhausted":
         env.status = "active"
     p = pct(env)
-    env.threshold_state = "exhausted" if p >= 100 - EPS else ("warned" if p >= float(env.warn_pct or 80) else "ok")
+    env.threshold_state = level_of(env, p)
     db.add(env); db.commit(); db.refresh(env)
+    expired = expire_soft_grants(db, env, "override hạn mức")
     restored_members, restored_tasks, requeued = [], [], []
     if env.threshold_state != "exhausted":
         last = (db.query(AuditEvent).filter(AuditEvent.organization_id == env.organization_id,
@@ -412,7 +545,7 @@ def override(db: Session, env: BudgetEnvelope, *, actor_member_id: int | None, a
     payload = {"reason": reason, "before": before,
                "after": {"amount_limit": env.amount_limit, "threshold_state": env.threshold_state, "pct": pct(env)},
                "restored_members": restored_members, "restored_tasks": restored_tasks,
-               "requeued_wakeups": requeued}
+               "requeued_wakeups": requeued, "expired_approvals": expired}
     log_event(db, env.organization_id, "budget.override", object_type="budget_envelope", object_id=str(env.id),
               actor_member_id=actor_member_id, actor_name=actor_name, result="success", risk="high", payload=payload)
     _event(db, env, "budget.override", payload)
@@ -431,7 +564,7 @@ def context_lines(db: Session, member: Member | None, task) -> list[str]:
         return []
     out = []
     for env in applicable(db, member, task):
-        if (env.threshold_state or "ok") in ("warned", "exhausted"):
+        if (env.threshold_state or "ok") in ("warned", "soft_stopped", "exhausted"):
             out.append(f"- Ngân sách '{env.name}' đã dùng {pct(env):.0f}% hạn mức: CHỈ làm việc critical. "
                        "Việc không critical thì ghi comment xin hoãn rồi dừng.")
     return out[:2]
@@ -497,6 +630,7 @@ def public(env: BudgetEnvelope) -> dict:
     return {"id": env.id, "name": env.name, "scope_type": st, "scope_id": sid, "company_id": env.company_id,
             "goal_id": env.goal_id, "amount_limit": env.amount_limit,
             "amount_reserved": round(env.amount_reserved or 0, 6), "amount_spent": round(env.amount_spent or 0, 6),
-            "warn_pct": env.warn_pct, "period": env.period, "threshold_state": env.threshold_state or "ok",
+            "warn_pct": env.warn_pct, "soft_stop_pct": env.soft_stop_pct, "period": env.period,
+            "threshold_state": env.threshold_state or "ok", "level_vi": LEVEL_VI.get(env.threshold_state or "ok", ""),
             "status": env.status, "pct": pct(env), "remaining": round(budget_svc.remaining(env), 6),
             "currency": env.currency}

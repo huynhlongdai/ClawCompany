@@ -33,11 +33,12 @@ from app.models import Approval, Member, Task
 from app.models.extended import InboxItem
 
 KINDS = ("approval_pending", "approval_escalated", "run_failed", "task_review", "mention",
-         "budget_warned", "budget_exhausted", "routine_paused", "goal_completed")
+         "budget_warned", "budget_soft_stopped", "budget_exhausted", "routine_paused", "goal_completed")
 KIND_VI = {
     "approval_pending": "Chờ duyệt", "approval_escalated": "Duyệt quá hạn — chuyển lên anh",
     "run_failed": "Run lỗi", "task_review": "Vào review", "mention": "Được nhắc tên",
     "budget_warned": "Ngân sách chạm nấc cảnh báo", "budget_exhausted": "Hết ngân sách",
+    "budget_soft_stopped": "Ngân sách chạm nấc dừng mềm",
     "routine_paused": "Routine tự dừng",
     "goal_completed": "Mục tiêu hoàn thành",
 }

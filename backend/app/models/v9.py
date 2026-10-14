@@ -61,7 +61,9 @@ class BudgetEnvelope(Base):
     scope_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     warn_pct: Mapped[int] = mapped_column(Integer, default=80)
     period: Mapped[str] = mapped_column(String(16), default="total")
-    threshold_state: Mapped[str] = mapped_column(String(16), default="ok")  # ok|warned|exhausted
+    threshold_state: Mapped[str] = mapped_column(String(16), default="ok")  # ok|warned|soft_stopped|exhausted
+    # M4b (0030_budget_soft_stop): nấc dừng mềm — chạm nấc thì lượt chạy mới cần phê duyệt. NULL = tắt.
+    soft_stop_pct: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

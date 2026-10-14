@@ -64,6 +64,10 @@ async def resolve_approval(approval_id: int, payload: ApprovalResolve, principal
             raise HTTPException(409, "Approval already resolved")
         if obj.approver_member_id and principal.member_id != obj.approver_member_id:
             raise HTTPException(403, {"error": "not_the_approver", "approver_member_id": obj.approver_member_id})
+    if obj.status != "pending" and payload.status in ("approved", "rejected"):
+        # M4b: trước đây quyết lại một hàng đã quyết vẫn 200 và chạy lại hậu quả (đánh thức seat lần hai).
+        raise HTTPException(409, {"error": "already_decided",
+                                  "message": f"Yêu cầu này đã {obj.status} — không quyết lại được"})
     obj.status = payload.status; obj.resolution_note = payload.resolution_note
     db.add(obj); db.commit(); db.refresh(obj)
     from app.services.runtime_stream import _audit
