@@ -11,7 +11,8 @@ import {SkeletonRows} from "../ui/Skeleton";
 import {api} from "../../lib/api";
 import {logout} from "../../lib/auth";
 import {SECTIONS, sectionFor} from "../../lib/nav";
-import {Counts, getCounts, getOrg, peekCounts, subscribeCounts} from "../../lib/counts";
+import {token as authToken} from "../../lib/auth";
+import {Counts, getCounts, useOrg, peekCounts, subscribeCounts} from "../../lib/counts";
 import {ThemePref, useCompanyId, useThemePref} from "../../lib/prefs";
 import {t, lazy} from "../../lib/i18n";
 
@@ -31,14 +32,16 @@ export function useCounts() {
     const cached = peekCounts(); if (cached) setCounts(cached);
     getCounts().then(c => { if (alive) setCounts(c); }).catch(() => {});
     const off = subscribeCounts(c => { if (alive) setCounts(c); });
-    return () => { alive = false; off(); };
+    const onAuth = () => { getCounts(true).catch(() => {}); };
+    window.addEventListener("cc:auth", onAuth);
+    return () => { alive = false; off(); window.removeEventListener("cc:auth", onAuth); };
   }, []);
   return counts;
 }
 
 function CompanySwitcher({onNavigate}: {onNavigate: () => void}) {
   useCounts();
-  const org = getOrg();
+  const org = useOrg();
   const [companyId, setCompanyId] = useCompanyId();
   const [open, setOpen] = useState(false);
   const current = org.companies.find(c => c.id === companyId) || org.companies[0];
@@ -93,7 +96,13 @@ function Account() {
   const [me, setMe] = useState<any>(null);
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useThemePref();
-  useEffect(() => { let alive = true; api.me().then(u => { if (alive) setMe(u); }).catch(() => {}); return () => { alive = false; }; }, []);
+  // Chưa đăng nhập thì không hỏi /auth/me (tránh 401 trên màn đăng nhập); đăng nhập xong ("cc:auth") mới hỏi.
+  useEffect(() => {
+    let alive = true;
+    const load = () => { if (authToken()) api.me().then(u => { if (alive) setMe(u); }).catch(() => {}); };
+    load(); window.addEventListener("cc:auth", load);
+    return () => { alive = false; window.removeEventListener("cc:auth", load); };
+  }, []);
   useDismiss(open, () => setOpen(false), ".ui-acct");
   useProfileLocale(me);
   const name = me?.full_name || me?.display_name || me?.email?.split("@")[0] || t("shell.tai_khoan");

@@ -8,7 +8,7 @@ import {Segmented} from "../ui/Tabs";
 import {StatusPill} from "../ui/StatusPill";
 import {ButtonLink} from "../ui/Button";
 import {useCounts} from "../shell/Shell";
-import {getOrg} from "../../lib/counts";
+import {useOrg} from "../../lib/counts";
 import {apiV19} from "../../lib/api";
 import {ThemePref, useCompanyId, useLab, useThemePref} from "../../lib/prefs";
 import {LAB_PAGES} from "../../lib/nav";
@@ -19,7 +19,7 @@ const SHORTCUTS: [string, string][] = lazy(() => ([["Ctrl K / ⌘K", t("settings
 
 export function SettingsHome() {
   useCounts();
-  const org = getOrg();
+  const org = useOrg();
   const [theme, setTheme] = useThemePref();
   const [lab] = useLab();
   const [companyId, setCompanyId] = useCompanyId();

@@ -9,7 +9,7 @@ import {Skeleton} from "../ui/Skeleton";
 import {ButtonLink} from "../ui/Button";
 import {apiCosts, apiInboxHub, apiWork} from "../../lib/api";
 import {useCounts} from "../shell/Shell";
-import {getOrg} from "../../lib/counts";
+import {useOrg} from "../../lib/counts";
 import {t as tr, intlLocale} from "../../lib/i18n";
 
 /* M7 (sớm) — Tổng quan "Hôm nay công ty làm gì".
@@ -52,7 +52,7 @@ function useToday() {
 export function TodayOverview() {
   const {work, inbox, costs, budgets, load} = useToday();
   const counts = useCounts();
-  const org = getOrg();
+  const org = useOrg();
   const [today, setToday] = useState("");
   useEffect(() => { setToday(new Intl.DateTimeFormat(intlLocale(), {weekday: "long", day: "numeric", month: "long"}).format(new Date())); }, []);
 
