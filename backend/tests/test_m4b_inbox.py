@@ -256,14 +256,16 @@ def test_unauthorized_approver_is_refused(env):
 def test_double_approve_race_only_one_wins(env):
     a = approval(env, approver=env.hung)
     s1, s2 = env.Maker(), env.Maker()
-    s1.get(Approval, a.id); s2.get(Approval, a.id)          # cả hai đã "xem" thẻ ở trạng thái chờ
+    seen1, seen2 = s1.get(Approval, a.id), s2.get(Approval, a.id)   # cả hai đã "xem" thẻ ở trạng thái chờ
+    assert seen1.status == seen2.status == "pending"
     p = env.principal("hung")
     first = asyncio.run(inbox_hub.decide(s1, env.org.id, p, a.id, decision="approve", expected_revision=1))
     assert first["status"] == "approved"
     # Yêu cầu thứ hai đã đọc hàng TRƯỚC khi yêu cầu đầu commit: trong bộ nhớ của nó hàng vẫn "chờ",
     # nên kiểm tra trạng thái đầu hàm cho qua — chỉ UPDATE có điều kiện chặn được.
     from sqlalchemy.orm.attributes import set_committed_value
-    set_committed_value(s2.get(Approval, a.id), "status", "pending")
+    assert s2.get(Approval, a.id) is seen2 and seen2.status == "pending"   # bản trong bộ nhớ của yêu cầu 2
+    set_committed_value(seen2, "status", "pending")
     with pytest.raises(WorkError) as e:
         asyncio.run(inbox_hub.decide(s2, env.org.id, p, a.id, decision="reject", note="đổi ý",
                                      expected_revision=1))
@@ -526,6 +528,8 @@ def test_old_routes_still_work_with_deprecation_and_successor_link(env):
         assert r.headers.get("Deprecation") == "true" and r.headers["Link"] == f'<{succ}>; rel="successor-version"'
     r = env.c.post(f"/api/approvals/{a.id}/resolve", json={"status": "approved"}, headers=H)
     assert r.status_code == 200 and r.headers["Link"] == f'</api/inbox/approvals/{a.id}/decide>; rel="successor-version"'
+    again = env.c.post(f"/api/approvals/{a.id}/resolve", json={"status": "rejected"}, headers=H)
+    assert again.status_code == 409 and again.json()["detail"]["error"] == "already_decided"   # lỗi cũ: 200
     for path in ("/api/inbox/items", "/api/inbox/summary", "/api/costs/budgets", "/api/costs/overview"):
         assert "Deprecation" not in env.c.get(path, headers=H).headers
 
