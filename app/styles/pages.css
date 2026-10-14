@@ -287,7 +287,13 @@ a.org-node:hover{border-color:var(--text-muted);box-shadow:var(--shadow-2)}
 .org-stats{display:flex;gap:6px 18px;flex-wrap:wrap;font-size:var(--fs-13);color:var(--text-muted)}
 .org-stats b{color:var(--text)}
 /* hồ sơ / tuyển agent (AgentHR) */
-.hrWrap,.hrPanel{display:flex;flex-direction:column;gap:12px;min-width:0}
+.hrWrap,.hrPanel{display:flex;flex-direction:column;gap:16px;min-width:0}
+/* tab Nhân sự: các thẻ đứng cạnh nhau, không lồng trong panel khác; khoảng cách do gap lo (bỏ margin “panel + panel”) */
+.hrPanel.hrPanel > *,.hrPanel.hrPanel > .ui-panel.ui-panel-body,.hrPanel.hrPanel > .ui-grid > .ui-panel.ui-panel-body,.hrWrap.hrWrap > .ui-panel.ui-panel-body{margin-top:0}
+.hrPanel [data-testid=hr-tools] select{width:100%;min-width:max-content}
+.hrFacts + .tmRow{margin-top:12px}
+.lab-cardhead > .ui-pill{display:inline-flex;flex:none;align-self:center}
+.hrSrc{white-space:nowrap}
 .hrScroll{overflow-x:auto;min-width:0}
 .hrSteps{display:flex;gap:6px;list-style:none;margin:0 0 12px;padding:0;flex-wrap:wrap;counter-reset:s}
 .hrSteps li{counter-increment:s;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:var(--radius-full);font-size:var(--fs-12);background:var(--surface-2);color:var(--text-muted)}

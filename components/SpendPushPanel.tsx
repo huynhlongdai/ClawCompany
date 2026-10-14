@@ -170,7 +170,7 @@ export function SpendPushPanel(){
         Tối đa {detail.usage_events_capped_at} dòng usage.
       </p>
       <table className="ui-table">
-        <thead><tr><th>#</th><th>Loại</th><th>SL</th><th>Tiền</th><th>Run</th><th>Lúc</th></tr></thead>
+        <thead><tr><th>#</th><th>Loại</th><th>SL</th><th>Tiền</th><th>Lượt chạy</th><th>Lúc</th></tr></thead>
         <tbody>
           {(detail.usage_events ?? []).map((item:any) => <tr key={item.usage_event_id}>
             <td>{item.usage_event_id}</td><td>{item.event_type}</td>

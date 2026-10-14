@@ -11,14 +11,14 @@ export const LIFECYCLE_VI: Record<string, string> = lazy(() => ({
   active: tr("agentHr.dang_lam"), paused: tr("agentHr.tam_dung"), retired: tr("agentHr.da_nghi"), runtime_missing: tr("agentHr.cho_gateway"),
   provisioning: tr("agentHr.dang_tao"), runtime_error: tr("agentHr.loi_tao"), detached: tr("agentHr.mat_tren_gateway"),
 }));
-const LIFECYCLE_CLS: Record<string, string> = {active: "", paused: "busy", retired: "off", runtime_missing: "busy",
-  runtime_error: "busy", detached: "busy", provisioning: "busy"};
+const LIFECYCLE_CLS: Record<string, string> = {active: "is-ok", paused: "is-wait", retired: "is-outline", runtime_missing: "is-wait",
+  runtime_error: "is-risk", detached: "is-risk", provisioning: "is-info"};
 const FILE_VI: Record<string, string> = lazy(() => ({in_sync: tr("agentHr.khop"), edited_on_gateway: tr("agentHr.bi_sua_tren_gateway"),
   missing_on_gateway: tr("agentHr.mat_tren_gateway"), untracked: tr("agentHr.chua_co_ban_clawcompany"), absent: tr("agentHr.chua_co"), no_agent: tr("agentHr.khong_co_agent"), error: tr("agentHr.loi_doc")}));
 const LEVEL_VI: Record<string, string> = lazy(() => ({allowed: tr("agentHr.cho_phep"), ask: tr("agentHr.hoi_duyet"), off: tr("agentHr.tat")}));
 
 function Pill({lc}: {lc: string}) {
-  return <span className={`ui-pill ${LIFECYCLE_CLS[lc] ?? "busy"}`} data-testid="hr-lifecycle">{LIFECYCLE_VI[lc] || lc}</span>;
+  return <span className={`ui-pill ${LIFECYCLE_CLS[lc] ?? "is-wait"}`} data-testid="hr-lifecycle">{LIFECYCLE_VI[lc] || lc}</span>;
 }
 
 // ------------------------------------------------------------------ tab: danh sách + tuyển
@@ -173,7 +173,7 @@ export function AgentHRPanel({memberId}: {memberId: number}) {
   if (seat === false) return null;
   const canEdit = !!me?.capabilities?.invite && seat.lifecycle !== "retired";
   const isAdmin = ["admin", "owner"].includes(me?.role);
-  return <div className="ui-panel ui-panel-body" data-testid="hr-panel">
+  return <div className="hrPanel" data-testid="hr-panel">
     {error && <div className="ui-banner is-error" data-testid="hr-error">{error}</div>}
     {note && <div className="ui-banner tmNote" data-testid="hr-note">{note}</div>}
     <div className="ui-grid is-2">
@@ -358,7 +358,7 @@ function Tools({seat, isAdmin, busy, act, tick}: any) {
           <option value="inherit">{x.source === "member" ? tr("agentHr.theo_bac_mac_dinh") : tr("agentHr.theo_bac_mac_dinh_2", {p0: LEVEL_VI[x.level] || x.level})}</option>
           {t.levels.map((l: string) => <option key={l} value={l}>{LEVEL_VI[l] || l}</option>)}</select>
         : <span className={x.level === "off" ? "is-warn" : ""}>{LEVEL_VI[x.level] || x.level}</span>}</td>
-      <td><small>{src(x.source)}</small></td></tr>)}</tbody></table></div>}
+      <td className="hrSrc"><small>{src(x.source)}</small></td></tr>)}</tbody></table></div>}
     {t && !isAdmin && <small className="tmGuide">{tr("agentHr.doi_quyen_tool_can_vai")}</small>}
   </section>;
 }

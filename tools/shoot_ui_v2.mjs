@@ -64,7 +64,7 @@ const scanButtonOverflow = () => {
 };
 
 const rep = {};
-const b = await chromium.launch({args: ["--no-sandbox"]});
+const b = await chromium.launch({args: ["--no-sandbox"], ...(process.env.CHROME_PATH ? {executablePath: process.env.CHROME_PATH} : {})});
 const [W, H] = size === "desktop" ? [1440, 900] : [390, 844];
 const tag = `-${size === "desktop" ? "1440" : "390"}-${theme}${lang === "en" ? "-en" : ""}`;
 const mk = async (auth) => {
@@ -113,6 +113,8 @@ if ((!ONLY || ONLY.includes("loi-moi")) && inv?.invite_path) await shootOne(anon
 await anon.close();
 await b.close();
 const file = `${OUT}/report${tag}.json`;
+// ONLY=...: gộp vào báo cáo cũ (chụp lại vài trang không xoá kết quả các trang khác).
+if (ONLY && fs.existsSync(file)) { const old = JSON.parse(fs.readFileSync(file, "utf8")); for (const k of Object.keys(rep)) old[k] = rep[k]; Object.assign(rep, old, rep); }
 fs.writeFileSync(file, JSON.stringify(rep, null, 1));
 const bad = Object.entries(rep).filter(([, v]) => v.errors.length || v.overflow_x > 0 || v.english.length || v.btn_overflow.length || v.html_lang !== lang || v.inbox_last_card_under_nav_px > 0);
 console.log(`${Object.keys(rep).length} ảnh${tag}; có vấn đề: ${bad.length}`);
