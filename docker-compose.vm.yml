@@ -46,11 +46,12 @@ services:
     ports: !override
       - "0.0.0.0:3000:3000"
   # Tuỳ chọn khi cloud firewall chặn cổng 3000: Cloudflare quick tunnel (URL *.trycloudflare.com
-  # đổi mỗi lần container khởi động lại). Bật: thêm `--profile tunnel`; xem URL:
+  # đổi mỗi lần container khởi động lại). Dùng --protocol http2 (TCP 443): QUIC/UDP trên VM này
+  # hay rớt "datagram manager error: timeout: no recent network activity". Bật: thêm `--profile tunnel`; xem URL:
   #   docker compose ... logs tunnel | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | tail -1
   tunnel:
     image: cloudflare/cloudflared:latest
     profiles: [tunnel]
     restart: unless-stopped
-    command: ["tunnel", "--no-autoupdate", "--url", "http://web:3000"]
+    command: ["tunnel", "--no-autoupdate", "--protocol", "http2", "--url", "http://web:3000"]
     depends_on: [web]
