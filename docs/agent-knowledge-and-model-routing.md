@@ -135,9 +135,9 @@ Giả định một agent làm 200 việc/ngày, mỗi việc ~6.000 token vào 
 |---|---|---|---|
 | Tất cả bằng `claude-sonnet-5` | ~$0.016 | ~$3.20 | ~$96 |
 | Tất cả bằng `gpt-5-mini` | ~$0.0025 | ~$0.50 | ~$15 |
-| Định tuyến: 60% T1, 25% T2, 15% T3 (`gemini-3.8-flash`) | ~$0.0015 | ~$0.31 | ~$9 |
+| Định tuyến: 60% T1, 25% T2, 15% T3 (`gemini-3.8-flash`) | ~$0.0018 | ~$0.36 | ~$11 |
 
-Định tuyến rẻ hơn khoảng **90%** so với dùng một model mạnh cho mọi việc, và vẫn dành model mạnh cho 15% việc khó. Con số thật phụ thuộc tỷ lệ làm lại — phải đo bằng log ở 2.5.
+Định tuyến rẻ hơn khoảng **89%** so với dùng một model mạnh cho mọi việc, và vẫn dành model mạnh cho 15% việc khó. Con số thật phụ thuộc tỷ lệ làm lại — phải đo bằng log ở 2.5.
 
 ## 2.7 Màn hình
 
