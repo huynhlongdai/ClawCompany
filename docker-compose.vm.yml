@@ -1,0 +1,47 @@
+# Deploy thật lên VM (production): web build sẵn, chỉ publish cổng 3000; DB/Redis/API chỉ 127.0.0.1.
+#   cp .env.example? → không: tạo .env bằng tools/vm_env.sh (bí mật ngẫu nhiên, chmod 600)
+#   docker compose -f docker-compose.yml -f docker-compose.prized.yml -f docker-compose.vm.yml up -d --build
+# Biến bắt buộc trong .env: POSTGRES_PASSWORD, JWT_SECRET, WORKLOAD_IDENTITY_DEV_SECRET, SUPPLY_CHAIN_SIGNING_KEY
+x-prod-env: &prod-env
+  ENV: production
+  DATABASE_URL: postgresql+psycopg://clawcompany:${POSTGRES_PASSWORD:?thiếu POSTGRES_PASSWORD}@db:5432/clawcompany
+  JWT_SECRET: ${JWT_SECRET:?thiếu JWT_SECRET}
+  WORKLOAD_IDENTITY_DEV_SECRET: ${WORKLOAD_IDENTITY_DEV_SECRET:?thiếu WORKLOAD_IDENTITY_DEV_SECRET}
+  SUPPLY_CHAIN_SIGNING_KEY: ${SUPPLY_CHAIN_SIGNING_KEY:?thiếu SUPPLY_CHAIN_SIGNING_KEY}
+  LAB_JOBS_ENABLED: "false"
+  APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Ho_Chi_Minh}
+services:
+  db:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?thiếu POSTGRES_PASSWORD}
+  redis:
+    restart: unless-stopped
+  api:
+    restart: unless-stopped
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers"
+    environment: *prod-env
+  worker:
+    restart: unless-stopped
+    environment: *prod-env
+  beat:
+    restart: unless-stopped
+    environment: *prod-env
+  web:
+    image: clawcompany-web:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_BASE: /api
+        NEXT_PUBLIC_AUTH_REQUIRED: "true"
+        API_PROXY_TARGET: http://api:8000
+    restart: unless-stopped
+    volumes: !reset []
+    command: !reset null
+    environment:
+      NEXT_PUBLIC_API_BASE: /api
+      NEXT_PUBLIC_AUTH_REQUIRED: "true"
+      API_PROXY_TARGET: http://api:8000
+    ports: !override
+      - "0.0.0.0:3000:3000"
