@@ -57,6 +57,8 @@ async function request<T = any>(path:string, init?:RequestInit):Promise<T>{
 export const api = {
   // Người đang đăng nhập — sidebar cần để hiện tên thật thay vì chữ ghim cứng.
   me: () => request<any>(`/auth/me`),
+  // Cờ LAB_JOBS_ENABLED của backend: 6 job nền Phòng thí nghiệm có chạy không.
+  labStatus: () => request<{lab_jobs_enabled:boolean; env:string; jobs:string[]}>(`/health/lab`),
   dashboard: (organizationId=1) => request(`/dashboard/summary?organization_id=${organizationId}`),
   companies: (organizationId=1) => request(`/companies?organization_id=${organizationId}`),
   departments: (companyId?:number) => request(`/departments${companyId?`?company_id=${companyId}`:""}`),

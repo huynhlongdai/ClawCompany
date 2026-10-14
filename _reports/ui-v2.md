@@ -111,6 +111,84 @@ Danh sách này là **suy ra**: plan-v2-modules §2 nói "ẩn 27 trang" nhưng 
 - Vận hành & tin cậy (9): /app/runners, /app/sre-control, /app/incidents, /app/observability, /app/telemetry-federation, /app/trust, /app/supply-chain, /app/production-trust, /app/secrets-federation
 - Điều hành đời cũ (4): /app/control-center, /app/founder-cockpit, /app/autonomy, /app/simulation
 
+## Kiểm kê lượt 2 (trước khi restyle) — `python3 tools/ui_inventory.py`
+
+Kiểm kê tĩnh: mỗi route → component nó kéo vào (đệ quy) → số class còn lấy từ `legacy.css` và số chuỗi tiếng Anh trong JSX. "cũ" = còn ít nhất một class legacy hoặc một chuỗi tiếng Anh. 68 route `page.tsx`; **27 "mới", 41 "cũ"** lúc bắt đầu lượt này. 60 file component còn dùng class legacy.
+
+legacy.css: 18871 byte, 217 class
+
+| Route | Class legacy còn dùng | Chuỗi tiếng Anh (tĩnh) | Trạng thái |
+|---|---|---|---|
+| `/` | 0 | 0 | mới |
+| `/app/agent-tools` | 11 | 0 | cũ |
+| `/app/agents` | 18 | 4 | cũ |
+| `/app/agents/[id]` | 20 | 0 | cũ |
+| `/app/approve` | 0 | 0 | mới |
+| `/app/artifacts` | 11 | 4 | cũ |
+| `/app/autonomy` | 8 | 3 | cũ |
+| `/app/budgets` | 0 | 0 | mới |
+| `/app/cicd` | 9 | 2 | cũ |
+| `/app/collaboration` | 10 | 0 | cũ |
+| `/app/communications` | 8 | 0 | cũ |
+| `/app/company-factory` | 12 | 3 | cũ |
+| `/app/control-center` | 16 | 0 | cũ |
+| `/app/costs` | 0 | 0 | mới |
+| `/app/customers` | 14 | 0 | cũ |
+| `/app/delivery` | 13 | 4 | cũ |
+| `/app/deployments` | 10 | 2 | cũ |
+| `/app/dev-cloud` | 10 | 3 | cũ |
+| `/app/engineering` | 11 | 2 | cũ |
+| `/app/events` | 12 | 2 | cũ |
+| `/app/flow` | 0 | 0 | mới |
+| `/app/founder-cockpit` | 14 | 2 | cũ |
+| `/app/goals` | 7 | 0 | cũ |
+| `/app/inbox` | 0 | 0 | mới |
+| `/app/incidents` | 7 | 1 | cũ |
+| `/app/knowledge-mesh` | 7 | 0 | cũ |
+| `/app/live-runs` | 14 | 0 | cũ |
+| `/app/marketplace` | 12 | 0 | cũ |
+| `/app/memory` | 8 | 2 | cũ |
+| `/app/nina` | 0 | 0 | mới |
+| `/app/observability` | 9 | 2 | cũ |
+| `/app/openclaw` | 0 | 0 | mới |
+| `/app/os` | 1 | 0 | cũ |
+| `/app/portfolio` | 9 | 2 | cũ |
+| `/app/production-trust` | 12 | 4 | cũ |
+| `/app/progressive-delivery` | 8 | 2 | cũ |
+| `/app/quality` | 6 | 2 | cũ |
+| `/app/release-manager` | 8 | 2 | cũ |
+| `/app/releases` | 10 | 2 | cũ |
+| `/app/reports` | 14 | 0 | cũ |
+| `/app/repositories` | 10 | 6 | cũ |
+| `/app/reviews` | 8 | 1 | cũ |
+| `/app/routines` | 0 | 0 | mới |
+| `/app/routing` | 11 | 0 | cũ |
+| `/app/runners` | 12 | 4 | cũ |
+| `/app/sandboxes` | 7 | 3 | cũ |
+| `/app/secrets` | 0 | 0 | mới |
+| `/app/secrets-federation` | 10 | 3 | cũ |
+| `/app/settings` | 0 | 0 | mới |
+| `/app/settings/lab` | 0 | 0 | mới |
+| `/app/simulation` | 6 | 2 | cũ |
+| `/app/sre-control` | 11 | 4 | cũ |
+| `/app/strategy` | 0 | 0 | mới |
+| `/app/supply-chain` | 8 | 2 | cũ |
+| `/app/system` | 0 | 0 | mới |
+| `/app/tasks/[id]` | 18 | 0 | cũ |
+| `/app/team` | 10 | 0 | cũ |
+| `/app/telemetry-federation` | 7 | 2 | cũ |
+| `/app/trust` | 10 | 6 | cũ |
+| `/app/work` | 0 | 0 | mới |
+| `/app/workflows` | 0 | 0 | mới |
+| `/app/workspace-gateway` | 9 | 3 | cũ |
+| `/app/workspace-ops` | 15 | 1 | cũ |
+| `/app/workspaces` | 8 | 3 | cũ |
+| `/invite/[token]` | 0 | 0 | mới |
+| `/onboarding` | 0 | 0 | mới |
+| `/portal` | 10 | 3 | cũ |
+| `/portal/chat` | 7 | 0 | cũ |
+
+
 ## Chưa làm / còn lại
 
 - **6 job nền Lab chưa tắt** (xem trên) — cần cờ env ở backend; `lib/nav.ts` có `LAB_JOBS` ghi tên để làm sau.
