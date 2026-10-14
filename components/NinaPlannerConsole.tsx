@@ -1,14 +1,94 @@
 "use client";
-import {useEffect,useState} from "react";
-import {AuthGate} from "./AuthGate";
-import {V8AppShell} from "./V8AppShell";
-import {api,apiV8} from "../lib/api";
+import Link from "next/link";
+import {useCallback, useEffect, useState} from "react";
+import {PageFrame} from "./shell/PageFrame";
+import {api, apiV8} from "../lib/api";
 import {activeOrganizationId} from "../lib/auth";
+import {Button} from "./ui/Button";
+import {Field, FormRow} from "./ui/Field";
+import {Panel} from "./ui/Panel";
+import {StatusPill, toneOf} from "./ui/StatusPill";
+import {EmptyState, ErrorBanner} from "./ui/EmptyState";
+import {useToast} from "./ui/Toast";
 
-type Company={id:number;name:string}; type Project={id:number;company_id:number;name:string}; type Plan={id:number;objective:string;status:string;summary:string;created_at:string};
-type PlanDetail={plan:Plan;steps:{id:number;step_index:number;title:string;description:string;owner_member_id:number|null;task_id:number|null;status:string}[]};
-export function NinaPlannerConsole(){const org=activeOrganizationId();const [objective,setObjective]=useState("Launch a profitable TikTok campaign for the summer collection within 14 days"),[companyId,setCompanyId]=useState(""),[projectId,setProjectId]=useState(""),[companies,setCompanies]=useState<Company[]>([]),[projects,setProjects]=useState<Project[]>([]),[plans,setPlans]=useState<Plan[]>([]),[detail,setDetail]=useState<PlanDetail|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState("");
- async function load(){try{const [c,p,pl]=await Promise.all([api.companies(org),api.projects(),apiV8.ninaPlans()]);setCompanies(c as Company[]);setProjects(p as Project[]);setPlans(pl as Plan[])}catch(e:any){setError(e.message)}} useEffect(()=>{load()},[]);
- async function create(){setBusy(true);setError("");try{const j=await apiV8.createNinaPlan({organization_id:org,objective,company_id:companyId?Number(companyId):null,project_id:projectId?Number(projectId):null,auto_create_tasks:true,max_steps:5}) as PlanDetail;setDetail(j);await load();}catch(e:any){setError(e.message)}finally{setBusy(false)}}
- async function delegate(){if(!detail)return;setBusy(true);try{await apiV8.delegateNinaPlan(detail.plan.id);setDetail({...detail,plan:{...detail.plan,status:"delegated"}});await load()}catch(e:any){setError(e.message)}finally{setBusy(false)}}
- return <AuthGate><V8AppShell title="Nina Planner" subtitle="Founder objective → plan → owners → tasks → agent delegation" action={<button className="v8Primary" disabled={busy||!objective.trim()} onClick={create}>{busy?"Planning…":"Create execution plan"}</button>}><div className="v8NinaHero"><div><span className="v8Pill">AI CHIEF OF STAFF</span><h2>Give Nina the outcome, not the task list.</h2><p>Nina converts a founder-level objective into an auditable execution plan and assigns work to the current AI workforce.</p></div><div className="v8NinaOrb">N</div></div>{error&&<div className="v8Error">{error}</div>}<div className="v8Two"><section className="v8Card"><div className="v8CardHead"><div><b>Objective</b><span>What should the company achieve?</span></div></div><textarea className="v8Textarea" value={objective} onChange={e=>setObjective(e.target.value)}/><div className="v8Form"><label>Company<select value={companyId} onChange={e=>{setCompanyId(e.target.value);setProjectId("")}}><option value="">No company constraint</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>Existing project<select value={projectId} onChange={e=>setProjectId(e.target.value)}><option value="">Create a Nina project</option>{projects.filter(p=>!companyId||String(p.company_id)===companyId).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label></div></section><section className="v8Card"><div className="v8CardHead"><div><b>Planner contract</b><span>Deterministic orchestration baseline</span></div></div><div className="v8Checklist"><p>✓ discover available AI employees</p><p>✓ create project when needed</p><p>✓ decompose into ordered steps</p><p>✓ match role → owner</p><p>✓ create Company Tasks</p><p>✓ dispatch only through Runtime Adapter</p></div></section></div>{detail&&<section className="v8Card"><div className="v8CardHead"><div><b>{detail.plan.objective}</b><span>Plan #{detail.plan.id} · {detail.plan.status}</span></div><button className="v8Primary" onClick={delegate} disabled={busy}>Delegate to AI workforce</button></div><div className="v8Timeline">{detail.steps.map((s,i)=><div className="v8TimelineRow" key={s.id}><div className="v8StepNo">{i+1}</div><div><b>{s.title}</b><p>{s.description}</p><span>Owner member #{s.owner_member_id||"unassigned"} · Task #{s.task_id||"—"}</span></div><em>{s.status}</em></div>)}</div></section>}<section className="v8Card"><div className="v8CardHead"><div><b>Recent Nina plans</b><span>Founder-level execution history</span></div></div><div className="v8PlanGrid">{plans.map(p=><button key={p.id} onClick={async()=>{try{const r=await fetch(`${process.env.NEXT_PUBLIC_API_BASE||"http://localhost:8000/api"}/nina/plans/${p.id}`,{headers:{Authorization:`Bearer ${localStorage.getItem("clawcompany_token")}`}});if(r.ok)setDetail(await r.json())}catch{}}}><span>#{p.id}</span><b>{p.objective}</b><em>{p.status}</em></button>)}</div></section></V8AppShell></AuthGate>}
+/* Mục tiêu & Kế hoạch › Nina lập nhanh (v8 planner): đưa một kết quả, Nina chia
+   thành các bước có người phụ trách và tạo việc ngay — không qua vòng duyệt.
+   Muốn có duyệt theo phòng ban thì dùng tab "Kế hoạch chờ duyệt". */
+
+type Plan = {id: number; objective: string; status: string; summary: string; created_at: string};
+type Detail = {plan: Plan; steps: {id: number; step_index: number; title: string; description: string; owner_member_id: number | null; task_id: number | null; status: string}[]};
+const ST_VI: Record<string, string> = {planned: "Đã lập", delegated: "Đã giao", draft: "Nháp", completed: "Xong", pending: "Chờ", in_progress: "Đang làm", todo: "Cần làm", done: "Xong"};
+
+export function NinaPlannerConsole() {
+  const org = activeOrganizationId();
+  const toast = useToast();
+  const [objective, setObjective] = useState(""), [companyId, setCompanyId] = useState(""), [projectId, setProjectId] = useState("");
+  const [companies, setCompanies] = useState<any[]>([]), [projects, setProjects] = useState<any[]>([]), [plans, setPlans] = useState<Plan[]>([]);
+  const [members, setMembers] = useState<Record<number, string>>({});
+  const [detail, setDetail] = useState<Detail | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState<unknown>(null);
+
+  const load = useCallback(async () => {
+    const [c, p, pl, m] = await Promise.allSettled([api.companies(org), api.projects(), apiV8.ninaPlans(), api.members()]);
+    if (c.status === "fulfilled") setCompanies((c.value as any[]) || []);
+    if (p.status === "fulfilled") setProjects((p.value as any[]) || []);
+    if (pl.status === "fulfilled") setPlans((pl.value as Plan[]) || []); else setError(pl.reason);
+    if (m.status === "fulfilled") setMembers(Object.fromEntries(((m.value as any[]) || []).map(x => [x.id, x.name])));
+  }, [org]);
+  useEffect(() => { load(); }, [load]);
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault(); setBusy(true); setError(null);
+    try {
+      const j = await apiV8.createNinaPlan({organization_id: org, objective, company_id: companyId ? Number(companyId) : null,
+        project_id: projectId ? Number(projectId) : null, auto_create_tasks: true, max_steps: 5}) as Detail;
+      setDetail(j); toast(`Nina đã lập kế hoạch #${j.plan.id} với ${j.steps.length} bước`); setObjective(""); await load();
+    } catch (e2) { setError(e2); } finally { setBusy(false); }
+  }
+  async function delegate() {
+    if (!detail) return; setBusy(true); setError(null);
+    try { await apiV8.delegateNinaPlan(detail.plan.id); setDetail({...detail, plan: {...detail.plan, status: "delegated"}}); toast("Đã giao kế hoạch cho đội agent"); await load(); }
+    catch (e) { setError(e); } finally { setBusy(false); }
+  }
+  async function openPlan(id: number) {
+    setError(null);
+    try {
+      const r = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api"}/nina/plans/${id}`, {headers: {Authorization: `Bearer ${localStorage.getItem("clawcompany_token")}`}});
+      if (!r.ok) throw Object.assign(new Error(await r.text()), {status: r.status});
+      setDetail(await r.json());
+    } catch (e) { setError(e); }
+  }
+
+  return <PageFrame>
+    <section className="nina-hero"><span className="nina-orb" aria-hidden="true">N</span>
+      <div><h2>Đưa Nina kết quả, không cần danh sách việc</h2>
+        <p>Nina chia mục tiêu thành tối đa 5 bước, chọn agent hợp vai và tạo việc ngay. Cần duyệt trước khi giao? Dùng tab <Link className="ui-link" href="/app/strategy">Kế hoạch chờ duyệt</Link>.</p></div></section>
+    {error ? <ErrorBanner error={error} onClose={() => setError(null)} context="Lập kế hoạch"/> : null}
+    <div className="ui-grid is-2">
+      <Panel title="Mục tiêu cho Nina">
+        <form className="ui-form" onSubmit={create}>
+          <Field label="Công ty cần đạt điều gì?"><textarea rows={4} value={objective} onChange={e => setObjective(e.target.value)} placeholder="VD: Chạy chiến dịch TikTok có lãi cho bộ sưu tập hè trong 14 ngày…"/></Field>
+          <FormRow>
+            <Field label="Công ty"><select value={companyId} onChange={e => { setCompanyId(e.target.value); setProjectId(""); }}>
+              <option value="">Không giới hạn</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+            <Field label="Dự án"><select value={projectId} onChange={e => setProjectId(e.target.value)}>
+              <option value="">Nina tạo dự án mới</option>{projects.filter(p => !companyId || String(p.company_id) === companyId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+          </FormRow>
+          <Button type="submit" variant="primary" busy={busy} disabled={objective.trim().length < 4}>{busy ? "Nina đang lập…" : "Lập kế hoạch"}</Button>
+        </form>
+      </Panel>
+      <Panel title={detail ? `Kế hoạch #${detail.plan.id}` : "Kế hoạch gần đây"} desc={detail ? detail.plan.objective : `${plans.length} kế hoạch`}
+        actions={detail ? <>{detail.plan.status !== "delegated" && <Button size="sm" variant="primary" busy={busy} onClick={delegate}>Giao cho đội</Button>}
+          <Button size="sm" variant="ghost" onClick={() => setDetail(null)}>Danh sách</Button></> : undefined} flush={!detail}>
+        {detail ? <ol className="gl-steps">{detail.steps.map(s => <li key={s.id}>
+            <div><b>{s.title}</b><small>{s.description}</small></div>
+            <div style={{textAlign: "right"}}><StatusPill tone={toneOf(s.status)}>{ST_VI[s.status] || s.status}</StatusPill>
+              <small>{s.owner_member_id ? members[s.owner_member_id] || `#${s.owner_member_id}` : "chưa có người"}{s.task_id ? <> · <Link href={`/app/work?peek=${s.task_id}`}>việc #{s.task_id}</Link></> : null}</small></div>
+          </li>)}</ol>
+          : plans.length === 0 ? <EmptyState compact mood="chao" title="Chưa có kế hoạch nào">Viết mục tiêu bên trái rồi bấm Lập kế hoạch.</EmptyState>
+          : <div className="ui-list">{plans.slice(0, 12).map(p => <button key={p.id} className="ui-row" onClick={() => openPlan(p.id)}>
+              <span className="ui-row-main"><span className="ui-row-title">#{p.id} {p.objective}</span><span className="ui-row-meta">{p.summary}</span></span>
+              <StatusPill tone={toneOf(p.status)}>{ST_VI[p.status] || p.status}</StatusPill></button>)}</div>}
+      </Panel>
+    </div>
+  </PageFrame>;
+}
