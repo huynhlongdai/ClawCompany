@@ -1,3 +1,4 @@
-import { ClawCompanyApp } from "../components/ClawCompanyApp";
-import { AuthGate } from "../components/AuthGate";
-export default function Page(){return <AuthGate><ClawCompanyApp/></AuthGate>;}
+import {redirect} from "next/navigation";
+
+/* Trang gốc dẫn thẳng vào app. Dashboard demo đời cũ (ClawCompanyApp, dữ liệu mẫu) không còn route nào trỏ tới. */
+export default function Page() { redirect("/app/os"); }

@@ -4,7 +4,6 @@
 // lý do. Không dùng khung ứng dụng đầy đủ để vừa màn hình 360px.
 import Link from "next/link";
 import {useCallback, useEffect, useState} from "react";
-import {AuthGate} from "./AuthGate";
 import {apiInbox} from "../lib/api";
 import {deadline} from "./InboxConsole";
 
@@ -59,7 +58,7 @@ export function QuickApprove() {
     apiInbox.quickApprovals().then((d: any) => setItems(d.approvals)).catch((e: any) => setError(String(e?.message || e)));
   }, []);
   useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, [load]);
-  return <AuthGate><main style={{maxWidth: 520, margin: "0 auto", padding: "16px 12px 40px", background: "#f6f6f3", minHeight: "100vh",
+  return <main style={{maxWidth: 520, margin: "0 auto", padding: "16px 12px 40px", background: "#f6f6f3", minHeight: "100vh",
     fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif"}}>
     <header style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12}}>
       <div><div style={{fontSize: 22, fontWeight: 700}}>Duyệt nhanh</div>
@@ -69,5 +68,5 @@ export function QuickApprove() {
     {error && <div role="alert" style={{background: "#fdecea", color: "#b42318", padding: 12, borderRadius: 12, marginBottom: 12}}>{error}</div>}
     {note && <div role="status" style={{background: "#e7f5ee", color: "#16794c", padding: 12, borderRadius: 12, marginBottom: 12}}>{note}</div>}
     {(items || []).map(a => <Card key={a.id} a={a} onDone={(id, msg) => { setItems(s => (s || []).filter(x => x.id !== id)); setNote(`${msg} #${id}.`); }}/>)}
-  </main></AuthGate>;
+  </main>;
 }

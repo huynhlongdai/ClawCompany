@@ -1,10 +1,7 @@
 "use client";
-import {AuthGate} from "@/components/AuthGate";
-import {AppShell} from "@/components/AppShell";
+import {PageFrame} from "@/components/shell/PageFrame";
 import {SystemDirectory} from "@/components/SystemDirectory";
 
 export default function Page() {
-  return <AuthGate><AppShell title="Danh bạ công cụ" subtitle="">
-    <SystemDirectory/>
-  </AppShell></AuthGate>;
+  return <PageFrame><SystemDirectory/></PageFrame>;
 }

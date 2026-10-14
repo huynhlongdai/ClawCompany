@@ -7,7 +7,7 @@ import {Icon} from "./Icon";
    dự án và nhiệm vụ (13 endpoint ghi của v18). Một menu đẹp mà bấm vào không
    tạo được gì thì tệ hơn là một liên kết đúng chỗ. */
 export function CreateButton() {
-  return <Link href="/app/workspace-ops" className="v8Primary" style={{textDecoration: "none"}}>
+  return <Link href="/app/workspace-ops" className="ui-btn is-primary">
     <Icon name="plus" size={16}/>
     Tạo mới
   </Link>;

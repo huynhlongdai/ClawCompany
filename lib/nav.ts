@@ -1,152 +1,147 @@
-/* Sổ đăng ký điều hướng — nguồn duy nhất cho sidebar, command palette,
-   danh bạ công cụ và tiêu đề trang.
+/* Sổ đăng ký điều hướng — nguồn duy nhất cho sidebar (8 mục), tab của từng
+   mục, thanh dưới trên điện thoại, ⌘K, tiêu đề trang và Phòng thí nghiệm.
 
-   Vì sao cần: trước v6 có mười vỏ ứng dụng (V8…V17AppShell), mỗi vỏ một danh
-   sách menu riêng, nửa Anh nửa Việt. Cùng một trang /app/budgets có thể hiện
-   "Budgets" ở vỏ này và không có mặt ở vỏ kia. Một danh sách, một tên cho mỗi
-   khái niệm (DESIGN.md của Paperclip gọi là "one name per concept"). */
+   Theo plan-v2 §5: đúng 8 mục menu. Mỗi mục có các tab là route thật (link đổi
+   URL, chia sẻ được). Trang không thuộc 8 mục chia hai nhóm:
+   - MORE: trang còn dùng nhưng không đáng một chỗ trên menu — vào bằng ⌘K hoặc
+     từ trang cha (vd. Phòng họp, Nhật ký sự kiện).
+   - LAB:  27 trang ít dùng của plan §2 (giao phần mềm v11–v15 + điều hành v9/v10).
+     Route vẫn chạy; chỉ hiện ở Cài đặt › Phòng thí nghiệm và ⌘K khi bật cờ. */
 
 import type {IconName} from "../components/Icon";
 
-export type NavGroupKey = "top" | "work" | "team" | "control" | "business" | "system";
-
-export type NavEntry = {
-  href: string;
-  label: string;
-  group: NavGroupKey;
-  icon: IconName;
-  desc: string;
-  /** Nhóm con trong "Hệ thống" — chỉ dùng cho danh bạ công cụ. */
-  area?: string;
-  keywords?: string;
-  countKey?: string;
+export type NavTab = {href: string; label: string; desc?: string};
+export type NavSection = {
+  key: string; href: string; label: string; icon: IconName; desc: string; keywords: string;
+  countKey?: string; tabs: NavTab[];
+  /** Tiền tố đường dẫn thuộc về mục này (kể cả trang chi tiết). */
+  owns: string[];
 };
+export type NavPage = {href: string; label: string; icon: IconName; desc: string; keywords?: string; area: string; kind: "more" | "lab"};
 
-export const NAV_GROUPS: {key: NavGroupKey; label: string}[] = [
-  {key: "top", label: ""},
-  {key: "work", label: "Công việc"},
-  {key: "team", label: "Đội ngũ"},
-  {key: "control", label: "Kiểm soát"},
-  {key: "business", label: "Kinh doanh"},
-  {key: "system", label: "Hệ thống"},
+export const SECTIONS: NavSection[] = [
+  {key: "inbox", href: "/app/inbox", label: "Hộp việc", icon: "inbox", countKey: "inbox",
+   desc: "Những gì đang chờ anh: phê duyệt, kết quả cần xem, ngân sách chạm nấc",
+   keywords: "inbox phê duyệt approval duyệt thông báo", owns: ["/app/inbox", "/app/approve"],
+   tabs: []},
+  {key: "os", href: "/app/os", label: "Tổng quan", icon: "home",
+   desc: "Hôm nay công ty làm gì: agent đang làm, việc chờ duyệt, chi tiêu so với ngân sách",
+   keywords: "home trang chủ dashboard hôm nay", owns: ["/app/os"], tabs: []},
+  {key: "work", href: "/app/work", label: "Công việc", icon: "check",
+   desc: "Danh sách, bảng và dự án — lượt chạy kèm chi phí, review chéo",
+   keywords: "task nhiệm vụ kanban board bảng list danh sách dự án project lượt chạy",
+   owns: ["/app/work", "/app/tasks", "/app/flow"],
+   tabs: [{href: "/app/work", label: "Danh sách"}, {href: "/app/work?view=board", label: "Bảng"}, {href: "/app/work?view=projects", label: "Dự án"}]},
+  {key: "goals", href: "/app/goals", label: "Mục tiêu & Kế hoạch", icon: "target",
+   desc: "Đặt mục tiêu, Nina chia thành kế hoạch cho từng phòng, anh duyệt",
+   keywords: "goal okr mục tiêu strategy kế hoạch nina plan phân rã",
+   owns: ["/app/goals", "/app/strategy", "/app/nina"],
+   tabs: [{href: "/app/goals", label: "Mục tiêu"}, {href: "/app/strategy", label: "Kế hoạch chờ duyệt"}, {href: "/app/nina", label: "Nina lập nhanh"}]},
+  {key: "team", href: "/app/team", label: "Đội ngũ", icon: "users",
+   desc: "Sơ đồ tổ chức, agent, người và quyền, đào tạo",
+   keywords: "team org chart sơ đồ agent nhân sự ai người mời quyền phòng ban đào tạo",
+   owns: ["/app/team", "/app/agents/"],
+   tabs: [{href: "/app/team", label: "Sơ đồ"}, {href: "/app/team?tab=ai", label: "Agent"}, {href: "/app/team?tab=people", label: "Người & quyền"},
+          {href: "/app/team?tab=departments", label: "Phòng ban"}, {href: "/app/team?tab=training", label: "Đào tạo"}, {href: "/app/team?tab=build", label: "Dựng công ty"}]},
+  {key: "routines", href: "/app/routines", label: "Việc định kỳ", icon: "zap",
+   desc: "Việc lặp theo lịch hoặc webhook, và quy trình nhiều bước",
+   keywords: "routine cron lịch webhook định kỳ workflow quy trình tự động hoá",
+   owns: ["/app/routines", "/app/workflows"],
+   tabs: [{href: "/app/routines", label: "Việc định kỳ"}, {href: "/app/workflows", label: "Quy trình"}]},
+  {key: "costs", href: "/app/costs", label: "Chi phí", icon: "coins",
+   desc: "Chi phí model theo agent, phòng, công ty — ngân sách 3 nấc",
+   keywords: "budget cost chi phí ngân sách hạn mức tiền model", owns: ["/app/costs", "/app/budgets"],
+   tabs: [{href: "/app/costs", label: "Tổng quan"}, {href: "/app/costs?tab=budgets", label: "Ngân sách"}]},
+  {key: "settings", href: "/app/settings", label: "Cài đặt", icon: "gear",
+   desc: "Kết nối OpenClaw, kỹ năng & công cụ, bí mật, thành viên, Phòng thí nghiệm",
+   keywords: "settings cài đặt openclaw gateway kỹ năng skill tool mcp bí mật secret thành viên phòng thí nghiệm lab",
+   owns: ["/app/settings", "/app/openclaw", "/app/agent-tools", "/app/secrets"],
+   tabs: [{href: "/app/settings", label: "Chung"}, {href: "/app/openclaw", label: "OpenClaw"}, {href: "/app/agent-tools", label: "Kỹ năng & công cụ"},
+          {href: "/app/secrets", label: "Bí mật"}, {href: "/app/team?tab=people&from=settings", label: "Thành viên"},
+          {href: "/app/settings/lab", label: "Phòng thí nghiệm"}]},
 ];
 
-export const NAV: NavEntry[] = [
-  {href: "/app/inbox", label: "Hộp việc", group: "top", icon: "inbox", countKey: "inbox",
-   desc: "Mọi thứ đang chờ anh quyết: phê duyệt, việc bị chặn, việc chờ duyệt", keywords: "inbox phê duyệt approval duyệt"},
-  {href: "/app/os", label: "Tổng quan", group: "top", icon: "home",
-   desc: "Ai đang làm gì, cái gì cần anh, số liệu chính", keywords: "home trang chủ dashboard"},
-
-  {href: "/app/work", label: "Công việc", group: "work", icon: "check",
-   desc: "Danh sách & bảng việc, lượt chạy kèm chi phí, review chéo — kéo thả hoặc ba chấm để chuyển trạng thái",
-   keywords: "kanban task nhiệm vụ board flow bảng việc list danh sách lượt chạy run review"},
-  {href: "/app/os?tab=projects", label: "Dự án", group: "work", icon: "layers", countKey: "projects_active",
-   desc: "Dự án, tiến độ và hạn chót", keywords: "project"},
-  {href: "/app/goals", label: "Mục tiêu", group: "work", icon: "target",
-   desc: "Mục tiêu điều hành, kế hoạch và vòng vận hành", keywords: "goal okr"},
-  {href: "/app/strategy", label: "Kế hoạch mục tiêu", group: "work", icon: "target",
-   desc: "Nina phân rã mục tiêu → duyệt / yêu cầu sửa → giao phòng", keywords: "strategy plan nina kế hoạch phân rã"},
-  {href: "/app/nina", label: "Nina lập kế hoạch", group: "work", icon: "crown",
-   desc: "Đưa mục tiêu, Nina chia việc và giao cho đội", keywords: "planner chief of staff"},
-  {href: "/app/collaboration", label: "Phòng họp", group: "work", icon: "room",
-   desc: "Phòng phối hợp có chủ toạ, bàn giao giữa agent", keywords: "room meeting collaboration"},
-  {href: "/app/workflows", label: "Tự động hoá", group: "work", icon: "zap",
-   desc: "Quy trình và việc định kỳ", keywords: "workflow automation"},
-  {href: "/app/routines", label: "Việc định kỳ", group: "work", icon: "zap",
-   desc: "Routine theo lịch / webhook, chạy bù, tự dừng khi lỗi", keywords: "routine cron lịch webhook định kỳ"},
-
-  {href: "/app/team", label: "Đội ngũ", group: "team", icon: "users",
-   desc: "Sơ đồ tổ chức, mời người, phân quyền, trưởng phòng, mẫu công ty", keywords: "team org chart sơ đồ mời invite quyền role csv mẫu"},
-  {href: "/app/os?tab=agents", label: "Nhân sự AI", group: "team", icon: "sparkle", countKey: "agents",
-   desc: "Seat agent, model, trạng thái runtime", keywords: "agent seat ai"},
-  {href: "/app/os?tab=people", label: "Con người", group: "team", icon: "users", countKey: "humans",
-   desc: "Thành viên là người và vai trò", keywords: "member people nhân sự"},
-  {href: "/app/os?tab=companies", label: "Công ty & sơ đồ", group: "team", icon: "building", countKey: "companies",
-   desc: "Công ty con, phòng ban, sơ đồ tổ chức", keywords: "company org chart"},
-  {href: "/app/os?tab=knowledge", label: "Kiến thức", group: "team", icon: "book",
-   desc: "Tài liệu, SOP và quyết định đã chốt", keywords: "knowledge sop docs"},
-
-  {href: "/app/routing", label: "Định tuyến phòng ban", group: "team", icon: "users",
-   desc: "Giao việc cho phòng, trưởng phòng chọn người", keywords: "routing department trưởng phòng giao việc"},
-  {href: "/app/costs", label: "Chi phí", group: "control", icon: "coins",
-   desc: "Chi phí model theo agent / phòng / công ty, ngân sách 3 nấc: cảnh báo → dừng mềm cần duyệt → dừng cứng",
-   keywords: "budget cost chi phí ngân sách hạn mức tiền model"},
-  {href: "/app/agent-tools", label: "Công cụ của agent", group: "control", icon: "shield",
-   desc: "Tool company_* qua MCP và quyền theo ghế", keywords: "mcp tool quyền permission"},
-  {href: "/app/live-runs", label: "Phiên đang chạy", group: "control", icon: "pulse",
-   desc: "Phiên OpenClaw, lease, chuyển trạng thái", keywords: "run session live"},
-  {href: "/app/events", label: "Nhật ký sự kiện", group: "control", icon: "list",
-   desc: "Event bus và trigger", keywords: "event audit log"},
-  {href: "/app/reports", label: "Báo cáo", group: "control", icon: "chart",
-   desc: "Chỉ số có kỳ trước và mục tiêu", keywords: "report analytics kpi"},
-
-  {href: "/app/customers", label: "Khách hàng", group: "business", icon: "users",
-   desc: "Khách hàng, ghế đã bán, chi phí AI theo khách", keywords: "customer"},
-  {href: "/app/marketplace", label: "Marketplace", group: "business", icon: "doc",
-   desc: "Mẫu công ty, mẫu nhân sự và quy trình", keywords: "template"},
-
-  {href: "/app/system", label: "Danh bạ công cụ", group: "system", icon: "grid",
-   desc: "Mọi console chuyên sâu, chia theo khu vực", keywords: "system tools console danh bạ"},
-
-  /* ---- Hệ thống: có thật, chạy được, nhưng là công cụ chuyên sâu ---- */
-  {href: "/app/workspace-ops", label: "Vận hành tổ chức", group: "system", area: "Tổ chức", icon: "pencil", desc: "Lập công ty, phòng ban, ghế, dự án"},
-  {href: "/app/company-factory", label: "Dựng công ty từ mẫu", group: "system", area: "Tổ chức", icon: "building", desc: "Company Factory"},
-  {href: "/app/agents", label: "Lực lượng AI", group: "system", area: "Tổ chức", icon: "sparkle", desc: "AI Workforce — tuyển và cấp phát seat"},
-  {href: "/app/memory", label: "Bộ nhớ tổ chức", group: "system", area: "Tổ chức", icon: "book", desc: "Org Memory"},
-  {href: "/app/knowledge-mesh", label: "Lưới tri thức", group: "system", area: "Tổ chức", icon: "mesh", desc: "Knowledge Mesh — grant có hạn"},
-  {href: "/app/control-center", label: "Trung tâm điều hành", group: "system", area: "Điều hành", icon: "target", desc: "Executive Control"},
-  {href: "/app/founder-cockpit", label: "Buồng lái founder", group: "system", area: "Điều hành", icon: "crown", desc: "Founder Cockpit"},
-  {href: "/app/autonomy", label: "Mức tự chủ", group: "system", area: "Điều hành", icon: "shield", desc: "Autonomy & Ops policy"},
-  {href: "/app/simulation", label: "Mô phỏng", group: "system", area: "Điều hành", icon: "layers", desc: "Digital Twin — what-if"},
-  {href: "/app/communications", label: "Tin nhắn agent", group: "system", area: "Phối hợp", icon: "room", desc: "Agent Message Bus"},
-  {href: "/app/artifacts", label: "Sản phẩm & bàn giao", group: "system", area: "Phối hợp", icon: "doc", desc: "Artifacts & Handoff"},
-  {href: "/app/quality", label: "QA & SLA", group: "system", area: "Phối hợp", icon: "check", desc: "Evaluator gates, hạn và leo thang"},
-  {href: "/app/openclaw", label: "Lõi OpenClaw", group: "system", area: "Runtime", icon: "gear", desc: "Gateway, phiên theo agent, đối soát"},
-  {href: "/app/runners", label: "Runner phân tán", group: "system", area: "Runtime", icon: "server", desc: "Distributed Runners"},
-  {href: "/app/sandboxes", label: "Sandbox", group: "system", area: "Runtime", icon: "shield", desc: "Secure Sandboxes"},
-  {href: "/app/workspaces", label: "Workspace phát triển", group: "system", area: "Runtime", icon: "layers", desc: "Development Workspaces"},
-  {href: "/app/workspace-gateway", label: "Workspace Gateway", group: "system", area: "Runtime", icon: "server", desc: "Trao đổi file giữa provider"},
-  {href: "/app/dev-cloud", label: "Dev Cloud", group: "system", area: "Runtime", icon: "server", desc: "Secure AI Development Cloud"},
-  {href: "/app/engineering", label: "Tổ chức kỹ thuật", group: "system", area: "Giao phần mềm", icon: "users", desc: "AI Engineering Organization"},
-  {href: "/app/portfolio", label: "Danh mục kỹ thuật", group: "system", area: "Giao phần mềm", icon: "chart", desc: "Nina Engineering Portfolio"},
-  {href: "/app/repositories", label: "Repository", group: "system", area: "Giao phần mềm", icon: "doc", desc: "Registry và trạng thái Git"},
-  {href: "/app/delivery", label: "Pipeline giao hàng", group: "system", area: "Giao phần mềm", icon: "arrow-right", desc: "Bundle → worktree → test → review → merge"},
-  {href: "/app/reviews", label: "Review code", group: "system", area: "Giao phần mềm", icon: "check", desc: "Code Reviews"},
-  {href: "/app/cicd", label: "CI/CD", group: "system", area: "Giao phần mềm", icon: "layers", desc: "DAG từ commit tới release"},
-  {href: "/app/releases", label: "Release Train", group: "system", area: "Giao phần mềm", icon: "arrow-right", desc: "Commit → duyệt → môi trường"},
-  {href: "/app/release-manager", label: "Quản lý release", group: "system", area: "Giao phần mềm", icon: "crown", desc: "Release Manager"},
-  {href: "/app/deployments", label: "Triển khai", group: "system", area: "Giao phần mềm", icon: "server", desc: "Preview, staging, production"},
-  {href: "/app/progressive-delivery", label: "Triển khai dần", group: "system", area: "Giao phần mềm", icon: "pulse", desc: "Canary và rollback theo SLO"},
-  {href: "/app/sre-control", label: "Nina SRE", group: "system", area: "Vận hành & tin cậy", icon: "crown", desc: "Khôi phục sự cố có kiểm soát"},
-  {href: "/app/incidents", label: "Sự cố", group: "system", area: "Vận hành & tin cậy", icon: "alert", desc: "Incident Response"},
-  {href: "/app/observability", label: "SLO & telemetry", group: "system", area: "Vận hành & tin cậy", icon: "pulse", desc: "Tín hiệu sức khoẻ"},
-  {href: "/app/telemetry-federation", label: "Liên kết telemetry", group: "system", area: "Vận hành & tin cậy", icon: "mesh", desc: "OTLP, Prometheus"},
-  {href: "/app/trust", label: "Tin cậy", group: "system", area: "Vận hành & tin cậy", icon: "shield", desc: "Trust & Supply Chain"},
-  {href: "/app/supply-chain", label: "Chuỗi cung ứng phần mềm", group: "system", area: "Vận hành & tin cậy", icon: "layers", desc: "SBOM, provenance"},
-  {href: "/app/production-trust", label: "Production Trust", group: "system", area: "Vận hành & tin cậy", icon: "shield", desc: "mTLS runner, xoay khoá"},
-  {href: "/app/secrets", label: "Bí mật & quyền", group: "system", area: "Vận hành & tin cậy", icon: "key", desc: "Secrets & Grants"},
-  {href: "/app/secrets-federation", label: "Liên kết bí mật", group: "system", area: "Vận hành & tin cậy", icon: "key", desc: "Lease bí mật có hạn"},
+/* Trang còn dùng, ngoài menu. */
+export const MORE_PAGES: NavPage[] = [
+  {href: "/app/collaboration", label: "Phòng họp", icon: "room", area: "Phối hợp", kind: "more", desc: "Phòng phối hợp có chủ toạ, bàn giao giữa agent", keywords: "room meeting họp"},
+  {href: "/app/communications", label: "Tin nhắn agent", icon: "room", area: "Phối hợp", kind: "more", desc: "Tin nhắn giữa agent và người", keywords: "message bus chat"},
+  {href: "/app/artifacts", label: "Sản phẩm & bàn giao", icon: "doc", area: "Phối hợp", kind: "more", desc: "Tệp, kết quả, bàn giao giữa agent", keywords: "artifact handoff"},
+  {href: "/app/quality", label: "Chất lượng & hạn", icon: "check", area: "Phối hợp", kind: "more", desc: "Cổng đánh giá, hạn và leo thang", keywords: "qa sla"},
+  {href: "/app/live-runs", label: "Phiên đang chạy", icon: "pulse", area: "Vận hành", kind: "more", desc: "Phiên OpenClaw, lease, chuyển trạng thái", keywords: "run session live"},
+  {href: "/app/events", label: "Nhật ký sự kiện", icon: "list", area: "Vận hành", kind: "more", desc: "Sự kiện hệ thống và trigger", keywords: "event audit log nhật ký"},
+  {href: "/app/reports", label: "Báo cáo", icon: "chart", area: "Vận hành", kind: "more", desc: "Chỉ số có kỳ trước và mục tiêu", keywords: "report analytics kpi"},
+  {href: "/app/routing", label: "Định tuyến phòng ban", icon: "users", area: "Tổ chức", kind: "more", desc: "Giao việc cho phòng, trưởng phòng chọn người", keywords: "routing department"},
+  {href: "/app/agents", label: "Tuyển agent (cũ)", icon: "sparkle", area: "Tổ chức", kind: "more", desc: "Trang tuyển agent đời cũ — dùng Đội ngũ › Agent", keywords: "workforce hire"},
+  {href: "/app/company-factory", label: "Dựng công ty từ mẫu (cũ)", icon: "building", area: "Tổ chức", kind: "more", desc: "Company Factory đời cũ — dùng Đội ngũ › Dựng công ty", keywords: "factory template"},
+  {href: "/app/workspace-ops", label: "Sửa dữ liệu tổ chức", icon: "pencil", area: "Tổ chức", kind: "more", desc: "Lập công ty, phòng ban, ghế, dự án bằng form", keywords: "workspace ops"},
+  {href: "/app/memory", label: "Bộ nhớ tổ chức", icon: "book", area: "Tri thức", kind: "more", desc: "Ghi nhớ và tìm lại quyết định", keywords: "memory"},
+  {href: "/app/knowledge-mesh", label: "Lưới tri thức", icon: "mesh", area: "Tri thức", kind: "more", desc: "Không gian tri thức có cấp quyền", keywords: "knowledge mesh"},
+  {href: "/app/customers", label: "Khách hàng", icon: "users", area: "Kinh doanh", kind: "more", desc: "Khách hàng, ghế đã bán, chi phí AI theo khách", keywords: "customer"},
+  {href: "/app/marketplace", label: "Kho mẫu", icon: "doc", area: "Kinh doanh", kind: "more", desc: "Mẫu công ty, mẫu nhân sự và quy trình", keywords: "marketplace template"},
+  {href: "/app/system", label: "Danh bạ công cụ", icon: "grid", area: "Khác", kind: "more", desc: "Mọi trang ngoài menu, chia theo khu vực", keywords: "system tools danh bạ"},
 ];
 
-export const SYSTEM_TOOLS = NAV.filter(n => n.group === "system" && !!n.area);
+/* 27 trang ít dùng — plan-v2 §2. */
+export const LAB_PAGES: NavPage[] = [
+  ...[
+    ["/app/repositories", "Repository", "Kho mã, quyền truy cập và trạng thái Git", "doc"],
+    ["/app/delivery", "Pipeline giao hàng", "Gói → worktree → test → review → merge", "arrow-right"],
+    ["/app/reviews", "Review mã", "Cổng review người + AI trước khi merge", "check"],
+    ["/app/cicd", "CI/CD", "Đồ thị chạy từ commit tới bản phát hành", "layers"],
+    ["/app/releases", "Chuyến phát hành", "Commit → duyệt → môi trường", "arrow-right"],
+    ["/app/release-manager", "Quản lý phát hành", "Thăng cấp có kiểm soát, rollback theo sức khoẻ", "crown"],
+    ["/app/deployments", "Triển khai", "Preview, staging, production", "server"],
+    ["/app/progressive-delivery", "Triển khai dần", "Canary và rollback theo SLO", "pulse"],
+    ["/app/sandboxes", "Sandbox", "Môi trường chạy build/test có chính sách", "shield"],
+    ["/app/workspaces", "Workspace phát triển", "Bàn giao workspace giữa các agent viết mã", "layers"],
+    ["/app/workspace-gateway", "Cổng workspace", "Trao đổi tệp giữa các nhà cung cấp", "server"],
+    ["/app/dev-cloud", "Dev Cloud", "Workspace, sandbox, phát hành trong một nơi", "server"],
+    ["/app/engineering", "Tổ chức kỹ thuật", "Giao phần mềm do Nina điều phối", "users"],
+    ["/app/portfolio", "Danh mục kỹ thuật", "Sức khoẻ kỹ thuật và đề xuất của Nina", "chart"],
+  ].map(([href, label, desc, icon]) => ({href, label, desc, icon: icon as IconName, area: "Giao phần mềm", kind: "lab" as const})),
+  ...[
+    ["/app/runners", "Runner phân tán", "Cho thuê tài nguyên chạy theo năng lực", "server"],
+    ["/app/sre-control", "Nina SRE", "Khôi phục sự cố tự động có kiểm soát", "crown"],
+    ["/app/incidents", "Sự cố", "Xử lý sự cố có kiểm toán", "alert"],
+    ["/app/observability", "SLO & đo lường", "Tín hiệu sức khoẻ điều khiển thăng cấp/rollback", "pulse"],
+    ["/app/telemetry-federation", "Liên kết đo lường", "OTLP, Prometheus, exporter", "mesh"],
+    ["/app/trust", "Tin cậy", "Bằng chứng ký số, bộ quét", "shield"],
+    ["/app/supply-chain", "Chuỗi cung ứng phần mềm", "SBOM, provenance, cổng bảo mật", "layers"],
+    ["/app/production-trust", "Tin cậy production", "Danh tính mTLS của runner, xoay khoá", "shield"],
+    ["/app/secrets-federation", "Liên kết bí mật", "Thuê bí mật có hạn", "key"],
+  ].map(([href, label, desc, icon]) => ({href, label, desc, icon: icon as IconName, area: "Vận hành & tin cậy", kind: "lab" as const})),
+  ...[
+    ["/app/control-center", "Trung tâm điều hành", "Bảng điều hành đời v9", "target"],
+    ["/app/founder-cockpit", "Buồng lái founder", "Bảng điều hành đời v10", "crown"],
+    ["/app/autonomy", "Mức tự chủ", "Chính sách tự chủ & vận hành", "shield"],
+    ["/app/simulation", "Mô phỏng", "Thử “nếu… thì” trước khi đổi công ty thật", "layers"],
+  ].map(([href, label, desc, icon]) => ({href, label, desc, icon: icon as IconName, area: "Điều hành đời cũ", kind: "lab" as const})),
+];
 
-/** Công cụ hệ thống hay dùng, ghim sẵn khi mở nhóm "Hệ thống". */
-export const SYSTEM_PINNED = ["/app/openclaw", "/app/sre-control", "/app/incidents", "/app/delivery"];
+/** Job nền thuộc các trang Phòng thí nghiệm (plan §2) — chưa có cờ env ở backend; xem _reports/ui-v2.md. */
+export const LAB_JOBS = ["devcloud.cleanup_expired", "v14.reap_runner_leases", "v14.evaluate_slos", "v14.review_portfolios", "v15.control_plane_tick", "v15.export_telemetry"];
 
-/** Mục khớp nhất với đường dẫn hiện tại (dùng cho tiêu đề và trạng thái active). */
-export function matchNav(pathname: string, tab: string): NavEntry | undefined {
-  const exact = NAV.find(n => {
-    const [base, q = ""] = n.href.split("?");
-    const t = q.startsWith("tab=") ? q.slice(4) : "";
-    return base === pathname && t === tab;
-  });
-  if (exact) return exact;
-  if (pathname === "/app/os") return NAV.find(n => n.href === "/app/os");
-  if (pathname.startsWith("/app/tasks/") || pathname.startsWith("/app/flow")) return NAV.find(n => n.href === "/app/work");
-  if (pathname.startsWith("/app/agents/")) return NAV.find(n => n.href === "/app/os?tab=agents");
-  return NAV.find(n => n.href.split("?")[0] === pathname);
+const pathOf = (href: string) => href.split("?")[0];
+const paramsOf = (href: string) => new URLSearchParams(href.split("?")[1] || "");
+
+export function sectionFor(pathname: string): NavSection | undefined {
+  return SECTIONS.find(s => s.owns.some(p => p.endsWith("/") ? pathname.startsWith(p) : pathname === p || pathname.startsWith(p + "/")));
 }
 
-export function groupLabel(key: NavGroupKey) {
-  return NAV_GROUPS.find(g => g.key === key)?.label || "";
+/** Tab đang chọn: khớp đường dẫn + mọi tham số của tab có trong URL; ưu tiên tab nhiều tham số nhất. */
+export function activeTab(section: NavSection | undefined, pathname: string, search: URLSearchParams): NavTab | undefined {
+  if (!section) return undefined;
+  let best: NavTab | undefined, score = -1;
+  for (const t of section.tabs) {
+    if (pathOf(t.href) !== pathname) continue;
+    const p = paramsOf(t.href); let ok = true, n = 0;
+    p.forEach((v, k) => { if (k === "from") return; n++; if (search.get(k) !== v) ok = false; });
+    if (ok && n > score) { best = t; score = n; }
+  }
+  return best;
 }
+
+export function pageFor(pathname: string): NavPage | undefined {
+  return [...MORE_PAGES, ...LAB_PAGES].find(p => p.href === pathname);
+}
+export const isLabPath = (pathname: string) => LAB_PAGES.some(p => p.href === pathname);

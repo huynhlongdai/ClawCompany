@@ -4,8 +4,7 @@
 // kèm lý do. Trang này cho thấy phòng đang giữ việc gì và vì sao việc đã giao
 // cho người đó (task.routed trong company_events).
 import {useEffect, useState} from "react";
-import {AuthGate} from "./AuthGate";
-import {V9AppShell} from "./V9AppShell";
+import {PageFrame} from "./shell/PageFrame";
 import {api, apiV18, errorText} from "../lib/api";
 
 const EV_VI: Record<string, string> = {
@@ -66,7 +65,7 @@ export function RoutingConsole() {
   }
 
   const head = data?.department?.head;
-  return <AuthGate><V9AppShell title="Định tuyến phòng ban" subtitle="Giao việc cho phòng · trưởng phòng chọn người, lý do ghi vào nhật ký sự kiện">
+  return <PageFrame title="Định tuyến phòng ban" subtitle="Giao việc cho phòng · trưởng phòng chọn người, lý do ghi vào nhật ký sự kiện">
     {error && <div className="v8Error" data-testid="routing-error">{error}</div>}
     {note && <div className="v8Card" style={{padding: 10, marginBottom: 10, borderLeft: "3px solid #16794c"}} data-testid="routing-note">{note}</div>}
     <div style={{display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12}}>
@@ -115,5 +114,5 @@ export function RoutingConsole() {
         </div>
       </section>
     </div>}
-  </V9AppShell></AuthGate>;
+  </PageFrame>;
 }

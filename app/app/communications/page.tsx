@@ -1,2 +1,2 @@
-import {AuthGate} from "../../../components/AuthGate";import {V10AppShell} from "../../../components/V10AppShell";import {AgentMessageBusConsole} from "../../../components/AgentMessageBusConsole";
-export default function Page(){return <AuthGate><V10AppShell title="Agent Message Bus" subtitle="Persistent agent-to-agent and human-to-agent communication"><AgentMessageBusConsole/></V10AppShell></AuthGate>}
+import {PageFrame} from "../../../components/shell/PageFrame";import {AgentMessageBusConsole} from "../../../components/AgentMessageBusConsole";
+export default function Page(){return <PageFrame title="Agent Message Bus" subtitle="Persistent agent-to-agent and human-to-agent communication"><AgentMessageBusConsole/></PageFrame>}

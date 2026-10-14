@@ -1,5 +1,4 @@
-import {AuthGate} from "../../../../components/AuthGate";
-import {V17AppShell} from "../../../../components/V17AppShell";
+import {PageFrame} from "../../../../components/shell/PageFrame";
 import {AgentDetail} from "../../../../components/AgentDetail";
 import {SeatProfileByMember} from "../../../../components/SeatProfile";
 import {AgentHRPanel} from "../../../../components/AgentHR";
@@ -18,8 +17,8 @@ import {AgentHRPanel} from "../../../../components/AgentHR";
    cấu hình thế nào" và "nhân viên này đang làm gì". */
 export default function Page({params}: {params: {id: string}}) {
   const memberId = Number(params.id);
-  return <AuthGate>
-    <V17AppShell title="Hồ sơ nhân sự AI"
+  return 
+    <PageFrame title="Hồ sơ nhân sự AI"
                  subtitle="Danh tính, tính cách, mô tả công việc, năng lực, quyền và hạn mức — ghi trực tiếp vào gateway OpenClaw">
       {Number.isFinite(memberId)
         ? <>
@@ -28,6 +27,6 @@ export default function Page({params}: {params: {id: string}}) {
             <AgentDetail memberId={memberId}/>
           </>
         : <div className="v8Error">Id agent không hợp lệ.</div>}
-    </V17AppShell>
-  </AuthGate>;
+    </PageFrame>
+  ;
 }

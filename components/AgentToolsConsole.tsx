@@ -1,7 +1,6 @@
 "use client";
 import {useEffect, useMemo, useState} from "react";
-import {AuthGate} from "./AuthGate";
-import {V9AppShell} from "./V9AppShell";
+import {PageFrame} from "./shell/PageFrame";
 import {api, apiMcp, errorText} from "../lib/api";
 
 /* D1.5 + D1.6 — "Công cụ của agent".
@@ -122,7 +121,7 @@ export function AgentToolsConsole() {
     }}},
   }, null, 2);
 
-  return <AuthGate><V9AppShell title="Công cụ của agent"
+  return <PageFrame title="Công cụ của agent"
       subtitle={`Máy chủ MCP ${catalog?.server?.name || "clawcompany"} · ${catalog?.count ?? "…"} tool company_* · quyền theo bậc ghế`}>
     {error && <div className="v8Error" data-testid="tools-error">{error}</div>}
 
@@ -212,5 +211,5 @@ export function AgentToolsConsole() {
             </div>;
           })}</div>}
     </section>
-  </V9AppShell></AuthGate>;
+  </PageFrame>;
 }

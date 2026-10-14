@@ -4,8 +4,7 @@
 // có lý do (ghi audit). Chi tiêu lấy từ sổ cái (đã quyết toán theo gateway),
 // không từ ước lượng.
 import {useEffect, useState} from "react";
-import {AuthGate} from "./AuthGate";
-import {V9AppShell} from "./V9AppShell";
+import {PageFrame} from "./shell/PageFrame";
 import {api, apiV9, errorText} from "../lib/api";
 import {activeOrganizationId} from "../lib/auth";
 
@@ -84,7 +83,7 @@ export function BudgetsConsole() {
     } catch (e: any) { setError(errorText(e)); }
   }
 
-  return <AuthGate><V9AppShell title="Ngân sách AI" subtitle="Giữ chỗ trước khi gửi việc cho agent · quyết toán theo số thật của gateway">
+  return <PageFrame title="Ngân sách AI" subtitle="Giữ chỗ trước khi gửi việc cho agent · quyết toán theo số thật của gateway">
     {error && <div className="v8Error" data-testid="budget-error">{error}</div>}
     {note && <div className="v8Card" style={{padding: 10, marginBottom: 10, borderLeft: "3px solid #16794c"}} data-testid="budget-note">{note}</div>}
     <div className="v9Grid2">
@@ -151,5 +150,5 @@ export function BudgetsConsole() {
       <div className="v8CardHead"><div><b>Toàn tổ chức</b><span>Mỗi lượt chạy chỉ đếm một lần dù nằm trong nhiều phong bì · tổng {usd(data.all.total_usd)}</span></div></div>
       <div className="v9Grid2"><Table title="Theo seat" rows={data.all.by_seat}/><Table title="Theo dự án" rows={data.all.by_project}/></div>
     </section>}
-  </V9AppShell></AuthGate>;
+  </PageFrame>;
 }

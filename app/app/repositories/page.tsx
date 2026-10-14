@@ -1,3 +1,3 @@
-import {V11AppShell} from "../../../components/V11AppShell";
+import {PageFrame} from "../../../components/shell/PageFrame";
 import {RepositoryRegistryConsole} from "../../../components/RepositoryRegistryConsole";
-export default function Page(){return <V11AppShell title="Repositories" subtitle="Repository registry, identity grants and exact Git state"><RepositoryRegistryConsole/></V11AppShell>}
+export default function Page(){return <PageFrame title="Repositories" subtitle="Repository registry, identity grants and exact Git state"><RepositoryRegistryConsole/></PageFrame>}

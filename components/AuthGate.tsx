@@ -1,67 +1,66 @@
 "use client";
-import {useEffect, useState} from "react";
-import {login, token} from "../lib/auth";
-import {Icon} from "./Icon";
-import {LogoLockup} from "./Logo";
+import {ReactNode, useState, useSyncExternalStore} from "react";
+import {login} from "../lib/auth";
+import {explain} from "../lib/errors";
+import {Logo, LogoLockup} from "./Logo";
+import {BeCang} from "./BeCang";
+import {Button} from "./ui/Button";
+import {Field} from "./ui/Field";
 
-/* Cửa đăng nhập — màn hình đầu tiên ai cũng thấy, nên nó phải nói cùng ngôn
-   ngữ với phần còn lại. Bản trước dùng inline style với gradient tím, không
-   liên quan gì tới design canvas; nay dùng class .portalLogin* của design
-   system. */
+/* Cửa đăng nhập. Nằm trong app/app/layout.tsx nên bọc mọi trang /app/* đúng
+   một lần (trước v2: mỗi trang tự bọc, có trang bọc hai lần).
 
-export function AuthGate({children}: {children: React.ReactNode}) {
+   Đọc token bằng useSyncExternalStore: server và lần vẽ đầu ở client đều ra
+   trạng thái "đang kiểm tra" (màn chờ có logo), không còn nháy form đăng nhập
+   rồi mới vào app như bản cũ. */
+
+const sub = (fn: () => void) => { window.addEventListener("storage", fn); window.addEventListener("cc:auth", fn); return () => { window.removeEventListener("storage", fn); window.removeEventListener("cc:auth", fn); }; };
+const snap = () => { try { return localStorage.getItem("clawcompany_token") ? "in" : "out"; } catch { return "out"; } };
+
+export function AuthGate({children}: {children: ReactNode}) {
   const required = process.env.NEXT_PUBLIC_AUTH_REQUIRED === "true";
-  const [authed, setAuthed] = useState(!required);
-  useEffect(() => { if (required && token()) setAuthed(true); }, [required]);
+  const state = useSyncExternalStore(sub, snap, () => "checking");
+  if (!required || state === "in") return <>{children}</>;
+  if (state === "checking") return <div className="auth-splash" aria-busy="true" aria-label="Đang mở ClawCompany…"><Logo size={44} hole="var(--bg)"/></div>;
+  return <LoginScreen/>;
+}
 
+export function LoginScreen({onDone}: {onDone?: () => void}) {
   const [email, setEmail] = useState("admin@clawcompany.local");
   const [password, setPassword] = useState("ChangeMe123!");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ReturnType<typeof explain> | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function submit() {
-    setBusy(true); setError("");
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true); setError(null);
     try {
-      await login(email, password);
-      setAuthed(true);
-    } catch (e: any) {
-      // Thông báo lỗi của FastAPI là JSON dài; cắt cho người đọc được.
-      const raw = String(e?.message || e);
-      setError(raw.length > 180 ? raw.slice(0, 180) + "…" : raw);
+      await login(email.trim(), password);
+      window.dispatchEvent(new Event("cc:auth"));
+      onDone?.();
+    } catch (err: any) {
+      const raw = String(err?.message || err);
+      const status = /401|invalid credentials/i.test(raw) ? 401 : /failed to fetch|network/i.test(raw) ? 0 : 500;
+      const x = explain(Object.assign(new Error(raw), {status, code: status === 0 ? "network" : ""}), "Đăng nhập");
+      setError(status === 401 ? {...x, title: "Sai email hoặc mật khẩu", fix: "Kiểm tra lại, hoặc nhờ người quản trị gửi lời mời mới."} : x);
     } finally { setBusy(false); }
   }
 
-  if (authed) return <>{children}</>;
-
-  return <div className="portalLogin">
-    <div className="portalLoginCard">
-      <LogoLockup hole="#ffffff" dark={false}/>
-
-      <h1>Đăng nhập</h1>
-      <p>Công ty của bạn, vận hành cùng đội agent.</p>
-
-      <label htmlFor="cc-email">Email</label>
-      <input id="cc-email" value={email} autoComplete="username"
-             onChange={e => setEmail(e.target.value)}
-             onKeyDown={e => e.key === "Enter" && submit()}
-             placeholder="ban@congty.com"/>
-
-      <label htmlFor="cc-password">Mật khẩu</label>
-      <input id="cc-password" value={password} type="password" autoComplete="current-password"
-             onChange={e => setPassword(e.target.value)}
-             onKeyDown={e => e.key === "Enter" && submit()}
-             placeholder="••••••••"/>
-
-      {error && <div className="portalError" style={{marginTop: 12}}>{error}</div>}
-
-      <button onClick={submit} disabled={busy}>
-        {busy ? "Đang đăng nhập…" : "Đăng nhập"}
-        {!busy && <Icon name="arrow-right" size={16}/>}
-      </button>
-
-      <small style={{display: "block", marginTop: 14, textAlign: "center"}}>
-        Bản cài demo dùng <code>admin@clawcompany.local</code>
-      </small>
-    </div>
+  return <div className="auth">
+    <form className="auth-card" onSubmit={submit} data-testid="login-form" noValidate>
+      <LogoLockup hole="var(--surface)"/>
+      <div><h1>Đăng nhập</h1><p>Vào công ty của anh và đội agent đang làm việc.</p></div>
+      <Field label="Email"><input type="email" name="email" value={email} autoComplete="username" spellCheck={false} inputMode="email"
+        onChange={e => setEmail(e.target.value)} placeholder="ban@congty.vn…" required/></Field>
+      <Field label="Mật khẩu"><input type="password" name="password" value={password} autoComplete="current-password"
+        onChange={e => setPassword(e.target.value)} placeholder="Mật khẩu…" required/></Field>
+      {error && <div className="ui-banner is-error" role="alert"><div><b>{error.title}.</b><span className="ui-banner-fix">{error.fix}</span></div></div>}
+      <Button type="submit" variant="primary" size="lg" block busy={busy} data-testid="login-submit">{busy ? "Đang đăng nhập…" : "Đăng nhập"}</Button>
+      <small className="auth-note">Bản cài demo: <code translate="no">admin@clawcompany.local</code></small>
+    </form>
+    <aside className="auth-art" aria-hidden="true">
+      <BeCang mood="working" size={220}/>
+      <p>Cửa sổ sáng là agent đang làm.<br/>Anh chỉ cần duyệt những việc quan trọng.</p>
+    </aside>
   </div>;
 }

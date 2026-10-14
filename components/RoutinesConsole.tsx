@@ -3,8 +3,7 @@
 // khi nào (cron theo múi giờ, webhook). Mỗi lần chạy có idempotency key nên
 // không có việc trùng; lỗi liên tiếp quá ngưỡng → routine tự dừng và báo Hộp việc.
 import {useEffect, useState} from "react";
-import {AuthGate} from "./AuthGate";
-import {V9AppShell} from "./V9AppShell";
+import {PageFrame} from "./shell/PageFrame";
 import {api, apiRoutines, errorText} from "../lib/api";
 
 const ST_VI: Record<string, string> = {queued: "đang chờ", running: "đang chạy", succeeded: "xong", failed: "lỗi", skipped: "bỏ qua"};
@@ -54,7 +53,7 @@ export function RoutinesConsole() {
   }
   const set = (k: string) => (e: any) => setForm({...form, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value});
 
-  return <AuthGate><V9AppShell title="Việc định kỳ" subtitle="Routine theo lịch (múi giờ của routine) hoặc webhook · mỗi lần chạy một khoá, không bao giờ trùng việc">
+  return <PageFrame title="Việc định kỳ" subtitle="Routine theo lịch (múi giờ của routine) hoặc webhook · mỗi lần chạy một khoá, không bao giờ trùng việc">
     {error && <div className="v8Error" data-testid="routines-error">{error}</div>}
     {note && <div className="v8Card" style={{padding: 10, marginBottom: 10, borderLeft: "3px solid #16794c"}} data-testid="routines-note">{note}</div>}
     <div className="v9Grid2">
@@ -134,5 +133,5 @@ export function RoutinesConsole() {
         </div>
       </section>
     </div>
-  </V9AppShell></AuthGate>;
+  </PageFrame>;
 }

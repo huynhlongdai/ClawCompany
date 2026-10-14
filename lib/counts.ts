@@ -1,36 +1,33 @@
-/* Số đếm cho sidebar và chuông.
+/* Số đếm cho sidebar + chuông, tên tổ chức và danh sách công ty cho bộ đổi công ty.
 
-   Vỏ ứng dụng nằm trong từng trang (không nằm trong layout), nên mỗi lần
-   chuyển trang nó mount lại. Giữ kết quả 30 giây ở cấp module để chuyển trang
-   không bắn lại ba request và số không nhấp nháy về rỗng. */
-import {api, apiInboxHub, apiV17} from "./api";
+   Shell nằm trong layout nên chỉ mount một lần; vẫn giữ cache 30 giây ở cấp
+   module để các trang gọi refreshCounts() sau khi duyệt/đọc mà không bắn lặp.
+   Hai nguồn gọi SONG SONG (trước UI v2: tổng quan + duyệt + việc chạy song song
+   rồi mới gọi tóm tắt hộp việc — một thác nước 2 nhịp). */
+import {apiInboxHub, apiV17} from "./api";
 
 export type Counts = Record<string, number>;
+export type OrgInfo = {name: string; companies: {id: number; name: string; industry?: string}[]};
 
-let orgName = "";
-export function getOrgName() { return orgName; }
+let org: OrgInfo = {name: "", companies: []};
+export function getOrg() { return org; }
+/** Giữ tương thích với code cũ. */
+export function getOrgName() { return org.name; }
 
 let cache: {at: number; data: Counts} | null = null;
 let inflight: Promise<Counts> | null = null;
 const listeners = new Set<(c: Counts) => void>();
 
 async function load(): Promise<Counts> {
-  const [overview, approvals, tasks] = await Promise.allSettled([
-    apiV17.overview(), api.approvals(), apiV17.tasks(),
-  ]);
+  const [overview, summary] = await Promise.allSettled([apiV17.overview(), apiInboxHub.summary()]);
   const out: Counts = {};
-  if (overview.status === "fulfilled") Object.assign(out, (overview.value as any)?.kpis || {});
-  const pending = approvals.status === "fulfilled" && Array.isArray(approvals.value)
-    ? approvals.value.filter((a: any) => a.status === "pending").length : 0;
-  /* Số trên chuông = số việc cần anh RA TAY: phê duyệt chờ + nhiệm vụ bị
-     chặn + kết quả chờ duyệt. Thông báo chưa đọc là thông tin, không tính —
-     để con số này khớp đúng với dòng tóm tắt trong Hộp việc. */
-  const stuck = tasks.status === "fulfilled" && Array.isArray(tasks.value)
-    ? tasks.value.filter((t: any) => t.status === "blocked" || t.status === "review").length : 0;
-  if (approvals.status === "fulfilled" || tasks.status === "fulfilled") out.inbox = pending + stuck;
-  /* M4b: số trên chuông lấy đúng số "cần anh ra tay" của Hộp việc (duyệt + xem) — cùng nguồn với trang. */
-  try { out.inbox = Number((await apiInboxHub.summary())?.need_action ?? out.inbox); } catch { /* giữ số cũ */ }
-  if (overview.status === "fulfilled") orgName = (overview.value as any)?.organization?.name || orgName;
+  if (overview.status === "fulfilled") {
+    const o: any = overview.value || {};
+    Object.assign(out, o.kpis || {});
+    org = {name: o.organization?.name || org.name, companies: (o.companies || []).map((c: any) => ({id: c.id, name: c.name, industry: c.industry}))};
+  }
+  /* Số trên chuông = số "cần anh ra tay" của Hộp việc (duyệt + xem) — cùng nguồn với trang. */
+  if (summary.status === "fulfilled") out.inbox = Number((summary.value as any)?.need_action ?? 0);
   return out;
 }
 
@@ -45,12 +42,8 @@ export function getCounts(force = false): Promise<Counts> {
   }
   return inflight;
 }
-
 export function peekCounts(): Counts | null { return cache?.data || null; }
-
-/** Gọi sau khi duyệt/đọc một mục để sidebar và chuông cập nhật ngay. */
 export function refreshCounts() { return getCounts(true); }
-
 export function subscribeCounts(fn: (c: Counts) => void) {
   listeners.add(fn);
   return () => { listeners.delete(fn); };
