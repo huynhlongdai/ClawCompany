@@ -17,7 +17,7 @@ const PAGES = [
   ["tong-quan", "/app/os"], ["hop-viec", "/app/inbox"], ["cong-viec-list", "/app/work"], ["cong-viec-board", "/app/work?view=board"],
   ["cong-viec-peek", "/app/work?peek=2"], ["cong-viec-du-an", "/app/work?view=projects"], ["muc-tieu", "/app/goals"], ["ke-hoach", "/app/strategy"],
   ["nina", "/app/nina"], ["doi-ngu-so-do", "/app/team"], ["doi-ngu-agent", "/app/team?tab=ai"], ["doi-ngu-nguoi", "/app/team?tab=people"],
-  ["doi-ngu-dao-tao", "/app/team?tab=training"], ["agent-ho-so", "/app/agents/4"], ["viec-dinh-ky", "/app/routines"], ["quy-trinh", "/app/workflows"],
+  ["doi-ngu-dao-tao", "/app/team?tab=training"], ["agent-ho-so", "/app/agents/4"], ["agent-nhan-su", "/app/agents/4?tab=hr"], ["agent-openclaw", "/app/agents/4?tab=openclaw"], ["viec-dinh-ky", "/app/routines"], ["quy-trinh", "/app/workflows"],
   ["chi-phi", "/app/costs"], ["chi-phi-ngan-sach", "/app/costs?tab=budgets"], ["openclaw", "/app/openclaw"], ["cai-dat", "/app/settings"],
   ["phong-thi-nghiem", "/app/settings/lab"], ["ky-nang", "/app/agent-tools"], ["bi-mat", "/app/secrets"], ["onboarding", "/onboarding"],
   ["lab-repositories", "/app/repositories"], ["lab-control-center", "/app/control-center"], ["khac-su-kien", "/app/events"], ["khac-phong-hop", "/app/collaboration"],

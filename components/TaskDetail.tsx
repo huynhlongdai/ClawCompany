@@ -61,6 +61,10 @@ function stamp(iso?: string) {
                                     hour: "2-digit", minute: "2-digit"});
 }
 
+/* UI v2: nhãn tiếng Việt thay cho mã enum thô (in_progress, high) ở dòng tiêu đề. */
+const STATUS_VI: Record<string, string> = {backlog: "Tồn đọng", todo: "Cần làm", in_progress: "Đang làm", review: "Chờ duyệt", blocked: "Bị chặn", done: "Xong", cancelled: "Đã huỷ"};
+const PRIO_VI: Record<string, string> = {urgent: "Khẩn", high: "Cao", medium: "Vừa", low: "Thấp"};
+
 export function TaskDetail({taskId}: {taskId: number}) {
   const [task, setTask] = useState<Row | null>(null);
   const [journal, setJournal] = useState<Row | null>(null);
@@ -90,15 +94,15 @@ export function TaskDetail({taskId}: {taskId: number}) {
   const entries: Row[] = journal?.entries || [];
   const owner = members.find(m => m.id === task?.assignee_member_id);
 
-  return <>
+  return <div className="tdPage">
     {/* ---------------- công việc này là gì, của ai ---------------- */}
     <div className="panel">
       <div className="panelHead">
         <div>
           <b>{task?.title || `Công việc #${taskId}`}</b>
           <small style={{display: "block"}}>
-            {task?.status ? `trạng thái: ${task.status}` : ""}
-            {task?.priority ? ` · ưu tiên: ${task.priority}` : ""}
+            {task?.status ? `Trạng thái: ${STATUS_VI[task.status] || task.status}` : ""}
+            {task?.priority ? ` · ưu tiên: ${PRIO_VI[task.priority] || task.priority}` : ""}
             {owner ? ` · đang thuộc ${owner.name}` : " · chưa có người nhận"}
           </small>
         </div>
@@ -152,13 +156,12 @@ export function TaskDetail({taskId}: {taskId: number}) {
       </div>}
     </div>
 
-    <div style={{display: "grid", gridTemplateColumns: "minmax(0,1.35fr) minmax(0,1fr)",
-                 gap: 18, alignItems: "start"}}>
-      <div style={{display: "grid", gap: 18}}>
+    <div className="tdCols">
+      <div className="tdCol">
         <JournalPanel entries={entries} kinds={journal?.kinds || []} taskId={taskId} onDone={load}/>
         <ContextPackPanel pack={pack}/>
       </div>
-      <div style={{display: "grid", gap: 18}}>
+      <div className="tdCol">
         <HandoffPanel taskId={taskId} members={members} ownerId={task?.assignee_member_id}
                       onDone={load}/>
         <TaskPolicyPanel taskId={taskId} members={members} onChange={load} refreshKey={tick}/>
@@ -167,7 +170,7 @@ export function TaskDetail({taskId}: {taskId: number}) {
         <TaskWakeupsPanel taskId={taskId} refreshKey={tick}/>
       </div>
     </div>
-  </>;
+  </div>;
 }
 
 /* ------------------------------------------------- sổ ghi theo thời gian */

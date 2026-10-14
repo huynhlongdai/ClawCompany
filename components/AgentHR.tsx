@@ -266,9 +266,9 @@ function Lifecycle({seat, all, canEdit, busy, act}: any) {
     {canEdit && lc !== "retired" && <div className="tmRow">
       {lc === "paused" ? <button className="ui-btn is-primary" disabled={busy} data-testid="hr-resume"
           onClick={() => act(() => apiAgentsHR.lifecycle(seat.agent_id, {action: "resume"}), said)}>Tiếp tục</button>
-        : <button className="ui-btn is-ghost" disabled={busy} data-testid="hr-pause"
+        : <button className="ui-btn is-sm" disabled={busy} data-testid="hr-pause"
           onClick={() => act(() => apiAgentsHR.lifecycle(seat.agent_id, {action: "pause"}), said)}>Tạm dừng</button>}
-      <button className="ui-btn is-ghost hrDanger" disabled={busy} onClick={() => setRetire(!retire)} data-testid="hr-retire-open">Cho nghỉ việc…</button>
+      <button className="ui-btn is-sm is-danger" disabled={busy} onClick={() => setRetire(!retire)} data-testid="hr-retire-open">Cho nghỉ việc…</button>
     </div>}
     {retire && lc !== "retired" && <div className="hrConfirm v9Form" data-testid="hr-retire-confirm">
       <b>Cho {seat.name} nghỉ việc?</b>
