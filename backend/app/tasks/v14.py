@@ -1,4 +1,5 @@
 from app.worker import celery_app
+from app.core.lab import lab_job
 from app.db.session import SessionLocal
 from app.models import RunnerLease, PortfolioObjective
 from app.services.runner_broker import reap_expired_leases
@@ -7,6 +8,7 @@ from app.services.nina_portfolio import review_portfolio
 
 
 @celery_app.task(name="v14.reap_runner_leases")
+@lab_job
 def reap_runner_leases():
     db = SessionLocal()
     try: return {"expired": reap_expired_leases(db)}
@@ -14,6 +16,7 @@ def reap_runner_leases():
 
 
 @celery_app.task(name="v14.evaluate_slos")
+@lab_job
 def evaluate_slos():
     db = SessionLocal()
     try: return {"evaluated": evaluate_due_slos(db)}
@@ -21,6 +24,7 @@ def evaluate_slos():
 
 
 @celery_app.task(name="v14.review_portfolios")
+@lab_job
 def review_portfolios():
     db = SessionLocal(); count = 0
     try:

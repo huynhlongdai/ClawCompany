@@ -1,5 +1,6 @@
 from datetime import datetime
 from app.worker import celery_app
+from app.core.lab import lab_job
 from app.db.session import SessionLocal
 from app.models import DevWorkspace, PreviewEnvironment, SandboxRun, Deployment, Release, DeploymentEnvironment
 from app.services.dev_cloud import destroy_workspace
@@ -34,6 +35,7 @@ def deploy_release_task(release_id: int, environment_id: int, requested_by_membe
 
 
 @celery_app.task(name="devcloud.cleanup_expired")
+@lab_job
 def cleanup_expired_task():
     db = SessionLocal(); now = datetime.utcnow(); destroyed = 0
     try:

@@ -1,5 +1,6 @@
 import os
 from app.worker import celery_app
+from app.core.lab import lab_job
 from app.db.session import SessionLocal
 from app.models import Organization, TelemetryExporter
 from app.core.config import settings
@@ -10,6 +11,7 @@ from app.services.telemetry_export import dispatch_exporter
 
 
 @celery_app.task(name="v15.control_plane_tick")
+@lab_job
 def control_plane_tick():
     db = SessionLocal(); summary = {"leaders":0,"sre":{},"paging":{},"exports":0}
     try:
@@ -26,6 +28,7 @@ def control_plane_tick():
 
 
 @celery_app.task(name="v15.export_telemetry")
+@lab_job
 def export_telemetry():
     db = SessionLocal(); completed = failed = 0
     try:

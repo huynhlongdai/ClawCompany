@@ -99,6 +99,10 @@ class Settings(BaseSettings):
     # follower attaches to a session. On by default because it is a no-op
     # unless the approvals scope is granted and the runtime supports listing.
     openclaw_auto_reconcile: bool = True
+    # Phòng thí nghiệm (plan-v2-modules §2): 6 job nền của module bị ẩn (devcloud/v14/v15)
+    # mặc định KHÔNG lập lịch và KHÔNG chạy. Bật bằng LAB_JOBS_ENABLED=true khi thật sự dùng các
+    # trang đó — v15.control_plane_tick ghi vào bảng approvals nên có thể đẩy phê duyệt lạ vào Hộp việc.
+    lab_jobs_enabled: bool = False
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 60
