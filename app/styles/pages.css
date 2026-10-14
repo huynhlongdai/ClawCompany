@@ -78,7 +78,8 @@
 .wkSelect{height:34px;min-height:34px;font-size:var(--fs-13);max-width:180px}
 .wkNew{margin-left:auto}
 .wkCost{display:inline-flex;align-items:center;gap:5px;margin-left:auto}
-.wkList{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;min-width:0}
+.wkList{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;overflow:clip;min-width:0}
+/* clip chứ không hidden: hidden biến .wkList thành khung cuộn nên tiêu đề nhóm sticky bị đẩy xuống 52px, đè lên dòng đầu */
 .wkList[aria-busy]{background:none;border:0;display:grid;gap:8px}
 .wkGroup + .wkGroup{border-top:1px solid var(--border)}
 .wkGroupHead{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--surface-2);border-bottom:1px solid var(--border);position:sticky;top:var(--topbar-h);z-index:1}
@@ -119,7 +120,7 @@
   .wkRow .wkCostCell{grid-area:c}
   .wkRow .wkId,.wkRow .wkWho,.wkRow .wkMeta,.wkRow .wkWhen{display:none}
   .wkSearch{max-width:none;flex-basis:100%}
-  .wkSelect{flex:1;max-width:none;min-width:0}
+  .wkSelect{flex:1 1 28%;max-width:none;min-width:0;padding-right:22px}
   .wkNew{margin-left:0}
 }
 /* bảng (board) */
@@ -355,7 +356,7 @@ a.org-node:hover{border-color:var(--text-muted);box-shadow:var(--shadow-2)}
   .ov-mascot figcaption{display:none}
   .ov-hero h2{font-size:var(--fs-20);padding-right:84px}
   .ov-stat b{font-size:var(--fs-24)}
-  .ov-stat.is-wide{grid-column:1/-1}
+  .ov-sm-hide{display:none}
 }
 
 /* ================================================================ MỤC TIÊU & KẾ HOẠCH */

@@ -124,7 +124,7 @@ function ChartTab({chart, onBuild}: {chart: any; onBuild: () => void}) {
       <span className="ui-grow"/>
       <div className="org-legend"><span><span className="ui-ava is-agent" style={{width: 14, height: 14}}/>Agent — bấm để mở hồ sơ</span><span><span className="ui-ava is-human" style={{width: 14, height: 14}}/>Người</span></div>
     </div>
-    <div className="org" data-testid="org-tree">
+    <div className="org" data-testid="org-tree" ref={el => { /* sơ đồ rộng hơn màn hình (điện thoại): mở ra ở giữa, gốc công ty nằm trong tầm nhìn */ if (el && el.scrollWidth > el.clientWidth && !el.dataset.centered) { el.dataset.centered = "1"; el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2; } }}>
       {chart.tree.length ? <ul className="org-tree"><li>
         <div className="org-node is-root"><span className="ui-ava is-lg" aria-hidden="true"><Icon name="building" size={18}/></span>
           <span><b>{chart.company.name}</b><small>{s.departments} phòng · {(s.humans || 0) + (s.agents || 0)} thành viên</small></span></div>

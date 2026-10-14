@@ -159,15 +159,15 @@ export function TodayOverview() {
         {work.error ? null : loading ? <div className="ui-panel-body ui-skel-stack"><Skeleton h={32}/><Skeleton h={32}/><Skeleton h={32}/></div>
           : recent.length === 0 ? <EmptyState compact mood="chao" title="Chưa có lượt chạy nào">Khi agent làm việc qua OpenClaw, mỗi lượt kèm chi phí hiện ở đây.</EmptyState>
           : <div className="ui-table-wrap"><table className="ui-table">
-            <thead><tr><th>Việc</th><th>Ai làm</th><th>Lượt cuối</th><th className="is-num">Lượt</th><th className="is-num">Chi phí</th><th className="is-num">Cập nhật</th></tr></thead>
+            <thead><tr><th>Việc</th><th className="ov-sm-hide">Ai làm</th><th>Lượt cuối</th><th className="is-num ov-sm-hide">Lượt</th><th className="is-num">Chi phí</th><th className="is-num ov-sm-hide">Cập nhật</th></tr></thead>
             <tbody>{recent.map(t => <tr key={t.id}>
               <td><Link href={`/app/work?peek=${t.id}`} className="ov-task"><span className="ui-mono">#{t.id}</span> {t.title}</Link></td>
-              <td><span className="ui-who">{t.assignee?.name || "—"}</span></td>
+              <td className="ov-sm-hide"><span className="ui-who">{t.assignee?.name || "—"}</span></td>
               <td>{t.runs.running ? <StatusPill tone="ok" live>Đang chạy</StatusPill> : t.runs.last_status === "failed" ? <StatusPill tone="risk">Lỗi</StatusPill>
                 : <StatusPill tone="ok">Xong</StatusPill>}</td>
-              <td className="is-num">{t.runs.count}{t.runs.failed ? <small> · {t.runs.failed} lỗi</small> : null}</td>
+              <td className="is-num ov-sm-hide">{t.runs.count}{t.runs.failed ? <small> · {t.runs.failed} lỗi</small> : null}</td>
               <td className="is-num">{money(t.runs.cost_usd)}</td>
-              <td className="is-num"><small>{when(t.updated_at)}</small></td>
+              <td className="is-num ov-sm-hide"><small>{when(t.updated_at)}</small></td>
             </tr>)}</tbody></table></div>}
       </section>
 

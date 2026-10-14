@@ -93,7 +93,7 @@ export function RoutinesConsole() {
           actions={detail ? <>
             <Button size="sm" variant="primary" icon="play" disabled={!detail.enabled} onClick={() => act(() => apiRoutines.run(detail.id), (x: any) => `Lần chạy #${x.run_id}: ${ST_VI[x.status] || x.status}${x.task_id ? ` · việc #${x.task_id}` : ""}.`)} data-testid="routine-run">Chạy ngay</Button>
             <Button size="sm" onClick={() => act(() => apiRoutines.setEnabled(detail.id, !detail.enabled), (x: any) => x.enabled ? "Đã bật lại (xoá chuỗi lỗi, lịch tính từ bây giờ)." : "Đã tắt routine.")} data-testid="routine-toggle">{detail.enabled ? "Tắt" : "Bật lại"}</Button></> : undefined}>
-          {!detail ? <EmptyState compact mood="ngu" title="Chưa chọn routine">Chọn ở danh sách bên trái.</EmptyState> : <div className="ui-grid" style={{gap: 12}}>
+          {!detail ? <EmptyState compact mood="ngu" title="Chưa chọn routine">Chọn một routine trong danh sách để xem lần chạy.</EmptyState> : <div className="ui-grid" style={{gap: 12}}>
             {detail.triggers.filter((t: any) => t.kind === "webhook").map((t: any) => <div key={t.id} className="gl-summary" data-testid="routine-hook">
               <b>Webhook</b>: POST <code translate="no">{t.hook_path}</code><br/>Gửi kèm header <code translate="no">X-Routine-Secret: {t.secret}</code> và <code translate="no">Idempotency-Key</code> (bắt buộc — gửi lại cùng khoá không tạo việc mới).</div>)}
             {detail.runbook && <pre className="gl-summary">{detail.runbook}</pre>}

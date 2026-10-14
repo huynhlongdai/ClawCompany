@@ -244,7 +244,6 @@ details > pre{margin-top:6px;padding:10px;border-radius:var(--radius-sm);backgro
 
 .ui-side{position:sticky;top:0;height:100dvh;display:flex;flex-direction:column;gap:4px;padding:10px 10px 12px;
   border-right:1px solid var(--border);background:var(--bg);overflow-y:auto;scrollbar-width:thin;z-index:var(--z-nav)}
-@media (min-width:901px){.ui-side{border-right-color:transparent}}
 .ui-switch{position:relative}
 .ui-switch-btn{display:flex;align-items:center;gap:10px;width:100%;padding:6px 8px;border:0;border-radius:var(--radius-sm);background:transparent;text-align:left}
 .ui-switch-btn:hover{background:var(--hover)}
@@ -331,11 +330,14 @@ details > pre{margin-top:6px;padding:10px;border-radius:var(--radius-sm);backgro
   .ui-bottomnav [aria-current="page"] svg{color:var(--accent-text)}
   .ui-bottomnav .ui-dot{top:4px;right:calc(50% - 20px)}
 }
-@media (max-width:420px){.ui-crumbs > :not(b){display:none}}
+/* Icon đặt display:block inline nên mũi tên cần !important mới ẩn được */
+@media (max-width:420px){.ui-crumbs > :not(b){display:none}.ui-crumbs > svg{display:none !important}}
 .ui-top .ui-search-btn{display:flex;align-items:center;gap:8px;height:32px;padding:0 8px 0 10px;border-radius:var(--radius-sm);border:1px solid var(--border);
   background:var(--surface);color:var(--text-muted);font-size:var(--fs-13);min-width:220px}
 .ui-top .ui-search-btn:hover{border-color:var(--border-strong);color:var(--text)}
 .ui-top .ui-search-btn span{flex:1;text-align:left}
+/* điện thoại: ô tìm kiếm thu về nút kính lúp; phải nằm SAU quy tắc display:flex ở trên, nếu không breadcrumb bị ép còn 0px */
+@media (max-width:900px){.ui-top .ui-search-btn{display:none}}
 
 /* ================================================================ ⌘K */
 .ui-palette-scrim{position:fixed;inset:0;z-index:var(--z-palette);background:var(--scrim);display:flex;justify-content:center;align-items:flex-start;padding:12vh 16px 16px;overscroll-behavior:contain}
