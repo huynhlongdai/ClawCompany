@@ -33,7 +33,8 @@ from app.models import Approval, Member, Task
 from app.models.extended import InboxItem
 
 KINDS = ("approval_pending", "approval_escalated", "run_failed", "task_review", "mention",
-         "budget_warned", "budget_soft_stopped", "budget_exhausted", "routine_paused", "goal_completed")
+         "budget_warned", "budget_soft_stopped", "budget_exhausted", "routine_paused", "goal_completed",
+         "lesson_proposal")   # M5 sẽ ghi: agent đề xuất bài học → người duyệt → MEMORY.md
 KIND_VI = {
     "approval_pending": "Chờ duyệt", "approval_escalated": "Duyệt quá hạn — chuyển lên anh",
     "run_failed": "Run lỗi", "task_review": "Vào review", "mention": "Được nhắc tên",
@@ -41,6 +42,7 @@ KIND_VI = {
     "budget_soft_stopped": "Ngân sách chạm nấc dừng mềm",
     "routine_paused": "Routine tự dừng",
     "goal_completed": "Mục tiêu hoàn thành",
+    "lesson_proposal": "Bài học đề xuất",
 }
 PRIO = {"low": 0, "normal": 1, "medium": 1, "high": 2, "urgent": 3}
 OPEN = ("unread", "read")
@@ -76,6 +78,18 @@ def manager_of(db: Session, member_id: int | None) -> int | None:
         return None
     up = human_recipients(db, m.manager_id)
     return up[0] if up else None
+
+
+def department_head_for(db: Session, a: Approval, *, exclude: int | None = None) -> int | None:
+    """Trưởng phòng (là người, đang làm) của phòng mà seat xin duyệt thuộc về — đường leo thang theo phòng ban."""
+    from app.models import Department
+    req = db.get(Member, a.requester_member_id) if a.requester_member_id else None
+    dept = db.get(Department, req.department_id) if req is not None and req.department_id else None
+    if dept is None or not dept.head_member_id:
+        return None
+    heads = human_recipients(db, dept.head_member_id)
+    head = heads[0] if heads else None
+    return head if head is not None and head != exclude else None
 
 
 def _top_humans(db: Session, organization_id: int, company_id: int | None) -> list[int]:
@@ -313,6 +327,8 @@ def escalate_overdue(db: Session, *, now: datetime | None = None,
         target = a.escalate_to_member_id or (manager_of(db, primary[0]) if primary else None)
         if target is not None and target == prev:
             target = manager_of(db, prev)
+        if target is None:
+            target = department_head_for(db, a, exclude=prev)   # M4b: không có quản lý → trưởng phòng
         overdue_h = round((now - a.expires_at).total_seconds() / 3600 + float(settings.approval_ttl_hours), 1)
         if target is None:
             a.expires_at = now + ttl            # thử lại sau một chu kỳ, không spam audit mỗi phút

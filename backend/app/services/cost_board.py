@@ -22,7 +22,7 @@ from app.services import budget_scope
 from app.services.cost_ledger import EVENT_TYPE
 from app.services.work_board import WorkError
 
-UI_SCOPES = {"company": "Công ty", "department": "Phòng ban", "member": "Agent"}
+UI_SCOPES = {"company": "Công ty", "department": "Phòng ban", "team": "Nhóm", "member": "Agent"}
 
 
 def scope_name(db: Session, env: BudgetEnvelope) -> str:
@@ -36,6 +36,10 @@ def scope_name(db: Session, env: BudgetEnvelope) -> str:
     if st == "member":
         m = db.get(Member, sid) if sid else None
         return m.name if m else f"Thành viên #{sid}"
+    if st == "team":
+        from app.models.v16 import AgentTeam
+        t = db.get(AgentTeam, sid) if sid else None
+        return t.name if t else f"Nhóm #{sid}"
     return f"{st} #{sid}"
 
 
@@ -132,9 +136,9 @@ def _levels(warn: int | None, soft: int | None) -> None:
 
 def _check_scope(db: Session, organization_id: int, scope_type: str, scope_id: int | None) -> int | None:
     if scope_type not in UI_SCOPES:
-        raise WorkError(422, "bad_scope", "Phạm vi chỉ được là công ty, phòng ban hoặc agent")
+        raise WorkError(422, "bad_scope", "Phạm vi chỉ được là công ty, phòng ban, nhóm hoặc agent")
     if scope_id is None:
-        raise WorkError(422, "bad_scope", "Chọn công ty, phòng ban hoặc agent cho ngân sách")
+        raise WorkError(422, "bad_scope", "Chọn công ty, phòng ban, nhóm hoặc agent cho ngân sách")
     if scope_type == "company":
         c = db.get(Company, scope_id)
         ok = c is not None and c.organization_id == organization_id
@@ -144,6 +148,11 @@ def _check_scope(db: Session, organization_id: int, scope_type: str, scope_id: i
         c = db.get(Company, d.company_id) if d else None
         ok = c is not None and c.organization_id == organization_id
         company_id = c.id if ok else None
+    elif scope_type == "team":
+        from app.models.v16 import AgentTeam
+        t = db.get(AgentTeam, scope_id)
+        ok = t is not None and t.organization_id == organization_id
+        company_id = t.company_id if ok else None
     else:
         m = db.get(Member, scope_id)
         ok = m is not None and m.organization_id == organization_id

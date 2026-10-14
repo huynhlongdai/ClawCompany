@@ -172,15 +172,16 @@ def test_feed_groups_counts_and_keeps_each_persons_inbox_private(env):
     approval(env, approver=env.stranger, org=env.other, requester=env.stranger)   # tổ chức khác
 
     body = feed(env, "hung")
-    assert [g["key"] for g in body["groups"]] == ["approvals", "review", "budget", "updates"]
-    assert [g["label"] for g in body["groups"]] == ["Cần anh duyệt", "Cần anh xem", "Ngân sách", "Thông báo"]
+    assert [g["key"] for g in body["groups"]] == ["approvals", "review", "budget", "lessons", "updates"]
+    assert [g["label"] for g in body["groups"]] == ["Cần anh duyệt", "Cần anh xem", "Ngân sách", "Bài học đề xuất",
+                                                    "Thông báo"]
     ap = cards(body, "approvals")
     assert len(ap) == 1 and ap[0]["approval"]["id"] == a.id and ap[0]["approval"]["can_decide"]
     assert ap[0]["approval"]["requester"] == "Mai Anh" and ap[0]["approval"]["summary"] == "Bài đã soạn xong, chờ đăng"
     assert ap[0]["approval"]["deadline_vi"].startswith("Còn 23 giờ")
     assert [c["task"]["id"] for c in cards(body, "review")] == [t.id]
     assert len(cards(body, "budget")) == 1 and len(cards(body, "updates")) == 1
-    assert body["counts"]["by_group"] == {"approvals": 1, "review": 1, "budget": 1, "updates": 1}
+    assert body["counts"]["by_group"] == {"approvals": 1, "review": 1, "budget": 1, "lessons": 0, "updates": 1}
     assert body["counts"]["need_action"] == 2 and body["counts"]["unread"] == 4
     assert env.c.get("/api/inbox/summary", headers=env.tok("hung")).json()["need_action"] == 2
     only = feed(env, "hung", group="approvals")
@@ -469,7 +470,7 @@ def test_costs_budget_crud_validates_in_vietnamese(env):
     assert r.status_code == 409 and r.json()["detail"]["error"] == "duplicate_scope"
     lst = env.c.get("/api/costs/budgets", headers=Hm).json()
     assert [x["id"] for x in lst["budgets"]] == [b["id"]] and lst["caps"]["manage"] is False
-    assert {"company", "department", "member"} == set(lst["scopes"])
+    assert {"company", "department", "team", "member"} == set(lst["scopes"])
     det = env.c.get(f"/api/costs/budgets/{b['id']}", headers=H).json()
     assert det["budget"]["id"] == b["id"] and det["ledger"] == []
 
@@ -527,3 +528,86 @@ def test_old_routes_still_work_with_deprecation_and_successor_link(env):
     assert r.status_code == 200 and r.headers["Link"] == f'</api/inbox/approvals/{a.id}/decide>; rel="successor-version"'
     for path in ("/api/inbox/items", "/api/inbox/summary", "/api/costs/budgets", "/api/costs/overview"):
         assert "Deprecation" not in env.c.get(path, headers=H).headers
+
+
+# ------------------------------------------------------------------ theo seat / phòng / nhóm (công ty agent)
+
+
+def test_department_grant_clears_the_whole_department_queue(env):
+    e = _budget(env, limit=10.0, spent=8.5, scope="department", sid=env.mkt.id)
+    env.db.query(Member).filter_by(id=env.lam.id).update({"department_id": env.mkt.id}); env.db.commit()
+    t1, t2 = task(env), task(env, title="Việc của Lâm", assignee=env.lam)
+    enqueue(env, t1); enqueue(env, t2, env.lam); drain(env)
+    a1 = env.db.query(Approval).filter_by(policy_key=budget_scope.soft_key(e.id, t1.id)).one()
+    a2 = env.db.query(Approval).filter_by(policy_key=budget_scope.soft_key(e.id, t2.id)).one()
+    card = [c for c in cards(feed(env, "hung", department_id=env.mkt.id), "approvals") if c["approval"]["id"] == a1.id][0]
+    assert card["department"]["name"] == "Marketing" and card["seat"]["name"] == "Mai Anh"
+    assert card["approval"]["grant_scopes"] == ["task", "seat", "department"]
+    assert decide(env, "hung", a2.id, grant_scope="seat", expect=200)["grant_scope"] == "seat"
+    assert decide(env, "hung", (approval(env, approver=env.hung)).id, grant_scope="department",
+                  expect=422)["detail"]["error"] == "bad_grant_scope"
+    out = decide(env, "hung", a1.id, grant_scope="department")
+    assert out["grant_scope"] == "department"
+    env.db.expire_all()
+    t3 = task(env, title="Việc mới của Mai")                     # việc mới cùng phòng: không hỏi lại
+    enqueue(env, t3)
+    res = drain(env)
+    assert {r["decision"] for r in res} == {"dispatched"}
+    assert env.db.query(Approval).filter_by(policy_key=budget_scope.soft_key(e.id, t3.id)).count() == 0
+
+
+def test_department_grant_auto_approves_pending_siblings(env):
+    e = _budget(env, limit=10.0, spent=8.5, scope="department", sid=env.mkt.id)
+    env.db.query(Member).filter_by(id=env.lam.id).update({"department_id": env.mkt.id}); env.db.commit()
+    t1, t2 = task(env), task(env, title="Việc của Lâm", assignee=env.lam)
+    enqueue(env, t1); enqueue(env, t2, env.lam); drain(env)
+    a1 = env.db.query(Approval).filter_by(policy_key=budget_scope.soft_key(e.id, t1.id)).one()
+    a2 = env.db.query(Approval).filter_by(policy_key=budget_scope.soft_key(e.id, t2.id)).one()
+    out = decide(env, "hung", a1.id, grant_scope="department")
+    assert out["covered_approvals"] == [a2.id] and len(out["woken_all"]) == 2
+    env.db.expire_all()
+    assert env.db.get(Approval, a2.id).status == "approved"
+    assert env.db.query(InboxItem).filter_by(related_type="approval", related_id=str(a2.id)).one().status == "done"
+    res = drain(env)
+    assert sorted(r["decision"] for r in res) == ["dispatched", "dispatched"] and len(env.rt.calls) == 2
+
+
+def test_team_budget_covers_only_team_members(env):
+    from app.models.v16 import AgentTeam, AgentTeamMember
+    team = AgentTeam(organization_id=env.org.id, company_id=env.co.id, team_key="launch", name="Đội ra mắt")
+    env.db.add(team); env.db.commit()
+    env.db.add(AgentTeamMember(organization_id=env.org.id, team_id=team.id, member_id=env.mai.id)); env.db.commit()
+    r = env.c.post("/api/costs/budgets", json={"scope_type": "team", "scope_id": team.id, "amount_limit": 1},
+                   headers=env.tok("hung"))
+    assert r.status_code == 201 and r.json()["scope_name"] == "Đội ra mắt" and r.json()["scope_vi"] == "Nhóm"
+    e = env.db.get(BudgetEnvelope, r.json()["id"])
+    assert [x.id for x in budget_scope.applicable(env.db, env.db.get(Member, env.mai.id))] == [e.id]
+    assert budget_scope.applicable(env.db, env.db.get(Member, env.lam.id)) == []
+    e.amount_spent = 1.0; env.db.commit(); budget_scope.check_thresholds(env.db, e)
+    env.db.expire_all()
+    assert env.db.get(Member, env.mai.id).status == "paused" and env.db.get(Member, env.lam.id).status == "active"
+
+
+def test_lesson_proposals_have_their_own_group_and_decision_slot(env):
+    from app.services import inbox
+    inbox.notify(env.db, organization_id=env.org.id, recipients=[env.hung.id], kind="lesson_proposal",
+                 title="Mai Anh đề xuất bài học: caption nên có CTA", related_type="lesson", related_id="1")
+    a = approval(env, approver=env.hung, policy_key="lesson:m{0}".format(env.mai.id),
+                 action="Ghi bài học vào MEMORY.md của Mai Anh")
+    body = feed(env, "hung")
+    lessons = cards(body, "lessons")
+    assert len(lessons) == 2 and cards(body, "approvals") == []
+    card = [c for c in lessons if c["approval"]][0]["approval"]
+    assert card["kind"] == "lesson" and card["can_decide"]
+    out = decide(env, "hung", a.id)
+    assert out["effect"] == "lesson" and out["applied"] is False      # M5 sẽ ghi MEMORY.md
+
+
+def test_escalation_without_manager_falls_back_to_department_head(env):
+    env.mkt.head_member_id = env.hung.id; env.db.commit()
+    a = approval(env, approver=env.boss, requester=env.mai)      # seat Marketing, người duyệt không có cấp trên
+    a.expires_at = datetime.utcnow() - timedelta(minutes=1); env.db.commit()
+    card = cards(feed(env, "boss"), "approvals")[0]["approval"]
+    assert card["escalation_blocked"] is False and card["escalate_to"] == "Anh Hùng"
+    r = env.c.post("/api/inbox/escalate", headers=env.tok("boss")).json()
+    assert r["escalated"][0]["escalated"] is True and r["escalated"][0]["to_member_id"] == env.hung.id

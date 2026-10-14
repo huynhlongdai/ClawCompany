@@ -40,7 +40,8 @@ from app.runtime.factory import resolve_mode
 from app.models import BudgetEnvelope, BudgetLedgerEntry, Member, Task, TaskRun
 from app.services import budget as budget_svc
 
-SCOPES = ("company", "department", "member", "project", "goal")
+SCOPES = ("company", "department", "member", "team", "project", "goal")
+GRANT_SCOPES = ("task", "seat", "department")   # M4b: một phê duyệt chi tiếp phủ một việc / cả seat / cả phòng
 LEVELS = ("ok", "warned", "soft_stopped", "exhausted")
 LEVEL_ORDER = {k: i for i, k in enumerate(LEVELS)}
 LEVEL_VI = {"ok": "Trong hạn mức", "warned": "Cảnh báo", "soft_stopped": "Dừng mềm — cần duyệt để chi tiếp",
@@ -64,8 +65,19 @@ def scope_of(env: BudgetEnvelope) -> tuple[str, int | None]:
     return st, env.scope_id
 
 
-def covers(env: BudgetEnvelope, member: Member | None, task) -> bool:
+def team_ids(db: Session, member_id: int | None) -> set[int]:
+    """Nhóm (agent_teams) đang có mặt thành viên này — để ngân sách theo nhóm phủ đúng seat."""
+    if not member_id:
+        return set()
+    from app.models.v16 import AgentTeamMember
+    return {t for (t,) in db.query(AgentTeamMember.team_id).filter(AgentTeamMember.member_id == member_id,
+                                                                    AgentTeamMember.status == "active").all()}
+
+
+def covers(env: BudgetEnvelope, member: Member | None, task, teams: set[int] | None = None) -> bool:
     st, sid = scope_of(env)
+    if st == "team":
+        return member is not None and sid is not None and sid in (teams or set())
     if st == "company":
         return member is not None and (sid is None or sid == member.company_id)
     if st == "department":
@@ -86,7 +98,8 @@ def applicable(db: Session, member: Member | None, task=None) -> list[BudgetEnve
     rows = (db.query(BudgetEnvelope)
             .filter(BudgetEnvelope.organization_id == org, BudgetEnvelope.status != "archived")
             .order_by(BudgetEnvelope.id).all())
-    return [e for e in rows if covers(e, member, task)]
+    teams = team_ids(db, member.id) if any((e.scope_type or "") == "team" for e in rows) else set()
+    return [e for e in rows if covers(e, member, task, teams)]
 
 
 def estimate(db: Session, member_id: int | None) -> float:
@@ -149,11 +162,11 @@ def soft_gate(db: Session, env: BudgetEnvelope, member: Member, task) -> str:
     if not isinstance(task, Task):
         return f"budget_approval: {env.name}: đã chạm nấc dừng mềm ({pct(env):.0f}%) — cần duyệt chi tiếp"
     key = soft_key(env.id, task.id)
+    if grant_for(db, env, member, task) is not None:
+        return ""
     latest = (db.query(Approval).filter(Approval.organization_id == env.organization_id,
                                         Approval.policy_key == key)
               .order_by(Approval.id.desc()).first())
-    if latest is not None and latest.status == "approved":
-        return ""
     if latest is not None and latest.status in ("rejected", "denied"):
         return (f"budget_rejected: {env.name}: chi tiếp cho việc #{task.id} đã bị từ chối "
                 f"(phê duyệt #{latest.id})")
@@ -161,6 +174,38 @@ def soft_gate(db: Session, env: BudgetEnvelope, member: Member, task) -> str:
         latest = _request_soft_approval(db, env, member, task, key)
     return (f"budget_approval: {env.name}: đã dùng {pct(env):.0f}% (nấc dừng mềm {env.soft_stop_pct}%) — "
             f"chờ duyệt chi tiếp (phê duyệt #{latest.id})")
+
+
+def grant_scope_of(a) -> str:
+    p = a.payload if isinstance(a.payload, dict) else {}
+    return p.get("grant_scope") if p.get("grant_scope") in GRANT_SCOPES else "task"
+
+
+def _evidence(a) -> dict:
+    try:
+        ev = json.loads(a.evidence or "{}")
+        return ev if isinstance(ev, dict) else {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def grant_covers(a, member: Member, task) -> bool:
+    """Phê duyệt chi tiếp ``a`` (đã duyệt) có phủ (seat, việc) này không — theo phạm vi người duyệt chọn."""
+    scope, ev = grant_scope_of(a), _evidence(a)
+    if scope == "department":
+        return ev.get("department_id") is not None and ev.get("department_id") == member.department_id
+    if scope == "seat":
+        return ev.get("member_id") == member.id
+    parsed = parse_soft_key(a.policy_key or "")
+    return parsed is not None and task is not None and parsed[1] == task.id
+
+
+def grant_for(db: Session, env: BudgetEnvelope, member: Member, task):
+    from app.models import Approval
+    rows = (db.query(Approval).filter(Approval.organization_id == env.organization_id,
+                                      Approval.policy_key.like(f"{SOFT_PREFIX}e{env.id}:t%"),
+                                      Approval.status == "approved").order_by(Approval.id.desc()).all())
+    return next((a for a in rows if grant_covers(a, member, task)), None)
 
 
 def soft_approver(db: Session, env: BudgetEnvelope, member: Member) -> int | None:
@@ -181,6 +226,7 @@ def _request_soft_approval(db: Session, env: BudgetEnvelope, member: Member, tas
                  evidence=json.dumps({"task_id": task.id, "budget_id": env.id, "pct": pct(env),
                                       "soft_stop_pct": env.soft_stop_pct, "spent_usd": round(env.amount_spent or 0, 6),
                                       "limit_usd": env.amount_limit, "member_id": member.id,
+                                      "department_id": member.department_id,
                                       "summary": f"{member.name} muốn chạy tiếp việc #{task.id} khi ngân sách "
                                                  f"'{env.name}' đã dùng {pct(env):.0f}% hạn mức"},
                                      ensure_ascii=False))
@@ -204,18 +250,43 @@ def expire_soft_grants(db: Session, env: BudgetEnvelope, why: str) -> list[int]:
 
 
 def on_soft_decision(db: Session, approval) -> dict:
-    """Duyệt chi tiếp → đánh thức lại seat trên đúng việc đó."""
+    """Duyệt chi tiếp → đánh thức lại seat trên đúng việc đó.
+
+    Phạm vi ``seat``/``department``: các yêu cầu chi tiếp đang chờ mà phê duyệt này phủ
+    được duyệt theo (một quyết định gỡ cả hàng chờ của phòng), và seat trong phạm vi được đánh thức lại."""
+    from app.models import Approval
     from app.services import wakeup
     parsed = parse_soft_key(approval.policy_key or "")
     if parsed is None or approval.status != "approved":
         return {"woken": None}
-    task = db.get(Task, parsed[1])
-    if task is None:
-        return {"woken": None}
-    wk = wakeup.enqueue_for_task(db, task, "approval_resolved", member_id=approval.requester_member_id,
-                                 dedupe_key=f"budget_soft:a{approval.id}",
-                                 payload={"approval_id": approval.id, "budget_id": parsed[0]})
-    return {"woken": wk.id if wk is not None else None}
+    scope = grant_scope_of(approval)
+    covered: list[int] = []
+    woken: list[int] = []
+    if scope != "task":
+        siblings = (db.query(Approval).filter(Approval.organization_id == approval.organization_id,
+                                              Approval.policy_key.like(f"{SOFT_PREFIX}e{parsed[0]}:t%"),
+                                              Approval.status == "pending", Approval.id != approval.id).all())
+        for s in siblings:
+            m = db.get(Member, s.requester_member_id) if s.requester_member_id else None
+            sp = parse_soft_key(s.policy_key or "")
+            if m is not None and sp is not None and grant_covers(approval, m, db.get(Task, sp[1])):
+                s.status = "approved"
+                s.payload = {**(s.payload or {}), "covered_by": approval.id}
+                s.resolution_note = f"Được phủ bởi phê duyệt #{approval.id} ({scope})"
+                db.add(s); covered.append(s.id)
+        db.commit()
+    for a in [approval] + [db.get(Approval, i) for i in covered]:
+        sp = parse_soft_key(a.policy_key or "")
+        task = db.get(Task, sp[1]) if sp else None
+        if task is None:
+            continue
+        wk = wakeup.enqueue_for_task(db, task, "approval_resolved", member_id=a.requester_member_id,
+                                     dedupe_key=f"budget_soft:a{a.id}",
+                                     payload={"approval_id": a.id, "budget_id": parsed[0]})
+        if wk is not None:
+            woken.append(wk.id)
+    return {"woken": woken[0] if woken else None, "woken_all": woken, "grant_scope": scope,
+            "covered_approvals": covered}
 
 
 def level_of(env: BudgetEnvelope, p: float | None = None) -> str:
@@ -406,6 +477,11 @@ def _scope_members(db: Session, env: BudgetEnvelope) -> list[Member]:
     elif st == "company":
         if sid is not None:
             q = q.filter(Member.company_id == sid)
+    elif st == "team":
+        from app.models.v16 import AgentTeamMember
+        ids = [m for (m,) in db.query(AgentTeamMember.member_id).filter(AgentTeamMember.team_id == sid,
+                                                                        AgentTeamMember.status == "active").all()]
+        q = q.filter(Member.id.in_(ids or [-1]))
     else:
         return []          # project/goal: chỉ chặn task trong phạm vi, không dừng seat
     return q.all()

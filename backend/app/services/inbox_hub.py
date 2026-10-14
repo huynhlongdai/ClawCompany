@@ -35,17 +35,20 @@ GROUPS = [
     ("approvals", "Cần anh duyệt"),
     ("review", "Cần anh xem"),
     ("budget", "Ngân sách"),
+    ("lessons", "Bài học đề xuất"),   # M5: đề xuất bài học của agent chờ người duyệt
     ("updates", "Thông báo"),
 ]
 GROUP_VI = dict(GROUPS)
 REVIEW_KINDS = {"task_review", "run_failed"}
 BUDGET_KINDS = {"budget_warned", "budget_soft_stopped", "budget_exhausted"}
+LESSON_KINDS = {"lesson_proposal"}
 RISK_VI = {"critical": "Nghiêm trọng", "high": "Cao", "medium": "Vừa", "low": "Thấp"}
 STATUS_VI = {"approved": "duyệt", "rejected": "từ chối", "denied": "từ chối", "expired": "hết hiệu lực",
              "revision_requested": "yêu cầu sửa", "deciding": "xử lý", "pending": "chờ"}
 KIND_OF = (("task_stage:", "stage", "Chặng duyệt của việc"), ("strategy:", "plan", "Kế hoạch của Nina"),
            ("budget_soft:", "budget", "Chi tiếp khi chạm nấc ngân sách"),
-           ("openclaw:", "gateway", "Lệnh agent xin chạy (OpenClaw)"))
+           ("openclaw:", "gateway", "Lệnh agent xin chạy (OpenClaw)"),
+           ("lesson:", "lesson", "Bài học đề xuất ghi vào MEMORY.md"))
 
 
 # ------------------------------------------------------------------ quyền
@@ -122,7 +125,9 @@ def approval_card(db: Session, a: Approval, principal: Principal, names: dict[in
     task = db.get(Task, tid) if tid else None
     left = int((a.expires_at - now).total_seconds()) if a.expires_at else None
     kind, kind_vi = _kind(a)
-    esc_to = names.get(a.escalate_to_member_id) if a.escalate_to_member_id else None
+    esc_id = a.escalate_to_member_id or (None if (a.policy_key or "").startswith("openclaw:")
+                                         else inbox.department_head_for(db, a, exclude=a.approver_member_id))
+    esc_to = names.get(esc_id) if esc_id else None
     overdue = left is not None and left <= 0
     gateway = kind == "gateway"
     return {
@@ -138,14 +143,17 @@ def approval_card(db: Session, a: Approval, principal: Principal, names: dict[in
         "overdue": overdue, "escalated_at": a.escalated_at.isoformat() if a.escalated_at else None,
         "escalate_to": esc_to,
         # Quá hạn mà không có cấp trên: leo thang không làm được gì — nói thẳng thay vì im lặng.
-        "escalation_blocked": overdue and not gateway and not a.escalate_to_member_id,
+        "escalation_blocked": overdue and not gateway and not esc_id,
         "deadline_vi": "" if gateway and left is None else deadline_vi(left, esc_to, bool(a.escalated_at)),
         "reject_needs_note": True,
+        "grant_scopes": ["task", "seat", "department"] if kind == "budget" else [],
         "created_at": a.created_at.isoformat() if a.created_at else None,
     }
 
 
 def group_of(kinds: set[str], actionable: bool) -> str:
+    if kinds & LESSON_KINDS:
+        return "lessons"
     if actionable:
         return "approvals"
     if kinds & REVIEW_KINDS:
@@ -156,7 +164,8 @@ def group_of(kinds: set[str], actionable: bool) -> str:
 
 
 def feed(db: Session, organization_id: int, principal: Principal, *, status: str = "open",
-         group: str | None = None, now: datetime | None = None) -> dict:
+         group: str | None = None, member_id: int | None = None, department_id: int | None = None,
+         now: datetime | None = None) -> dict:
     """Hộp việc của người đăng nhập, nhóm theo việc cần làm, kèm số đếm."""
     now = now or datetime.utcnow()
     me = principal.member_id
@@ -171,35 +180,41 @@ def feed(db: Session, organization_id: int, principal: Principal, *, status: str
             q = q.filter(InboxItem.status == status)
         rows = q.order_by(InboxItem.updated_at.desc(), InboxItem.id.desc()).limit(300).all()
 
+    from app.models import Department
+    depts = {d.id: d.name for d in db.query(Department).all()}
     pending = {a.id: a for a in db.query(Approval).filter(Approval.organization_id == organization_id,
                                                           Approval.status == "pending").all()}
     cards: list[dict] = []
     seen_approvals: set[int] = set()
     for item in rows:
         kinds = {k for k in (item.kinds or "").split(",") if k} or {item.item_type}
-        appr = None
+        appr, a = None, None
         if item.related_type == "approval" and str(item.related_id).isdigit():
             a = pending.get(int(item.related_id))
             if a is not None:
                 appr = approval_card(db, a, principal, names, now)
                 seen_approvals.add(a.id)
         actionable = bool(appr and appr["can_decide"])
+        if a is not None and _kind(a)[0] == "lesson":
+            kinds = kinds | LESSON_KINDS
         cards.append({**inbox.public(item), "key": f"item:{item.id}", "group": group_of(kinds, actionable),
-                      "approval": appr, "task": _task(db, item.task_id)})
+                      "approval": appr, "task": _task(db, item.task_id),
+                      **_subject(db, item.task_id, a, depts)})
     # Phê duyệt anh là người quyết nhưng không có dòng hộp việc (tạo trước D3.5, hoặc báo đi chỗ khác).
     if status in ("open", "all") and me is not None:
         for a in sorted(pending.values(), key=lambda x: x.id):
             if a.id in seen_approvals or me not in deciders(db, a):
                 continue
             card = approval_card(db, a, principal, names, now)
-            cards.append({"id": None, "key": f"approval:{a.id}", "title": f"Chờ duyệt: {a.action}"[:220],
+            cards.append({**_subject(db, card["task"]["id"] if card["task"] else None, a, depts), "id": None, "key": f"approval:{a.id}", "title": f"Chờ duyệt: {a.action}"[:220],
                           "kind": "approval_pending", "kinds": ["approval_pending"],
                           "kinds_vi": [inbox.KIND_VI["approval_pending"]], "count": 1,
                           "priority": "high" if (a.risk or "") in ("high", "critical") else "normal",
                           "status": "unread", "task_id": card["task"]["id"] if card["task"] else None,
                           "group_key": f"approval:{a.id}", "related_type": "approval", "related_id": str(a.id),
                           "lines": [], "source": "approvals", "created_at": card["created_at"],
-                          "updated_at": card["created_at"], "group": "approvals", "approval": card,
+                          "updated_at": card["created_at"],
+                          "group": "lessons" if card["kind"] == "lesson" else "approvals", "approval": card,
                           "task": card["task"]})
 
     def rank(c: dict):
@@ -214,11 +229,23 @@ def feed(db: Session, organization_id: int, principal: Principal, *, status: str
         "overdue": sum(1 for c in cards if (c.get("approval") or {}).get("overdue")),
         "by_group": {k: sum(1 for c in cards if c["group"] == k) for k, _ in GROUPS},
     }
-    shown = [c for c in cards if not group or c["group"] == group]
+    shown = [c for c in cards if (not group or c["group"] == group)
+             and (member_id is None or (c.get("seat") or {}).get("id") == member_id)
+             and (department_id is None or (c.get("department") or {}).get("id") == department_id)]
     return {"member_id": me, "linked": me is not None, "counts": counts,
             "groups": [{"key": k, "label": label, "items": [c for c in shown if c["group"] == k]}
                        for k, label in GROUPS if not group or k == group],
             "caps": {"escalate": is_manager(principal)}}
+
+
+def _subject(db: Session, task_id: int | None, a: Approval | None, depts: dict[int, str]) -> dict:
+    """Seat và phòng ban mà dòng này nói tới (người nhận việc, hoặc seat xin duyệt) — để lọc theo seat/phòng."""
+    t = db.get(Task, task_id) if task_id else None
+    mid = (t.assignee_member_id if t is not None else None) or (a.requester_member_id if a is not None else None)
+    m = db.get(Member, mid) if mid else None
+    dept_id = (m.department_id if m is not None else None) or (getattr(t, "assignee_department_id", None) if t else None)
+    return {"seat": {"id": m.id, "name": m.name, "type": m.member_type} if m is not None else None,
+            "department": {"id": dept_id, "name": depts.get(dept_id, "")} if dept_id else None}
 
 
 def _ts(iso: str | None) -> float:
@@ -261,7 +288,8 @@ def mark_all_read(db: Session, organization_id: int, principal: Principal) -> in
 
 
 async def decide(db: Session, organization_id: int, principal: Principal, approval_id: int, *,
-                 decision: str, note: str = "", expected_revision: int | None = None) -> dict:
+                 decision: str, note: str = "", expected_revision: int | None = None,
+                 grant_scope: str | None = None) -> dict:
     a = db.get(Approval, approval_id)
     if a is None or a.organization_id != organization_id:
         raise WorkError(404, "not_found", "Không tìm thấy yêu cầu duyệt này")
@@ -278,6 +306,11 @@ async def decide(db: Session, organization_id: int, principal: Principal, approv
     note = (note or "").strip()
     if decision == "reject" and not note:
         raise WorkError(422, "note_required", "Ghi lý do từ chối để người gửi biết cần sửa gì")
+    if grant_scope not in (None, "task"):
+        if _kind(a)[0] != "budget":
+            raise WorkError(422, "bad_grant_scope", "Chỉ phê duyệt chi tiếp ngân sách mới chọn được phạm vi seat / phòng")
+        if grant_scope not in ("seat", "department"):
+            raise WorkError(422, "bad_grant_scope", "Phạm vi chỉ được là việc này, cả seat hoặc cả phòng")
     me = principal.member_id
     status = "approved" if decision == "approve" else "rejected"
     rev = a.revision or 1
@@ -303,6 +336,8 @@ async def decide(db: Session, organization_id: int, principal: Principal, approv
     _claim(db, a, rev, values={"status": "deciding"})
     a.status = status
     a.resolution_note = note
+    if grant_scope and _kind(a)[0] == "budget" and status == "approved":
+        a.payload = {**(a.payload or {}), "grant_scope": grant_scope}
     if a.approver_member_id is None and me is not None:
         a.approver_member_id = me
     db.add(a); db.commit(); db.refresh(a)
@@ -355,6 +390,9 @@ def after_decision(db: Session, a: Approval, actor_member_id: int | None) -> dic
         except strategy.StrategyError as exc:
             raise WorkError(409, "plan_error", exc.message) from exc
         return {"effect": "plan"}
+    if key.startswith("lesson:"):
+        # M5 sẽ ghi bài học đã duyệt vào MEMORY.md của agent; M4b chỉ giữ chỗ cho luồng duyệt.
+        return {"effect": "lesson", "applied": False}
     if key.startswith("budget_soft:"):
         from app.services import budget_scope
         return {"effect": "budget", **budget_scope.on_soft_decision(db, a)}

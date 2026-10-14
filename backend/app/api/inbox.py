@@ -60,14 +60,17 @@ class DecideIn(BaseModel):
     decision: str = Field(pattern="^(approve|reject)$")
     note: str = Field(default="", max_length=2000)
     expected_revision: int | None = None
+    grant_scope: str | None = None   # chi tiếp ngân sách: task | seat | department
 
 
 @router.get("/items")
-def items(status: str = "open", group: str | None = None, principal: Principal = Depends(require_human()),
+def items(status: str = "open", group: str | None = None, member_id: int | None = None,
+          department_id: int | None = None, principal: Principal = Depends(require_human()),
           db: Session = Depends(get_db)):
     if group is not None and group not in inbox_hub.GROUP_VI:
-        raise WorkError(422, "bad_group", "Nhóm chỉ được là approvals, review, budget hoặc updates")
-    return inbox_hub.feed(db, active_org(principal), principal, status=status, group=group)
+        raise WorkError(422, "bad_group", "Nhóm chỉ được là approvals, review, budget, lessons hoặc updates")
+    return inbox_hub.feed(db, active_org(principal), principal, status=status, group=group,
+                          member_id=member_id, department_id=department_id)
 
 
 @router.get("/summary")
@@ -92,7 +95,8 @@ async def decide(approval_id: int, payload: DecideIn, principal: Principal = Dep
                  db: Session = Depends(get_db)):
     """Duyệt một chạm. Từ chối phải có lý do. 409 khi đã có người quyết / nội dung vừa đổi."""
     return await inbox_hub.decide(db, active_org(principal), principal, approval_id, decision=payload.decision,
-                                  note=payload.note, expected_revision=payload.expected_revision)
+                                  note=payload.note, expected_revision=payload.expected_revision,
+                                  grant_scope=payload.grant_scope)
 
 
 @router.post("/escalate")
@@ -142,6 +146,7 @@ def costs_overview(days: int = 30, principal: Principal = Depends(require_human(
 def budgets(include_archived: bool = False, principal: Principal = Depends(require_human()),
             db: Session = Depends(get_db)):
     from app.models import Company, Department
+    from app.models.v16 import AgentTeam
     org = active_org(principal)
     cids = [c.id for c in db.query(Company).filter(Company.organization_id == org).all()]
     return {"budgets": cost_board.list_budgets(db, org, include_archived),
@@ -152,6 +157,8 @@ def budgets(include_archived: bool = False, principal: Principal = Depends(requi
                 "department": [{"id": d.id, "name": d.name, "company_id": d.company_id} for d in
                                (db.query(Department).filter(Department.company_id.in_(cids)).order_by(Department.id)
                                 if cids else [])],
+                "team": [{"id": t.id, "name": t.name} for t in
+                         db.query(AgentTeam).filter(AgentTeam.organization_id == org).order_by(AgentTeam.id)],
                 "member": [{"id": m.id, "name": m.name} for m in
                            db.query(Member).filter(Member.organization_id == org, Member.member_type == "agent",
                                                    Member.status != "retired").order_by(Member.name)]}}
