@@ -1,0 +1,115 @@
+/* ==========================================================================
+   ClawCompany UI v2 — tầng token mở rộng + nền.
+   Nguồn màu/font/khoảng cách gốc: design/brand/tokens.css (đã chốt, không sửa ở
+   đây). File này chỉ THÊM những gì tokens.css chưa có: thang chữ đủ cho bảng
+   dày, chuyển động, độ nổi, z-index, kích thước khung, và bảng màu trạng thái
+   dẫn xuất từ token thương hiệu. Mọi file CSS khác chỉ đọc biến, không viết mã
+   màu trực tiếp (trừ mascot).
+   ========================================================================== */
+
+:root{
+  color-scheme:light;
+  /* chữ: tokens.css có 12/14/16/20/28; bảng dày kiểu Linear cần 13, nhãn nhỏ 11 */
+  --fs-11:11px; --fs-13:13px; --fs-24:24px; --fs-36:36px;
+  --lh-snug:1.35;
+  --tracking-tight:-0.012em; --tracking-display:-0.022em;
+
+  --sp-5:20px; --sp-10:40px; --sp-16:64px;
+  --radius-xs:6px;
+
+  /* chuyển động: chỉ dùng cho phản hồi thao tác (mở, đóng, xác nhận) */
+  --dur-fast:120ms; --dur:180ms; --dur-slow:260ms;
+  --ease-out:cubic-bezier(.2,0,0,1); --ease-in-out:cubic-bezier(.4,0,.2,1);
+
+  /* độ nổi: 0 phẳng · 1 thẻ · 2 menu · 3 hộp thoại */
+  --shadow-3:0 24px 64px rgba(26,28,43,.18),0 2px 8px rgba(26,28,43,.08);
+
+  --z-sticky:20; --z-nav:30; --z-overlay:50; --z-palette:60; --z-toast:70;
+
+  /* khung */
+  --sidebar-w:244px; --topbar-h:52px; --bottomnav-h:62px; --peek-w:600px; --content-max:1240px;
+  --page-pad:28px;
+
+  /* tương tác — lớp phủ trong suốt để dùng chung trên mọi nền */
+  --hover:rgba(26,28,43,.05); --pressed:rgba(26,28,43,.09); --selected:rgba(214,58,47,.08);
+  --accent:var(--brand-cang);               /* chỉ để nhấn: chấm active, mascot */
+  --accent-text:var(--brand-cang-strong);   /* chữ màu càng trên nền sáng ≥4.5:1 */
+  --scrim:rgba(18,19,28,.42);
+  --track:var(--surface-2);
+
+  /* trạng thái = token ngữ nghĩa, không thêm màu mới */
+  --neutral:#5B6075; --neutral-bg:#F1E9E1;
+  --st-backlog:var(--neutral);  --st-backlog-bg:var(--neutral-bg);
+  --st-todo:var(--text);        --st-todo-bg:var(--surface-2);
+  --st-running:var(--ok);       --st-running-bg:var(--ok-bg);     /* Rong = agent đang làm */
+  --st-review:var(--wait);      --st-review-bg:var(--wait-bg);    /* Đèn = chờ duyệt */
+  --st-waiting:var(--wait);     --st-waiting-bg:var(--wait-bg);
+  --st-blocked:var(--risk);     --st-blocked-bg:var(--risk-bg);
+  --st-done:var(--ok);          --st-done-bg:var(--ok-bg);
+  --st-failed:var(--risk);      --st-failed-bg:var(--risk-bg);
+  --st-cancelled:var(--neutral);--st-cancelled-bg:var(--neutral-bg);
+  --lamp:var(--brand-den);      /* cửa sổ sáng của Bé Càng */
+}
+[data-theme="dark"]{
+  color-scheme:dark;
+  --shadow-3:0 24px 64px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.4);
+  --hover:rgba(255,255,255,.06); --pressed:rgba(255,255,255,.1); --selected:rgba(255,122,110,.12);
+  --accent-text:#FF8A80;  /* 6.6:1 trên --surface tối */
+  --scrim:rgba(0,0,0,.6);
+  --neutral:#A3A7BD; --neutral-bg:#262A40;
+}
+
+/* ---------------------------------------------------------------- nền */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+@media (pointer:fine){html{overscroll-behavior:none}}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:var(--font-sans);font-size:var(--fs-14);line-height:var(--lh-body);
+  font-feature-settings:"cv11","ss01";
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
+h1,h2,h3,h4{margin:0;font-weight:var(--fw-semibold);line-height:var(--lh-tight);letter-spacing:var(--tracking-tight);text-wrap:balance}
+p{margin:0;text-wrap:pretty}
+a{color:inherit}
+:where(a){text-decoration-color:color-mix(in srgb,currentColor 35%,transparent);text-underline-offset:2px}
+img,svg{display:block;max-width:100%}
+code,kbd,pre,samp{font-family:var(--font-mono);font-size:.92em}
+pre{white-space:pre-wrap;word-break:break-word;margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed}
+hr{border:0;border-top:1px solid var(--border);margin:var(--sp-4) 0}
+::selection{background:color-mix(in srgb,var(--brand-cang) 26%,transparent)}
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
+[hidden]{display:none !important}
+.ui-num,.tabular{font-variant-numeric:tabular-nums}
+.ui-mono{font-family:var(--font-mono);font-size:var(--fs-12)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* Ô nhập thô (nhiều console cũ dùng thẳng <input>/<select>) — specificity 0 nhờ :where,
+   nên mọi class cụ thể đều đè được. Native select có nền/chữ rõ ràng cho dark mode. */
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),select,textarea){
+  font:inherit;font-size:var(--fs-14);color:var(--text);background:var(--surface);
+  border:1px solid var(--border-strong);border-radius:var(--radius-sm);
+  min-height:36px;padding:7px 10px;max-width:100%;
+  transition:border-color var(--dur-fast) var(--ease-out),box-shadow var(--dur-fast) var(--ease-out);
+}
+:where(textarea){min-height:72px;line-height:var(--lh-body);resize:vertical;width:100%}
+:where(select){padding-right:28px;appearance:none;-webkit-appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--text-muted) 50%),linear-gradient(135deg,var(--text-muted) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 52%,calc(100% - 10px) 52%;background-size:5px 5px;background-repeat:no-repeat}
+:where(input,select,textarea):hover{border-color:var(--text-muted)}
+:where(input,select,textarea):focus-visible{outline:none;border-color:var(--primary);box-shadow:var(--focus)}
+:where(input,select,textarea):disabled{opacity:.6;cursor:not-allowed}
+:where(input,textarea)::placeholder{color:var(--text-muted);opacity:.85}
+:where(input[type="checkbox"],input[type="radio"]){accent-color:var(--primary);width:16px;height:16px;margin:0}
+:where(label){cursor:default}
+:where(table){border-collapse:collapse;width:100%}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+}

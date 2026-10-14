@@ -8,12 +8,13 @@ import type {ReactNode} from "react";
 
 export type BeCangMood = "hello" | "working" | "done" | "error" | "sleep";
 
-export function BeCang({mood = "hello", size = 96, title}: {mood?: BeCangMood; size?: number; title?: string}) {
-  const lit = mood === "working" || mood === "done";
+export function BeCang({mood = "hello", size = 96, title, lit: litCount}: {mood?: BeCangMood; size?: number; title?: string; lit?: number}) {
+  /* `lit` (0–6): số cửa sổ sáng = số agent đang làm (Tổng quan). Không truyền thì theo tâm trạng. */
+  const lit = litCount !== undefined ? litCount > 0 : mood === "working" || mood === "done";
   const win = (x: number, y: number, on: boolean) =>
-    <rect key={`${x}-${y}`} x={x} y={y} width="9" height="9" rx="1.5" fill={on ? "#FFD36B" : "#EADFD5"}/>;
+    <rect key={`${x}-${y}`} x={x} y={y} width="9" height="9" rx="1.5" fill={on ? "#FFD36B" : "#EADFD5"} className={on ? "bc-lit" : undefined}/>;
   const windows = [[44, 22], [57, 22], [44, 36], [57, 36], [44, 50], [57, 50]]
-    .map(([x, y], i) => win(x, y, lit && (mood === "done" || i % 2 === 0)));
+    .map(([x, y], i) => win(x, y, litCount !== undefined ? i < litCount : lit && (mood === "done" || i % 2 === 0)));
   return <svg className={`bc-svg bc-${mood}`} width={size} height={size} viewBox="0 0 100 100" role="img"
     aria-label={title || "Bé Càng"}>
     {/* vỏ: toà nhà */}

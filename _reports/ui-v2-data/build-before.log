@@ -1,0 +1,97 @@
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+  ▲ Next.js 14.2.15
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/66) ...
+   Generating static pages (16/66) 
+   Generating static pages (32/66) 
+   Generating static pages (49/66) 
+ ✓ Generating static pages (66/66)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+┌ ○ /                                    16.7 kB         114 kB
+├ ○ /_not-found                          876 B          88.1 kB
+├ ○ /app/agent-tools                     4.31 kB         119 kB
+├ ○ /app/agents                          2.64 kB         117 kB
+├ ƒ /app/agents/[id]                     6.55 kB         129 kB
+├ ○ /app/approve                         390 B          87.6 kB
+├ ○ /app/artifacts                       2.25 kB         116 kB
+├ ○ /app/autonomy                        2.15 kB         116 kB
+├ ○ /app/budgets                         384 B          87.6 kB
+├ ○ /app/cicd                            2.07 kB         116 kB
+├ ○ /app/collaboration                   2.74 kB         117 kB
+├ ○ /app/communications                  1.76 kB         116 kB
+├ ○ /app/company-factory                 2.3 kB          117 kB
+├ ○ /app/control-center                  2.46 kB         117 kB
+├ ○ /app/costs                           5.24 kB         119 kB
+├ ○ /app/customers                       2.22 kB         116 kB
+├ ○ /app/delivery                        1.83 kB         116 kB
+├ ○ /app/deployments                     1.31 kB         116 kB
+├ ○ /app/dev-cloud                       1.61 kB         116 kB
+├ ○ /app/engineering                     2.6 kB          117 kB
+├ ○ /app/events                          1.76 kB         116 kB
+├ ○ /app/flow                            386 B          87.6 kB
+├ ○ /app/founder-cockpit                 2.46 kB         117 kB
+├ ○ /app/goals                           2.27 kB         121 kB
+├ ○ /app/inbox                           5.2 kB          119 kB
+├ ○ /app/incidents                       1.72 kB         116 kB
+├ ○ /app/knowledge-mesh                  2.53 kB         117 kB
+├ ○ /app/live-runs                       5.59 kB         120 kB
+├ ○ /app/marketplace                     2.1 kB          116 kB
+├ ○ /app/memory                          2.03 kB         116 kB
+├ ○ /app/nina                            2.6 kB          117 kB
+├ ○ /app/observability                   2.11 kB         116 kB
+├ ○ /app/openclaw                        3.49 kB         118 kB
+├ ○ /app/os                              45.2 kB         159 kB
+├ ○ /app/portfolio                       2.07 kB         116 kB
+├ ○ /app/production-trust                2.45 kB         117 kB
+├ ○ /app/progressive-delivery            1.98 kB         116 kB
+├ ○ /app/quality                         1.77 kB         116 kB
+├ ○ /app/release-manager                 2.02 kB         116 kB
+├ ○ /app/releases                        1.31 kB         116 kB
+├ ○ /app/reports                         2.99 kB         117 kB
+├ ○ /app/repositories                    1.32 kB         116 kB
+├ ○ /app/reviews                         1.25 kB         116 kB
+├ ○ /app/routines                        4.39 kB         119 kB
+├ ○ /app/routing                         3.42 kB         118 kB
+├ ○ /app/runners                         2.46 kB         117 kB
+├ ○ /app/sandboxes                       1.38 kB         116 kB
+├ ○ /app/secrets                         1.37 kB         116 kB
+├ ○ /app/secrets-federation              2.06 kB         116 kB
+├ ○ /app/simulation                      1.71 kB         116 kB
+├ ○ /app/sre-control                     2.38 kB         117 kB
+├ ○ /app/strategy                        3.7 kB          118 kB
+├ ○ /app/supply-chain                    2.13 kB         116 kB
+├ ○ /app/system                          1.67 kB         116 kB
+├ ƒ /app/tasks/[id]                      6.98 kB         126 kB
+├ ○ /app/team                            5.65 kB         128 kB
+├ ○ /app/telemetry-federation            1.93 kB         116 kB
+├ ○ /app/trust                           2.17 kB         116 kB
+├ ○ /app/work                            11.2 kB         125 kB
+├ ○ /app/workflows                       2.22 kB         116 kB
+├ ○ /app/workspace-gateway               2.08 kB         116 kB
+├ ○ /app/workspace-ops                   12.5 kB         127 kB
+├ ○ /app/workspaces                      1.27 kB         116 kB
+├ ○ /icon.svg                            0 B                0 B
+├ ƒ /invite/[token]                      2.27 kB        99.1 kB
+├ ○ /portal                              2.76 kB          90 kB
+└ ○ /portal/chat                         2.73 kB        89.9 kB
++ First Load JS shared by all            87.2 kB
+  ├ chunks/2117-305c0782e78a361e.js      31.6 kB
+  ├ chunks/fd9d1056-4a097619cae40cd6.js  53.6 kB
+  └ other shared chunks (total)          1.96 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+EXIT 0

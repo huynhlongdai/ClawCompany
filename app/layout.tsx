@@ -1,25 +1,31 @@
-import "./globals.css";
-import "./theme-v2.css";
-import "./v6.css";
+import "../design/brand/tokens.css";
+import "./styles/fonts.css";
+import "./styles/system.css";
+import "./styles/ui.css";
+import "./styles/pages.css";
+import "./styles/legacy.css";
+import type {Metadata, Viewport} from "next";
+import {THEME_BOOT} from "../lib/theme-boot";
 
-export const metadata = {
-  title: "ClawCompany — AI Organization OS",
-  description: "Số hoá công ty thật thành đội agent phối hợp làm việc",
+/* UI v2: một tầng token (design/brand/tokens.css, đã chốt) + system/ui/pages/legacy.
+   Font Be Vietnam Pro + JetBrains Mono tự host (app/styles/fonts.css). Script
+   nhỏ trong <head> đặt data-theme TRƯỚC khi vẽ nên không nháy sáng→tối. */
+export const metadata: Metadata = {
+  title: {default: "ClawCompany", template: "%s · ClawCompany"},
+  description: "Điều hành công ty cùng đội agent OpenClaw",
+};
+export const viewport: Viewport = {
+  width: "device-width", initialScale: 1, viewportFit: "cover",
+  themeColor: [{media: "(prefers-color-scheme: light)", color: "#FFF7F0"}, {media: "(prefers-color-scheme: dark)", color: "#12131C"}],
 };
 
-export default function RootLayout({children}:{children:React.ReactNode}) {
+export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="vi">
+    <html lang="vi" suppressHydrationWarning>
       <head>
-        {/* Inter cho giao diện, Instrument Serif cho dòng hiển thị lớn. Cặp
-            này là ngôn ngữ của design canvas v17: sạch nhưng có chất biên
-            tập, không phải font mặc định của hệ điều hành. */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&family=Instrument+Serif:ital@0;1&display=swap"
-          rel="stylesheet"
-        />
+        <script dangerouslySetInnerHTML={{__html: THEME_BOOT}}/>
+        <link rel="preload" href="/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/>
+        <link rel="preload" href="/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous"/>
       </head>
       <body>{children}</body>
     </html>

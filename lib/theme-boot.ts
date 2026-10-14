@@ -1,0 +1,2 @@
+/* Chạy trong <head> trước khi vẽ: đặt data-theme theo lựa chọn đã lưu hoặc theo máy (không nháy). Không import hook ở đây — file này dùng ở Server Component. */
+export const THEME_BOOT = `(function(){try{var t=localStorage.getItem("cc_theme")||"system";var d=t==="dark"||(t==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light";}catch(e){}})();`;
