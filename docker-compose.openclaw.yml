@@ -1,6 +1,6 @@
 # Gateway OpenClaw thật cho ClawCompany (thay OPENCLAW_MODE=mock).
-#   1 lần: tạo .env.openclaw có OPENCLAW_GATEWAY_TOKEN=<chuỗi ngẫu nhiên> (+ key model nếu có)
-#   docker compose --env-file .env.openclaw -f docker-compose.yml -f docker-compose.prized.yml -f docker-compose.openclaw.yml up -d
+#   VM: tools/openclaw_setup.sh (1 lần: .env.openclaw, secrets/provider_key, openclaw.json, CLI /usr/local/bin/openclaw)
+#   rồi mọi lệnh compose qua tools/oc_compose.sh (nạp .env + .env.openclaw). Key model: tools/set_provider.sh.
 # Gateway chỉ nằm trong mạng docker (không publish cổng); api/worker/beat gọi ws://openclaw:18789.
 x-openclaw-env: &oc-env
   OPENCLAW_MODE: native
@@ -23,6 +23,8 @@ services:
     env_file: [.env.openclaw]
     volumes:
       - openclaw_home:/home/node/.openclaw
+      # Key provider (SecretRef file, singleValue) — file thuộc uid 1000, quyền 600; tools/set_provider.sh ghi.
+      - ./secrets:/home/node/.openclaw-secrets:ro
   api:
     environment: *oc-env
     volumes: [clawcompany_device:/var/lib/clawcompany]

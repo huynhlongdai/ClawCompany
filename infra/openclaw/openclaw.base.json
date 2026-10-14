@@ -1,0 +1,17 @@
+{
+  "gateway": {
+    "mode": "local",
+    "bind": "lan",
+    "port": 18789,
+    "auth": { "mode": "token", "token": "${OPENCLAW_GATEWAY_TOKEN}" }
+  },
+  "secrets": {
+    "providers": {
+      "providerkey": {
+        "source": "file",
+        "path": "/home/node/.openclaw-secrets/provider_key",
+        "mode": "singleValue"
+      }
+    }
+  }
+}

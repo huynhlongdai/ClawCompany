@@ -42,3 +42,7 @@ tsconfig.tsbuildinfo
 # Celery beat ghi file lich o thu muc lam viec khi chay qua docker compose.
 # La trang thai runtime, khong phai nguon.
 backend/celerybeat-schedule
+
+# Key provider model cho gateway OpenClaw (tools/set_provider.sh), không bao giờ commit.
+/secrets/
+.env.openclaw

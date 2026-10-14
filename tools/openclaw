@@ -1,0 +1,7 @@
+#!/bin/sh
+# CLI `openclaw` trên VM = chạy CLI bên trong container gateway (cùng config, cùng token).
+# Cài: sudo install -m 755 tools/openclaw /usr/local/bin/openclaw
+# Ví dụ: openclaw agents list · openclaw devices list · openclaw devices approve --latest · openclaw health
+CC_DIR="${CLAWCOMPANY_DIR:-/home/hura/clawcompany}"
+if [ -t 0 ] && [ -t 1 ]; then TTY=""; else TTY="-T"; fi
+exec "$CC_DIR/tools/oc_compose.sh" exec $TTY openclaw node openclaw.mjs "$@"
