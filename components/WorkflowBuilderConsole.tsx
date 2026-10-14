@@ -1,10 +1,74 @@
 "use client";
-import {useEffect,useState} from "react";
+import {useCallback, useEffect, useState} from "react";
 import {PageFrame} from "./shell/PageFrame";
-import {api,apiV8} from "../lib/api";
+import {api, apiV8} from "../lib/api";
 import {activeOrganizationId} from "../lib/auth";
+import {Button} from "./ui/Button";
+import {Panel} from "./ui/Panel";
+import {StatusPill} from "./ui/StatusPill";
+import {EmptyState, ErrorBanner} from "./ui/EmptyState";
+import {useToast} from "./ui/Toast";
 
-type WF={id:number;name:string;trigger_type:string;status:string};
-const starter={nodes:[{id:"trigger",type:"trigger",label:"Task created"},{id:"research",type:"agent",label:"Research agent"},{id:"draft",type:"agent",label:"Create draft"},{id:"approval",type:"approval",label:"Manager approval"},{id:"publish",type:"tool",label:"Publish output"}],edges:[{source:"trigger",target:"research"},{source:"research",target:"draft"},{source:"draft",target:"approval"},{source:"approval",target:"publish"}]};
-export function WorkflowBuilderConsole(){const org=activeOrganizationId();const [flows,setFlows]=useState<WF[]>([]),[selected,setSelected]=useState<number|undefined>(),[graph,setGraph]=useState<any>(starter),[versions,setVersions]=useState<any[]>([]),[error,setError]=useState(""),[saved,setSaved]=useState("");async function load(){try{const f=await api.workflows(org) as WF[];setFlows(f);if(f.length&&!selected)setSelected(f[0].id)}catch(e:any){setError(e.message)}}useEffect(()=>{load()},[]);useEffect(()=>{if(selected)apiV8.workflowGraphVersions(selected).then((v:any)=>{setVersions(v);if(v[0])try{setGraph(JSON.parse(v[0].graph_json))}catch{}}).catch(()=>{})},[selected]);async function save(publish:boolean){if(!selected)return;setError("");try{const v:any=await apiV8.saveWorkflowGraph(selected,graph,publish);setSaved(`Saved v${v.version}${publish?" · published":""}`);setVersions(await apiV8.workflowGraphVersions(selected) as any[])}catch(e:any){setError(e.message)}}function addNode(){const id=`step-${Date.now()}`;setGraph({...graph,nodes:[...graph.nodes,{id,type:"agent",label:"New agent step"}]})}
- return <PageFrame title="Workflow Builder" subtitle="Versioned DAG model for visual company automation" action={<><button className="v8Ghost" onClick={()=>save(false)}>Save draft</button><button className="v8Primary" onClick={()=>save(true)}>Publish</button></>}><div className="v8Builder"><aside className="v8Card v8FlowList"><div className="v8CardHead"><div><b>Workflows</b><span>{flows.length} definitions</span></div></div>{flows.map(f=><button key={f.id} className={selected===f.id?"active":""} onClick={()=>setSelected(f.id)}><b>{f.name}</b><span>{f.trigger_type} · {f.status}</span></button>)}</aside><section className="v8Card v8Canvas"><div className="v8CardHead"><div><b>Visual graph</b><span>Nodes + edges are validated as an acyclic graph</span></div><button className="v8Ghost" onClick={addNode}>+ Node</button></div>{error&&<div className="v8Error">{error}</div>}{saved&&<div className="v8Success">{saved}</div>}<div className="v8Graph">{graph.nodes.map((n:any,i:number)=><div key={n.id} className={`v8Node ${n.type}`}><small>{n.type.toUpperCase()}</small><input value={n.label} onChange={e=>{const nodes=[...graph.nodes];nodes[i]={...n,label:e.target.value};setGraph({...graph,nodes})}}/><code>{n.id}</code>{i<graph.nodes.length-1&&<i className="v8Arrow">→</i>}</div>)}</div><div className="v8EdgeEditor"><b>Edges</b>{graph.edges.map((e:any,i:number)=><div key={i}><code>{e.source}</code><span>→</span><code>{e.target}</code></div>)}</div></section><aside className="v8Card v8Versions"><div className="v8CardHead"><div><b>Versions</b><span>Immutable graph snapshots</span></div></div>{versions.map(v=><div className="v8Version" key={v.id}><b>v{v.version}</b><span>{v.published?"Published":"Draft"}</span></div>)}</aside></div></PageFrame>}
+/* Việc định kỳ › Quy trình (v8 workflow graph): đồ thị bước có phiên bản bất biến.
+   UI v2: tiếng Việt, primitive; API giữ nguyên (lưu nháp / phát hành một phiên bản). */
+type WF = {id: number; name: string; trigger_type: string; status: string};
+const TYPE_VI: Record<string, string> = {trigger: "Kích hoạt", agent: "Agent làm", approval: "Duyệt", tool: "Công cụ", human: "Người làm"};
+const STATUS_VI: Record<string, string> = {active: "Đang dùng", draft: "Nháp", paused: "Tạm dừng", archived: "Lưu trữ"};
+const starter = {nodes: [{id: "trigger", type: "trigger", label: "Có việc mới"}, {id: "research", type: "agent", label: "Agent tìm hiểu"},
+  {id: "draft", type: "agent", label: "Viết bản nháp"}, {id: "approval", type: "approval", label: "Quản lý duyệt"}, {id: "publish", type: "tool", label: "Đăng kết quả"}],
+  edges: [{source: "trigger", target: "research"}, {source: "research", target: "draft"}, {source: "draft", target: "approval"}, {source: "approval", target: "publish"}]};
+
+export function WorkflowBuilderConsole() {
+  const org = activeOrganizationId();
+  const toast = useToast();
+  const [flows, setFlows] = useState<WF[] | null>(null), [selected, setSelected] = useState<number | undefined>();
+  const [graph, setGraph] = useState<any>(starter), [versions, setVersions] = useState<any[]>([]);
+  const [error, setError] = useState<unknown>(null), [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try { const f = await api.workflows(org) as WF[]; setFlows(f || []); setSelected(s => s ?? f?.[0]?.id); }
+    catch (e) { setError(e); setFlows([]); }
+  }, [org]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!selected) return;
+    apiV8.workflowGraphVersions(selected).then((v: any) => { setVersions(v || []); if (v?.[0]) try { setGraph(JSON.parse(v[0].graph_json)); } catch { /* đồ thị hỏng: giữ mẫu */ } })
+      .catch(setError);
+  }, [selected]);
+
+  async function save(publish: boolean) {
+    if (!selected) return; setError(null); setBusy(true);
+    try { const v: any = await apiV8.saveWorkflowGraph(selected, graph, publish); toast(`Đã lưu phiên bản ${v.version}${publish ? " và phát hành" : " (nháp)"}`);
+      setVersions(await apiV8.workflowGraphVersions(selected) as any[]); }
+    catch (e) { setError(e); } finally { setBusy(false); }
+  }
+  const addNode = () => setGraph({...graph, nodes: [...graph.nodes, {id: `buoc-${graph.nodes.length + 1}`, type: "agent", label: "Bước mới"}]});
+
+  return <PageFrame actions={selected ? <><Button onClick={() => save(false)} busy={busy}>Lưu nháp</Button><Button variant="primary" onClick={() => save(true)} disabled={busy}>Phát hành</Button></> : undefined}>
+    {error ? <ErrorBanner error={error} onClose={() => setError(null)} context="Quy trình"/> : null}
+    {flows && flows.length === 0 ? <EmptyState mood="chao" title="Chưa có quy trình">
+      Quy trình là chuỗi bước cố định (agent làm → người duyệt → công cụ đăng). Việc lặp đơn giản thì dùng tab Việc định kỳ.</EmptyState> :
+    <div className="wf">
+      <Panel title="Quy trình" desc={flows ? `${flows.length} quy trình` : "Đang tải…"} flush>
+        <div className="ui-list">{(flows || []).map(f => <button key={f.id} className="ui-row" aria-pressed={selected === f.id} onClick={() => setSelected(f.id)}
+          style={selected === f.id ? {background: "var(--selected)"} : undefined}>
+          <span className="ui-row-main"><span className="ui-row-title">{f.name}</span><span className="ui-row-meta">{f.trigger_type}</span></span>
+          <StatusPill tone={f.status === "active" ? "ok" : "neutral"}>{STATUS_VI[f.status] || f.status}</StatusPill></button>)}</div>
+      </Panel>
+      <Panel title="Các bước" desc="Đồ thị được kiểm tra không có vòng lặp khi lưu" actions={<Button size="sm" icon="plus" onClick={addNode}>Thêm bước</Button>}>
+        <ol className="wf-steps">{graph.nodes.map((n: any, i: number) => <li key={n.id} className={"wf-node is-" + n.type}>
+          <span className="wf-type">{TYPE_VI[n.type] || n.type}</span>
+          <input value={n.label} aria-label={`Tên bước ${i + 1}`} onChange={e => { const nodes = [...graph.nodes]; nodes[i] = {...n, label: e.target.value}; setGraph({...graph, nodes}); }}/>
+          <code translate="no">{n.id}</code>
+        </li>)}</ol>
+        <details style={{marginTop: 12}}><summary>Nối giữa các bước ({graph.edges.length})</summary>
+          <ul className="wf-edges">{graph.edges.map((e: any, i: number) => <li key={i}><code>{e.source}</code> → <code>{e.target}</code></li>)}</ul></details>
+      </Panel>
+      <Panel title="Phiên bản" desc="Ảnh chụp bất biến" flush>
+        <div className="ui-list">{versions.map(v => <div key={v.id} className="ui-row"><span className="ui-row-main"><span className="ui-row-title">Bản {v.version}</span></span>
+          <StatusPill tone={v.published ? "ok" : "neutral"}>{v.published ? "Đã phát hành" : "Nháp"}</StatusPill></div>)}
+          {!versions.length && <p className="ui-row ui-row-meta">Chưa lưu phiên bản nào.</p>}</div>
+      </Panel>
+    </div>}
+  </PageFrame>;
+}
