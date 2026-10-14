@@ -9,6 +9,13 @@ const STATUS_TONE: Record<string, Tone> = {
   review: "wait", pending: "wait", waiting: "wait", queued: "wait", plan_pending: "wait", paused: "wait", warn: "wait", degraded: "wait",
   blocked: "risk", failed: "risk", error: "risk", rejected: "risk", detached: "risk", retired: "neutral", overdue: "risk", fail: "risk",
   backlog: "neutral", todo: "outline", cancelled: "neutral", draft: "neutral", skipped: "neutral",
+  resolved: "ok", passed: "ok", success: "ok", enabled: "ok", online: "ok", deployed: "ok", promoted: "ok", verified: "ok", merged: "ok",
+  executing: "ok", started: "ok", complete: "ok", clean: "ok", signed: "ok", sent: "ok", delivered: "ok", ok: "ok", green: "ok", on_track: "ok",
+  open: "wait", acknowledged: "wait", investigating: "wait", mitigated: "wait", provisioning: "wait", deploying: "wait", planned: "wait",
+  waiting_approval: "wait", awaiting_approval: "wait", in_review: "wait", changes_requested: "wait", insufficient_data: "wait", rolled_back: "wait",
+  high: "wait", medium: "info", low: "neutral", dirty: "wait", yellow: "wait", at_risk: "wait", scheduled: "info", new: "info",
+  breached: "risk", critical: "risk", unhealthy: "risk", offline: "risk", failure: "risk", errored: "risk", red: "risk", off_track: "risk", cleanup_failed: "risk",
+  disabled: "neutral", off: "neutral", expired: "neutral", revoked: "neutral", released: "neutral", destroyed: "neutral", closed: "neutral", archived: "neutral",
 };
 export const toneOf = (status?: string | null): Tone => STATUS_TONE[String(status || "").toLowerCase()] || "neutral";
 

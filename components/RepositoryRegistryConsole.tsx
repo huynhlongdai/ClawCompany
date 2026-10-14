@@ -1,17 +1,47 @@
 "use client";
-import {useEffect,useState} from "react";
+import {useEffect, useState} from "react";
 import {activeOrganizationId} from "../lib/auth";
 import {apiV11} from "../lib/api";
-type Any=Record<string,any>;
-export function RepositoryRegistryConsole(){
- const [items,setItems]=useState<Any[]>([]),[selected,setSelected]=useState<Any|null>(null),[error,setError]=useState("");
- const [name,setName]=useState("nova-product"),[project,setProject]=useState("");
- const load=async()=>{try{const data=await apiV11.repositories() as Any[];setItems(data);setError("");if(data[0]&&!selected)setSelected(await apiV11.repository(data[0].id) as Any)}catch(e:any){setError(e.message)}};
- useEffect(()=>{load()},[]);
- const create=async()=>{try{await apiV11.createRepository({organization_id:activeOrganizationId(),name,provider:"local",default_branch:"main",project_id:project?Number(project):null,initialize:true});await load()}catch(e:any){setError(e.message)}};
- const inspect=async(id:number)=>{try{setSelected(await apiV11.repository(id) as Any)}catch(e:any){setError(e.message)}};
- return <><div className="v11Flow"><span>Artifact Bundle</span><i>→</i><b>Repository Registry</b><i>→</i><b>Isolated Worktree</b><i>→</i><span>Commit Agent</span></div>
- <div className="v10Grid"><section className="v8Card"><div className="v8CardHead"><div><b>Register repository</b><small>Local Git works immediately. GitHub/generic remotes stay behind provider credentials.</small></div></div><div className="v9Form"><label>Name<input value={name} onChange={e=>setName(e.target.value)}/></label><label>Project ID (optional)<input value={project} onChange={e=>setProject(e.target.value)}/></label><button className="v8Primary" onClick={create}>Create & initialize</button></div>{error&&<div className="portalError">{error}</div>}</section>
- <section className="v8Card"><div className="v8CardHead"><div><b>Repository state</b><small>Exact branch, head SHA and clean/dirty state from Git.</small></div></div>{selected?<div className="v11RepoState"><b>{selected.repository?.name}</b><span>{selected.repository?.provider}</span><code>{selected.state?.path||"not initialized"}</code><div><small>Branch</small><strong>{selected.state?.branch||"—"}</strong></div><div><small>HEAD</small><strong>{String(selected.state?.head||"—").slice(0,12)}</strong></div><div><small>Status</small><strong>{selected.state?.status||"clean"}</strong></div></div>:<div className="v8Empty">Select a repository</div>}</section></div>
- <section className="v8Card"><div className="v8CardHead"><div><b>Repository Registry</b><small>Tenant-bound repositories and delivery targets</small></div></div><div className="v11RepoTable"><div className="v11RepoHead"><span>Name</span><span>Provider</span><span>Branch</span><span>Status</span><span/></div>{items.map(x=><div className="v11RepoRow" key={x.id}><b>{x.name}</b><span>{x.provider}</span><code>{x.default_branch}</code><em>{x.status}</em><button onClick={()=>inspect(x.id)}>Inspect</button></div>)}</div></section></>
+import {Button} from "./ui/Button";
+import {ErrorBanner} from "./ui/EmptyState";
+import {Field} from "./ui/Field";
+import {Any, Intro, KV, LabBody, Panel, Pill, Table, short, useAction, useLoad} from "./lab/kit";
+
+/* Phòng thí nghiệm · Repository (v11): sổ đăng ký kho mã theo tổ chức + trạng thái Git chính xác. */
+export function RepositoryRegistryConsole() {
+  const q = useLoad(async () => (await apiV11.repositories()) as Any[], []);
+  const [selected, setSelected] = useState<Any | null>(null);
+  const [name, setName] = useState("nova-product"), [project, setProject] = useState("");
+  const act = useAction();
+  const inspect = (id: number) => act.run("i" + id, async () => setSelected(await apiV11.repository(id) as Any));
+  useEffect(() => { if (!selected && q.data[0]) inspect(q.data[0].id); /* eslint-disable-next-line */ }, [q.data]);
+  const create = () => act.run("create", async () => {
+    await apiV11.createRepository({organization_id: activeOrganizationId(), name, provider: "local", default_branch: "main", project_id: project ? Number(project) : null, initialize: true}); await q.reload();
+  }, "Đã tạo repository");
+  const st = selected?.state || {};
+  return <LabBody q={q}>
+    <Intro flow={["Gói artifact", "Sổ repository", "Worktree riêng", "Agent commit"]}>Git cục bộ dùng được ngay; GitHub và remote khác nằm sau chứng chỉ của nhà cung cấp.</Intro>
+    {act.error ? <ErrorBanner error={act.error} context="Repository" onClose={() => act.setError(null)}/> : null}
+    <div className="ui-grid is-2">
+      <Panel title="Đăng ký repository">
+        <div className="ui-form">
+          <Field label="Tên"><input className="ui-input" value={name} onChange={e => setName(e.target.value)}/></Field>
+          <Field label="Mã dự án (không bắt buộc)"><input className="ui-input" inputMode="numeric" value={project} onChange={e => setProject(e.target.value)}/></Field>
+          <div><Button variant="primary" busy={act.busy === "create"} onClick={create}>Tạo và khởi tạo</Button></div>
+        </div>
+      </Panel>
+      <Panel title="Trạng thái repository" desc="Nhánh, HEAD và sạch/có thay đổi — đọc thẳng từ Git">
+        {selected ? <KV items={[["Tên", <b key="n">{selected.repository?.name}</b>], ["Nhà cung cấp", selected.repository?.provider], ["Đường dẫn", <code key="p">{st.path || "chưa khởi tạo"}</code>],
+          ["Nhánh", st.branch || "—"], ["HEAD", <code key="h">{short(st.head)}</code>], ["Tình trạng", <Pill key="s" s={st.status || "clean"}/>]]}/>
+          : <p className="ui-empty-line">Chọn một repository ở bảng dưới.</p>}
+      </Panel>
+    </div>
+    <Panel title="Sổ repository" desc="Kho mã theo tổ chức và đích giao hàng">
+      <Table rows={q.data} empty="Chưa đăng ký repository nào." cols={[
+        {label: "Tên", render: x => <b>{x.name}</b>}, {label: "Nhà cung cấp", render: x => x.provider, hideSm: true},
+        {label: "Nhánh", render: x => <code>{x.default_branch}</code>}, {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+        {label: "", render: x => <Button size="sm" busy={act.busy === "i" + x.id} onClick={() => inspect(x.id)}>Xem</Button>},
+      ]}/>
+    </Panel>
+  </LabBody>;
 }

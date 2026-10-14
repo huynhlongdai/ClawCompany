@@ -1,3 +1,43 @@
 "use client";
-import {useEffect,useState} from "react";import {apiV14} from "../lib/api";type Any=Record<string,any>;
-export function TrustConsole(){const [sigs,setSigs]=useState<Any[]>([]),[providers,setProviders]=useState<Any[]>([]),[runs,setRuns]=useState<Any[]>([]),[error,setError]=useState("");useEffect(()=>{Promise.all([apiV14.signatures(),apiV14.scannerProviders(),apiV14.scannerRuns()]).then(([a,b,c])=>{setSigs(a as Any[]);setProviders(b as Any[]);setRuns(c as Any[])}).catch((e:any)=>setError(e.message))},[]);return <>{error&&<div className="portalError">{error}</div>}<section className="v14Hero"><div><span>SOFTWARE SUPPLY CHAIN TRUST</span><h2>Evidence can now be signed and independently gated before release promotion.</h2><p>v14 keeps SBOM/provenance as immutable artifacts, attaches a signature record, and exposes scanner adapters for deterministic review, Semgrep, Trivy and OSV Scanner.</p><div className="v14Flow"><b>Commit</b><i>→</i><b>SBOM</b><i>→</i><b>Provenance</b><i>→</i><b>Signature</b><i>→</i><b>SAST / CVE</b><i>→</i><b>Release Gate</b></div></div><aside><small>TRUST MODEL</small><strong>No fake attestation</strong><p>Local HMAC is a development signer. Cosign CLI is an explicit adapter; keyless verification remains blocked until a trust-policy/bundle adapter is configured.</p></aside></section><div className="v13Split"><section className="v8Card"><div className="v8CardHead"><div><b>Evidence signatures</b><small>Digest-bound verification state</small></div></div><div className="v14TrustList">{sigs.map(x=><article key={x.id}><span>{x.verified?"✓":"○"}</span><div><b>Artifact #{x.artifact_id}</b><code>{x.subject_digest?.slice(0,20)}…</code></div><em>{x.signature_type}</em></article>)}{!sigs.length&&<div className="v8Empty">No signed evidence yet</div>}</div></section><section className="v8Card"><div className="v8CardHead"><div><b>Scanner providers</b><small>Explicit tool availability</small></div></div><div className="v14ProviderGrid compact">{providers.map(x=><article key={x.id}><span>{x.enabled?"enabled":"off"}</span><b>{x.name}</b><p>{x.provider_type} · block on {x.block_on}</p></article>)}{!providers.length&&<div className="v8Empty">No scanner provider configured</div>}</div></section></div><section className="v8Card"><div className="v8CardHead"><div><b>External scan runs</b><small>Normalized findings without hiding provider failures</small></div></div><div className="v14Table scan"><div className="head"><span>Run</span><span>Provider</span><span>Commit</span><span>Verdict</span><span>Status</span></div>{runs.map(x=><div key={x.id}><b>#{x.id}</b><span>provider #{x.provider_id}</span><code>{x.commit_sha?.slice(0,12)}</code><em>{x.verdict}</em><span>{x.status}</span></div>)}{!runs.length&&<div className="v8Empty">No scanner run yet</div>}</div></section></>}
+import {apiV14} from "../lib/api";
+import {Any, Intro, LabBody, Panel, Pill, Table, short, useLoad} from "./lab/kit";
+
+/* Phòng thí nghiệm · Tin cậy (v14): ký bằng chứng SBOM/provenance, adapter bộ quét, cổng trước khi thăng cấp bản phát hành. */
+export function TrustConsole() {
+  const q = useLoad(async () => {
+    const [a, b, c] = await Promise.all([apiV14.signatures(), apiV14.scannerProviders(), apiV14.scannerRuns()]);
+    return {sigs: a as Any[], providers: b as Any[], runs: c as Any[]};
+  }, {sigs: [], providers: [], runs: []});
+  const {data} = q;
+  return <LabBody q={q}>
+    <Intro flow={["Commit", "SBOM", "Provenance", "Chữ ký", "SAST / CVE", "Cổng phát hành"]}>
+      SBOM và provenance là artifact bất biến, kèm bản ghi chữ ký; adapter bộ quét cho review xác định, Semgrep, Trivy, OSV Scanner.
+      Không làm giả chứng thực: HMAC tại chỗ chỉ để phát triển; Cosign CLI là adapter tường minh; xác minh keyless vẫn bị chặn tới khi cấu hình chính sách tin cậy.
+    </Intro>
+    <div className="ui-grid is-2">
+      <Panel title="Chữ ký bằng chứng" desc="Trạng thái xác minh gắn với digest">
+        <Table rows={data.sigs} empty="Chưa có bằng chứng nào được ký." cols={[
+          {label: "Artifact", render: x => <>#{x.artifact_id}</>},
+          {label: "Digest", render: x => <code>{short(x.subject_digest, 20)}…</code>, hideSm: true},
+          {label: "Kiểu", render: x => <code>{x.signature_type}</code>},
+          {label: "Xác minh", render: x => <Pill s={x.verified ? "verified" : "unverified"}/>},
+        ]}/>
+      </Panel>
+      <Panel title="Bộ quét" desc="Công cụ nào thật sự có">
+        <Table rows={data.providers} empty="Chưa cấu hình bộ quét nào." cols={[
+          {label: "Tên", render: x => <><b>{x.name}</b><br/><small>{x.provider_type} · chặn từ mức {x.block_on}</small></>},
+          {label: "Trạng thái", render: x => <Pill s={x.enabled ? "enabled" : "off"}/>},
+        ]}/>
+      </Panel>
+    </div>
+    <Panel title="Lượt quét ngoài" desc="Kết quả chuẩn hoá, không giấu lỗi của nhà cung cấp">
+      <Table rows={data.runs} empty="Chưa có lượt quét nào." cols={[
+        {label: "Lượt", render: x => <>#{x.id}</>},
+        {label: "Bộ quét", render: x => <>#{x.provider_id}</>},
+        {label: "Commit", render: x => <code>{short(x.commit_sha)}</code>},
+        {label: "Kết luận", render: x => <Pill s={x.verdict}/>},
+        {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+      ]}/>
+    </Panel>
+  </LabBody>;
+}

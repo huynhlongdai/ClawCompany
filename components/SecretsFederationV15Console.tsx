@@ -1,5 +1,36 @@
 "use client";
-import {useEffect,useState} from "react";
 import {apiV15} from "../lib/api";
-type Any=Record<string,any>;
-export function SecretsFederationV15Console(){const [providers,setProviders]=useState<Any[]>([]),[leases,setLeases]=useState<Any[]>([]),[error,setError]=useState("");useEffect(()=>{Promise.all([apiV15.secretProviders(),apiV15.secretAccessLeases()]).then(([a,b])=>{setProviders(a as Any[]);setLeases(b as Any[])}).catch((e:any)=>setError(e.message))},[]);return <>{error&&<div className="portalError">{error}</div>}<section className="v14Hero"><div><span>SECRETS FEDERATION</span><h2>Agents receive a lease to use a secret, never the secret as company memory.</h2><p>Provider metadata stays in ClawCompany while values are resolved at execution time from env, Vault or supported cloud CLI adapters.</p><div className="v14Flow"><b>Agent</b><i>→</i><b>Secret Grant</b><i>→</i><b>Access Lease</b><i>→</i><b>Provider</b><i>→</i><b>Ephemeral mount</b></div></div><aside><small>DATA POSTURE</small><strong>Metadata only</strong><p>SecretAccessLease records identity, expiry and mount intent. Plaintext values are never persisted in the ClawCompany database.</p></aside></section><div className="v14Metrics">{[["Providers",providers.length],["Active leases",leases.filter(x=>x.status==="active").length],["Vault adapters",providers.filter(x=>x.provider==="vault_http").length],["Cloud CLI adapters",providers.filter(x=>String(x.provider).endsWith("_cli")).length]].map(([l,v])=><article key={String(l)}><small>{l}</small><b>{v}</b></article>)}</div><div className="v13Split"><section className="v8Card"><div className="v8CardHead"><div><b>Provider connections</b><small>No secret value displayed</small></div></div><div className="v14LeaseList">{providers.map(x=><article key={x.id}><div><span className={`v13Dot ${x.enabled?"running":"completed"}`}/><div><b>{x.name}</b><small>{x.provider} · {x.endpoint||"local execution environment"}</small></div></div><em>{x.enabled?"enabled":"disabled"}</em></article>)}{!providers.length&&<div className="v8Empty">No federation provider configured</div>}</div></section><section className="v8Card"><div className="v8CardHead"><div><b>Secret access leases</b><small>Runner/agent-bound, time-limited</small></div></div><div className="v14LeaseList">{leases.slice(0,14).map(x=><article key={x.id}><div><span className={`v13Dot ${x.status==="active"?"running":"completed"}`}/><div><b>Secret lease #{x.id}</b><small>ref #{x.secret_reference_id} · runner {x.runner_lease_id||"—"}</small></div></div><em>{x.status}</em></article>)}{!leases.length&&<div className="v8Empty">No active secret lease</div>}</div></section></div></>}
+import {Any, Intro, LabBody, Panel, Pill, Stats, Table, useLoad} from "./lab/kit";
+
+/* Phòng thí nghiệm · Liên kết bí mật (v15): agent nhận "lease" để dùng bí mật, không bao giờ nhận giá trị làm bộ nhớ công ty. */
+export function SecretsFederationV15Console() {
+  const q = useLoad(async () => {
+    const [a, b] = await Promise.all([apiV15.secretProviders(), apiV15.secretAccessLeases()]);
+    return {providers: a as Any[], leases: b as Any[]};
+  }, {providers: [], leases: []});
+  const {data, reload} = q;
+  const {providers, leases} = data;
+  return <LabBody q={q}>
+    <Intro flow={["Agent", "Quyền dùng bí mật", "Lease truy cập", "Nhà cung cấp", "Gắn tạm thời"]}>
+      Chỉ lưu metadata: giá trị bí mật được lấy lúc thực thi từ biến môi trường, Vault hoặc CLI đám mây, và không bao giờ ghi vào cơ sở dữ liệu ClawCompany.
+    </Intro>
+    <Stats items={[["Nhà cung cấp", providers.length], ["Lease đang hiệu lực", leases.filter(x => x.status === "active").length],
+      ["Adapter Vault", providers.filter(x => x.provider === "vault_http").length], ["Adapter CLI đám mây", providers.filter(x => String(x.provider).endsWith("_cli")).length]]}/>
+    <div className="ui-grid is-2">
+      <Panel title="Kết nối nhà cung cấp" desc="Không hiện giá trị bí mật nào">
+        <Table rows={providers} empty="Chưa cấu hình nhà cung cấp nào." cols={[
+          {label: "Tên", render: x => <><b>{x.name}</b><br/><small>{x.endpoint || "môi trường thực thi tại chỗ"}</small></>},
+          {label: "Loại", render: x => <code>{x.provider}</code>},
+          {label: "Trạng thái", render: x => <Pill s={x.enabled ? "enabled" : "disabled"}/>},
+        ]}/>
+      </Panel>
+      <Panel title="Lease truy cập bí mật" desc="Gắn với runner/agent, có hạn">
+        <Table rows={leases.slice(0, 14)} empty="Chưa có lease nào." cols={[
+          {label: "Lease", render: x => <>#{x.id}</>},
+          {label: "Tham chiếu / runner", render: x => <small>ref #{x.secret_reference_id} · runner {x.runner_lease_id || "—"}</small>},
+          {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+        ]}/>
+      </Panel>
+    </div>
+  </LabBody>;
+}

@@ -1,5 +1,28 @@
 "use client";
-import {useEffect,useState} from "react";
 import {apiV15} from "../lib/api";
-type Any=Record<string,any>;
-export function TelemetryFederationV15Console(){const [items,setItems]=useState<Any[]>([]),[summary,setSummary]=useState<Any>({}),[error,setError]=useState("");useEffect(()=>{Promise.all([apiV15.telemetryExporters(),apiV15.summary()]).then(([a,b])=>{setItems(a as Any[]);setSummary(b as Any)}).catch((e:any)=>setError(e.message))},[]);return <>{error&&<div className="portalError">{error}</div>}<section className="v14Hero"><div><span>OBSERVABILITY FEDERATION</span><h2>One metric plane for ClawCompany, Prometheus and OTLP ecosystems.</h2><p>v15 accepts OTLP JSON metrics, preserves tenant/environment/release attribution, exposes Prometheus text and can push to allowlisted exporters.</p><div className="v14Flow"><b>Apps</b><i>→</i><b>OTLP JSON</b><i>→</i><b>ClawCompany SLO</b><i>→</i><b>Prometheus / OTLP</b></div></div><aside><small>SLO PRINCIPLE</small><strong>No data ≠ green</strong><p>Canary promotion still halts on insufficient telemetry. Export failure is recorded separately from SLO truth.</p></aside></section><div className="v14Metrics">{[["Configured exporters",items.length],["Enabled exporters",summary.telemetry_exporters||0],["Open incidents",summary.open_incidents||0],["Pull endpoint","/api/v15/metrics"]].map(([l,v])=><article key={String(l)}><small>{l}</small><b>{v}</b></article>)}</div><section className="v8Card"><div className="v8CardHead"><div><b>Telemetry exporters</b><small>Prometheus pull · Pushgateway · OTLP HTTP JSON</small></div></div><div className="v14ProviderGrid">{items.map(x=><article key={x.id}><span>{x.enabled?"enabled":"disabled"}</span><b>{x.name}</b><p>{x.provider}<br/>{x.endpoint||"scraped from ClawCompany"}</p></article>)}{!items.length&&<article><span>ready</span><b>Prometheus pull built in</b><p>Create an exporter only when a push path is required.</p></article>}</div></section></>}
+import {Any, Intro, LabBody, Panel, Pill, Stats, Table, useLoad} from "./lab/kit";
+
+/* Phòng thí nghiệm · Liên kết đo lường (v15): nhận OTLP JSON, xuất Prometheus, đẩy tới exporter trong danh sách cho phép. */
+export function TelemetryFederationV15Console() {
+  const q = useLoad(async () => {
+    const [a, b] = await Promise.all([apiV15.telemetryExporters(), apiV15.summary()]);
+    return {items: a as Any[], summary: b as Any};
+  }, {items: [], summary: {}});
+  const {data, reload} = q;
+  return <LabBody q={q}>
+    <Intro flow={["Ứng dụng", "OTLP JSON", "SLO ClawCompany", "Prometheus / OTLP"]}>
+      Một mặt phẳng số đo cho ClawCompany, Prometheus và OTLP. Không có dữ liệu không có nghĩa là xanh: canary vẫn dừng khi thiếu số đo; lỗi xuất ghi riêng, không đổi kết quả SLO.
+      Job xuất định kỳ chỉ chạy khi bật <code>LAB_JOBS_ENABLED</code>.
+    </Intro>
+    <Stats items={[["Exporter đã cấu hình", data.items.length], ["Exporter đang bật", data.summary.telemetry_exporters || 0],
+      ["Sự cố đang mở", data.summary.open_incidents || 0], ["Điểm kéo số đo", <code key="u">/api/v15/metrics</code>]]}/>
+    <Panel title="Exporter số đo" desc="Prometheus pull · Pushgateway · OTLP HTTP JSON">
+      <Table rows={data.items} empty="Chưa có exporter nào. Prometheus pull đã có sẵn — chỉ tạo exporter khi cần đẩy đi." cols={[
+        {label: "Tên", render: x => <b>{x.name}</b>},
+        {label: "Nhà cung cấp", render: x => <code>{x.provider}</code>},
+        {label: "Đích", render: x => x.endpoint ? <code>{x.endpoint}</code> : "Kéo từ ClawCompany", hideSm: true},
+        {label: "Trạng thái", render: x => <Pill s={x.enabled ? "enabled" : "disabled"}/>},
+      ]}/>
+    </Panel>
+  </LabBody>;
+}

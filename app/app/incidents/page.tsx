@@ -1,1 +1,1 @@
-import {PageFrame} from "../../../components/shell/PageFrame";import {IncidentsV14Console} from "../../../components/IncidentsV14Console";export default function Page(){return <PageFrame title="Incident Response" subtitle="Auditable operational incidents across AI and human teams"><IncidentsV14Console/></PageFrame>}
+import {PageFrame} from "../../../components/shell/PageFrame";import {IncidentsV14Console} from "../../../components/IncidentsV14Console";export default function Page(){return <PageFrame><IncidentsV14Console/></PageFrame>}

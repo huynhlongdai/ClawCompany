@@ -1,13 +1,45 @@
 "use client";
-import {useEffect,useState} from "react";
+import {useState} from "react";
 import {apiV12} from "../lib/api";
-type Any=Record<string,any>;
-export function WorkspacesConsole(){
- const [items,setItems]=useState<Any[]>([]),[err,setErr]=useState("");
- const [name,setName]=useState("Feature workspace"),[key,setKey]=useState(`feature-${Date.now().toString().slice(-5)}`),[repo,setRepo]=useState("");
- const load=async()=>{try{setItems(await apiV12.workspaces() as Any[]);setErr("")}catch(e:any){setErr(e.message)}};useEffect(()=>{load()},[]);
- const create=async()=>{try{await apiV12.createWorkspace({organization_id:1,name,workspace_key:key,repository_id:repo?Number(repo):null,ttl_minutes:720});await load()}catch(e:any){setErr(e.message)}};
- const destroy=async(id:number)=>{try{await apiV12.destroyWorkspace(id);await load()}catch(e:any){setErr(e.message)}};
- return <><div className="v12Two"><section className="v8Card"><div className="v8CardHead"><div><b>Create isolated workspace</b><small>Repository worktree or clean managed directory</small></div></div><div className="v9Form"><label>Name<input value={name} onChange={e=>setName(e.target.value)}/></label><label>Workspace key<input value={key} onChange={e=>setKey(e.target.value)}/></label><label>Repository ID (optional)<input value={repo} onChange={e=>setRepo(e.target.value)} placeholder="1"/></label><button className="v8Primary" onClick={create}>Provision workspace</button></div>{err&&<div className="portalError">{err}</div>}</section><section className="v12PolicyCard"><b>Workspace contract</b><p>Agents receive a path scoped to one organization and one job. Repository workspaces use detached Git worktrees; non-repository workspaces stay under the configured development root.</p><div><span>TTL cleanup</span><strong>Enabled</strong></div><div><span>Path traversal</span><strong>Blocked</strong></div><div><span>Shared agent home</span><strong>Disabled</strong></div></section></div>
- <section className="v8Card"><div className="v8CardHead"><div><b>Development workspaces</b><small>Ephemeral collaboration surface shared through ClawCompany, not through model-specific local storage.</small></div></div><div className="v12WorkspaceGrid">{items.map(x=><article key={x.id}><header><span>▤</span><div><b>{x.name}</b><small>{x.workspace_key}</small></div><em>{x.status}</em></header><code>{x.root_path||"provisioning…"}</code><div className="v12Meta"><span>Repo <b>{x.repository_id||"—"}</b></span><span>Owner <b>{x.owner_member_id||"—"}</b></span><span>Base <b>{x.base_ref||"—"}</b></span></div><footer><button onClick={()=>destroy(x.id)}>Destroy</button></footer></article>)}</div></section></>
+import {activeOrganizationId} from "../lib/auth";
+import {Button} from "./ui/Button";
+import {ErrorBanner} from "./ui/EmptyState";
+import {Field} from "./ui/Field";
+import {Any, Intro, KV, LabBody, Panel, Pill, Table, useAction, useLoad} from "./lab/kit";
+
+/* Phòng thí nghiệm · Workspace phát triển (v12): thư mục làm việc cô lập theo tổ chức + việc, có hạn dùng. */
+export function WorkspacesConsole() {
+  const q = useLoad(async () => (await apiV12.workspaces()) as Any[], []);
+  const [name, setName] = useState("Workspace tính năng"), [key, setKey] = useState(() => `feature-${Date.now().toString().slice(-5)}`), [repo, setRepo] = useState("");
+  const act = useAction();
+  const create = () => act.run("create", async () => {
+    await apiV12.createWorkspace({organization_id: activeOrganizationId(), name, workspace_key: key, repository_id: repo ? Number(repo) : null, ttl_minutes: 720}); await q.reload();
+  }, "Đã tạo workspace");
+  const destroy = (id: number) => act.run("x" + id, async () => { await apiV12.destroyWorkspace(id); await q.reload(); }, "Đã huỷ workspace");
+  return <LabBody q={q}>
+    <Intro>Agent nhận một đường dẫn gói trong một tổ chức và một việc. Workspace có repository dùng Git worktree tách rời; workspace thường nằm dưới thư mục gốc phát triển đã cấu hình.</Intro>
+    {act.error ? <ErrorBanner error={act.error} context="Workspace" onClose={() => act.setError(null)}/> : null}
+    <div className="ui-grid is-2">
+      <Panel title="Tạo workspace cô lập" desc="Worktree của repository hoặc thư mục sạch có quản lý">
+        <div className="ui-form">
+          <Field label="Tên"><input className="ui-input" value={name} onChange={e => setName(e.target.value)}/></Field>
+          <Field label="Khoá workspace"><input className="ui-input" value={key} onChange={e => setKey(e.target.value)}/></Field>
+          <Field label="Mã repository (không bắt buộc)"><input className="ui-input" inputMode="numeric" value={repo} onChange={e => setRepo(e.target.value)} placeholder="1"/></Field>
+          <div><Button variant="primary" busy={act.busy === "create"} onClick={create}>Tạo workspace</Button></div>
+        </div>
+      </Panel>
+      <Panel title="Cam kết của workspace">
+        <KV items={[["Dọn theo hạn dùng", "Bật (chỉ khi LAB_JOBS_ENABLED=true)"], ["Đi ngược thư mục", "Bị chặn"], ["Thư mục home dùng chung giữa agent", "Tắt"]]}/>
+      </Panel>
+    </div>
+    <Panel title="Workspace phát triển" desc="Bề mặt cộng tác tạm thời, chia sẻ qua ClawCompany chứ không qua bộ nhớ cục bộ của từng model">
+      <Table rows={q.data} empty="Chưa có workspace nào." cols={[
+        {label: "Workspace", render: x => <><b>{x.name}</b><br/><code>{x.workspace_key}</code></>},
+        {label: "Đường dẫn", render: x => <code>{x.root_path || "đang chuẩn bị…"}</code>, hideSm: true},
+        {label: "Repo / chủ / base", render: x => <small>#{x.repository_id || "—"} · #{x.owner_member_id || "—"} · {x.base_ref || "—"}</small>, hideSm: true},
+        {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+        {label: "", render: x => <Button size="sm" variant="danger" busy={act.busy === "x" + x.id} onClick={() => destroy(x.id)}>Huỷ</Button>},
+      ]}/>
+    </Panel>
+  </LabBody>;
 }

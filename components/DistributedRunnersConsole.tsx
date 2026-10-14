@@ -1,14 +1,51 @@
 "use client";
-import {useEffect,useState} from "react";
 import {apiV14} from "../lib/api";
-type Any=Record<string,any>;
-export function DistributedRunnersConsole(){
- const [pools,setPools]=useState<Any[]>([]),[nodes,setNodes]=useState<Any[]>([]),[leases,setLeases]=useState<Any[]>([]),[error,setError]=useState("");
- useEffect(()=>{Promise.all([apiV14.runnerPools(),apiV14.runnerNodes(),apiV14.runnerLeases()]).then(([a,b,c])=>{setPools(a as Any[]);setNodes(b as Any[]);setLeases(c as Any[])}).catch((e:any)=>setError(e.message))},[]);
- const online=nodes.filter(x=>x.status==="online").length, active=leases.filter(x=>x.status==="active").length;
- return <>{error&&<div className="portalError">{error}</div>}<section className="v14Hero"><div><span>DISTRIBUTED SECURE EXECUTION</span><h2>Lease compute to AI employees without handing them infrastructure credentials.</h2><p>The broker matches capabilities and capacity, issues short-lived lease-bound workload identity, then lets a remote runner pull only the jobs assigned to that node.</p><div className="v14Flow"><b>Agent</b><i>→</i><b>Runner Lease</b><i>→</i><b>Workload JWT</b><i>→</i><b>Remote Runner</b><i>→</i><b>Artifact / Result</b></div></div><aside><small>PRODUCTION POSTURE</small><strong>Fail closed</strong><p>Expired lease revokes workload identity. Kubernetes / Firecracker execution stays adapter-bound and cannot silently fall back to privileged local execution.</p></aside></section>
- <div className="v14Metrics">{[["Runner pools",pools.length],["Online nodes",online],["Active leases",active],["Available capacity",nodes.reduce((n,x)=>n+Math.max(0,(x.capacity||0)-(x.active_leases||0)),0)]].map(([l,v])=><article key={String(l)}><small>{l}</small><b>{v}</b></article>)}</div>
- <div className="v13Split"><section className="v8Card"><div className="v8CardHead"><div><b>Runner fleet</b><small>Heartbeat + capacity + capabilities</small></div></div><div className="v14Table"><div className="head"><span>Node</span><span>Provider</span><span>Capacity</span><span>Capabilities</span><span>Status</span></div>{nodes.map(x=><div key={x.id}><b>{x.node_key}</b><span>{x.provider}</span><span>{x.active_leases}/{x.capacity}</span><code>{(JSON.parse(x.capabilities_json||"[]") as string[]).join(", ")||"—"}</code><em>{x.status}</em></div>)}{!nodes.length&&<div className="v8Empty">No remote runner registered yet</div>}</div></section>
- <section className="v8Card"><div className="v8CardHead"><div><b>Active leases</b><small>Identity and workload are bounded to lease lifetime</small></div></div><div className="v14LeaseList">{leases.slice(0,12).map(x=><article key={x.id}><div><span className={`v13Dot ${x.status==="active"?"running":"completed"}`}/><div><b>Lease #{x.id}</b><small>{x.workload_type} · {x.workload_ref||"unbound"}</small></div></div><em>{x.status}</em></article>)}{!leases.length&&<div className="v8Empty">No lease activity</div>}</div></section></div>
- <section className="v8Card"><div className="v8CardHead"><div><b>Execution provider contract</b><small>Control-plane support vs runtime availability</small></div></div><div className="v14ProviderGrid">{[["Remote pull runner","implemented","API-key node auth + lease-bound workload JWT"],["Kubernetes","adapter","Traffic + execution contracts; cluster credentials external"],["Firecracker / microVM","adapter","Broker contract only; privileged runner is separate infrastructure"],["Local","development","Never used as hidden fallback for production providers"]].map(([a,b,c])=><article key={a}><span>{b}</span><b>{a}</b><p>{c}</p></article>)}</div></section></>
+import {Any, Intro, LabBody, Panel, Pill, Stats, Table, parseJson, useLoad} from "./lab/kit";
+
+/* Phòng thí nghiệm · Runner phân tán (v14): cho agent thuê tài nguyên chạy mà không giao chứng chỉ hạ tầng. */
+const PROVIDERS: [string, string, string][] = [
+  ["Runner kéo việc từ xa", "Đã có", "Xác thực nút bằng API key + JWT workload gắn với lease"],
+  ["Kubernetes", "Adapter", "Có hợp đồng lưu lượng + thực thi; chứng chỉ cụm nằm ngoài"],
+  ["Firecracker / microVM", "Adapter", "Chỉ có hợp đồng broker; runner đặc quyền là hạ tầng riêng"],
+  ["Tại chỗ", "Phát triển", "Không bao giờ là đường lùi ngầm cho nhà cung cấp production"],
+];
+export function DistributedRunnersConsole() {
+  const q = useLoad(async () => {
+    const [a, b, c] = await Promise.all([apiV14.runnerPools(), apiV14.runnerNodes(), apiV14.runnerLeases()]);
+    return {pools: a as Any[], nodes: b as Any[], leases: c as Any[]};
+  }, {pools: [], nodes: [], leases: []});
+  const {data} = q;
+  const online = data.nodes.filter(x => x.status === "online").length, active = data.leases.filter(x => x.status === "active").length;
+  const free = data.nodes.reduce((n, x) => n + Math.max(0, (x.capacity || 0) - (x.active_leases || 0)), 0);
+  return <LabBody q={q}>
+    <Intro flow={["Agent", "Lease runner", "JWT workload", "Runner từ xa", "Kết quả"]}>
+      Broker khớp năng lực và sức chứa, cấp danh tính workload ngắn hạn gắn với lease, rồi runner từ xa chỉ kéo đúng việc giao cho nút đó.
+      Lease hết hạn thì danh tính bị thu hồi. Job dọn lease hết hạn chỉ chạy khi bật <code>LAB_JOBS_ENABLED</code>.
+    </Intro>
+    <Stats items={[["Nhóm runner", data.pools.length], ["Nút trực tuyến", online], ["Lease đang hiệu lực", active], ["Sức chứa còn trống", free]]}/>
+    <div className="ui-grid is-2">
+      <Panel title="Đội runner" desc="Nhịp tim + sức chứa + năng lực">
+        <Table rows={data.nodes} empty="Chưa đăng ký runner từ xa nào." cols={[
+          {label: "Nút", render: x => <><code>{x.node_key}</code><br/><small>{x.provider}</small></>},
+          {label: "Đang dùng", render: x => `${x.active_leases}/${x.capacity}`, num: true},
+          {label: "Năng lực", render: x => parseJson<string[]>(x.capabilities_json, []).join(", ") || "—", hideSm: true},
+          {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+        ]}/>
+      </Panel>
+      <Panel title="Lease" desc="Danh tính và việc chỉ sống trong đời của lease">
+        <Table rows={data.leases.slice(0, 12)} empty="Chưa có lease nào." cols={[
+          {label: "Lease", render: x => <>#{x.id}</>},
+          {label: "Việc", render: x => <small>{x.workload_type} · {x.workload_ref || "chưa gắn"}</small>},
+          {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+        ]}/>
+      </Panel>
+    </div>
+    <Panel title="Hợp đồng nhà cung cấp thực thi" desc="Mặt điều khiển hỗ trợ gì so với runtime thật có gì">
+      <Table rows={PROVIDERS.map(([a, b, c]) => ({id: a, a, b, c}))} empty="" cols={[
+        {label: "Nhà cung cấp", render: x => <b>{x.a}</b>},
+        {label: "Mức", render: x => <Pill s={x.b === "Đã có" ? "ok" : "draft"} label={x.b}/>},
+        {label: "Ghi chú", render: x => x.c},
+      ]}/>
+    </Panel>
+  </LabBody>;
 }

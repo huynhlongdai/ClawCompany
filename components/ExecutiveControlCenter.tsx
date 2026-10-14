@@ -1,29 +1,47 @@
 "use client";
-import {useEffect,useState} from "react";
 import {PageFrame} from "./shell/PageFrame";
 import {apiV9} from "../lib/api";
+import {Button} from "./ui/Button";
+import {Any, Intro, LabBody, Panel, Pill, Stats, Table, useLoad} from "./lab/kit";
 
-type Control={autonomy:{mode:string;max_auto_risk:string;max_concurrent_runs:number};metrics:Record<string,number>;goals:any[];cycles:any[];incidents:any[];budgets:any[]};
-export function ExecutiveControlCenter(){
- const [data,setData]=useState<Control|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false);
- async function load(){setBusy(true);setError("");try{setData(await apiV9.controlCenter() as Control)}catch(e:any){setError(e.message)}finally{setBusy(false)}}
- useEffect(()=>{load()},[]);
- const m=data?.metrics||{};
- return <PageFrame title="Executive Control Center" subtitle="Founder view of goals, delegation, risk, approvals, memory and budget" action={<button className="v8Ghost" onClick={load} disabled={busy}>{busy?"Refreshing…":"Refresh"}</button>}>
-   {error&&<div className="v8Error">{error}</div>}
-   <section className="v9Hero"><div><span className="v8Pill">AUTONOMY MODE · {data?.autonomy?.mode||"—"}</span><h2>The company is operating through governed AI delegation.</h2><p>Nina plans and delegates. Managers and agents execute through the runtime. Budgets, risk thresholds and approvals remain explicit controls.</p></div><div className="v9Pulse"><span>LIVE</span><b>{m.running_assignments||0}</b><small>running assignments</small></div></section>
-   <div className="v9Metrics">
-    <Metric label="Active goals" value={m.active_goals||0}/><Metric label="Running AI work" value={m.running_assignments||0}/><Metric label="Open incidents" value={m.open_incidents||0}/><Metric label="Pending approvals" value={m.pending_approvals||0}/><Metric label="Org memories" value={m.memory_items||0}/><Metric label="AI cost · 24h" value={`$${Number(m.usage_cost_24h||0).toFixed(2)}`}/>
-   </div>
-   <div className="v9Grid2">
-    <section className="v8Card"><div className="v8CardHead"><div><b>Executive goals</b><span>Outcome-oriented company objectives</span></div></div><div className="v9List">{(data?.goals||[]).map(g=><div className="v9Row" key={g.id}><div><span className={`v9Dot ${g.status}`}/><b>{g.title}</b><small>{g.status} · {g.priority} priority</small></div><div className="v9Progress"><i style={{width:`${g.progress||0}%`}}/><span>{g.progress||0}%</span></div></div>)}{!data?.goals?.length&&<Empty text="No executive goals yet"/>}</div></section>
-    <section className="v8Card"><div className="v8CardHead"><div><b>Attention queue</b><span>Incidents and governance stops</span></div></div><div className="v9List">{(data?.incidents||[]).map(x=><div className="v9Incident" key={x.id}><span>{x.severity}</span><div><b>{x.incident_type}</b><small>{x.error||"Execution needs attention"}</small></div><em>{x.status}</em></div>)}{!data?.incidents?.length&&<Empty text="No open incidents"/>}</div></section>
-   </div>
-   <div className="v9Grid2">
-    <section className="v8Card"><div className="v8CardHead"><div><b>Operating cycles</b><span>Nina → manager → AI employee execution loops</span></div></div><div className="v9List">{(data?.cycles||[]).map(c=><div className="v9Row" key={c.id}><div><b>Cycle #{c.id}</b><small>Goal #{c.goal_id} · {c.mode}</small></div><em className="v9Status">{c.status}</em></div>)}</div></section>
-    <section className="v8Card"><div className="v8CardHead"><div><b>Budget envelopes</b><span>Hard limits before autonomous work</span></div><div className="v9BudgetTotal">${Number(m.budget_spent||0).toFixed(2)} / ${Number(m.budget_limit||0).toFixed(2)}</div></div><div className="v9List">{(data?.budgets||[]).map(b=>{const pct=b.limit?Math.min(100,Math.round(((b.spent+b.reserved)/b.limit)*100)):0;return <div className="v9Budget" key={b.id}><div><b>{b.name}</b><small>{b.currency} · ${Number(b.remaining).toFixed(2)} remaining</small></div><div className="v9Bar"><i style={{width:`${pct}%`}}/></div></div>})}</div></section>
-   </div>
- </PageFrame>
+/* Phòng thí nghiệm · Trung tâm điều hành (v9): mục tiêu, uỷ quyền, rủi ro, duyệt, bộ nhớ, ngân sách trong một màn. */
+export function ExecutiveControlCenter() {
+  const q = useLoad(async () => (await apiV9.controlCenter()) as Any, {} as Any);
+  const d = q.data, m = d.metrics || {};
+  const usd = (v: unknown) => `$${Number(v || 0).toFixed(2)}`;
+  return <PageFrame action={<Button icon="arrow-right" busy={q.loading && q.loaded} onClick={q.reload}>Tải lại</Button>}>
+    <LabBody q={q}>
+      <Intro>Nina lập kế hoạch và uỷ quyền; quản lý và agent thực thi qua runtime. Ngân sách, ngưỡng rủi ro và phê duyệt vẫn là các nút điều khiển tường minh.
+        Chế độ tự chủ hiện tại: <b>{d.autonomy?.mode || "—"}</b>.</Intro>
+      <Stats items={[["Mục tiêu đang chạy", m.active_goals || 0], ["Việc AI đang chạy", m.running_assignments || 0], ["Sự cố đang mở", m.open_incidents || 0],
+        ["Chờ duyệt", m.pending_approvals || 0], ["Ghi nhớ tổ chức", m.memory_items || 0], ["Chi phí AI 24 giờ", usd(m.usage_cost_24h)]]}/>
+      <div className="ui-grid is-2">
+        <Panel title="Mục tiêu điều hành" desc="Mục tiêu công ty theo kết quả">
+          <Table rows={d.goals || []} empty="Chưa có mục tiêu điều hành nào." cols={[
+            {label: "Mục tiêu", render: g => <><b>{g.title}</b><br/><small>ưu tiên {g.priority}</small></>},
+            {label: "Tiến độ", render: g => <span className="ui-meter" style={{display: "block", width: 90}}><i style={{width: `${g.progress || 0}%`}}/></span>},
+            {label: "Trạng thái", render: g => <Pill s={g.status}/>},
+          ]}/>
+        </Panel>
+        <Panel title="Cần chú ý" desc="Sự cố và điểm dừng quản trị">
+          <Table rows={d.incidents || []} empty="Không có sự cố nào đang mở." cols={[
+            {label: "Sự cố", render: x => <><code>{x.incident_type}</code><br/><small>{x.error || "Lượt thực thi cần chú ý"}</small></>},
+            {label: "Mức độ", render: x => <Pill s={x.severity}/>}, {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+          ]}/>
+        </Panel>
+        <Panel title="Chu kỳ vận hành" desc="Nina → quản lý → nhân sự AI">
+          <Table rows={d.cycles || []} empty="Chưa có chu kỳ nào." cols={[
+            {label: "Chu kỳ", render: c => <>#{c.id} · mục tiêu #{c.goal_id}</>}, {label: "Chế độ", render: c => c.mode}, {label: "Trạng thái", render: c => <Pill s={c.status}/>},
+          ]}/>
+        </Panel>
+        <Panel title="Hạn mức ngân sách" desc={`Giới hạn cứng trước việc tự động · đã chi ${usd(m.budget_spent)} / ${usd(m.budget_limit)}`}>
+          <Table rows={d.budgets || []} empty="Chưa có hạn mức nào." cols={[
+            {label: "Ngân sách", render: b => <><b>{b.name}</b><br/><small>còn {usd(b.remaining)} {b.currency}</small></>},
+            {label: "Đã dùng", render: b => { const pct = b.limit ? Math.min(100, Math.round(((b.spent + b.reserved) / b.limit) * 100)) : 0;
+              return <span className={"ui-meter" + (pct >= 90 ? " is-risk" : pct >= 70 ? " is-wait" : "")} style={{display: "block", width: 90}}><i style={{width: `${pct}%`}}/></span>; }},
+          ]}/>
+        </Panel>
+      </div>
+    </LabBody>
+  </PageFrame>;
 }
-function Metric({label,value}:{label:string;value:any}){return <div className="v9Metric"><span>{label}</span><b>{value}</b></div>}
-function Empty({text}:{text:string}){return <div className="v9Empty">{text}</div>}

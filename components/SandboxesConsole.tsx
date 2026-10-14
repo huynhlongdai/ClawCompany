@@ -1,12 +1,56 @@
 "use client";
-import {useEffect,useState} from "react";
+import {useEffect, useState} from "react";
 import {apiV12} from "../lib/api";
-type Any=Record<string,any>;
-export function SandboxesConsole(){
- const [profiles,setProfiles]=useState<Any[]>([]),[runs,setRuns]=useState<Any[]>([]),[workspaces,setWorkspaces]=useState<Any[]>([]),[err,setErr]=useState("");
- const [ws,setWs]=useState(""),[profile,setProfile]=useState(""),[cmd,setCmd]=useState("python -V");
- const load=async()=>{try{const [p,r,w]=await Promise.all([apiV12.sandboxProfiles(),apiV12.sandboxRuns(),apiV12.workspaces()]);setProfiles(p as Any[]);setRuns(r as Any[]);setWorkspaces(w as Any[]);if(!ws&&(w as Any[])[0])setWs(String((w as Any[])[0].id));if(!profile&&(p as Any[])[0])setProfile(String(((p as Any[])[0].profile||p[0]).id));setErr("")}catch(e:any){setErr(e.message)}};useEffect(()=>{load()},[]);
- const run=async()=>{try{await apiV12.runSandbox({workspace_id:Number(ws),profile_id:Number(profile),purpose:"test",command:cmd.trim().split(/\s+/),secret_grant_ids:[]});await load()}catch(e:any){setErr(e.message)}};
- return <><div className="v12Two"><section className="v8Card"><div className="v8CardHead"><div><b>Launch sandbox</b><small>argv-based execution; no shell interpolation</small></div></div><div className="v9Form"><label>Workspace<select value={ws} onChange={e=>setWs(e.target.value)}>{workspaces.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><label>Profile<select value={profile} onChange={e=>setProfile(e.target.value)}>{profiles.map((x:any)=>{const p=x.profile||x;return <option key={p.id} value={p.id}>{p.name} · {p.provider}</option>})}</select></label><label>Command<input value={cmd} onChange={e=>setCmd(e.target.value)}/></label><button className="v8Primary" onClick={run}>Run in sandbox</button></div>{err&&<div className="portalError">{err}</div>}</section><section className="v8Card"><div className="v8CardHead"><div><b>Security profile</b><small>Docker adapter fails closed when egress policy is unavailable.</small></div></div><div className="v12Security">{profiles.slice(0,4).map((x:any)=>{const p=x.profile||x,pol=x.policy||{};return <article key={p.id}><div><b>{p.name}</b><span>{p.provider}</span></div><small>{p.image}</small><ul><li>Network: {p.network_mode}</li><li>Root FS: {p.read_only_root?"read-only":"writable"}</li><li>Memory: {p.memory_mb} MB</li><li>CPU: {p.cpu_limit}</li></ul><em>{pol.secure_default?"secure default":"review policy"}</em></article>})}</div></section></div>
- <section className="v8Card"><div className="v8CardHead"><div><b>Sandbox run history</b><small>Output is bounded and secrets are mounted as temporary files.</small></div></div><div className="v12RunTable"><div className="head"><span>Run</span><span>Purpose</span><span>Workspace</span><span>Provider ref</span><span>Exit</span><span>Status</span></div>{runs.map(x=><div key={x.id}><b>#{x.id}</b><span>{x.purpose}</span><span>#{x.workspace_id}</span><code>{x.provider_run_id||"—"}</code><span>{x.exit_code??"—"}</span><em className={x.status}>{x.status}</em></div>)}</div></section></>
+import {Button} from "./ui/Button";
+import {ErrorBanner} from "./ui/EmptyState";
+import {Field} from "./ui/Field";
+import {Any, Intro, LabBody, Panel, Pill, Table, useAction, useLoad} from "./lab/kit";
+
+/* Phòng thí nghiệm · Sandbox (v12): chạy build/test theo argv trong môi trường có chính sách. */
+export function SandboxesConsole() {
+  const q = useLoad(async () => {
+    const [p, r, w] = await Promise.all([apiV12.sandboxProfiles(), apiV12.sandboxRuns(), apiV12.workspaces()]);
+    return {profiles: p as Any[], runs: r as Any[], workspaces: w as Any[]};
+  }, {profiles: [], runs: [], workspaces: []});
+  const {data, reload} = q;
+  const [ws, setWs] = useState(""), [profile, setProfile] = useState(""), [cmd, setCmd] = useState("python -V");
+  const act = useAction();
+  useEffect(() => {
+    if (!ws && data.workspaces[0]) setWs(String(data.workspaces[0].id));
+    if (!profile && data.profiles[0]) setProfile(String((data.profiles[0].profile || data.profiles[0]).id));
+  }, [data, ws, profile]);
+  const run = () => act.run("run", async () => {
+    await apiV12.runSandbox({workspace_id: Number(ws), profile_id: Number(profile), purpose: "test", command: cmd.trim().split(/\s+/), secret_grant_ids: []}); await reload();
+  }, "Đã chạy trong sandbox");
+  return <LabBody q={q}>
+    <Intro>Lệnh chạy theo argv, không nội suy shell. Adapter Docker đóng khi lỗi nếu không áp được chính sách mạng ra ngoài. Đầu ra có giới hạn; bí mật gắn dạng tệp tạm.</Intro>
+    {act.error ? <ErrorBanner error={act.error} context="Chạy sandbox" onClose={() => act.setError(null)}/> : null}
+    <div className="ui-grid is-2">
+      <Panel title="Chạy trong sandbox">
+        <div className="ui-form">
+          <Field label="Workspace"><select className="ui-select" value={ws} onChange={e => setWs(e.target.value)}>
+            {!data.workspaces.length && <option value="">Chưa có workspace</option>}
+            {data.workspaces.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></Field>
+          <Field label="Hồ sơ bảo mật"><select className="ui-select" value={profile} onChange={e => setProfile(e.target.value)}>
+            {data.profiles.map((x: Any) => { const p = x.profile || x; return <option key={p.id} value={p.id}>{p.name} · {p.provider}</option>; })}</select></Field>
+          <Field label="Lệnh"><input className="ui-input" value={cmd} onChange={e => setCmd(e.target.value)} style={{fontFamily: "var(--font-mono)"}}/></Field>
+          <div><Button variant="primary" busy={act.busy === "run"} disabled={!ws || !profile} onClick={run}>Chạy</Button></div>
+        </div>
+      </Panel>
+      <Panel title="Hồ sơ bảo mật" desc="Mạng, hệ tệp gốc, bộ nhớ, CPU">
+        <Table rows={data.profiles.slice(0, 4).map((x: Any) => ({...(x.profile || x), _secure: x.policy?.secure_default}))} empty="Chưa có hồ sơ nào." cols={[
+          {label: "Hồ sơ", render: p => <><b>{p.name}</b><br/><small>{p.provider} · {p.image}</small></>},
+          {label: "Giới hạn", render: p => <small>mạng {p.network_mode} · root {p.read_only_root ? "chỉ đọc" : "ghi được"} · {p.memory_mb} MB · CPU {p.cpu_limit}</small>, hideSm: true},
+          {label: "Chính sách", render: p => <Pill s={p._secure ? "ok" : "pending"} label={p._secure ? "An toàn mặc định" : "Cần xem lại"}/>},
+        ]}/>
+      </Panel>
+    </div>
+    <Panel title="Lịch sử chạy sandbox">
+      <Table rows={data.runs} empty="Chưa có lượt chạy nào." cols={[
+        {label: "Lượt", render: x => <>#{x.id}</>}, {label: "Mục đích", render: x => x.purpose},
+        {label: "Workspace", render: x => <>#{x.workspace_id}</>, hideSm: true}, {label: "Mã nhà cung cấp", render: x => <code>{x.provider_run_id || "—"}</code>, hideSm: true},
+        {label: "Mã thoát", render: x => x.exit_code ?? "—", num: true}, {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+      ]}/>
+    </Panel>
+  </LabBody>;
 }

@@ -1,12 +1,39 @@
 "use client";
-import {useEffect,useState} from "react";
 import {apiV13} from "../lib/api";
-type Any=Record<string,any>;
-export function WorkspaceGatewayV13Console(){
- const [sessions,setSessions]=useState<Any[]>([]),[providers,setProviders]=useState<Any[]>([]),[ops,setOps]=useState<Any[]>([]),[error,setError]=useState("");
- useEffect(()=>{Promise.all([apiV13.gatewaySessions(),apiV13.executionProviders(),apiV13.gatewayOperations()]).then(([a,b,c])=>{setSessions(a as Any[]);setProviders(b as Any[]);setOps(c as Any[])}).catch((e:any)=>setError(e.message))},[]);
- return <>{error&&<div className="portalError">{error}</div>}<section className="v13GatewayHero"><div><span>PROVIDER-NEUTRAL WORKSPACE GATEWAY</span><h2>Claude, Gemini, OpenClaw or future agents use the same workspace protocol.</h2><p>The provider session never receives repository credentials. It gets bounded read/write/snapshot capabilities, then hands source to Artifact Registry for Commit Agent processing.</p><div className="v13Protocol"><b>Provider Agent</b><i>→</i><b>Gateway Session</b><i>→</i><b>Dev Workspace</b><i>→</i><b>Artifact Snapshot</b><i>→</i><b>Commit Agent</b></div></div><aside><code>read</code><code>write</code><code>snapshot</code><code>close</code></aside></section>
- <div className="v13Split"><section className="v8Card"><div className="v8CardHead"><div><b>Active gateway sessions</b><small>Identity + provider + workspace lease</small></div></div><div className="v13SessionTable"><div className="head"><span>ID</span><span>Provider</span><span>Workspace</span><span>Member</span><span>Status</span></div>{sessions.map(x=><div key={x.id}><b>#{x.id}</b><span>{x.provider}</span><span>#{x.workspace_id}</span><span>#{x.member_id||"—"}</span><em>{x.status}</em></div>)}{!sessions.length&&<div className="v8Empty">No gateway sessions yet</div>}</div></section>
- <section className="v8Card"><div className="v8CardHead"><div><b>Execution fabric</b><small>Isolation provider contract</small></div></div><div className="v13Providers">{providers.map(x=><article key={x.provider}><div><b>{x.provider}</b><em>{x.isolation}</em></div><small>{x.notes}</small><footer><span>{x.network_policy?"Network policy":"No network policy"}</span><span>{x.secrets_mount?"Secret mounts":"No secret mounts"}</span></footer></article>)}</div></section></div>
- <section className="v8Card"><div className="v8CardHead"><div><b>Workspace operations audit</b><small>Every provider write/read/snapshot becomes a durable operation record.</small></div></div><div className="v13Ops"><div className="head"><span>Session</span><span>Operation</span><span>Path</span><span>Artifact</span><span>Status</span></div>{ops.slice(0,12).map(x=><div key={x.id}><span>#{x.session_id}</span><b>{x.operation_type}</b><code>{x.logical_path||"—"}</code><span>{x.artifact_id?`#${x.artifact_id}`:"—"}</span><em>{x.status}</em></div>)}</div></section></>
+import {Any, Intro, LabBody, Panel, Pill, Table, useLoad} from "./lab/kit";
+
+/* Phòng thí nghiệm · Cổng workspace (v13): mọi nhà cung cấp agent dùng chung một giao thức workspace. */
+export function WorkspaceGatewayV13Console() {
+  const q = useLoad(async () => {
+    const [a, b, c] = await Promise.all([apiV13.gatewaySessions(), apiV13.executionProviders(), apiV13.gatewayOperations()]);
+    return {sessions: a as Any[], providers: b as Any[], ops: c as Any[]};
+  }, {sessions: [], providers: [], ops: []});
+  const {data} = q;
+  return <LabBody q={q}>
+    <Intro flow={["Agent của nhà cung cấp", "Phiên gateway", "Workspace phát triển", "Ảnh chụp artifact", "Agent commit"]}>
+      Claude, Gemini, OpenClaw hay agent sau này dùng chung một giao thức. Phiên của nhà cung cấp không nhận chứng chỉ repository; chỉ có quyền đọc / ghi / chụp / đóng trong giới hạn, rồi giao mã nguồn cho kho artifact.
+    </Intro>
+    <div className="ui-grid is-2">
+      <Panel title="Phiên gateway" desc="Danh tính + nhà cung cấp + lease workspace">
+        <Table rows={data.sessions} empty="Chưa có phiên gateway nào." cols={[
+          {label: "Phiên", render: x => <>#{x.id}</>}, {label: "Nhà cung cấp", render: x => <code>{x.provider}</code>},
+          {label: "Workspace / thành viên", render: x => <small>#{x.workspace_id} · #{x.member_id || "—"}</small>, hideSm: true}, {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+        ]}/>
+      </Panel>
+      <Panel title="Lớp thực thi" desc="Hợp đồng cô lập của từng nhà cung cấp">
+        <Table rows={data.providers.map(x => ({...x, id: x.provider}) as Any)} empty="Chưa có nhà cung cấp nào." cols={[
+          {label: "Nhà cung cấp", render: x => <><b>{x.provider}</b><br/><small>{x.notes}</small></>},
+          {label: "Cô lập", render: x => <code>{x.isolation}</code>},
+          {label: "Mạng / bí mật", render: x => <small>{x.network_policy ? "Có chính sách mạng" : "Không chính sách mạng"} · {x.secrets_mount ? "gắn bí mật" : "không gắn bí mật"}</small>, hideSm: true},
+        ]}/>
+      </Panel>
+    </div>
+    <Panel title="Nhật ký thao tác workspace" desc="Mỗi lần đọc/ghi/chụp của nhà cung cấp thành một bản ghi lâu dài">
+      <Table rows={data.ops.slice(0, 12)} empty="Chưa có thao tác nào." cols={[
+        {label: "Phiên", render: x => <>#{x.session_id}</>}, {label: "Thao tác", render: x => <code>{x.operation_type}</code>},
+        {label: "Đường dẫn", render: x => <code>{x.logical_path || "—"}</code>, hideSm: true}, {label: "Artifact", render: x => x.artifact_id ? `#${x.artifact_id}` : "—"},
+        {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+      ]}/>
+    </Panel>
+  </LabBody>;
 }

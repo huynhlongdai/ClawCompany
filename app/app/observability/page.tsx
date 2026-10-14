@@ -1,1 +1,1 @@
-import {PageFrame} from "../../../components/shell/PageFrame";import {ObservabilityConsole} from "../../../components/ObservabilityConsole";export default function Page(){return <PageFrame title="SLO & Telemetry" subtitle="Health signals that control promotion and rollback"><ObservabilityConsole/></PageFrame>}
+import {PageFrame} from "../../../components/shell/PageFrame";import {ObservabilityConsole} from "../../../components/ObservabilityConsole";export default function Page(){return <PageFrame><ObservabilityConsole/></PageFrame>}

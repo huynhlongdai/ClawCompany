@@ -4,7 +4,7 @@ import {CreateButton} from "../../../components/CreateButton";
 
 export default function Page() {
   return (
-    <PageFrame title="Khách hàng" subtitle="Khách hàng, ghế đã bán, đội phụ trách và chi phí AI thực tế"
+    <PageFrame
                  action={<CreateButton/>}>
       <CustomersConsole/>
     </PageFrame>

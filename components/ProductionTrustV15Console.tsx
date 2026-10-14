@@ -1,13 +1,47 @@
 "use client";
-import {useEffect,useState} from "react";
 import {apiV15} from "../lib/api";
-type Any=Record<string,any>;
-export function ProductionTrustV15Console(){
- const [summary,setSummary]=useState<Any>({}),[cas,setCas]=useState<Any[]>([]),[certs,setCerts]=useState<Any[]>([]),[keys,setKeys]=useState<Any[]>([]),[policies,setPolicies]=useState<Any[]>([]),[checks,setChecks]=useState<Any[]>([]),[error,setError]=useState("");
- useEffect(()=>{Promise.all([apiV15.summary(),apiV15.trustAuthorities(),apiV15.runnerCertificates(),apiV15.workloadSigningKeys(),apiV15.evidencePolicies(),apiV15.evidenceVerifications()]).then(([a,b,c,d,e,f])=>{setSummary(a as Any);setCas(b as Any[]);setCerts(c as Any[]);setKeys(d as Any[]);setPolicies(e as Any[]);setChecks(f as Any[])}).catch((e:any)=>setError(e.message))},[]);
- return <>{error&&<div className="portalError">{error}</div>}<section className="v14Hero"><div><span>PRODUCTION TRUST PLANE</span><h2>Runner identity, rotating workload keys and signed delivery evidence.</h2><p>Long-lived infrastructure credentials stay outside agent prompts. Runner certificates and workload tokens are short-lived, tenant-bound and independently revocable.</p><div className="v14Flow"><b>mTLS Runner</b><i>→</i><b>Lease</b><i>→</i><b>Workload JWT</b><i>→</i><b>Signed Evidence</b></div></div><aside><small>TRUST POSTURE</small><strong>Fail closed</strong><p>Expired runner certificates, revoked signing keys or unverifiable evidence stop execution instead of silently falling back.</p></aside></section>
- <div className="v14Metrics">{[["Active runner certs",summary.runner_certificates_active||0],["Active workload keys",summary.workload_keys_active||0],["Trust authorities",cas.length],["Evidence checks",checks.length]].map(([l,v])=><article key={String(l)}><small>{l}</small><b>{v}</b></article>)}</div>
- <div className="v13Split"><section className="v8Card"><div className="v8CardHead"><div><b>Runner certificates</b><small>Issued from company-managed CA references</small></div></div><div className="v14Table"><div className="head"><span>Node</span><span>Fingerprint</span><span>Expires</span><span>Status</span><span>Chain</span></div>{certs.slice(0,12).map(x=><div key={x.id}><b>Runner #{x.runner_node_id}</b><code>{String(x.fingerprint_sha256||"").slice(0,14)}…</code><span>{String(x.not_after||"").slice(0,10)}</span><em>{x.status}</em><span>{x.previous_certificate_id?`rotated #${x.previous_certificate_id}`:"root issue"}</span></div>)}{!certs.length&&<div className="v8Empty">No runner certificate issued yet</div>}</div></section>
- <section className="v8Card"><div className="v8CardHead"><div><b>Workload signing keys</b><small>Active + retiring keys remain visible in JWKS until revoked</small></div></div><div className="v14LeaseList">{keys.slice(0,12).map(x=><article key={x.id}><div><span className={`v13Dot ${x.status==="active"?"running":"completed"}`}/><div><b>{x.kid}</b><small>{x.algorithm} · {x.private_key_ref||"external key ref"}</small></div></div><em>{x.status}</em></article>)}{!keys.length&&<div className="v8Empty">Using v14 settings fallback until a managed signing key is created</div>}</div></section></div>
- <section className="v8Card"><div className="v8CardHead"><div><b>Evidence trust policy</b><small>Signature verification is separate from artifact generation</small></div></div><div className="v14ProviderGrid">{policies.map(x=><article key={x.id}><span>{x.enabled?"enabled":"disabled"}</span><b>{x.name}</b><p>{x.signature_type} · {x.expected_signer||"signer pinned by key"}</p></article>)}{!policies.length&&<article><span>not configured</span><b>No production trust policy</b><p>HMAC remains a development option; production should pin asymmetric signer identity.</p></article>}</div></section></>
+import {viTime} from "../lib/labels";
+import {Any, Intro, LabBody, Panel, Pill, Stats, Table, short, useLoad} from "./lab/kit";
+
+/* Phòng thí nghiệm · Tin cậy production (v15): danh tính runner mTLS, khoá ký workload xoay vòng, bằng chứng giao hàng có chữ ký. */
+export function ProductionTrustV15Console() {
+  const q = useLoad(async () => {
+    const [summary, cas, certs, keys, policies, checks] = await Promise.all([apiV15.summary(), apiV15.trustAuthorities(), apiV15.runnerCertificates(),
+      apiV15.workloadSigningKeys(), apiV15.evidencePolicies(), apiV15.evidenceVerifications()]);
+    return {summary: summary as Any, cas: cas as Any[], certs: certs as Any[], keys: keys as Any[], policies: policies as Any[], checks: checks as Any[]};
+  }, {summary: {}, cas: [], certs: [], keys: [], policies: [], checks: []});
+  const {data, reload} = q; const s = data.summary;
+  return <LabBody q={q}>
+    <Intro flow={["Runner mTLS", "Lease", "JWT workload", "Bằng chứng có chữ ký"]}>
+      Chứng chỉ hạ tầng dài hạn không bao giờ vào prompt agent. Chứng chỉ runner và token workload ngắn hạn, gắn với tổ chức, thu hồi riêng được.
+      Nguyên tắc đóng khi lỗi: chứng chỉ hết hạn, khoá bị thu hồi hay bằng chứng không xác minh được thì dừng chạy, không âm thầm lùi về đường khác.
+    </Intro>
+    <Stats items={[["Chứng chỉ runner hiệu lực", s.runner_certificates_active || 0], ["Khoá workload hiệu lực", s.workload_keys_active || 0],
+      ["Tổ chức cấp chứng chỉ", data.cas.length], ["Lần xác minh bằng chứng", data.checks.length]]}/>
+    <div className="ui-grid is-2">
+      <Panel title="Chứng chỉ runner" desc="Cấp từ tham chiếu CA do công ty quản lý">
+        <Table rows={data.certs.slice(0, 12)} empty="Chưa cấp chứng chỉ runner nào." cols={[
+          {label: "Nút", render: x => <>Runner #{x.runner_node_id}</>, nowrap: true},
+          {label: "Dấu vân tay", render: x => <code>{short(x.fingerprint_sha256, 14)}…</code>, hideSm: true},
+          {label: "Hết hạn", render: x => viTime(x.not_after), nowrap: true},
+          {label: "Chuỗi", render: x => x.previous_certificate_id ? `xoay từ #${x.previous_certificate_id}` : "cấp gốc", hideSm: true},
+          {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+        ]}/>
+      </Panel>
+      <Panel title="Khoá ký workload" desc="Khoá đang dùng và khoá sắp nghỉ vẫn hiện trong JWKS tới khi bị thu hồi">
+        <Table rows={data.keys.slice(0, 12)} empty="Đang dùng cấu hình v14 dự phòng cho tới khi tạo khoá ký có quản lý." cols={[
+          {label: "Mã khoá", render: x => <><code>{x.kid}</code><br/><small>{x.algorithm} · {x.private_key_ref || "tham chiếu khoá ngoài"}</small></>},
+          {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+        ]}/>
+      </Panel>
+    </div>
+    <Panel title="Chính sách tin cậy bằng chứng" desc="Xác minh chữ ký tách khỏi việc sinh artifact">
+      <Table rows={data.policies} empty="Chưa có chính sách tin cậy production. HMAC chỉ dành cho môi trường phát triển; production nên ghim danh tính người ký bất đối xứng." cols={[
+        {label: "Tên", render: x => <b>{x.name}</b>},
+        {label: "Kiểu chữ ký", render: x => <code>{x.signature_type}</code>},
+        {label: "Người ký", render: x => x.expected_signer || "ghim theo khoá", hideSm: true},
+        {label: "Trạng thái", render: x => <Pill s={x.enabled ? "enabled" : "disabled"}/>},
+      ]}/>
+    </Panel>
+  </LabBody>;
 }

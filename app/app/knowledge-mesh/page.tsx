@@ -1,1 +1,1 @@
-import {PageFrame} from "../../../components/shell/PageFrame";import {KnowledgeMeshConsole} from "../../../components/KnowledgeMeshConsole";export default function Page(){return <PageFrame title="Knowledge Mesh" subtitle="Tri thức dùng chung deny-by-default, grant có hạn và nhật ký truy cập"><KnowledgeMeshConsole/></PageFrame>}
+import {PageFrame} from "../../../components/shell/PageFrame";import {KnowledgeMeshConsole} from "../../../components/KnowledgeMeshConsole";export default function Page(){return <PageFrame><KnowledgeMeshConsole/></PageFrame>}

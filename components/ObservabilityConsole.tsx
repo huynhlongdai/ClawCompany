@@ -1,2 +1,37 @@
-"use client";import {useEffect,useState} from "react";import {apiV14} from "../lib/api";type Any=Record<string,any>;
-export function ObservabilityConsole(){const [slos,setSlos]=useState<Any[]>([]),[evs,setEvs]=useState<Any[]>([]),[metrics,setMetrics]=useState<Any[]>([]),[error,setError]=useState("");useEffect(()=>{Promise.all([apiV14.slos(),apiV14.sloEvaluations(),apiV14.metrics()]).then(([a,b,c])=>{setSlos(a as Any[]);setEvs(b as Any[]);setMetrics(c as Any[])}).catch((e:any)=>setError(e.message))},[]);const latest=new Map<string,Any>();metrics.forEach(x=>{if(!latest.has(x.metric_name))latest.set(x.metric_name,x)});return <>{error&&<div className="portalError">{error}</div>}<section className="v14Hero"><div><span>SLO & TELEMETRY CONTROL PLANE</span><h2>Deployment promotion is governed by service health, not just a green build.</h2><p>Telemetry samples are tenant-bound, SLOs define explicit comparators and windows, and breaches can open incidents or stop a canary before 100% traffic.</p></div><aside><small>OBSERVABILITY LOOP</small><strong>Measure → Evaluate → Act</strong><p>Celery evaluates enabled SLOs every minute. Canary promotion asks the same evaluator after every traffic step.</p></aside></section><div className="v14Metrics">{Array.from(latest.values()).slice(0,4).map(x=><article key={x.metric_name}><small>{x.metric_name}</small><b>{Number(x.value).toFixed(2)} <i>{x.unit}</i></b></article>)}{!latest.size&&<article><small>Metric stream</small><b>—</b></article>}</div><div className="v13Split"><section className="v8Card"><div className="v8CardHead"><div><b>Service level objectives</b><small>Environment-scoped promotion policy</small></div></div><div className="v14SloList">{slos.map(x=><article key={x.id}><div><b>{x.name}</b><small>{x.metric_name} · {x.window_minutes}m · min {x.min_samples} samples</small></div><strong>{x.comparator} {x.threshold}</strong><em>{x.enabled?"active":"off"}</em></article>)}{!slos.length&&<div className="v8Empty">No SLO defined</div>}</div></section><section className="v8Card"><div className="v8CardHead"><div><b>Recent evaluations</b><small>Pass, breach or insufficient data</small></div></div><div className="v14TrustList">{evs.slice(0,12).map(x=><article key={x.id}><span className={x.status}>{x.status==="passed"?"✓":x.status==="breached"?"!":"…"}</span><div><b>SLO #{x.slo_id}</b><small>{x.sample_count} samples · avg {x.aggregate_value??"—"}</small></div><em>{x.status}</em></article>)}{!evs.length&&<div className="v8Empty">No SLO evaluation yet</div>}</div></section></div></>}
+"use client";
+import {apiV14} from "../lib/api";
+import {Any, Intro, LabBody, Panel, Pill, Stats, Table, useLoad} from "./lab/kit";
+
+/* Phòng thí nghiệm · SLO & đo lường (v14): mẫu đo theo tổ chức, SLO có ngưỡng + cửa sổ, lần đánh giá gần đây. */
+export function ObservabilityConsole() {
+  const q = useLoad(async () => {
+    const [slos, evs, metrics] = await Promise.all([apiV14.slos(), apiV14.sloEvaluations(), apiV14.metrics()]);
+    return {slos: slos as Any[], evs: evs as Any[], metrics: metrics as Any[]};
+  }, {slos: [], evs: [], metrics: []});
+  const {data, reload} = q;
+  const latest = new Map<string, Any>();
+  data.metrics.forEach(x => { if (!latest.has(x.metric_name)) latest.set(x.metric_name, x); });
+  return <LabBody q={q}>
+    <Intro flow={["Đo", "Đánh giá SLO", "Hành động (dừng canary / mở sự cố)"]}>
+      Thăng cấp bản triển khai dựa trên sức khoẻ dịch vụ, không chỉ build xanh. Job đánh giá SLO chỉ chạy khi máy chủ bật <code>LAB_JOBS_ENABLED</code>.
+    </Intro>
+    <Stats items={latest.size ? Array.from(latest.values()).slice(0, 4).map(x => [x.metric_name, `${Number(x.value).toFixed(2)} ${x.unit || ""}`]) : [["Luồng số đo", "—", "Chưa có mẫu đo nào"]]}/>
+    <div className="ui-grid is-2">
+      <Panel title="Mục tiêu mức dịch vụ (SLO)" desc="Chính sách thăng cấp theo từng môi trường">
+        <Table rows={data.slos} empty="Chưa định nghĩa SLO nào." cols={[
+          {label: "Tên", render: x => <><b>{x.name}</b><br/><small>{x.metric_name} · {x.window_minutes} phút · tối thiểu {x.min_samples} mẫu</small></>},
+          {label: "Ngưỡng", render: x => <code>{x.comparator} {x.threshold}</code>, nowrap: true},
+          {label: "Trạng thái", render: x => <Pill s={x.enabled ? "active" : "off"}/>},
+        ]}/>
+      </Panel>
+      <Panel title="Lần đánh giá gần đây" desc="Đạt, vi phạm hoặc thiếu dữ liệu">
+        <Table rows={data.evs.slice(0, 12)} empty="Chưa có lần đánh giá SLO nào." cols={[
+          {label: "SLO", render: x => <>SLO #{x.slo_id}</>, nowrap: true},
+          {label: "Mẫu", render: x => x.sample_count, num: true},
+          {label: "Trung bình", render: x => x.aggregate_value ?? "—", num: true},
+          {label: "Kết quả", render: x => <Pill s={x.status}/>},
+        ]}/>
+      </Panel>
+    </div>
+  </LabBody>;
+}

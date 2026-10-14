@@ -1,12 +1,38 @@
 "use client";
-import {useEffect,useState} from "react";
 import {apiV13} from "../lib/api";
-type Any=Record<string,any>;
-export function ReleaseManagerV13Console(){
- const [decisions,setDecisions]=useState<Any[]>([]),[strategies,setStrategies]=useState<Any[]>([]),[health,setHealth]=useState<Any[]>([]),[error,setError]=useState("");
- useEffect(()=>{Promise.all([apiV13.releaseManagerRuns(),apiV13.deploymentStrategies(),apiV13.healthRuns()]).then(([d,s,h])=>{setDecisions(d as Any[]);setStrategies(s as Any[]);setHealth(h as Any[])}).catch((e:any)=>setError(e.message))},[]);
- return <>{error&&<div className="portalError">{error}</div>}<section className="v13ReleaseHero"><div><span>RELEASE MANAGER AGENT</span><h2>Promote only when CI, security, approval and deployment health agree.</h2><p>The Release Manager is a deterministic governance service today; it can later be wrapped by an AI Release Manager without allowing the model to bypass policy.</p></div><aside><div><span>Rolling</span><b>deploy → verify → rollback</b></div><div><span>Blue/Green</span><b>verify candidate → atomic cutover</b></div><div><span>Canary</span><b>router adapter required</b></div></aside></section>
- <div className="v13Split"><section className="v8Card"><div className="v8CardHead"><div><b>Release decisions</b><small>Evidence-backed approve / hold / reject</small></div></div><div className="v13DecisionList">{decisions.map(x=><article key={x.id}><span className={`v13Decision ${x.decision}`}>{x.decision}</span><div><b>Release #{x.release_id}</b><small>{x.reason}</small></div><em>#{x.id}</em></article>)}{!decisions.length&&<div className="v8Empty">No release manager decision yet</div>}</div></section>
- <section className="v8Card"><div className="v8CardHead"><div><b>Progressive delivery</b><small>Strategy state machine</small></div></div><div className="v13StrategyList">{strategies.map(x=><article key={x.id}><div><b>{x.strategy}</b><em>{x.status}</em></div><small>release #{x.release_id} → env #{x.environment_id}</small><footer><span>{x.traffic_percent}% traffic request</span><span>{x.rollback_id?`rollback #${x.rollback_id}`:"no rollback"}</span></footer></article>)}{!strategies.length&&<div className="v8Empty">No deployment strategy run yet</div>}</div></section></div>
- <section className="v8Card"><div className="v8CardHead"><div><b>Health checks</b><small>Post-deploy verification with automatic rollback hooks</small></div></div><div className="v13Health">{health.slice(0,12).map(x=><div key={x.id}><span>#{x.id}</span><b>Deployment #{x.deployment_id}</b><small>{x.successes} success · {x.failures} failure</small><em>{x.status}</em></div>)}</div></section></>
+import {Any, Intro, LabBody, Panel, Pill, Table, useLoad} from "./lab/kit";
+
+/* Phòng thí nghiệm · Quản lý phát hành (v13): chỉ thăng cấp khi CI, bảo mật, duyệt và sức khoẻ triển khai cùng đồng ý. */
+export function ReleaseManagerV13Console() {
+  const q = useLoad(async () => {
+    const [d, s, h] = await Promise.all([apiV13.releaseManagerRuns(), apiV13.deploymentStrategies(), apiV13.healthRuns()]);
+    return {decisions: d as Any[], strategies: s as Any[], health: h as Any[]};
+  }, {decisions: [], strategies: [], health: []});
+  const {data} = q;
+  return <LabBody q={q}>
+    <Intro>Quản lý phát hành hiện là dịch vụ quản trị xác định (chưa phải agent AI); sau này có thể bọc bằng agent mà không cho model vượt chính sách.
+      Chiến lược: <b>cuốn chiếu</b> (triển khai → kiểm → rollback), <b>xanh/lam</b> (kiểm bản mới → chuyển một lần), <b>canary</b> (cần adapter router).</Intro>
+    <div className="ui-grid is-2">
+      <Panel title="Quyết định phát hành" desc="Duyệt / giữ / từ chối kèm bằng chứng">
+        <Table rows={data.decisions} empty="Chưa có quyết định nào." cols={[
+          {label: "Bản phát hành", render: x => <><b>#{x.release_id}</b><br/><small>{x.reason}</small></>},
+          {label: "Quyết định", render: x => <Pill s={x.decision}/>},
+        ]}/>
+      </Panel>
+      <Panel title="Triển khai dần" desc="Máy trạng thái của chiến lược">
+        <Table rows={data.strategies} empty="Chưa chạy chiến lược triển khai nào." cols={[
+          {label: "Chiến lược", render: x => <><code>{x.strategy}</code><br/><small>bản #{x.release_id} → môi trường #{x.environment_id}</small></>},
+          {label: "Lưu lượng", render: x => `${x.traffic_percent}%`, num: true},
+          {label: "Rollback", render: x => x.rollback_id ? `#${x.rollback_id}` : "Không", hideSm: true},
+          {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+        ]}/>
+      </Panel>
+    </div>
+    <Panel title="Kiểm tra sức khoẻ" desc="Kiểm sau triển khai, có móc rollback tự động">
+      <Table rows={data.health.slice(0, 12)} empty="Chưa có lần kiểm tra sức khoẻ nào." cols={[
+        {label: "Lần", render: x => <>#{x.id}</>}, {label: "Lượt triển khai", render: x => <>#{x.deployment_id}</>},
+        {label: "Đạt / lỗi", render: x => `${x.successes} / ${x.failures}`, num: true}, {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+      ]}/>
+    </Panel>
+  </LabBody>;
 }

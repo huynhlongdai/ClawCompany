@@ -1,2 +1,21 @@
-"use client";import {useEffect,useState} from "react";import {apiV14} from "../lib/api";type Any=Record<string,any>;
-export function IncidentsV14Console(){const [items,setItems]=useState<Any[]>([]),[error,setError]=useState("");useEffect(()=>{apiV14.incidents().then(x=>setItems(x as Any[])).catch((e:any)=>setError(e.message))},[]);return <>{error&&<div className="portalError">{error}</div>}<section className="v14Hero incident"><div><span>INCIDENT RESPONSE</span><h2>Every SLO breach becomes an operational object with ownership and timeline.</h2><p>Nina can see the same incident state as humans and agents, while acknowledgement, mitigation and resolution remain explicit auditable transitions.</p></div><aside><small>OPEN INCIDENTS</small><strong>{items.filter(x=>x.status!=="resolved").length}</strong><p>{items.filter(x=>x.severity==="critical"&&x.status!=="resolved").length} critical · {items.filter(x=>x.severity==="high"&&x.status!=="resolved").length} high</p></aside></section><section className="v8Card"><div className="v8CardHead"><div><b>Incident queue</b><small>SLO, deployment and manual operational signals</small></div></div><div className="v14IncidentList">{items.map(x=><article key={x.id}><span className={`sev ${x.severity}`}>{x.severity}</span><div><b>{x.title}</b><small>{x.summary||x.source} · env #{x.environment_id||"—"} · release #{x.release_id||"—"}</small></div><em>{x.status}</em></article>)}{!items.length&&<div className="v8Empty">No incident — system healthy</div>}</div></section></>}
+"use client";
+import {apiV14} from "../lib/api";
+import {Any, Intro, LabBody, Panel, Pill, Stats, Table, useLoad} from "./lab/kit";
+
+/* Phòng thí nghiệm · Sự cố (v14): mỗi lần SLO vi phạm thành một sự cố có chủ và dòng thời gian. */
+export function IncidentsV14Console() {
+  const q = useLoad(async () => (await apiV14.incidents()) as Any[], []);
+  const items = q.data, open = items.filter(x => x.status !== "resolved");
+  return <LabBody q={q}>
+    <Intro>Mỗi lần SLO vi phạm, triển khai lỗi hay báo tay đều thành một sự cố có người phụ trách và dòng thời gian. Nina thấy cùng trạng thái như người và agent; nhận, giảm nhẹ và xử lý xong là các bước chuyển tường minh, có kiểm toán.</Intro>
+    <Stats items={[["Sự cố đang mở", open.length], ["Nghiêm trọng", open.filter(x => x.severity === "critical").length], ["Cao", open.filter(x => x.severity === "high").length], ["Tổng", items.length]]}/>
+    <Panel title="Hàng đợi sự cố" desc="Từ SLO, triển khai và báo tay">
+      <Table rows={items} empty="Không có sự cố nào — hệ thống ổn." cols={[
+        {label: "Sự cố", render: x => <><b>{x.title}</b><br/><small>{x.summary || x.source}</small></>},
+        {label: "Môi trường / bản", render: x => <small>môi trường #{x.environment_id || "—"} · bản #{x.release_id || "—"}</small>, hideSm: true},
+        {label: "Mức độ", render: x => <Pill s={x.severity}/>},
+        {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+      ]}/>
+    </Panel>
+  </LabBody>;
+}

@@ -1,5 +1,52 @@
 "use client";
-import {useEffect,useState} from "react";
-import {apiV15,apiV14} from "../lib/api";
-type Any=Record<string,any>;
-export function NinaSREV15Console(){const [summary,setSummary]=useState<Any>({}),[runs,setRuns]=useState<Any[]>([]),[decisions,setDecisions]=useState<Any[]>([]),[routes,setRoutes]=useState<Any[]>([]),[notes,setNotes]=useState<Any[]>([]),[nodes,setNodes]=useState<Any[]>([]),[incidents,setIncidents]=useState<Any[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState("");const load=()=>Promise.all([apiV15.summary(),apiV15.sreRuns(),apiV15.sreDecisions(),apiV15.pagingRoutes(),apiV15.pagingNotifications(),apiV15.schedulerNodes(),apiV14.incidents()]).then(([a,b,c,d,e,f,g])=>{setSummary(a as Any);setRuns(b as Any[]);setDecisions(c as Any[]);setRoutes(d as Any[]);setNotes(e as Any[]);setNodes(f as Any[]);setIncidents(g as Any[])}).catch((e:any)=>setError(e.message));useEffect(()=>{load()},[]);const tick=async()=>{setBusy(true);try{await apiV15.sreTick();await apiV15.dispatchPaging();await load()}catch(e:any){setError(e.message)}finally{setBusy(false)}};return <>{error&&<div className="portalError">{error}</div>}<section className="v14Hero"><div><span>NINA AUTONOMOUS SRE</span><h2>Detect, decide, page, recover — with deterministic policy and Founder approval where risk demands it.</h2><p>Nina does not get an unrestricted production shell. She creates a recovery plan, evaluates severity, respects approval gates and records every decision/action.</p><div className="v14Flow"><b>SLO / Incident</b><i>→</i><b>Nina Plan</b><i>→</i><b>Policy</b><i>→</i><b>Approval</b><i>→</i><b>Recovery</b></div></div><aside><small>CONTROL LOOP</small><strong>{summary.open_incidents||0} open incident(s)</strong><p>{summary.sre_runs_active||0} recovery run(s) currently planned, waiting approval or executing.</p><button className="v8Primary" disabled={busy} onClick={tick}>{busy?"Running…":"Run governed SRE tick"}</button></aside></section><div className="v14Metrics">{[["Open incidents",summary.open_incidents||0],["Active SRE runs",summary.sre_runs_active||0],["Paging routes",summary.paging_routes||0],["Scheduler nodes",summary.scheduler_nodes_online||0]].map(([l,v])=><article key={String(l)}><small>{l}</small><b>{v}</b></article>)}</div><div className="v13Split"><section className="v8Card"><div className="v8CardHead"><div><b>Recovery queue</b><small>Approval-gated autonomous actions</small></div></div><div className="v14LeaseList">{runs.slice(0,14).map(x=><article key={x.id}><div><span className={`v13Dot ${x.status==="completed"?"completed":"running"}`}/><div><b>Run #{x.id} · Incident #{x.incident_id}</b><small>attempt {x.attempt} · approval {x.approval_id||"not required"}</small></div></div><em>{x.status}</em></article>)}{!runs.length&&<div className="v8Empty">No recovery run yet</div>}</div></section><section className="v8Card"><div className="v8CardHead"><div><b>Nina decisions</b><small>Explainable SRE intent</small></div></div><div className="v14LeaseList">{decisions.slice(0,12).map(x=><article key={x.id}><div><span className="v13Dot running"/><div><b>{x.decision}</b><small>{x.rationale}</small></div></div><em>{x.risk}</em></article>)}{!decisions.length&&<div className="v8Empty">No SRE decision recorded</div>}</div></section></div><section className="v8Card"><div className="v8CardHead"><div><b>Paging & HA posture</b><small>{routes.length} route(s) · {notes.length} notification(s) · {nodes.length} scheduler node(s)</small></div></div><div className="v14ProviderGrid">{incidents.slice(0,6).map(x=><article key={x.id}><span>{x.severity}</span><b>{x.title}</b><p>{x.status} · {x.source}</p></article>)}{!incidents.length&&<article><span>green</span><b>No active incident</b><p>Continuous SLO and runner health monitoring remains enabled.</p></article>}</div></section></>}
+import {apiV14, apiV15} from "../lib/api";
+import {Button} from "./ui/Button";
+import {ErrorBanner} from "./ui/EmptyState";
+import {Any, Intro, LabBody, Panel, Pill, Stats, Table, useAction, useLoad} from "./lab/kit";
+
+/* Phòng thí nghiệm · Nina SRE (v15): phát hiện → lập kế hoạch → chính sách → duyệt → khôi phục, mọi quyết định được ghi lại. */
+export function NinaSREV15Console() {
+  const q = useLoad(async () => {
+    const [summary, runs, decisions, routes, notes, nodes, incidents] = await Promise.all([apiV15.summary(), apiV15.sreRuns(), apiV15.sreDecisions(),
+      apiV15.pagingRoutes(), apiV15.pagingNotifications(), apiV15.schedulerNodes(), apiV14.incidents()]);
+    return {summary: summary as Any, runs: runs as Any[], decisions: decisions as Any[], routes: routes as Any[], notes: notes as Any[], nodes: nodes as Any[], incidents: incidents as Any[]};
+  }, {summary: {}, runs: [], decisions: [], routes: [], notes: [], nodes: [], incidents: []});
+  const {data, reload} = q;
+  const act = useAction();
+  const s = data.summary;
+  const tick = () => act.run("tick", async () => { await apiV15.sreTick(); await apiV15.dispatchPaging(); await reload(); }, "Đã chạy một lượt SRE");
+  return <LabBody q={q}>
+    <Intro flow={["SLO / sự cố", "Nina lập kế hoạch", "Chính sách", "Duyệt", "Khôi phục"]}>
+      Nina không có shell production tự do: cô lập kế hoạch khôi phục, đánh giá mức độ, dừng ở cổng duyệt khi rủi ro cao và ghi lại mọi quyết định.
+      Lượt tự động (<code>v15.control_plane_tick</code>) chỉ chạy khi bật <code>LAB_JOBS_ENABLED</code>; nút dưới đây chạy một lượt bằng tay.
+    </Intro>
+    {act.error ? <ErrorBanner error={act.error} context="Chạy lượt SRE" onClose={() => act.setError(null)}/> : null}
+    <Panel title="Vòng điều khiển" desc={`${s.open_incidents || 0} sự cố đang mở · ${s.sre_runs_active || 0} lượt khôi phục đang lập/chờ duyệt/chạy`}
+      actions={<Button variant="primary" icon="pulse" busy={act.busy === "tick"} onClick={tick}>Chạy một lượt SRE</Button>}>
+      <Stats items={[["Sự cố đang mở", s.open_incidents || 0], ["Lượt SRE đang chạy", s.sre_runs_active || 0], ["Tuyến báo động", s.paging_routes || 0], ["Nút lập lịch", s.scheduler_nodes_online || 0]]}/>
+    </Panel>
+    <div className="ui-grid is-2">
+      <Panel title="Hàng đợi khôi phục" desc="Hành động tự động có cổng duyệt">
+        <Table rows={data.runs.slice(0, 14)} empty="Chưa có lượt khôi phục nào." cols={[
+          {label: "Lượt", render: x => <>#{x.id} · sự cố #{x.incident_id}</>, nowrap: true},
+          {label: "Lần thử / duyệt", render: x => <small>lần {x.attempt} · {x.approval_id ? `duyệt #${x.approval_id}` : "không cần duyệt"}</small>, hideSm: true},
+          {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+        ]}/>
+      </Panel>
+      <Panel title="Quyết định của Nina" desc="Ý định SRE có giải thích">
+        <Table rows={data.decisions.slice(0, 12)} empty="Chưa ghi quyết định SRE nào." cols={[
+          {label: "Quyết định", render: x => <><b>{x.decision}</b><br/><small>{x.rationale}</small></>},
+          {label: "Rủi ro", render: x => <Pill s={x.risk}/>},
+        ]}/>
+      </Panel>
+    </div>
+    <Panel title="Báo động & độ sẵn sàng" desc={`${data.routes.length} tuyến · ${data.notes.length} thông báo · ${data.nodes.length} nút lập lịch`}>
+      <Table rows={data.incidents.slice(0, 6)} empty="Không có sự cố nào đang hoạt động." cols={[
+        {label: "Sự cố", render: x => <b>{x.title}</b>},
+        {label: "Nguồn", render: x => x.source, hideSm: true},
+        {label: "Mức độ", render: x => <Pill s={x.severity}/>},
+        {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+      ]}/>
+    </Panel>
+  </LabBody>;
+}

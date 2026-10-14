@@ -1,1 +1,1 @@
-import {PageFrame} from "../../../components/shell/PageFrame";import {TrustConsole} from "../../../components/TrustConsole";export default function Page(){return <PageFrame title="Trust & Supply Chain" subtitle="Signed evidence, scanner adapters and release trust"><TrustConsole/></PageFrame>}
+import {PageFrame} from "../../../components/shell/PageFrame";import {TrustConsole} from "../../../components/TrustConsole";export default function Page(){return <PageFrame><TrustConsole/></PageFrame>}

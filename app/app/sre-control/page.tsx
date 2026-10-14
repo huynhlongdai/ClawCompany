@@ -1,1 +1,1 @@
-import {PageFrame} from "../../../components/shell/PageFrame";import {NinaSREV15Console} from "../../../components/NinaSREV15Console";export default function Page(){return <PageFrame title="Nina SRE Control" subtitle="Governed autonomous incident recovery and paging"><NinaSREV15Console/></PageFrame>}
+import {PageFrame} from "../../../components/shell/PageFrame";import {NinaSREV15Console} from "../../../components/NinaSREV15Console";export default function Page(){return <PageFrame><NinaSREV15Console/></PageFrame>}

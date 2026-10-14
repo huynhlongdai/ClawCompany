@@ -1,1 +1,1 @@
-import {PageFrame} from "../../../components/shell/PageFrame";import {DistributedRunnersConsole} from "../../../components/DistributedRunnersConsole";export default function Page(){return <PageFrame title="Distributed Runners" subtitle="Capability-aware compute leasing and workload identity"><DistributedRunnersConsole/></PageFrame>}
+import {PageFrame} from "../../../components/shell/PageFrame";import {DistributedRunnersConsole} from "../../../components/DistributedRunnersConsole";export default function Page(){return <PageFrame><DistributedRunnersConsole/></PageFrame>}

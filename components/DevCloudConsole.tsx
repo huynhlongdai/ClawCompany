@@ -1,15 +1,39 @@
 "use client";
-import {useEffect,useState} from "react";
 import {apiV12} from "../lib/api";
-type Any=Record<string,any>;
-export function DevCloudConsole(){
- const [data,setData]=useState<Any|null>(null),[error,setError]=useState("");
- const load=async()=>{try{setData(await apiV12.dashboard() as Any);setError("")}catch(e:any){setError(e.message)}};useEffect(()=>{load()},[]);
- const m=data?.metrics||{};
- return <><section className="v12Hero"><div><span>SECURE AI DEVELOPMENT CLOUD</span><h2>From agent artifact to production release — governed end to end.</h2><p>Every coding agent works through an isolated workspace, policy-bound sandbox, immutable release commit and approval-aware deployment path. Secrets are references and short-lived grants, never copied into agent prompts or persisted as plaintext.</p><div className="v12Flow"><b>Agent</b><i>→</i><b>Artifact</b><i>→</i><b>Workspace</b><i>→</i><b>Sandbox</b><i>→</i><b>Delivery</b><i>→</i><b>Release</b><i>→</i><b>Deploy</b></div></div><aside><strong>ZERO-TRUST DEFAULTS</strong><ul><li>Network disabled</li><li>Read-only root FS</li><li>Capabilities dropped</li><li>Secret file grants</li><li>Commit-pinned deploys</li></ul></aside></section>
- {error&&<div className="portalError">{error}</div>}
- <div className="v12Metrics">{[["Active workspaces",m.active_workspaces,"▤"],["Sandbox running",m.sandbox_running,"⬡"],["Ready releases",m.releases_ready,"◇"],["Deployments today",m.deployments_24h,"↗"],["Preview envs",m.preview_environments,"◌"],["Secret refs",m.secret_references,"⌁"]].map(([l,v,i])=><article key={String(l)}><span>{i}</span><div><small>{l}</small><b>{v??"—"}</b></div></article>)}</div>
- <div className="v12Grid"><section className="v8Card"><div className="v8CardHead"><div><b>Recent sandbox runs</b><small>Execution status and provenance</small></div></div><div className="v12List">{(data?.sandbox_runs||[]).map((x:Any)=><div key={x.id}><span className={`v12Dot ${x.status}`}/><div><b>Run #{x.id} · {x.purpose}</b><small>workspace #{x.workspace_id} · profile #{x.profile_id}</small></div><em>{x.status}</em></div>)}{!data?.sandbox_runs?.length&&<div className="v8Empty">No sandbox runs yet</div>}</div></section>
- <section className="v8Card"><div className="v8CardHead"><div><b>Release train</b><small>Immutable Git commit → environment</small></div></div><div className="v12ReleaseRail">{(data?.releases||[]).map((x:Any)=><article key={x.id}><div><b>{x.version}</b><span>{x.status}</span></div><code>{(x.commit_sha||"").slice(0,12)||"pending"}</code><small>repo #{x.repository_id}</small></article>)}{!data?.releases?.length&&<div className="v8Empty">No releases yet</div>}</div></section></div>
- <section className="v8Card"><div className="v8CardHead"><div><b>Deployment activity</b><small>Production is never “just another branch”. Every environment has a gate and rollback lineage.</small></div></div><div className="v12DeployStrip">{(data?.deployments||[]).map((x:Any)=><article key={x.id}><span>#{x.id}</span><b>Release {x.release_id}</b><small>environment #{x.environment_id}</small><em>{x.status}</em></article>)}{!data?.deployments?.length&&<div className="v8Empty">No deployments yet</div>}</div></section></>
+import {Any, Intro, LabBody, Panel, Pill, Stats, Table, short, useLoad} from "./lab/kit";
+
+/* Phòng thí nghiệm · Dev Cloud (v12): workspace cô lập → sandbox có chính sách → commit bất biến → triển khai có duyệt. */
+export function DevCloudConsole() {
+  const q = useLoad(async () => (await apiV12.dashboard()) as Any, {} as Any);
+  const d = q.data, m = d.metrics || {};
+  return <LabBody q={q}>
+    <Intro flow={["Agent", "Artifact", "Workspace", "Sandbox", "Giao hàng", "Phát hành", "Triển khai"]}>
+      Mỗi agent viết mã làm việc trong workspace cô lập, sandbox theo chính sách (tắt mạng, root chỉ đọc, bỏ capability), commit phát hành bất biến và đường triển khai có duyệt.
+      Bí mật chỉ là tham chiếu + quyền ngắn hạn, không bao giờ chép vào prompt. Job dọn workspace hết hạn chỉ chạy khi bật <code>LAB_JOBS_ENABLED</code>.
+    </Intro>
+    <Stats items={[["Workspace đang mở", m.active_workspaces], ["Sandbox đang chạy", m.sandbox_running], ["Bản sẵn sàng", m.releases_ready],
+      ["Triển khai 24 giờ", m.deployments_24h], ["Môi trường xem trước", m.preview_environments], ["Tham chiếu bí mật", m.secret_references]]}/>
+    <div className="ui-grid is-2">
+      <Panel title="Lượt sandbox gần đây" desc="Trạng thái chạy và nguồn gốc">
+        <Table rows={d.sandbox_runs || []} empty="Chưa có lượt sandbox nào." cols={[
+          {label: "Lượt", render: x => <><b>#{x.id} · {x.purpose}</b><br/><small>workspace #{x.workspace_id} · hồ sơ #{x.profile_id}</small></>},
+          {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+        ]}/>
+      </Panel>
+      <Panel title="Chuyến phát hành" desc="Commit Git bất biến → môi trường">
+        <Table rows={d.releases || []} empty="Chưa có bản phát hành nào." cols={[
+          {label: "Phiên bản", render: x => <b>{x.version}</b>},
+          {label: "Commit", render: x => <code>{x.commit_sha ? short(x.commit_sha) : "chờ"}</code>},
+          {label: "Repo", render: x => <>#{x.repository_id}</>, hideSm: true},
+          {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+        ]}/>
+      </Panel>
+    </div>
+    <Panel title="Hoạt động triển khai" desc="Production không phải “một nhánh nữa”: mỗi môi trường có cổng duyệt và dòng rollback">
+      <Table rows={d.deployments || []} empty="Chưa có lượt triển khai nào." cols={[
+        {label: "Lượt", render: x => <>#{x.id}</>}, {label: "Bản phát hành", render: x => <>#{x.release_id}</>},
+        {label: "Môi trường", render: x => <>#{x.environment_id}</>}, {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+      ]}/>
+    </Panel>
+  </LabBody>;
 }

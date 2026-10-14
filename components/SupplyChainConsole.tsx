@@ -1,12 +1,35 @@
 "use client";
-import {useEffect,useState} from "react";
 import {apiV13} from "../lib/api";
-type Any=Record<string,any>;
-export function SupplyChainConsole(){
- const [builds,setBuilds]=useState<Any[]>([]),[reviews,setReviews]=useState<Any[]>([]),[error,setError]=useState("");
- useEffect(()=>{Promise.all([apiV13.builds(),apiV13.securityReviews()]).then(([b,r])=>{setBuilds(b as Any[]);setReviews(r as Any[])}).catch((e:any)=>setError(e.message))},[]);
- return <>{error&&<div className="portalError">{error}</div>}<section className="v13SupplyHero"><div><span>SOFTWARE SUPPLY CHAIN</span><h2>Every release can explain exactly what source went in and which gate approved it.</h2><p>ClawCompany emits a source manifest, SPDX 2.3 JSON and SLSA-style provenance statement as ordinary immutable Artifacts, so they can be reviewed and handed off like code.</p></div><div className="v13Evidence"><article><b>SPDX 2.3</b><small>file checksums</small></article><article><b>SLSA-style</b><small>builder + materials</small></article><article><b>SHA-256</b><small>source digest</small></article></div></section>
- <div className="v13Split"><section className="v8Card"><div className="v8CardHead"><div><b>Build evidence</b><small>Commit → manifest → SBOM → provenance</small></div></div><div className="v13Builds">{builds.map(x=><article key={x.id}><div><b>Build #{x.id}</b><em>{x.status}</em></div><code>{x.commit_sha?.slice(0,14)}</code><small>{x.source_digest?.slice(0,18)}…</small></article>)}{!builds.length&&<div className="v8Empty">No build evidence yet</div>}</div></section>
- <section className="v8Card"><div className="v8CardHead"><div><b>Security reviewer</b><small>Fail-closed release gate</small></div></div><div className="v13SecurityList">{reviews.map(x=><article key={x.id}><div><span className={`v13Shield ${x.verdict}`}>⌾</span><div><b>Review #{x.id}</b><small>{x.summary}</small></div></div><strong>{Math.round(x.score||0)}</strong><em>{x.verdict}</em></article>)}{!reviews.length&&<div className="v8Empty">No security review yet</div>}</div></section></div>
- <section className="v13Guardrail"><div><b>What this scanner does</b><p>Detects deterministic high-risk source patterns such as committed private keys, shell execution, unsafe deserialization and disabled TLS verification.</p></div><div><b>What it does not claim</b><p>It is not a dependency CVE database, SAST replacement or formal supply-chain attestation service. Those remain provider adapters for a hardened deployment.</p></div></section></>
+import {Any, Intro, KV, LabBody, Panel, Pill, Table, short, useLoad} from "./lab/kit";
+
+/* Phòng thí nghiệm · Chuỗi cung ứng phần mềm (v13): manifest nguồn, SBOM SPDX 2.3, provenance kiểu SLSA, review bảo mật. */
+export function SupplyChainConsole() {
+  const q = useLoad(async () => {
+    const [b, r] = await Promise.all([apiV13.builds(), apiV13.securityReviews()]);
+    return {builds: b as Any[], reviews: r as Any[]};
+  }, {builds: [], reviews: []});
+  const {data} = q;
+  return <LabBody q={q}>
+    <Intro flow={["Commit", "Manifest", "SBOM", "Provenance"]}>
+      Mỗi bản phát hành giải thích được mã nguồn nào đã vào và cổng nào đã duyệt. Manifest, SPDX 2.3 JSON và provenance là artifact bất biến bình thường, review và bàn giao được như mã.
+    </Intro>
+    <div className="ui-grid is-2">
+      <Panel title="Bằng chứng build">
+        <Table rows={data.builds} empty="Chưa có bằng chứng build nào." cols={[
+          {label: "Build", render: x => <>#{x.id}</>}, {label: "Commit", render: x => <code>{short(x.commit_sha, 14)}</code>},
+          {label: "Digest nguồn", render: x => <code>{short(x.source_digest, 18)}…</code>, hideSm: true}, {label: "Trạng thái", render: x => <Pill s={x.status}/>},
+        ]}/>
+      </Panel>
+      <Panel title="Review bảo mật" desc="Cổng phát hành đóng khi lỗi">
+        <Table rows={data.reviews} empty="Chưa có review bảo mật nào." cols={[
+          {label: "Review", render: x => <><b>#{x.id}</b><br/><small>{x.summary}</small></>},
+          {label: "Điểm", render: x => Math.round(x.score || 0), num: true}, {label: "Kết luận", render: x => <Pill s={x.verdict}/>},
+        ]}/>
+      </Panel>
+    </div>
+    <Panel title="Giới hạn của bộ quét">
+      <KV items={[["Làm được", "Phát hiện mẫu mã rủi ro cao xác định: khoá riêng bị commit, gọi shell, giải tuần tự hoá không an toàn, tắt xác minh TLS."],
+        ["Không khẳng định", "Không phải cơ sở dữ liệu CVE phụ thuộc, không thay SAST, không phải dịch vụ chứng thực chuỗi cung ứng chính thức — các việc đó là adapter cho bản triển khai đã gia cố."]]}/>
+    </Panel>
+  </LabBody>;
 }

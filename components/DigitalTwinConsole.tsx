@@ -1,3 +1,34 @@
 "use client";
-import {useEffect,useState} from "react";import {apiV10} from "../lib/api";type Any=Record<string,any>;
-export function DigitalTwinConsole(){const [scenarios,setScenarios]=useState<Any[]>([]),[runs,setRuns]=useState<Any[]>([]),[error,setError]=useState("");const load=async()=>{try{const [a,b]=await Promise.all([apiV10.simulations(),apiV10.simulationRuns()]);setScenarios(a as Any[]);setRuns(b as Any[]);setError("")}catch(e:any){setError(e.message)}};useEffect(()=>{load()},[]);return <div className="v10Grid"><section className="v8Card"><div className="v8CardHead"><div><b>Company simulation scenarios</b><small>What-if model before changing workforce, cost or autonomy.</small></div></div>{error&&<div className="portalError">{error}</div>}{scenarios.map(s=><div className="v10Simulation" key={s.id}><div><b>{s.name}</b><small>{s.description||s.status}</small></div><button onClick={async()=>{await apiV10.runSimulation(s.id);load()}}>Run</button></div>)}{!scenarios.length&&<p className="v9Empty">No simulation scenario yet. Seed creates a sample scenario.</p>}</section><section className="v8Card"><div className="v8CardHead"><div><b>Simulation results</b><small>Capacity, expected cost, backlog and risk score.</small></div></div>{runs.map(r=>{let result:Any={};try{result=JSON.parse(r.result_json||'{}')}catch{}return <div className="v10Run" key={r.id}><div className="v10RunScore"><b>{Math.round(r.score)}</b><small>score</small></div><div><b>Scenario #{r.scenario_id}</b><small>Capacity {result.expected_capacity_tasks??'—'} · Cost ${result.expected_cost??'—'} · Backlog {result.backlog_after_horizon??'—'}</small></div></div>})}</section></div>}
+import {apiV10} from "../lib/api";
+import {Button} from "./ui/Button";
+import {ErrorBanner} from "./ui/EmptyState";
+import {Any, Intro, LabBody, Panel, Table, parseJson, useAction, useLoad} from "./lab/kit";
+
+/* Phòng thí nghiệm · Mô phỏng (v10): thử "nếu… thì" về nhân sự, chi phí, tự chủ trước khi đổi công ty thật. */
+export function DigitalTwinConsole() {
+  const q = useLoad(async () => {
+    const [a, b] = await Promise.all([apiV10.simulations(), apiV10.simulationRuns()]);
+    return {scenarios: a as Any[], runs: b as Any[]};
+  }, {scenarios: [], runs: []});
+  const act = useAction();
+  const run = (id: number) => act.run("r" + id, async () => { await apiV10.runSimulation(id); await q.reload(); }, "Đã chạy mô phỏng");
+  return <LabBody q={q}>
+    <Intro>Mô hình "nếu… thì" trước khi đổi nhân sự, chi phí hay mức tự chủ: sức chứa, chi phí dự kiến, việc tồn và điểm rủi ro.</Intro>
+    {act.error ? <ErrorBanner error={act.error} context="Chạy mô phỏng" onClose={() => act.setError(null)}/> : null}
+    <div className="ui-grid is-2">
+      <Panel title="Kịch bản mô phỏng">
+        <Table rows={q.data.scenarios} empty="Chưa có kịch bản nào. seed.py tạo sẵn một kịch bản mẫu." cols={[
+          {label: "Kịch bản", render: s => <><b>{s.name}</b><br/><small>{s.description || s.status}</small></>},
+          {label: "", render: s => <Button size="sm" busy={act.busy === "r" + s.id} onClick={() => run(s.id)}>Chạy</Button>},
+        ]}/>
+      </Panel>
+      <Panel title="Kết quả mô phỏng">
+        <Table rows={q.data.runs} empty="Chưa chạy mô phỏng nào." cols={[
+          {label: "Kịch bản", render: r => <>#{r.scenario_id}</>}, {label: "Điểm", render: r => Math.round(r.score), num: true},
+          {label: "Sức chứa / chi phí / tồn", render: r => { const x = parseJson<Any>(r.result_json, {});
+            return <small>{x.expected_capacity_tasks ?? "—"} việc · ${x.expected_cost ?? "—"} · tồn {x.backlog_after_horizon ?? "—"}</small>; }},
+        ]}/>
+      </Panel>
+    </div>
+  </LabBody>;
+}

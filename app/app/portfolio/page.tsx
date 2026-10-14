@@ -1,1 +1,1 @@
-import {PageFrame} from "../../../components/shell/PageFrame";import {NinaPortfolioConsole} from "../../../components/NinaPortfolioConsole";export default function Page(){return <PageFrame title="Nina Engineering Portfolio" subtitle="Executive engineering health and autonomous recommendations"><NinaPortfolioConsole/></PageFrame>}
+import {PageFrame} from "../../../components/shell/PageFrame";import {NinaPortfolioConsole} from "../../../components/NinaPortfolioConsole";export default function Page(){return <PageFrame><NinaPortfolioConsole/></PageFrame>}
