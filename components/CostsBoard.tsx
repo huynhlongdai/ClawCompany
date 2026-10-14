@@ -1,9 +1,11 @@
 "use client";
 import Link from "next/link";
 import {useCallback, useEffect, useState} from "react";
-import {usePathname, useRouter, useSearchParams} from "next/navigation";
+import {useSearchParams} from "next/navigation";
 import {Icon} from "./Icon";
-import {BeCangState} from "./BeCang";
+import {EmptyState, ErrorState} from "./ui/EmptyState";
+import {SkeletonRows} from "./ui/Skeleton";
+import {useToast} from "./ui/Toast";
 import {apiCosts, errorText} from "../lib/api";
 
 /* M4b — Chi phí: tổng chi model (usage_events từ gateway) + ngân sách 3 nấc
@@ -24,12 +26,11 @@ function Bars({rows, empty}: {rows: {name: string; cost_usd: number}[]; empty: s
 }
 
 function Overview() {
-  const [d, setD] = useState<any>(null), [err, setErr] = useState("");
-  const load = useCallback(() => { setErr(""); apiCosts.overview(30).then(setD).catch(e => setErr(errorText(e, "Không tải được chi phí"))); }, []);
+  const [d, setD] = useState<any>(null), [err, setErr] = useState<unknown>(null);
+  const load = useCallback(() => { setErr(null); apiCosts.overview(30).then(setD).catch(setErr); }, []);
   useEffect(() => { load(); }, [load]);
-  if (err) return <BeCangState mood="error" title="Bé Càng chưa đọc được sổ chi phí"
-    action={<button className="ui-btn is-primary" onClick={load}>Thử lại</button>}>{err}</BeCangState>;
-  if (!d) return <div className="cst-tiles">{[0, 1, 2, 3].map(i => <div key={i} className="ui-skel" style={{height: 76}}/>)}</div>;
+  if (err) return <ErrorState error={err} onRetry={load} context="Đọc sổ chi phí"/>;
+  if (!d) return <SkeletonRows n={2} h={76}/>;
   const t = d.totals;
   return <div className="cst-overview">
     <div className="cst-tiles">
@@ -40,9 +41,9 @@ function Overview() {
     </div>
     {d.alerts > 0 && <Link className="cst-alert" href="?tab=budgets"><Icon name="alert" size={16}/>
       {d.alerts} ngân sách đang ở nấc cảnh báo trở lên — xem tab Ngân sách</Link>}
-    {t.model_calls === 0 && <BeCangState mood="sleep" title="Chưa có chi phí model nào trong kỳ">
+    {t.model_calls === 0 && <EmptyState mood="ngu" title="Chưa có chi phí model nào trong kỳ">
       Chi phí được ghi khi agent chạy việc qua gateway OpenClaw (mỗi câu trả lời của model mang số tiền của nó).
-    </BeCangState>}
+    </EmptyState>}
     {t.model_calls > 0 && <div className="cst-cols">
       <section><h3>Theo agent</h3><Bars rows={d.by_agent} empty="—"/></section>
       <section><h3>Theo phòng ban</h3><Bars rows={d.by_department} empty="—"/></section>
@@ -145,36 +146,31 @@ function CreateBudget({scopes, onDone}: {scopes: any; onDone: (msg: string) => v
 }
 
 function Budgets() {
-  const [d, setD] = useState<any>(null), [err, setErr] = useState(""), [toast, setToast] = useState("");
+  const [d, setD] = useState<any>(null), [err, setErr] = useState<unknown>(null);
+  const toast = useToast();
   const [creating, setCreating] = useState(false);
-  const load = useCallback(() => { setErr(""); apiCosts.budgets().then(setD).catch(e => setErr(errorText(e, "Không tải được ngân sách"))); }, []);
+  const load = useCallback(() => { setErr(null); apiCosts.budgets().then(setD).catch(setErr); }, []);
   useEffect(() => { load(); }, [load]);
-  const changed = (msg: string) => { setToast(msg); setCreating(false); load(); };
-  if (err) return <BeCangState mood="error" title="Bé Càng chưa mở được sổ ngân sách"
-    action={<button className="ui-btn is-primary" onClick={load}>Thử lại</button>}>{err}</BeCangState>;
-  if (!d) return <div className="cst-list">{[0, 1].map(i => <div key={i} className="ui-skel" style={{height: 120}}/>)}</div>;
+  const changed = (msg: string) => { toast(msg); setCreating(false); load(); };
+  if (err) return <ErrorState error={err} onRetry={load} context="Mở sổ ngân sách"/>;
+  if (!d) return <SkeletonRows n={2} h={120}/>;
   return <div className="cst-budgets">
     <p className="cst-help">Ba nấc trên mỗi ngân sách: <b>cảnh báo</b> (báo vào Hộp việc, agent chỉ làm việc critical) →
       <b> dừng mềm</b> (mỗi lượt chạy mới cần anh duyệt — duyệt cho một việc, cả seat hoặc cả phòng) →
       <b> dừng cứng</b> ở 100% (seat tạm dừng, việc bị chặn, chỉ mở lại bằng Nâng hạn mức có lý do).</p>
-    {toast && <div className="ibx-toast" role="status">{toast}</div>}
     {d.caps.manage && (creating ? <CreateBudget scopes={d.scopes} onDone={changed}/>
       : <button className="ui-btn is-primary" onClick={() => setCreating(true)}><Icon name="plus" size={14}/>Thêm ngân sách</button>)}
-    {!d.budgets.length && !creating && <BeCangState mood="hello" title="Chưa có ngân sách nào">
+    {!d.budgets.length && !creating && <EmptyState mood="chao" title="Chưa có ngân sách nào">
       Đặt hạn mức cho công ty, phòng ban, nhóm hoặc từng agent để chi phí model không vượt ngoài ý anh.
-    </BeCangState>}
+    </EmptyState>}
     <div className="cst-list">{d.budgets.map((b: any) => <BudgetCard key={b.id} b={b} manage={d.caps.manage} onChanged={changed}/>)}</div>
   </div>;
 }
 
 export function CostsBoard() {
-  const params = useSearchParams(), router = useRouter(), pathname = usePathname();
-  const tab = params.get("tab") === "budgets" ? "budgets" : "overview";
+  /* Tab Tổng quan / Ngân sách nằm ở khung trang (lib/nav.ts) — đổi URL, chia sẻ được. */
+  const tab = useSearchParams().get("tab") === "budgets" ? "budgets" : "overview";
   return <div className="cst">
-    <div className="ui-seg" role="tablist" aria-label="Chi phí">
-      <button role="tab" aria-selected={tab === "overview"} onClick={() => router.replace(pathname)}>Tổng quan</button>
-      <button role="tab" aria-selected={tab === "budgets"} onClick={() => router.replace(`${pathname}?tab=budgets`)}>Ngân sách</button>
-    </div>
     {tab === "overview" ? <Overview/> : <Budgets/>}
   </div>;
 }

@@ -3,7 +3,9 @@ import Link from "next/link";
 import {useCallback, useEffect, useState} from "react";
 import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import {Icon} from "./Icon";
-import {BeCangState} from "./BeCang";
+import {EmptyState, ErrorState} from "./ui/EmptyState";
+import {SkeletonRows} from "./ui/Skeleton";
+import {useToast} from "./ui/Toast";
 import {apiInboxHub, errorText} from "../lib/api";
 import {refreshCounts} from "../lib/counts";
 
@@ -117,16 +119,16 @@ function NoticeCard({c, onChange}: {c: Card; onChange: (msg?: string) => void}) 
 export function InboxHub() {
   const params = useSearchParams(), router = useRouter(), pathname = usePathname();
   const group = params.get("group") || "";
-  const [data, setData] = useState<any>(null), [error, setError] = useState(""), [toast, setToast] = useState("");
+  const [data, setData] = useState<any>(null), [error, setError] = useState<unknown>(null);
+  const toast = useToast(); const setToast = (m: string) => { if (m) toast(m); };
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    setError("");
+    setError(null);
     try { setData(await apiInboxHub.items()); }
-    catch (e) { setError(errorText(e, "Không tải được hộp việc")); }
+    catch (e) { setError(e); }
   }, []);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 4000); return () => clearTimeout(t); }, [toast]);
 
   const setGroup = (g: string) => router.replace(g ? `${pathname}?group=${g}` : pathname);
   const after = (msg?: string) => { if (msg) setToast(msg); load(); refreshCounts(); };
@@ -154,7 +156,7 @@ export function InboxHub() {
       <span><b className="ui-num">{counts.unread}</b> chưa đọc</span>
     </div>}
     <div className="ibx-bar">
-      <div className="ibx-tabs" role="tablist" aria-label="Nhóm">
+      <div className="ui-seg ibx-tabs" role="tablist" aria-label="Nhóm">
         <button role="tab" aria-selected={!group} onClick={() => setGroup("")}>Tất cả{counts ? ` ${counts.open}` : ""}</button>
         {(data?.groups || []).map((g: any) => <button key={g.key} role="tab" aria-selected={group === g.key}
           onClick={() => setGroup(g.key)}><Icon name={GROUP_ICON[g.key] || "inbox"} size={14}/>{g.label}
@@ -166,20 +168,16 @@ export function InboxHub() {
           title="Chuyển các yêu cầu quá hạn lên cấp trên ngay (bình thường hệ thống tự làm mỗi phút)">Leo thang ngay</button>}
       </div>
     </div>
-    {toast && <div className="ibx-toast" role="status">{toast}</div>}
 
-    {error && <BeCangState mood="error" title="Bé Càng chưa mở được hộp việc"
-      action={<button className="ui-btn is-primary" onClick={load}>Thử lại</button>}>
-      {error}. Nếu vẫn lỗi, kiểm tra dịch vụ API đang chạy rồi tải lại trang.
-    </BeCangState>}
-    {!data && !error && <div className="ibx-list" aria-busy="true">{[0, 1, 2].map(i => <div key={i} className="ui-skel" style={{height: 120}}/>)}</div>}
-    {data && !data.linked && <BeCangState mood="hello" title="Tài khoản chưa gắn với một thành viên">
-      Hộp việc là của từng người. Nhờ chủ công ty gắn tài khoản của anh với hồ sơ thành viên trong Đội ngũ.
-    </BeCangState>}
-    {data && data.linked && total === 0 && <BeCangState mood={group ? "sleep" : "done"}
+    {error ? <ErrorState error={error} onRetry={load} context="Mở hộp việc"/> : null}
+    {!data && !error && <SkeletonRows n={3} h={120}/>}
+    {data && !data.linked && <EmptyState mood="chao" title="Tài khoản chưa gắn với một thành viên">
+      Hộp việc là của từng người. Nhờ chủ công ty gắn tài khoản của anh với hồ sơ thành viên trong Đội ngũ › Người &amp; quyền.
+    </EmptyState>}
+    {data && data.linked && total === 0 && <EmptyState mood={group ? "ngu" : "duyet-xong"}
       title={group ? "Nhóm này đang trống" : "Không có gì cần anh lúc này"}>
-      {group ? "Chọn \"Tất cả\" để xem các nhóm khác." : "Bé Càng trông nhà — có phê duyệt, việc chờ xem hay ngân sách chạm nấc sẽ hiện ở đây."}
-    </BeCangState>}
+      {group ? "Chọn “Tất cả” để xem các nhóm khác." : "Bé Càng trông nhà — có phê duyệt, việc chờ xem hay ngân sách chạm nấc sẽ hiện ở đây."}
+    </EmptyState>}
 
     {data && total > 0 && groups.filter(g => g.items.length).map(g => <section key={g.key} className="ibx-group">
       <h2><Icon name={GROUP_ICON[g.key] || "inbox"} size={16}/>{g.label}<span className="ui-num">{g.items.length}</span></h2>

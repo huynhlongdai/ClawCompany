@@ -7,6 +7,9 @@ import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {Icon} from "./Icon";
 import {apiWork, errorText} from "../lib/api";
 import {refreshCounts} from "../lib/counts";
+import {EmptyState, ErrorBanner} from "./ui/EmptyState";
+import {SkeletonRows} from "./ui/Skeleton";
+import {ProjectsView} from "./work/ProjectsView";
 
 type Who = {id: number; name: string; type: string; role?: string; lifecycle?: string | null} | null;
 export type WorkItem = {
@@ -82,6 +85,13 @@ function Badges({t}: {t: WorkItem}) {
 // ------------------------------------------------------------------ trang chính
 
 export function WorkBoard() {
+  const sp = useSearchParams();
+  /* Công việc › Dự án là một tab riêng (route ?view=projects), không phải kiểu xem của danh sách việc. */
+  if (sp.get("view") === "projects") return <ProjectsView/>;
+  return <WorkTasks/>;
+}
+
+function WorkTasks() {
   const router = useRouter(), pathname = usePathname(), sp = useSearchParams();
   const view = sp.get("view") === "board" ? "board" : "list";
   const peek = Number(sp.get("peek") || 0) || null;
@@ -91,8 +101,8 @@ export function WorkBoard() {
   const [q, setQ] = useState(sp.get("q") || "");
   const [showDone, setShowDone] = useState(false);
   const [data, setData] = useState<any>(null), [meta, setMeta] = useState<any>(null);
-  const [error, setError] = useState(""), [notice, setNotice] = useState("");
-  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<unknown>(null), [notice, setNotice] = useState("");
+  const [creating, setCreating] = useState(sp.get("new") === "1");
   const [sel, setSel] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -105,11 +115,11 @@ export function WorkBoard() {
   const load = useCallback(async () => {
     try {
       setData(await apiWork.list({assignee, department_id: dept, priority: prio, q: q.trim()}));
-      setError("");
-    } catch (e) { setError(errorText(e, "Không tải được danh sách việc")); }
+      setError(null);
+    } catch (e) { setError(e); }
   }, [assignee, dept, prio, q]);
   useEffect(() => { const h = setTimeout(load, q ? 250 : 0); return () => clearTimeout(h); }, [load, q]);
-  useEffect(() => { apiWork.meta().then(setMeta).catch(e => setError(errorText(e))); }, []);
+  useEffect(() => { apiWork.meta().then(setMeta).catch(e => setError(e)); }, []);
   useEffect(() => {  // có lượt đang chạy → làm mới 10 giây/lần
     if (!data?.items?.some((t: WorkItem) => t.runs.running || t.status === "review")) return;
     const h = setInterval(load, 10000); return () => clearInterval(h);
@@ -166,10 +176,6 @@ export function WorkBoard() {
     </div>
 
     <div className="ui-toolbar wkToolbar">
-      <div className="ui-seg" role="group" aria-label="Kiểu xem">
-        <button aria-pressed={view === "list"} onClick={() => setParam({view: null})} data-testid="wk-view-list"><Icon name="list" size={14}/>Danh sách</button>
-        <button aria-pressed={view === "board"} onClick={() => setParam({view: "board"})} data-testid="wk-view-board"><Icon name="board" size={14}/>Bảng</button>
-      </div>
       <label className="wkSearch"><Icon name="search" size={14}/>
         <input ref={searchRef} value={q} onChange={e => setQ(e.target.value)} placeholder="Tìm việc hoặc #số  ( / )"
                aria-label="Tìm việc" data-testid="wk-search"/></label>
@@ -191,25 +197,23 @@ export function WorkBoard() {
         <Icon name="plus" size={14}/>Tạo việc <kbd>C</kbd></button>}
     </div>
 
-    {error && <div className="ui-banner is-error" role="alert"><Icon name="alert" size={16}/><span>{error}</span>
-      <button className="ui-btn is-ghost" onClick={load}>Tải lại</button></div>}
+    {error ? <ErrorBanner error={error} onRetry={load} context="Tải danh sách việc"/> : null}
     {notice && <div className="ui-banner is-error" role="alert" data-testid="wk-notice"><Icon name="alert" size={16}/><span>{notice}</span>
       <button className="ui-btn is-ghost" onClick={() => setNotice("")}>Đóng</button></div>}
 
-    {!data && !error && <div className="wkList" aria-busy="true">{[0, 1, 2, 3].map(i => <div key={i} className="ui-skel" style={{height: 40}}/>)}</div>}
-    {data && items.length === 0 && <div className="ui-empty">
-      <Icon name="check" size={20}/><b>{filtered ? "Không có việc nào khớp bộ lọc" : "Chưa có việc nào"}</b>
-      <span>{filtered ? "Bỏ bớt bộ lọc để xem thêm." : "Tạo việc đầu tiên và giao cho một agent — agent nhận việc ngay, kết quả và chi phí hiện ở đây."}</span>
-      {!filtered && meta?.caps?.create && <button className="ui-btn is-primary" onClick={() => setCreating(true)}>Tạo việc</button>}
-    </div>}
+    {!data && !error && <SkeletonRows n={6} h={40}/>}
+    {data && items.length === 0 && <EmptyState mood={filtered ? "ngu" : "chao"} title={filtered ? "Không có việc nào khớp bộ lọc" : "Chưa có việc nào"}
+      action={!filtered && meta?.caps?.create ? <button className="ui-btn is-primary" onClick={() => setCreating(true)}>Tạo việc</button> : undefined}>
+      {filtered ? "Bỏ bớt bộ lọc để xem thêm." : "Tạo việc đầu tiên và giao cho một agent — agent nhận việc ngay, kết quả và chi phí hiện ở đây."}
+    </EmptyState>}
 
     {data && items.length > 0 && view === "list" && <ListView items={flat} sel={sel} setSel={setSel}
       open={id => setParam({peek: String(id)})} active={peek}/>}
     {data && items.length > 0 && view === "board" && <BoardView items={flat} move={move} open={id => setParam({peek: String(id)})}/>}
 
     {peek && <TaskPeek id={peek} meta={meta} onClose={() => setParam({peek: null})} onChanged={() => { load(); refreshCounts(); }}/>}
-    {creating && meta && <CreateTask meta={meta} onClose={() => setCreating(false)}
-      onCreated={id => { setCreating(false); load(); refreshCounts(); setParam({peek: String(id)}); }}/>}
+    {creating && meta && <CreateTask meta={meta} onClose={() => { setCreating(false); if (sp.get("new")) setParam({new: null}); }}
+      onCreated={id => { setCreating(false); load(); refreshCounts(); setParam({peek: String(id), new: null}); }}/>}
   </div>;
 }
 
