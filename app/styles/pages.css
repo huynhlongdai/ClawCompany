@@ -383,3 +383,68 @@ a.org-node:hover{border-color:var(--text-muted);box-shadow:var(--shadow-2)}
 .tm-card-head span{display:block;font-size:var(--fs-12);color:var(--text-muted);margin-top:2px}
 .tm-list{display:flex;flex-direction:column;gap:8px}
 .org-legend .ui-ava{box-shadow:none}
+
+/* ================================================================ QUY TRÌNH */
+.wf{display:grid;grid-template-columns:260px minmax(0,1fr) 220px;gap:16px;align-items:start}
+@media (max-width:1100px){.wf{grid-template-columns:minmax(0,1fr)}}
+.wf-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0}
+.wf-node{position:relative;display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface)}
+.wf-node + .wf-node{margin-top:18px}
+.wf-node + .wf-node::before{content:"";position:absolute;left:50%;top:-18px;height:18px;border-left:1.5px dashed var(--border-strong)}
+.wf-type{font-size:var(--fs-12);font-weight:var(--fw-semibold);color:var(--text-muted)}
+.wf-node.is-approval .wf-type{color:var(--wait)} .wf-node.is-agent .wf-type{color:var(--ok)} .wf-node.is-trigger .wf-type{color:var(--info)}
+.wf-node input{min-height:32px;height:32px}
+.wf-node code{font-size:var(--fs-11);color:var(--text-muted)}
+.wf-edges{margin:8px 0 0;padding-left:18px;font-size:var(--fs-13);display:grid;gap:4px}
+@media (max-width:640px){.wf-node{grid-template-columns:minmax(0,1fr)}.wf-node code{display:none}}
+
+/* ================================================================ OPENCLAW */
+.oc-checks{list-style:none;margin:0;padding:0}
+.oc-check{display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px;align-items:start;padding:12px 16px;border-top:1px solid var(--border)}
+.oc-check:first-child{border-top:0}
+.oc-check.is-fail{background:color-mix(in srgb,var(--risk-bg) 60%,transparent)}
+.oc-check.is-warn{background:color-mix(in srgb,var(--wait-bg) 55%,transparent)}
+.oc-check-body{display:flex;flex-direction:column;gap:4px;align-items:flex-start;min-width:0;font-size:var(--fs-13)}
+.oc-check-body span{color:var(--text-muted);overflow-wrap:anywhere}
+.oc-check-body .oc-fix{display:inline-flex;gap:6px;align-items:flex-start;color:var(--text)}
+.oc-fix svg{margin-top:4px;flex:none}
+.oc-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:12px}
+.oc-facts > div{display:flex;flex-direction:column;gap:6px;align-items:flex-start;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);min-width:0}
+.oc-facts b{font-size:var(--fs-16);font-weight:var(--fw-semibold);max-width:100%}
+.oc-notes{margin:12px 0 0;padding-left:18px;font-size:var(--fs-13);color:var(--text-muted);display:grid;gap:4px}
+@media (max-width:640px){.oc-check{grid-template-columns:minmax(0,1fr)}}
+
+/* ================================================================ HỒ SƠ AGENT */
+.ag{display:flex;flex-direction:column;gap:16px;min-width:0}
+.ag-hero{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:18px;align-items:center;padding:20px;border-radius:var(--radius-lg);background:var(--surface);border:1px solid var(--border)}
+.ag-ava{width:64px;height:64px}
+.ag-id{display:flex;flex-direction:column;gap:8px;min-width:0}
+.ag-id h2{font-size:var(--fs-24);font-weight:var(--fw-bold);letter-spacing:var(--tracking-display)}
+.ag-id p{color:var(--text-muted)}
+.ag-links{display:flex;flex-direction:column;gap:8px}
+@media (max-width:760px){.ag-hero{grid-template-columns:auto minmax(0,1fr)}.ag-links{grid-column:1/-1;flex-direction:row;flex-wrap:wrap}}
+
+/* ================================================================ ONBOARDING */
+.ob{min-height:100dvh;background:var(--bg);display:flex;flex-direction:column}
+.ob-top{display:flex;align-items:center;justify-content:space-between;padding:18px 28px}
+.ob-body{flex:1;display:grid;grid-template-columns:240px minmax(0,640px);gap:40px;justify-content:center;align-items:start;padding:24px 20px 60px}
+.ob-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;position:sticky;top:24px}
+.ob-steps li{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--radius-sm);color:var(--text-muted);font-weight:var(--fw-medium)}
+.ob-steps li span{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border-strong);font-size:var(--fs-12);flex:none}
+.ob-steps li.is-on{color:var(--text);background:var(--surface);box-shadow:var(--shadow-1)}
+.ob-steps li.is-on span{background:var(--text);border-color:var(--text);color:var(--bg)}
+.ob-steps li.is-done span{background:var(--ok);border-color:var(--ok);color:#fff}
+.ob-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:28px;display:grid;gap:18px;box-shadow:var(--shadow-1)}
+.ob-card h1{font-size:var(--fs-24);font-weight:var(--fw-bold);letter-spacing:var(--tracking-display)}
+.ob-card h1 + p{color:var(--text-muted);margin-top:6px;max-width:60ch}
+.ob-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.ob-tpls{display:grid;gap:10px}
+.ob-tpl{display:flex;flex-direction:column;gap:4px;align-items:flex-start;text-align:left;padding:14px 16px;border:1px solid var(--border-strong);border-radius:var(--radius-md);background:var(--surface)}
+.ob-tpl:hover{border-color:var(--text-muted)}
+.ob-tpl[aria-checked="true"]{border-color:var(--text);box-shadow:inset 0 0 0 1px var(--text);background:var(--selected)}
+.ob-tpl b{font-size:var(--fs-16)}
+.ob-tpl span{color:var(--text-muted);font-size:var(--fs-13)}
+.ob-checks{border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden}
+.ob-note{font-size:var(--fs-13);color:var(--text-muted);padding:10px 12px;border-radius:var(--radius-sm);background:var(--wait-bg)}
+.ob-done{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:12px 0}
+@media (max-width:860px){.ob-body{grid-template-columns:minmax(0,1fr);gap:16px}.ob-steps{position:static;flex-direction:row;overflow-x:auto}.ob-steps li{white-space:nowrap;padding:8px 10px}.ob-card{padding:20px}.ob-top{padding:14px 16px}}

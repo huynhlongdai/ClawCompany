@@ -8,12 +8,12 @@ import {TaskDetail} from "../../../../components/TaskDetail";
    được gì (gói ngữ cảnh bảy khối). */
 export default function Page({params}: {params: {id: string}}) {
   const taskId = Number(params.id);
-  return 
+  return (
     <PageFrame title="Chi tiết công việc"
                  subtitle="Sổ ghi theo thời gian, bàn giao kèm hướng dẫn, và gói ngữ cảnh mà agent sẽ nhận">
       {Number.isFinite(taskId)
         ? <TaskDetail taskId={taskId}/>
         : <div className="v8Error">Id công việc không hợp lệ.</div>}
     </PageFrame>
-  ;
+  );
 }
