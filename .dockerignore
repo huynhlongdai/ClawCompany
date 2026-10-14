@@ -9,3 +9,4 @@ work
 **/*.db
 .env
 .env.*
+secrets
