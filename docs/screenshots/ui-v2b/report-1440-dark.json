@@ -1,0 +1,642 @@
+{
+ "tong-quan-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Tổng quan"
+ },
+ "hop-viec-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Hộp việc"
+ },
+ "cong-viec-list-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Công việc"
+ },
+ "cong-viec-board-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Công việc"
+ },
+ "cong-viec-peek-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Công việc"
+ },
+ "cong-viec-du-an-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Công việc"
+ },
+ "chi-tiet-viec-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Chi tiết công việc"
+ },
+ "muc-tieu-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Mục tiêu & Kế hoạch"
+ },
+ "ke-hoach-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Mục tiêu & Kế hoạch"
+ },
+ "nina-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Mục tiêu & Kế hoạch"
+ },
+ "doi-ngu-so-do-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Đội ngũ"
+ },
+ "doi-ngu-agent-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Đội ngũ"
+ },
+ "doi-ngu-nguoi-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Đội ngũ"
+ },
+ "doi-ngu-phong-ban-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Đội ngũ"
+ },
+ "doi-ngu-dao-tao-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Đội ngũ"
+ },
+ "doi-ngu-dung-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Đội ngũ"
+ },
+ "agent-ho-so-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Hồ sơ nhân sự AI"
+ },
+ "agent-nhan-su-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Hồ sơ nhân sự AI"
+ },
+ "agent-openclaw-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Hồ sơ nhân sự AI"
+ },
+ "viec-dinh-ky-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Việc định kỳ"
+ },
+ "quy-trinh-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Việc định kỳ"
+ },
+ "chi-phi-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Chi phí"
+ },
+ "chi-phi-ngan-sach-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Chi phí"
+ },
+ "cai-dat-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Cài đặt"
+ },
+ "openclaw-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Cài đặt"
+ },
+ "ky-nang-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Cài đặt"
+ },
+ "bi-mat-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Cài đặt"
+ },
+ "phong-thi-nghiem-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Cài đặt"
+ },
+ "onboarding-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Công ty của anh tên gì?"
+ },
+ "khac-collaboration-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Phòng họp"
+ },
+ "khac-communications-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Tin nhắn agent"
+ },
+ "khac-artifacts-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Sản phẩm & bàn giao"
+ },
+ "khac-quality-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Chất lượng & hạn"
+ },
+ "khac-live-runs-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Phiên đang chạy"
+ },
+ "khac-events-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Nhật ký sự kiện"
+ },
+ "khac-reports-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Báo cáo"
+ },
+ "khac-routing-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Định tuyến phòng ban"
+ },
+ "khac-agents-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Tuyển agent (cũ)"
+ },
+ "khac-company-factory-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Dựng công ty từ mẫu (cũ)"
+ },
+ "khac-workspace-ops-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Sửa dữ liệu tổ chức"
+ },
+ "khac-memory-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Bộ nhớ tổ chức"
+ },
+ "khac-knowledge-mesh-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Lưới tri thức"
+ },
+ "khac-customers-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Khách hàng"
+ },
+ "khac-marketplace-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Kho mẫu"
+ },
+ "khac-system-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Danh bạ công cụ"
+ },
+ "khac-approve-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Hộp việc"
+ },
+ "khac-budgets-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Chi phí"
+ },
+ "khac-flow-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Công việc"
+ },
+ "lab-repositories-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Repository Phòng thí nghiệm"
+ },
+ "lab-delivery-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Pipeline giao hàng Phòng thí nghiệm"
+ },
+ "lab-reviews-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Review mã Phòng thí nghiệm"
+ },
+ "lab-cicd-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "CI/CD Phòng thí nghiệm"
+ },
+ "lab-releases-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Chuyến phát hành Phòng thí nghiệm"
+ },
+ "lab-release-manager-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Quản lý phát hành Phòng thí nghiệm"
+ },
+ "lab-deployments-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Triển khai Phòng thí nghiệm"
+ },
+ "lab-progressive-delivery-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Triển khai dần Phòng thí nghiệm"
+ },
+ "lab-sandboxes-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Sandbox Phòng thí nghiệm"
+ },
+ "lab-workspaces-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Workspace phát triển Phòng thí nghiệm"
+ },
+ "lab-workspace-gateway-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Cổng workspace Phòng thí nghiệm"
+ },
+ "lab-dev-cloud-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Dev Cloud Phòng thí nghiệm"
+ },
+ "lab-engineering-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Tổ chức kỹ thuật Phòng thí nghiệm"
+ },
+ "lab-portfolio-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Danh mục kỹ thuật Phòng thí nghiệm"
+ },
+ "lab-runners-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Runner phân tán Phòng thí nghiệm"
+ },
+ "lab-sre-control-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Nina SRE Phòng thí nghiệm"
+ },
+ "lab-incidents-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Sự cố Phòng thí nghiệm"
+ },
+ "lab-observability-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "SLO & đo lường Phòng thí nghiệm"
+ },
+ "lab-telemetry-federation-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Liên kết đo lường Phòng thí nghiệm"
+ },
+ "lab-trust-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Tin cậy Phòng thí nghiệm"
+ },
+ "lab-supply-chain-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Chuỗi cung ứng phần mềm Phòng thí nghiệm"
+ },
+ "lab-production-trust-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Tin cậy production Phòng thí nghiệm"
+ },
+ "lab-secrets-federation-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Liên kết bí mật Phòng thí nghiệm"
+ },
+ "lab-control-center-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Trung tâm điều hành Phòng thí nghiệm"
+ },
+ "lab-founder-cockpit-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Buồng lái founder Phòng thí nghiệm"
+ },
+ "lab-autonomy-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Mức tự chủ Phòng thí nghiệm"
+ },
+ "lab-simulation-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Mô phỏng Phòng thí nghiệm"
+ },
+ "cong-khach-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Chào Acme Team"
+ },
+ "cong-khach-chat-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": ""
+ },
+ "palette-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Tổng quan"
+ },
+ "dang-nhap-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Đăng nhập"
+ },
+ "loi-moi-1440-dark": {
+  "overflow_x": 0,
+  "errors": [],
+  "english": [],
+  "btn_overflow": [],
+  "html_lang": "vi",
+  "h1": "Lời mời tham gia"
+ }
+}

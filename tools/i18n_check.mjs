@@ -10,7 +10,7 @@ const a = new Map(flat(vi)), b = new Map(flat(en));
 const problems = [];
 for (const k of a.keys()) if (!b.has(k)) problems.push(`thiếu trong en: ${k}`);
 for (const k of b.keys()) if (!a.has(k)) problems.push(`thừa trong en: ${k}`);
-const vars = s => [...String(s).matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort().join(",");
+const vars = s => [...new Set([...String(s).matchAll(/\{(\w+)(?::[^}]*)?\}/g)].map(m => m[1]))].sort().join(",");
 let untranslated = 0;
 for (const [k, v] of a) if (b.has(k)) {
   if (vars(v) !== vars(b.get(k))) problems.push(`biến lệch ở ${k}: vi {${vars(v)}} / en {${vars(b.get(k))}}`);

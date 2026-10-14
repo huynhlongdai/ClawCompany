@@ -1,4 +1,6 @@
 "use client";
+import {riskLabel} from "@/lib/risk";
+import {kindLabel, deadlineText} from "@/lib/approvalText";
 import Link from "next/link";
 import {useCallback, useEffect, useState} from "react";
 import {usePathname, useRouter, useSearchParams} from "next/navigation";
@@ -49,15 +51,15 @@ function ApprovalCard({c, onDone}: {c: Card; onDone: (msg: string, reload?: bool
 
   return <article className={"ibx-card is-approval" + (a.overdue ? " is-overdue" : "")} data-testid={`ibx-approval-${a.id}`}>
     <header className="ibx-top">
-      <span>{a.kind_vi}{a.requester ? t("inbox.xin_duyet", {p0: a.requester}) : ""}</span>
-      <span className={"ibx-risk " + riskCls(a.risk)}>{t("inbox.rui_ro")} {a.risk_vi.toLowerCase()}</span>
+      <span>{kindLabel(a.kind)}{a.requester ? t("inbox.xin_duyet", {p0: a.requester}) : ""}</span>
+      <span className={"ibx-risk " + riskCls(a.risk)}>{riskLabel(a.risk)}</span>
     </header>
     <h3 className="ibx-title">{a.action}</h3>
     {a.summary && <p className="ibx-summary">{a.summary}</p>}
     <div className="ibx-meta">
       {c.department?.name && <span><Icon name="users" size={13}/>{c.department.name}</span>}
       {a.task && <Link href={`/app/work?peek=${a.task.id}`}><Icon name="check" size={13}/>{t("inbox.viec")}{a.task.id}</Link>}
-      {a.deadline_vi && <span className={a.overdue || a.escalation_blocked ? "is-late" : ""}><Icon name="clock" size={13}/>{a.deadline_vi}</span>}
+      {deadlineText(a) && <span className={a.overdue || a.escalation_blocked ? "is-late" : ""}><Icon name="clock" size={13}/>{deadlineText(a)}</span>}
     </div>
     {!a.can_decide && <p className="ibx-note">{t("inbox.anh_chi_duoc_bao_nguoi")} {a.approver || t("inbox.quan_ly")}.</p>}
     {a.can_decide && a.kind === "budget" && mode !== "reject" &&

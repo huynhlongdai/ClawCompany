@@ -196,3 +196,19 @@ legacy.css: 18871 byte, 217 class
 - **Trang chưa restyle** (vẫn chạy nhờ `legacy.css` bắc cầu, nhìn đồng màu nhưng bố cục cũ): 27 trang Lab; /app/events, /app/collaboration, /portal, /portal/chat; ruột của SeatProfile (6 tab file/config), AgentHR (form, vòng đời, lệch, ma trận tool) và các khối phụ của chi tiết việc (Chặng duyệt, Liên kết, Lượt chạy, Đánh thức) — hồ sơ agent và chi tiết việc mới được một lượt bố cục, chưa viết lại từng khối trên `components/ui`.
 - `tools/shot_seat.py` (công cụ cũ) giả định SeatProfile nằm ngay trên `/app/agents/{id}`; giờ ở `?tab=openclaw`. Không phải test, chưa sửa.
 - Các lỗi nhỏ còn thấy trên ảnh (mục "chưa sửa" ở trên).
+
+## Đợt hoàn thiện + i18n (2026-10-14, tối)
+
+- Độ phủ route: **68/68** chạy trên giao diện mới (`tools/ui_inventory.py`); `legacy.css` 18.871 byte → **đã xoá**.
+- i18n: từ điển có kiểu tự viết (`messages/vi.json` + `en.json`, 1843 khoá khớp nhau; thiếu khoá → `tsc` lỗi). Locale ở cookie `cc_locale` + `users.locale` (migration 0031, `PATCH /auth/me`). Ngày/số/tiền theo `Intl`. Số ít/số nhiều tiếng Anh bằng cú pháp `{p0:item|items}` trong `t()`.
+- Backend trả lỗi theo `Accept-Language` (vi mặc định, en khi yêu cầu). Nhãn rủi ro, loại phê duyệt và hạn duyệt trong Hộp việc/Tổng quan dựng ở frontend theo locale (`lib/risk.ts`, `lib/approvalText.ts`), không còn dùng `risk_vi`/`kind_vi`/`deadline_vi`.
+- Cờ `LAB_JOBS_ENABLED` (mặc định tắt) chặn 6 job Lab, có test hành vi.
+- pytest: **1101 passed, 2 skipped, 1 failed**. Ca hỏng là `test_v36_insights.py::test_local_today_follows_the_configured_timezone`, phụ thuộc giờ chạy (10:00–12:00 UTC); chạy lại ngoài khung giờ đó thì xanh (16 passed). Không sửa test.
+- `tsc` sạch, `next build` xanh. First-load: `/app/os` 124 kB, `/app/inbox` 117 kB, `/app/work` 125 kB, `/app/team` 128 kB, `/invite/[token]` 102 kB (trước 109 kB).
+- Ảnh chụp (`docs/screenshots/ui-v2b/`): bản vi gồm 80 trang × 1440/390 × sáng/tối; bản en gồm 31 trang lõi ở 1440 và Hộp việc ở 390. **0 lỗi console/HTTP, 0 tràn ngang, 0 chữ Anh sót ở bản vi, 0 chữ tràn nút ở bản en.**
+
+### Còn lại
+- Thân 27 trang Lab và các trang phụ còn khoảng 566 chuỗi tiếng Việt viết cứng, chưa có bản en.
+- Backend vẫn trả một số nhãn tiếng Việt cố định trong dữ liệu (`status_vi`, nguồn chi phí…). Dữ liệu seed cũng là tiếng Việt.
+- Ca test phụ thuộc múi giờ nên được sửa riêng: cần anh duyệt vì đây là sửa test.
+- Chưa chạy với gateway OpenClaw thật (chỉ chạy chế độ mock).

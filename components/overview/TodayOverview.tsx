@@ -1,4 +1,6 @@
 "use client";
+import {riskLabel} from "@/lib/risk";
+import {kindLabel, deadlineText} from "@/lib/approvalText";
 import Link from "next/link";
 import {useCallback, useEffect, useMemo, useState} from "react";
 import {Icon} from "../Icon";
@@ -149,8 +151,8 @@ export function TodayOverview() {
             return <Link key={it.key} href="/app/inbox?group=approvals" className="ui-row" data-testid="ov-approval">
               <span className="ui-sdot is-pending" aria-hidden="true"/>
               <span className="ui-row-main"><span className="ui-row-title">{a.action || it.title}</span>
-                <span className="ui-row-meta">{[a.kind_vi, a.requester && `${a.requester} xin`, a.deadline_vi].filter(Boolean).join(" · ")}</span></span>
-              <span className="ui-row-end">{a.overdue ? <StatusPill tone="risk">{tr("overview.qua_han_2")}</StatusPill> : <StatusPill tone={a.risk === "high" || a.risk === "critical" ? "risk" : "wait"}>{tr("overview.rui_ro")} {String(a.risk_vi || "").toLowerCase()}</StatusPill>}</span>
+                <span className="ui-row-meta">{[kindLabel(a.kind), a.requester && tr("inbox.xin_short", {p0: a.requester}), deadlineText(a)].filter(Boolean).join(" · ")}</span></span>
+              <span className="ui-row-end">{a.overdue ? <StatusPill tone="risk">{tr("overview.qua_han_2")}</StatusPill> : <StatusPill tone={a.risk === "high" || a.risk === "critical" ? "risk" : "wait"}>{riskLabel(a.risk)}</StatusPill>}</span>
             </Link>; })}</div>}
       </section>
 

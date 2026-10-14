@@ -38,7 +38,11 @@ export function t(key: Key, vars?: Vars): string {
   const i = key.indexOf(".");
   const ns = key.slice(0, i), k = key.slice(i + 1);
   const s: string = (dict as any)?.[ns]?.[k] ?? key;
-  return vars ? s.replace(/\{(\w+)\}/g, (m, n) => (vars[n] != null ? String(vars[n]) : m)) : s;
+  if (!vars) return s;
+  // Số ít/số nhiều (en): "{p0:item|items}" → "1 item" / "3 items". Bản vi không cần dạng này.
+  return s
+    .replace(/\{(\w+):([^|}]*)\|([^}]*)\}/g, (m, n, one, other) => (vars[n] != null ? `${vars[n]} ${Number(vars[n]) === 1 ? one : other}` : m))
+    .replace(/\{(\w+)\}/g, (m, n) => (vars[n] != null ? String(vars[n]) : m));
 }
 
 /** Hằng cấp module phụ thuộc ngôn ngữ: object/array dựng lại theo locale khi được đọc. */
