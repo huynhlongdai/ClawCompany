@@ -37,6 +37,7 @@ services:
         NEXT_PUBLIC_AUTH_REQUIRED: "true"
         API_PROXY_TARGET: http://api:8000
     restart: unless-stopped
+    working_dir: /web
     volumes: !reset []
     command: !reset null
     environment:
