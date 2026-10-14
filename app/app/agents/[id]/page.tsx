@@ -17,16 +17,16 @@ import {AgentHRPanel} from "../../../../components/AgentHR";
    cấu hình thế nào" và "nhân viên này đang làm gì". */
 export default function Page({params}: {params: {id: string}}) {
   const memberId = Number(params.id);
-  return 
+  return (
     <PageFrame title="Hồ sơ nhân sự AI"
                  subtitle="Danh tính, tính cách, mô tả công việc, năng lực, quyền và hạn mức — ghi trực tiếp vào gateway OpenClaw">
       {Number.isFinite(memberId)
         ? <>
+            <AgentDetail memberId={memberId}/>
             <AgentHRPanel memberId={memberId}/>
             <SeatProfileByMember memberId={memberId}/>
-            <AgentDetail memberId={memberId}/>
           </>
-        : <div className="v8Error">Id agent không hợp lệ.</div>}
+        : <div className="ui-banner is-error">Mã agent trong đường dẫn không hợp lệ. Mở agent từ Đội ngũ › Agent.</div>}
     </PageFrame>
-  ;
+  );
 }

@@ -5,13 +5,18 @@
 // thích thay vì nút bấm rồi mới bị 403.
 import {useEffect, useMemo, useState} from "react";
 import {useRouter, useSearchParams} from "next/navigation";
-import {AuthGate} from "./AuthGate";
-import {V17AppShell} from "./V17AppShell";
+import {PageFrame} from "./shell/PageFrame";
 import {apiTeam, errorText} from "../lib/api";
 import {AgentHRTab} from "./AgentHR";
+import {Notice, EmptyState, ErrorBanner} from "./ui/EmptyState";
+import {SkeletonRows} from "./ui/Skeleton";
+import {useToast} from "./ui/Toast";
+import {Icon} from "./Icon";
+import Link from "next/link";
+import {useCompanyId} from "../lib/prefs";
 
-type Tab = "chart" | "people" | "departments" | "ai" | "build";
-const TABS: [Tab, string][] = [["chart", "Sơ đồ"], ["people", "Người & quyền"], ["departments", "Phòng ban"], ["ai", "Nhân sự AI"], ["build", "Tạo công ty & CSV"]];
+type Tab = "chart" | "people" | "departments" | "ai" | "training" | "build";
+const TAB_IDS: Tab[] = ["chart", "people", "departments", "ai", "training", "build"];
 const ROLE_VI: Record<string, string> = {guest: "Khách", member: "Thành viên", manager: "Quản lý", admin: "Quản trị", owner: "Chủ sở hữu"};
 const CSV_SAMPLE = `tên,loại,chức danh,phòng ban,quản lý,email,trưởng phòng
 Hà,người,Giám đốc,Ban điều hành,,ha@congty.vn,x
@@ -20,19 +25,17 @@ Bot đóng gói,agent,Đóng gói đơn,Kho,Minh,,`;
 
 function Node({n}: {n: any}) {
   const pending = n.status === "pending_runtime" || n.lifecycle === "runtime_missing";
+  const agent = n.type === "agent";
+  const inner = <>
+    <span className={"ui-ava is-lg " + (agent ? "is-agent" : "is-human")} aria-hidden="true">{agent ? <Icon name="sparkle" size={16} strokeWidth={2}/> : (n.name || "?").slice(0, 1).toUpperCase()}</span>
+    <span><b>{n.name}</b><small>{n.role || "—"}</small>{n.department && <span className="org-dept">{n.department}{n.access_role ? ` · ${ROLE_VI[n.access_role] || n.access_role}` : ""}</span>}</span>
+    {(pending || n.cycle) ? <span className="org-flag is-warn">{pending ? "chưa có trên gateway" : "vòng quản lý"}</span>
+      : n.is_head ? <span className="org-flag">Trưởng phòng</span> : null}
+  </>;
+  const cls = "org-node" + (n.is_head ? " is-head" : "") + (agent ? " is-agent" : "");
   return <li>
-    <div className={"tmNode" + (n.is_head ? " is-head" : "") + (n.type === "agent" ? " is-agent" : "")} data-testid={`node-${n.id}`}>
-      <b>{n.name}</b>
-      <small>{n.role || "—"}</small>
-      <span className="tmTags">
-        <em>{n.type === "agent" ? "AI" : "Người"}</em>
-        {n.department && <em>{n.department}</em>}
-        {n.is_head && <em className="is-head">Trưởng phòng</em>}
-        {n.access_role && <em>{ROLE_VI[n.access_role] || n.access_role}</em>}
-        {pending && <em className="is-warn">chưa có trên gateway</em>}
-        {n.cycle && <em className="is-warn">vòng quản lý</em>}
-      </span>
-    </div>
+    {agent ? <Link href={`/app/agents/${n.id}`} className={cls} data-testid={`node-${n.id}`}>{inner}</Link>
+      : <div className={cls} data-testid={`node-${n.id}`}>{inner}</div>}
     {n.children?.length > 0 && <ul>{n.children.map((c: any) => <Node key={c.id} n={c}/>)}</ul>}
   </li>;
 }
@@ -44,64 +47,90 @@ function flatten(tree: any[]): any[] {
 
 export function TeamConsole() {
   const router = useRouter(); const params = useSearchParams();
-  const tab = (params.get("tab") as Tab) || "chart";
-  const [companyId, setCompanyId] = useState<number | null>(Number(params.get("company")) || null);
-  const setTab = (t: Tab) => router.replace(`/app/team?tab=${t}${companyId ? `&company=${companyId}` : ""}`);
+  const raw = params.get("tab") as Tab;
+  const tab: Tab = TAB_IDS.includes(raw) ? raw : "chart";
+  const [pref, setPref] = useCompanyId();
+  const [companyId, setCompanyId] = useState<number | null>(Number(params.get("company")) || pref || null);
   const [me, setMe] = useState<any>(null), [chart, setChart] = useState<any>(null), [people, setPeople] = useState<any>(null);
-  const [error, setError] = useState(""), [note, setNote] = useState(""), [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null), [busy, setBusy] = useState(false);
+  const toast = useToast();
   const caps = me?.capabilities || {};
 
   async function load(cid = companyId) {
-    try {
-      const [m, c] = await Promise.all([apiTeam.me(), apiTeam.orgChart(cid)]);
-      setMe(m); setChart(c); if (c?.company && cid == null) setCompanyId(c.company.id);
-      apiTeam.people().then(setPeople).catch(() => setPeople(null));
-    } catch (e: any) { setError(errorText(e)); }
+    /* ba nguồn song song (trước v2: people gọi sau khi me + sơ đồ về — một nhịp chờ thừa) */
+    const [m, c, p] = await Promise.allSettled([apiTeam.me(), apiTeam.orgChart(cid), apiTeam.people()]);
+    if (m.status === "fulfilled") setMe(m.value); else setError(m.reason);
+    if (c.status === "fulfilled") { setChart(c.value); if (c.value?.company && cid == null) setCompanyId(c.value.company.id); } else setError(c.reason);
+    setPeople(p.status === "fulfilled" ? p.value : null);
   }
   useEffect(() => { load(); }, []);
+  /* bộ đổi công ty ở sidebar → đổi sơ đồ theo */
+  useEffect(() => { if (pref && pref !== companyId) { setCompanyId(pref); load(pref); } // eslint-disable-next-line
+  }, [pref]);
   async function act(fn: () => Promise<any>, ok: string | ((r: any) => string)) {
-    setBusy(true); setError(""); setNote("");
-    try { const r = await fn(); setNote(typeof ok === "string" ? ok : ok(r)); await load(); return r; }
-    catch (e: any) { setError(errorText(e)); } finally { setBusy(false); }
+    setBusy(true); setError(null);
+    try { const r = await fn(); toast(typeof ok === "string" ? ok : ok(r)); await load(); return r; }
+    catch (e: any) { setError(e); } finally { setBusy(false); }
   }
+  const pickCompany = (v: number) => { setCompanyId(v); setPref(v); load(v); };
+  const setTab = (t: Tab) => router.replace(`/app/team?tab=${t}${companyId ? `&company=${companyId}` : ""}`);
 
   const members = useMemo(() => flatten(chart?.tree || []), [chart]);
-  return <AuthGate><V17AppShell title="Đội ngũ" subtitle="Sơ đồ tổ chức, mời người, phân quyền và trưởng phòng">
-    {me && <div className="ui-banner tmRole" data-testid="team-role">
-      Bạn đang là <b>{me.role_label}</b> trong {me.organization || "tổ chức"}.{" "}
-      {caps.manage_roles ? "Bạn mời người, đổi vai, sửa sơ đồ và dựng công ty được."
-        : caps.invite ? "Bạn mời thành viên và sửa sơ đồ được; đổi vai cần Quản trị."
-        : "Bạn xem được sơ đồ và danh sách; mời người hay sửa sơ đồ cần vai Quản lý trở lên."}
-    </div>}
-    {error && <div className="ui-banner is-error" data-testid="team-error">{error}</div>}
-    {note && <div className="ui-banner tmNote" data-testid="team-note">{note}</div>}
-    <div className="ui-toolbar" style={{margin: "12px 0"}}>
-      <div className="ui-seg" role="tablist" aria-label="Đội ngũ">
-        {TABS.map(([k, l]) => <button key={k} role="tab" aria-pressed={tab === k} onClick={() => setTab(k)} data-testid={`tab-${k}`}>{l}</button>)}
-      </div>
-      {chart?.companies?.length > 0 && <label className="tmInline">Công ty
-        <select value={companyId ?? ""} onChange={e => { const v = Number(e.target.value); setCompanyId(v); load(v); }} data-testid="team-company">
-          {chart.companies.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select></label>}
-    </div>
+  return <PageFrame actions={chart?.companies?.length > 1 ? <label className="tmInline">Công ty
+      <select value={companyId ?? ""} onChange={e => pickCompany(Number(e.target.value))} data-testid="team-company">
+        {chart.companies.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select></label> : undefined}>
+    {me && tab !== "chart" && <Notice testId="team-role">
+      Anh đang là <b>{me.role_label}</b> trong {me.organization || "tổ chức"}.{" "}
+      {caps.manage_roles ? "Anh mời người, đổi vai, sửa sơ đồ và dựng công ty được."
+        : caps.invite ? "Anh mời thành viên và sửa sơ đồ được; đổi vai cần Quản trị."
+        : "Anh xem được sơ đồ và danh sách; mời người hay sửa sơ đồ cần vai Quản lý trở lên."}
+    </Notice>}
+    {error ? <ErrorBanner error={error} onClose={() => setError(null)} onRetry={() => load()} testId="team-error"/> : null}
 
-    {tab === "chart" && <ChartTab chart={chart}/>}
+    {tab === "chart" && <ChartTab chart={chart} onBuild={() => setTab("build")}/>}
     {tab === "people" && <PeopleTab me={me} people={people} chart={chart} busy={busy} act={act}/>}
     {tab === "departments" && <DepartmentsTab chart={chart} members={members} caps={caps} busy={busy} act={act}/>}
     {tab === "ai" && <AgentHRTab companyId={companyId} caps={caps}/>}
-    {tab === "build" && <BuildTab chart={chart} caps={caps} busy={busy} act={act} onCompany={(id: number) => { setCompanyId(id); load(id); setTab("chart"); }}/>}
-  </V17AppShell></AuthGate>;
+    {tab === "training" && <TrainingTab/>}
+    {tab === "build" && <BuildTab chart={chart} caps={caps} busy={busy} act={act} onCompany={(id: number) => { pickCompany(id); setTab("chart"); }}/>}
+  </PageFrame>;
 }
 
-function ChartTab({chart}: {chart: any}) {
-  if (!chart) return <div className="ui-empty">Đang tải…</div>;
-  if (!chart.company) return <div className="ui-empty">Chưa có công ty nào — vào “Tạo công ty & CSV” để dựng từ mẫu.</div>;
+function TrainingTab() {
+  return <div className="ui-grid is-2">
+    <EmptyState mood="lam-viec" title="Đào tạo agent đang được xây (M5)">
+      Skill Studio, bộ bài thử có chấm điểm, scorecard từng agent và bài học vào MEMORY.md thuộc module M5 — chưa có API nên chưa có màn hình thật ở đây.
+    </EmptyState>
+    <section className="ui-panel"><header className="ui-panel-head"><div className="ui-grow"><h2>Dùng được ngay</h2><p>Những phần đào tạo đã chạy</p></div></header>
+      <div className="ui-list">
+        <Link className="ui-row" href="/app/agent-tools"><Icon name="shield" size={16}/><span className="ui-row-main"><span className="ui-row-title">Kỹ năng & công cụ</span><span className="ui-row-meta">Công cụ agent được gọi, quyền theo ghế</span></span><Icon name="chevron-right" size={14}/></Link>
+        <Link className="ui-row" href="/app/team?tab=ai"><Icon name="sparkle" size={16}/><span className="ui-row-main"><span className="ui-row-title">Hồ sơ agent</span><span className="ui-row-meta">Sửa tính cách (SOUL), mô tả công việc, quyền, hạn mức</span></span><Icon name="chevron-right" size={14}/></Link>
+        <Link className="ui-row" href="/app/memory"><Icon name="book" size={16}/><span className="ui-row-main"><span className="ui-row-title">Bộ nhớ tổ chức</span><span className="ui-row-meta">Quyết định và tri thức dùng chung</span></span><Icon name="chevron-right" size={14}/></Link>
+      </div>
+    </section>
+  </div>;
+}
+
+function ChartTab({chart, onBuild}: {chart: any; onBuild: () => void}) {
+  if (!chart) return <SkeletonRows n={4} h={64}/>;
+  if (!chart.company) return <EmptyState mood="chao" title="Chưa có công ty nào" action={<button className="ui-btn is-primary" onClick={onBuild}>Dựng công ty từ mẫu</button>}>
+    Dựng từ mẫu (shop, agency, kế toán) để có sẵn phòng ban, trưởng phòng là agent và sơ đồ báo cáo.</EmptyState>;
   const s = chart.stats || {};
-  return <section className="v8Card">
-    <div className="v8CardHead"><div><b>{chart.company.name}</b>
-      <span>{s.departments} phòng ban · {s.humans} người · {s.agents} agent{s.without_head ? ` · ${s.without_head} phòng chưa có trưởng phòng` : ""}</span></div></div>
-    <div className="tmTree" data-testid="org-tree"><ul>{chart.tree.map((n: any) => <Node key={n.id} n={n}/>)}</ul></div>
-    {!chart.tree.length && <div className="ui-empty">Công ty chưa có thành viên.</div>}
+  return <section className="ui-section" data-testid="org-chart">
+    <div className="ui-toolbar">
+      <div className="org-stats"><span><b>{s.departments}</b> phòng ban</span><span><b>{s.humans}</b> người</span><span><b>{s.agents}</b> agent</span>
+        {s.without_head ? <span className="is-warn"><b>{s.without_head}</b> phòng chưa có trưởng phòng</span> : null}</div>
+      <span className="ui-grow"/>
+      <div className="org-legend"><span><span className="ui-ava is-agent" style={{width: 14, height: 14}}/>Agent — bấm để mở hồ sơ</span><span><span className="ui-ava is-human" style={{width: 14, height: 14}}/>Người</span></div>
+    </div>
+    <div className="org" data-testid="org-tree">
+      {chart.tree.length ? <ul className="org-tree"><li>
+        <div className="org-node is-root"><span className="ui-ava is-lg" aria-hidden="true"><Icon name="building" size={18}/></span>
+          <span><b>{chart.company.name}</b><small>{s.departments} phòng · {(s.humans || 0) + (s.agents || 0)} thành viên</small></span></div>
+        <ul>{chart.tree.map((n: any) => <Node key={n.id} n={n}/>)}</ul>
+      </li></ul> : <EmptyState compact mood="ngu" title="Công ty chưa có thành viên">Mời người ở tab Người &amp; quyền hoặc nhập sơ đồ từ CSV.</EmptyState>}
+    </div>
   </section>;
 }
 
@@ -109,16 +138,16 @@ function PeopleTab({me, people, chart, busy, act}: any) {
   const caps = me?.capabilities || {};
   const [email, setEmail] = useState(""), [role, setRole] = useState("member"), [title, setTitle] = useState("");
   const [dept, setDept] = useState(""), [link, setLink] = useState("");
-  if (!people) return <div className="ui-empty">Đang tải…</div>;
+  if (!people) return <SkeletonRows n={4}/>;
   const roles: string[] = people.assignable_roles || [];
   async function invite() {
     const r = await act(() => apiTeam.invite({email, role, job_title: title, company_id: chart?.company?.id || null,
       department_id: dept ? Number(dept) : null}), (x: any) => `Đã tạo lời mời cho ${x.email} (${x.role_label}). Gửi link bên dưới — link chỉ hiện một lần, hết hạn sau 7 ngày.`);
     if (r?.invite_path) { setLink(window.location.origin + r.invite_path); setEmail(""); setTitle(""); }
   }
-  return <div className="v9Grid2">
-    <section className="v8Card">
-      <div className="v8CardHead"><div><b>Người có quyền</b><span>Vai quyết định ai được mời, sửa sơ đồ, dựng công ty</span></div></div>
+  return <div className="ui-grid is-2">
+    <section className="ui-panel tm-card">
+      <div className="tm-card-head"><div><b>Người có quyền</b><span>Vai quyết định ai được mời, sửa sơ đồ, dựng công ty</span></div></div>
       <table className="tmTable" data-testid="people-table"><tbody>
         {people.users.map((u: any) => <tr key={u.user_id} className={u.status !== "active" ? "is-off" : ""}>
           <td><b>{u.display_name || u.email}</b>{u.is_self && " (bạn)"}<br/><small>{u.email}{u.member_name ? ` · ghế ${u.member_name}` : ""}</small></td>
@@ -133,15 +162,15 @@ function PeopleTab({me, people, chart, busy, act}: any) {
         </tr>)}
       </tbody></table>
     </section>
-    <section className="v8Card">
-      <div className="v8CardHead"><div><b>Mời người</b><span>{caps.invite ? "Tạo link mời; người nhận đặt mật khẩu và vào thẳng sơ đồ" : "Cần vai Quản lý trở lên để mời"}</span></div></div>
-      {caps.invite && <div className="v9Form">
-        <div className="v9FormRow">
+    <section className="ui-panel tm-card">
+      <div className="tm-card-head"><div><b>Mời người</b><span>{caps.invite ? "Tạo link mời; người nhận đặt mật khẩu và vào thẳng sơ đồ" : "Cần vai Quản lý trở lên để mời"}</span></div></div>
+      {caps.invite && <div className="ui-form">
+        <div className="ui-form-row">
           <label>Email<input value={email} onChange={e => setEmail(e.target.value)} placeholder="ten@congty.vn" data-testid="invite-email"/></label>
           <label>Vai<select value={role} onChange={e => setRole(e.target.value)} data-testid="invite-role">
             {roles.map((r: string) => <option key={r} value={r}>{ROLE_VI[r]}</option>)}</select></label>
         </div>
-        <div className="v9FormRow">
+        <div className="ui-form-row">
           <label>Chức danh<input value={title} onChange={e => setTitle(e.target.value)} placeholder="VD: Nhân viên bán hàng"/></label>
           <label>Phòng ban<select value={dept} onChange={e => setDept(e.target.value)} data-testid="invite-dept">
             <option value="">— chưa xếp —</option>
@@ -152,28 +181,28 @@ function PeopleTab({me, people, chart, busy, act}: any) {
           <button className="ui-btn is-ghost is-sm" onClick={() => navigator.clipboard?.writeText(link)}>Sao chép</button></div>}
       </div>}
       <b style={{display: "block", marginTop: 14, fontSize: 13}}>Lời mời gần đây</b>
-      <div className="v9List" data-testid="invite-list">
+      <div className="tm-list" data-testid="invite-list">
         {people.invitations.slice(0, 12).map((i: any) => <div key={i.id} className="tmInvite">
           <span><b>{i.email}</b> · {i.role_label}{i.job_title ? ` · ${i.job_title}` : ""}</span>
           <small className={`is-${i.status}`}>{({pending: "đang chờ", accepted: "đã nhận", revoked: "đã thu hồi", expired: "hết hạn"} as any)[i.status] || i.status}</small>
           {i.status === "pending" && caps.invite && <button className="ui-btn is-ghost is-sm" disabled={busy}
             onClick={() => act(() => apiTeam.revokeInvite(i.id), `Đã thu hồi lời mời ${i.email}`)}>Thu hồi</button>}
         </div>)}
-        {!people.invitations.length && <div className="v9Empty">Chưa có lời mời nào.</div>}
+        {!people.invitations.length && <div className="ui-empty-line">Chưa có lời mời nào.</div>}
       </div>
     </section>
   </div>;
 }
 
 function DepartmentsTab({chart, members, caps, busy, act}: any) {
-  if (!chart?.company) return <div className="ui-empty">Chưa có công ty.</div>;
+  if (!chart?.company) return <EmptyState compact mood="chao" title="Chưa có công ty">Dựng công ty ở tab Dựng công ty.</EmptyState>;
   const can = !!caps.edit_org_chart;
   return <div className="tmDepts" data-testid="dept-list">
     {!can && <div className="ui-banner">Bạn đang xem. Chọn trưởng phòng hay đổi người quản lý cần vai Quản lý trở lên.</div>}
     {chart.departments.map((d: any) => {
       const inDept = members.filter((m: any) => m.department_id === d.id);
-      return <section key={d.id} className="v8Card" data-testid={`dept-${d.id}`}>
-        <div className="v8CardHead"><div><b>{d.name}</b><span>{d.humans} người · {d.agents} agent</span></div></div>
+      return <section key={d.id} className="ui-panel tm-card" data-testid={`dept-${d.id}`}>
+        <div className="tm-card-head"><div><b>{d.name}</b><span>{d.humans} người · {d.agents} agent</span></div></div>
         <label className="tmInline">Trưởng phòng
           <select value={d.head_member_id ?? ""} disabled={!can || busy} data-testid={`head-${d.id}`}
             onChange={e => act(() => apiTeam.setHead(d.id, e.target.value ? Number(e.target.value) : null),
@@ -215,10 +244,10 @@ function BuildTab({chart, caps, busy, act, onCompany}: any) {
       : x.applied ? `Đã nhập vào ${chart.company.name}.` : "Chưa nhập vì còn lỗi.");
     if (r) setReport(r);
   }
-  return <div className="v9Grid2">
-    <section className="v8Card">
-      <div className="v8CardHead"><div><b>Tạo công ty từ mẫu</b><span>{can ? "Mỗi phòng có trưởng phòng là agent; trưởng phòng báo cáo Giám đốc" : "Cần vai Quản trị để dựng công ty"}</span></div></div>
-      <div className="v9List">
+  return <div className="ui-grid is-2">
+    <section className="ui-panel tm-card">
+      <div className="tm-card-head"><div><b>Tạo công ty từ mẫu</b><span>{can ? "Mỗi phòng có trưởng phòng là agent; trưởng phòng báo cáo Giám đốc" : "Cần vai Quản trị để dựng công ty"}</span></div></div>
+      <div className="tm-list">
         {templates.map(t => <div key={t.key} className="tmTpl" data-testid={`tpl-${t.key}`}>
           <b>{t.name}</b><small>{t.description}</small>
           <small>{t.departments.map((d: any) => `${d.name} (${[d.head, ...d.staff].join(", ")})`).join(" · ")}</small>
@@ -235,9 +264,9 @@ function BuildTab({chart, caps, busy, act, onCompany}: any) {
         <button className="ui-btn is-ghost is-sm" onClick={() => onCompany(result.company_id)}>Xem sơ đồ</button>
       </div>}
     </section>
-    <section className="v8Card">
-      <div className="v8CardHead"><div><b>Nhập sơ đồ từ CSV</b><span>Vào {chart?.company?.name || "công ty đang chọn"} · cột: tên, loại, chức danh, phòng ban, quản lý, email, trưởng phòng</span></div></div>
-      {can ? <div className="v9Form">
+    <section className="ui-panel tm-card">
+      <div className="tm-card-head"><div><b>Nhập sơ đồ từ CSV</b><span>Vào {chart?.company?.name || "công ty đang chọn"} · cột: tên, loại, chức danh, phòng ban, quản lý, email, trưởng phòng</span></div></div>
+      {can ? <div className="ui-form">
         <textarea rows={8} value={csv} onChange={e => { setCsv(e.target.value); setReport(null); }} data-testid="csv-text" style={{width: "100%", fontFamily: "var(--font-mono)", fontSize: 12}}/>
         <div className="tmRow">
           <label className="ui-btn is-ghost is-sm">Chọn file .csv<input type="file" accept=".csv,text/csv" hidden
