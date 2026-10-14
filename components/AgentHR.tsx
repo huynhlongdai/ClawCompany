@@ -48,7 +48,7 @@ export function AgentHRTab({companyId, caps}: {companyId: number | null; caps: a
           <td><small>{a.department || tr("agentHr.ban_dieu_hanh")}<br/>{a.manager ? tr("agentHr.bao_cao", {p0: a.manager}) : "—"}</small></td>
           <td><small>{a.model || a.gateway_model || "—"}</small></td>
           <td><Pill lc={a.lifecycle}/></td>
-          <td><small>{a.on_gateway === null ? "?" : a.on_gateway ? tr("agentHr.co_phien", {p0: a.sessions, p1: a.running ? " · đang chạy" : ""}) : a.lifecycle === "retired" ? tr("agentHr.da_go") : <span className="is-warn">{tr("agentHr.khong_co")}</span>}</small></td>
+          <td><small>{a.on_gateway === null ? "?" : a.on_gateway ? tr("agentHr.co_phien", {p0: a.sessions, p1: a.running ? tr("agentHr.dang_chay_hau_to") : ""}) : a.lifecycle === "retired" ? tr("agentHr.da_go") : <span className="is-warn">{tr("agentHr.khong_co")}</span>}</small></td>
         </tr>)}</tbody></table></div>
       {!roster.items.length && <div className="ui-empty">{tr("agentHr.chua_co_nhan_su_ai")}{caps.invite ? tr("agentHr.bam_tuyen_nhan_su_ai") : "."}</div>}
     </section>
@@ -141,7 +141,7 @@ function HireWizard({companyId, onClose, onDone}: {companyId: number | null; onC
         {x.name}{x.chars ? <small> · {x.chars} {tr("agentHr.ky_tu")}</small> : null}</li>)}</ul>
       {result.warnings?.map((w: string, i: number) => <small key={i} className="tmGuide">{w}</small>)}
       <div className="tmRow"><Link className="ui-btn is-primary" href={`/app/agents/${result.member_id}`}>{tr("agentHr.mo_ho_so")}</Link>
-        <button className="ui-btn is-ghost" onClick={onClose}>Xong</button></div>
+        <button className="ui-btn is-ghost" onClick={onClose}>{tr("agentHr.xong")}</button></div>
     </div>}
   </section>;
 }
@@ -263,7 +263,7 @@ function Lifecycle({seat, all, canEdit, busy, act}: any) {
   return <section className="ui-panel ui-panel-body" data-testid="hr-lifecycle-card">
     <div className="lab-cardhead"><div><b>{tr("agentHr.vong_doi")}</b><span>{tr("agentHr.tam_dung_chan_luot_moi")}</span></div><Pill lc={lc}/></div>
     <dl className="hrFacts"><dt>Agent</dt><dd><code>{seat.runtime_agent_id}</code></dd>
-      <dt>{tr("agentHr.tren_gateway")}</dt><dd>{seat.on_gateway === null ? tr("agentHr.khong_doc_duoc") : seat.on_gateway ? tr("agentHr.co_phien", {p0: seat.sessions, p1: seat.running ? " · đang chạy" : ""}) : tr("agentHr.khong_co")}</dd></dl>
+      <dt>{tr("agentHr.tren_gateway")}</dt><dd>{seat.on_gateway === null ? tr("agentHr.khong_doc_duoc") : seat.on_gateway ? tr("agentHr.co_phien", {p0: seat.sessions, p1: seat.running ? tr("agentHr.dang_chay_hau_to") : ""}) : tr("agentHr.khong_co")}</dd></dl>
     {canEdit && lc !== "retired" && <div className="tmRow">
       {lc === "paused" ? <button className="ui-btn is-primary" disabled={busy} data-testid="hr-resume"
           onClick={() => act(() => apiAgentsHR.lifecycle(seat.agent_id, {action: "resume"}), said)}>{tr("agentHr.tiep_tuc")}</button>
@@ -272,7 +272,7 @@ function Lifecycle({seat, all, canEdit, busy, act}: any) {
       <button className="ui-btn is-sm is-danger" disabled={busy} onClick={() => setRetire(!retire)} data-testid="hr-retire-open">{tr("agentHr.cho_nghi_viec")}</button>
     </div>}
     {retire && lc !== "retired" && <div className="hrConfirm ui-form" data-testid="hr-retire-confirm">
-      <b>Cho {seat.name} {tr("agentHr.nghi_viec")}</b>
+      <b>{tr("agentHr.cho_nghi_viec_ten", {p0: seat.name})}</b>
       <small>{tr("agentHr.dung_viec_dang_chay_xoa")}</small>
       <label>{tr("agentHr.viec_dang_mo_giao_cho")}<select value={to} onChange={e => setTo(e.target.value)} data-testid="hr-retire-to">
         <option value="">{tr("agentHr.tra_ve_phong_ban_truong")}</option>
@@ -351,10 +351,10 @@ function Tools({seat, isAdmin, busy, act, tick}: any) {
     {err && <div className="ui-banner is-error">{err}</div>}
     {t && <div className="hrScroll"><table className="ui-table"><tbody>{t.tools.map((x: any) => <tr key={x.name}>
       <td><b>{x.name}</b><br/><small>{x.description}</small></td>
-      <td><small>{x.group}{x.writes ? " · ghi" : ""}</small></td>
+      <td><small>{x.group}{x.writes ? tr("agentHr.ghi_hau_to") : ""}</small></td>
       <td>{isAdmin && seat.lifecycle !== "retired" ? <select value={x.source === "member" ? x.level : "inherit"} disabled={busy} data-testid={`hr-tool-${x.name}`}
           onChange={e => act(() => apiMcp.setPermission({tool: x.name, level: e.target.value, member_id: seat.member_id}),
-            () => tr("agentHr.da_dat", {p0: x.name, p1: e.target.value === "inherit" ? "theo bậc" : LEVEL_VI[e.target.value]}))}>
+            () => tr("agentHr.da_dat", {p0: x.name, p1: e.target.value === "inherit" ? tr("agentHr.theo_bac") : LEVEL_VI[e.target.value]}))}>
           <option value="inherit">{x.source === "member" ? tr("agentHr.theo_bac_mac_dinh") : tr("agentHr.theo_bac_mac_dinh_2", {p0: LEVEL_VI[x.level] || x.level})}</option>
           {t.levels.map((l: string) => <option key={l} value={l}>{LEVEL_VI[l] || l}</option>)}</select>
         : <span className={x.level === "off" ? "is-warn" : ""}>{LEVEL_VI[x.level] || x.level}</span>}</td>

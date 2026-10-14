@@ -1265,7 +1265,11 @@
   "da_dat": "Set {p0} = {p1}",
   "theo_bac_mac_dinh": "By tier / default",
   "theo_bac_mac_dinh_2": "By tier / default ({p0})",
-  "doi_quyen_tool_can_vai": "Changing tool permissions needs Admin."
+  "doi_quyen_tool_can_vai": "Changing tool permissions needs Admin.",
+  "dang_chay_hau_to": " · running",
+  "xong": "Done",
+  "ghi_hau_to": " · writes",
+  "cho_nghi_viec_ten": "Retire {p0}?"
  },
  "seat": {
   "ho_so": "Profile",

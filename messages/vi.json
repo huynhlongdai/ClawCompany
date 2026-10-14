@@ -1265,7 +1265,11 @@
   "da_dat": "Đã đặt {p0} = {p1}",
   "theo_bac_mac_dinh": "Theo bậc / mặc định",
   "theo_bac_mac_dinh_2": "Theo bậc / mặc định ({p0})",
-  "doi_quyen_tool_can_vai": "Đổi quyền tool cần vai Quản trị."
+  "doi_quyen_tool_can_vai": "Đổi quyền tool cần vai Quản trị.",
+  "dang_chay_hau_to": " · đang chạy",
+  "xong": "Xong",
+  "ghi_hau_to": " · ghi",
+  "cho_nghi_viec_ten": "Cho {p0} nghỉ việc?"
  },
  "seat": {
   "ho_so": "Hồ sơ",
