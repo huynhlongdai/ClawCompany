@@ -115,8 +115,7 @@ export function TaskDetail({taskId}: {taskId: number}) {
         {task.description}
       </p>}
 
-      <section className="lab-stats"
-               style={{gridTemplateColumns: "repeat(auto-fit,minmax(168px,1fr))"}}>
+      <section className="lab-stats td-tiles">
         <div className="lab-metric">
           <div className="lab-icon"><Icon name="doc" size={16}/></div>
           <label>{t("task.muc_trong_so_ghi")}</label><strong>{digest.entries ?? 0}</strong>

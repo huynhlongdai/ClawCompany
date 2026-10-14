@@ -1346,7 +1346,8 @@
   "chua_dat": "(chưa đặt)",
   "goi_y": "Gợi ý:",
   "luu_se_tao_gia_tri": "Lưu sẽ tạo giá trị riêng cho seat này, không đổi agents.defaults.",
-  "luu_thay_doi": "Lưu {p0} thay đổi"
+  "luu_thay_doi": "Lưu {p0} thay đổi",
+  "cac_tab_ho_so": "Các phần cấu hình OpenClaw"
  },
  "routines": {
   "dang_cho": "đang chờ",

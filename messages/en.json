@@ -1346,7 +1346,8 @@
   "chua_dat": "(not set)",
   "goi_y": "Suggested:",
   "luu_se_tao_gia_tri": "Saving creates a value for this seat only; agents.defaults is unchanged.",
-  "luu_thay_doi": "Save {p0} changes"
+  "luu_thay_doi": "Save {p0} changes",
+  "cac_tab_ho_so": "OpenClaw configuration sections"
  },
  "routines": {
   "dang_cho": "waiting",

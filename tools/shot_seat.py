@@ -19,12 +19,15 @@ from playwright.async_api import async_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "_reports" / "ui"
-WEB = "http://127.0.0.1:3000"
+import os
+WEB = os.environ.get("WEB", "http://127.0.0.1:3000")
+API = os.environ.get("API", "http://127.0.0.1:8000")
 EMAIL, PASSWORD = "admin@clawcompany.local", "ChangeMe123!"
 
 # Member id của Nina trong dữ liệu seed (member #2 ⇔ agent seat #1).
-MEMBER_ID = 2
-TABS = ["Hồ sơ", "Tính cách", "Công việc", "Năng lực", "Quyền", "Hạn mức"]
+MEMBER_ID = int(os.environ.get("MEMBER_ID", "2"))
+# id ổn định (data-testid), không phụ thuộc nhãn — nhãn đổi theo ngôn ngữ.
+TABS = ["profile", "personality", "job", "capability", "permission", "budget"]
 
 
 async def main() -> int:
@@ -38,22 +41,17 @@ async def main() -> int:
                 if m.type == "error" else None)
         page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
 
-        # đăng nhập
-        await page.goto(f"{WEB}/", wait_until="networkidle")
-        # Ô email KHÔNG có type="email" (chỉ có id + autoComplete), nên selector
-        # theo type sẽ chờ vô ích 30 giây rồi chết. Dùng id thật.
-        if await page.locator("#cc-email").count():
-            await page.fill("#cc-email", EMAIL)
-            await page.fill("#cc-password", PASSWORD)
-            # Nút đăng nhập không có type="submit" và không mang class .primary;
-            # chọn theo vai + tên là cách duy nhất không phụ thuộc chi tiết CSS.
-            await page.get_by_role("button", name="Đăng nhập").click()
-            # AuthGate là *cổng*, không phải redirect: đăng nhập xong URL vẫn là
-            # "/" và nội dung được thay tại chỗ. Nên chờ ô email biến mất, đừng
-            # chờ điều hướng — chờ điều hướng sẽ hết giờ dù đăng nhập đã thành công.
-            await page.locator("#cc-email").wait_for(state="detached", timeout=20_000)
+        # đăng nhập: lấy token qua API rồi đặt vào localStorage (AuthGate đọc khi mở trang).
+        # UI v2: form đăng nhập dùng name="email"/"password", không còn #cc-email — đặt token
+        # trực tiếp để script không gãy mỗi lần form đổi chữ hay ngôn ngữ.
+        import json, urllib.request
+        req = urllib.request.Request(f"{API}/api/auth/login", data=json.dumps({"email": EMAIL, "password": PASSWORD}).encode(),
+                                     headers={"Content-Type": "application/json"})
+        token = json.loads(urllib.request.urlopen(req).read())["access_token"]
+        await page.add_init_script(f"localStorage.setItem('clawcompany_token', {json.dumps(token)});")
 
-        await page.goto(f"{WEB}/app/agents/{MEMBER_ID}", wait_until="networkidle")
+        # UI v2: SeatProfile nằm ở tab "Cấu hình OpenClaw" của hồ sơ agent.
+        await page.goto(f"{WEB}/app/agents/{MEMBER_ID}?tab=openclaw", wait_until="networkidle")
         await page.wait_for_timeout(3500)
 
         # Trang phải thoát khỏi trạng thái "đang tải" — nếu không thì API lỗi.
@@ -64,24 +62,24 @@ async def main() -> int:
         await page.screenshot(path=str(OUT / "seat-profile-top.png"), full_page=False)
 
         for index, label in enumerate(TABS):
-            tab = page.locator(".pillTabs button", has_text=label).first
+            tab = page.locator(f"[data-testid=seat-tab-{label}]").first
             if not await tab.count():
                 errors.append(f"không thấy tab '{label}'")
                 continue
             await tab.click()
             await page.wait_for_timeout(900)
-            await page.screenshot(path=str(OUT / f"seat-tab-{index}-{label.replace(' ', '-').lower()}.png"))
+            await page.screenshot(path=str(OUT / f"seat-tab-{index}-{label}.png"))
 
         # Thử vượt hạn mức ký tự ngay trên UI: cảnh báo phải hiện và nút Lưu
         # phải bị khoá, chứ không để người dùng bấm rồi nhận lỗi từ server.
-        await page.locator(".pillTabs button", has_text="Tính cách").first.click()
+        await page.locator("[data-testid=seat-tab-personality]").first.click()
         await page.wait_for_timeout(600)
         area = page.locator("textarea").first
         if await area.count():
             await area.fill("x" * 20_050)
             await page.wait_for_timeout(500)
-            warned = await page.locator("text=Vượt hạn mức").count() > 0
-            save = page.locator("button.primary", has_text="Lưu").first
+            warned = await page.locator("text=/Vượt hạn mức|Over the limit/").count() > 0
+            save = page.locator("[data-testid=seat-file-save]").first
             disabled = await save.is_disabled() if await save.count() else False
             if not warned:
                 errors.append("vượt hạn mức nhưng UI không cảnh báo")

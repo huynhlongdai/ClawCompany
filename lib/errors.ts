@@ -1,6 +1,6 @@
 /* Mọi lỗi hiện cho người dùng = chuyện gì xảy ra + làm gì tiếp, bằng tiếng Việt.
    Dùng chung cho ErrorState, Banner, Toast và error boundary của app. */
-import {ApiError} from "./api";
+import type {ApiError} from "./http";
 import {t, lazy} from "./i18n";
 
 export type Explained = {title: string; detail: string; fix: string; code?: string; requestId?: string; retry: boolean};

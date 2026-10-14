@@ -120,7 +120,7 @@
   .wkRow .wkCostCell{grid-area:c}
   .wkRow .wkId,.wkRow .wkWho,.wkRow .wkMeta,.wkRow .wkWhen{display:none}
   .wkSearch{max-width:none;flex-basis:100%}
-  .wkSelect{flex:1 1 28%;max-width:none;min-width:0;padding-right:22px}
+  .wkSelect{flex:1 1 28%;max-width:none;min-width:0;padding-left:8px;padding-right:30px;text-overflow:ellipsis;background-position:right 8px center}
   .wkNew{margin-left:0}
 }
 /* bảng (board) */
@@ -552,3 +552,8 @@ a.org-node:hover{border-color:var(--text-muted);box-shadow:var(--shadow-2)}
 .pt-bubble{max-width:70ch;padding:10px 12px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--border)}
 .pt-orb{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:var(--text);color:var(--bg);font-weight:var(--fw-bold);font-size:22px}
 @media (max-width:760px){.pt-shell,.pt-chat{grid-template-columns:minmax(0,1fr)}.pt-side{border-right:0;border-bottom:1px solid var(--border)}}
+
+/* sửa lỗi lượt 2 */
+.ui-table .ui-pill{white-space:nowrap}
+.td-tiles{grid-template-columns:repeat(auto-fit,minmax(168px,1fr))}
+@media (max-width:640px){.td-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.td-tiles .lab-metric{flex-wrap:wrap;gap:6px 10px}.td-tiles .lab-icon{width:28px;height:28px}}

@@ -3,13 +3,21 @@
 // khẩu tài khoản sẵn có) rồi vào thẳng trang Đội ngũ với đúng quyền.
 import {useEffect, useState} from "react";
 import {useParams, useRouter} from "next/navigation";
-import {apiTeam} from "../../../lib/api";
+import {request} from "../../../lib/http";
+
 import {LogoLockup} from "../../../components/Logo";
 import {BeCang} from "../../../components/BeCang";
 import {Field} from "../../../components/ui/Field";
 import {Button} from "../../../components/ui/Button";
 import {explain} from "../../../lib/errors";
 import {t} from "../../../lib/i18n";
+
+// Chỉ hai lời gọi — gọi thẳng lõi HTTP thay vì import cả lib/api.ts (giảm bundle trang này).
+const apiTeam = {
+  lookupInvite: (token: string) => request<any>(`/team/invitations/lookup?token=${encodeURIComponent(token)}`),
+  acceptInvite: (token: string, password: string, display_name = "") =>
+    request<any>(`/team/invitations/accept`, {method: "POST", body: JSON.stringify({token, password, display_name})}),
+};
 
 export default function InvitePage() {
   const {token} = useParams<{token: string}>();

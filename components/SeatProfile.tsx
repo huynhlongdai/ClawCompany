@@ -190,15 +190,15 @@ export function SeatProfile({agentId}: {agentId: number}) {
     </div>
 
     {/* ---------- sáu tab ---------- */}
-    <div className="ui-panel">
-      <div className="ui-seg">
+    <div className="ui-panel ui-panel-body">
+      <div className="ui-seg" role="tablist" aria-label={tr("seat.cac_tab_ho_so")}>
         {TABS.map(t =>
-          <button key={t.id} className={tab === t.id ? "is-active" : ""}
-                  onClick={() => setTab(t.id)} title={t.hint}>
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} aria-pressed={tab === t.id}
+                  onClick={() => setTab(t.id)} title={t.hint} data-testid={`seat-tab-${t.id}`}>
             <Icon name={t.icon} size={14}/> {t.label}
           </button>)}
       </div>
-      <small style={{display: "block", margin: "2px 0 14px"}}>
+      <small style={{display: "block", margin: "8px 0 14px"}}>
         {TABS.find(t => t.id === tab)?.hint}
       </small>
 
@@ -297,7 +297,7 @@ function FileEditor({agentId, file, onSaved}:
     </div>}
 
     <div style={{display: "flex", gap: 10, alignItems: "center", marginTop: 10}}>
-      <button className="ui-btn is-primary" onClick={save} disabled={busy || over || !dirty}>
+      <button className="ui-btn is-primary" data-testid="seat-file-save" onClick={save} disabled={busy || over || !dirty}>
         {busy ? tr("seat.dang_luu") : tr("seat.luu")}
       </button>
       {dirty && !busy && <small>{tr("seat.chua_luu")}</small>}
