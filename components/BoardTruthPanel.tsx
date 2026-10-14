@@ -51,36 +51,36 @@ export function BoardTruthPanel({projects}:{projects:any[]}){
     if(out) await load();
   }
 
-  return <div className="panel">
-    <div className="panelHead pad">
+  return <div className="ui-panel">
+    <div className="ui-panel-head ui-panel-body">
       <b>Sự thật bảng dự án (v27)</b>
       <span style={{opacity:.6}}>tiến độ suy từ nhiệm vụ · khoá lạc quan · lưu trữ có dây chuyền</span>
     </div>
-    <div className="pad" style={{display:"grid",gap:10}}>
+    <div className="ui-panel-body" style={{display:"grid",gap:10}}>
       <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
         <select value={projectId} onChange={e=>{setProjectId(Number(e.target.value)); setTruth(null); setPreview(null);}}>
           <option value={0}>— chọn dự án —</option>
           {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
-        <button className="ghost" disabled={busy||!projectId} onClick={load}>Đọc</button>
-        <button className="darkBtn" disabled={busy||!truth?.derivable||truth?.drift===0} onClick={sync}>Đồng bộ tiến độ</button>
+        <button className="ui-btn" disabled={busy||!projectId} onClick={load}>Đọc</button>
+        <button className="ui-btn is-primary" disabled={busy||!truth?.derivable||truth?.drift===0} onClick={sync}>Đồng bộ tiến độ</button>
       </div>
 
       {err && <div style={{color:"#b4453f"}}>{err}</div>}
       {msg && !err && <div style={{color:"#2f7d52"}}>{msg}</div>}
 
-      {truth && <table className="dataTable">
+      {truth && <table className="ui-table">
         <tbody>
           <tr><td>Tiến độ suy từ bảng</td><td>
             {truth.derivable
               ? <b>{truth.derived_progress}%</b>
-              : <span className="tag orangeTag">chưa đo được</span>}
+              : <span className="ui-pill is-wait">chưa đo được</span>}
           </td></tr>
           <tr><td>Tiến độ đang lưu</td><td>{truth.stored_progress}%</td></tr>
           <tr><td>Lệch</td><td>
             {truth.drift === null
               ? <span style={{opacity:.6}}>không có nhiệm vụ nào để đếm — không suy ra 0%</span>
-              : <span className={truth.drift === 0 ? "tag greenTag" : "tag orangeTag"}>
+              : <span className={truth.drift === 0 ? "ui-pill is-ok" : "ui-pill is-wait"}>
                   {truth.drift > 0 ? "+" : ""}{truth.drift}
                 </span>}
           </td></tr>
@@ -96,15 +96,15 @@ export function BoardTruthPanel({projects}:{projects:any[]}){
 
       {preview && <div style={{borderTop:"1px solid #e6ddcd",paddingTop:10}}>
         <div style={{marginBottom:6}}><b>Lưu trữ sẽ làm gì</b></div>
-        <table className="dataTable">
+        <table className="ui-table">
           <tbody>
             <tr><td>Huỷ nhiệm vụ còn mở</td><td>{preview.will_cancel_tasks}</td></tr>
             <tr><td>Giữ nguyên nhiệm vụ đã xong</td><td>{preview.will_keep_done_tasks}</td></tr>
-            <tr><td>Xoá dữ liệu</td><td><span className="tag greenTag">không — chỉ chuyển trạng thái</span></td></tr>
+            <tr><td>Xoá dữ liệu</td><td><span className="ui-pill is-ok">không — chỉ chuyển trạng thái</span></td></tr>
             <tr><td>Phiên OpenClaw đang chạy</td><td>
               {preview.live_runtime_sessions?.length
-                ? <span className="tag redTag">{preview.live_runtime_sessions.length} phiên đang bám</span>
-                : <span className="tag greenTag">không có</span>}
+                ? <span className="ui-pill is-risk">{preview.live_runtime_sessions.length} phiên đang bám</span>
+                : <span className="ui-pill is-ok">không có</span>}
             </td></tr>
           </tbody>
         </table>
@@ -114,8 +114,8 @@ export function BoardTruthPanel({projects}:{projects:any[]}){
           hoặc ép lưu trữ và chấp nhận các phiên đó vẫn chạy.
         </div>}
         <div style={{display:"flex",gap:8,marginTop:8}}>
-          <button className="darkBtn" disabled={busy||preview.blocked||preview.already_archived} onClick={()=>archive(false)}>Lưu trữ dự án</button>
-          {preview.blocked && <button className="ghost" disabled={busy} onClick={()=>archive(true)}>Ép lưu trữ (để phiên chạy tiếp)</button>}
+          <button className="ui-btn is-primary" disabled={busy||preview.blocked||preview.already_archived} onClick={()=>archive(false)}>Lưu trữ dự án</button>
+          {preview.blocked && <button className="ui-btn" disabled={busy} onClick={()=>archive(true)}>Ép lưu trữ (để phiên chạy tiếp)</button>}
         </div>
       </div>}
     </div>

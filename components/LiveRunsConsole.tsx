@@ -97,27 +97,27 @@ export function LiveRunsConsole(){
   const events = streams.reduce((n,s)=>n+s.events,0);
 
   return <div>
-    {err && <div className="panel pad" style={{borderColor:"var(--risk)"}}>{err}</div>}
+    {err && <div className="ui-panel ui-panel-body" style={{borderColor:"var(--risk)"}}>{err}</div>}
 
-    <div className="metric5">
-      <div className="v8Card"><div className="kpi4">{running}</div><div>Phiên đang theo dõi</div></div>
-      <div className="v8Card"><div className="kpi4">{events}</div><div>Sự kiện đã ghi</div></div>
-      <div className="v8Card"><div className="kpi4">{approvals.length}</div><div>Chờ phê duyệt</div></div>
-      <div className="v8Card"><div className="kpi4">{resumable}</div><div>Phiên cần nối lại</div></div>
-      <div className="v8Card"><div className="kpi4">{autoDispatch?"BẬT":"TẮT"}</div><div>Tự giao việc</div></div>
+    <div className="lab-stats">
+      <div className="ui-panel ui-panel-body"><div className="lab-stats">{running}</div><div>Phiên đang theo dõi</div></div>
+      <div className="ui-panel ui-panel-body"><div className="lab-stats">{events}</div><div>Sự kiện đã ghi</div></div>
+      <div className="ui-panel ui-panel-body"><div className="lab-stats">{approvals.length}</div><div>Chờ phê duyệt</div></div>
+      <div className="ui-panel ui-panel-body"><div className="lab-stats">{resumable}</div><div>Phiên cần nối lại</div></div>
+      <div className="ui-panel ui-panel-body"><div className="lab-stats">{autoDispatch?"BẬT":"TẮT"}</div><div>Tự giao việc</div></div>
     </div>
 
-    <div className="panel">
-      <div className="panelHead">
+    <div className="ui-panel">
+      <div className="ui-panel-head">
         <b>Quyền sở hữu phiên (lease)</b>
         <span>
-          <button className="ghost" onClick={resume} disabled={busy}>Nối lại người theo dõi</button>{" "}
-          <button className="ghost" onClick={load} disabled={busy}>{busy?"Đang tải…":"Làm mới"}</button>
+          <button className="ui-btn" onClick={resume} disabled={busy}>Nối lại người theo dõi</button>{" "}
+          <button className="ui-btn" onClick={load} disabled={busy}>{busy?"Đang tải…":"Làm mới"}</button>
         </span>
       </div>
-      <div className="pad">
+      <div className="ui-panel-body">
         {lease && <p style={{marginTop:0}}>
-          Nền lease: <span className={"tag "+(lease.backend==="redis"?"greenTag":"orangeTag")}>{lease.backend}</span>{" "}
+          Nền lease: <span className={"ui-pill "+(lease.backend==="redis"?"is-ok":"is-wait")}>{lease.backend}</span>{" "}
           · TTL {lease.ttl_seconds}s · chủ sở hữu <code>{lease.owner}</code>
         </p>}
         {lease?.single_process_only && <p style={{opacity:.75,marginBottom:0}}>
@@ -127,21 +127,21 @@ export function LiveRunsConsole(){
       </div>
     </div>
 
-    <div className="panel">
-      <div className="panelHead">
+    <div className="ui-panel">
+      <div className="ui-panel-head">
         <b>Phạm vi quan sát (v22)</b>
         <span>
-          <button className="ghost" onClick={claim} disabled={busy || orphans.length===0}>
+          <button className="ui-btn" onClick={claim} disabled={busy || orphans.length===0}>
             Tiếp quản phiên bỏ trống ({orphans.length})
           </button>
         </span>
       </div>
-      <div className="pad">
+      <div className="ui-panel-body">
         {cluster && <p style={{marginTop:0}}>
-          Sổ theo dõi: <span className={"tag "+(cluster.registry.cluster_wide?"greenTag":"orangeTag")}>
+          Sổ theo dõi: <span className={"ui-pill "+(cluster.registry.cluster_wide?"is-ok":"is-wait")}>
             {cluster.registry.cluster_wide?"toàn cụm":"chỉ tiến trình này"}
           </span>{" "}
-          · quét tiếp quản: <span className={"tag "+(cluster.sweep_enabled?"greenTag":"orangeTag")}>
+          · quét tiếp quản: <span className={"ui-pill "+(cluster.sweep_enabled?"is-ok":"is-wait")}>
             {cluster.sweep_enabled?`mỗi ${cluster.sweep_seconds}s`:"tắt"}
           </span>
         </p>}
@@ -155,37 +155,37 @@ export function LiveRunsConsole(){
       </div>
     </div>
 
-    <div className="panel">
-      <div className="panelHead"><b>Hạ tầng dùng chung (v26)</b></div>
-      <div className="pad">
+    <div className="ui-panel">
+      <div className="ui-panel-head"><b>Hạ tầng dùng chung (v26)</b></div>
+      <div className="ui-panel-body">
         <p style={{marginTop:0}}>
           Lease, sổ theo dõi và sổ đối soát nay dùng <b>chung một kết nối Redis</b>, nên chúng không
           thể báo cáo lệch nhau về việc có Redis hay không.{" "}
-          <span className={"tag "+(fabric?.cluster_wide?"greenTag":"orangeTag")}>
+          <span className={"ui-pill "+(fabric?.cluster_wide?"is-ok":"is-wait")}>
             {fabric?.cluster_wide?"toàn cụm":"chỉ tiến trình này"}
           </span>{" "}
           {fabric && !fabric.consistent &&
-            <span className="tag redTag">ba kho đang báo lệch nhau</span>}
+            <span className="ui-pill is-risk">ba kho đang báo lệch nhau</span>}
         </p>
-        {fabric && <table className="dataTable">
+        {fabric && <table className="ui-table">
           <tbody>
             <tr><td>Kết nối</td><td><code>{fabric.pool?.url}</code>{" "}
-              <span className={"tag "+(fabric.pool?.available?"greenTag":"redTag")}>{fabric.pool?.backend}</span></td></tr>
+              <span className={"ui-pill "+(fabric.pool?.available?"is-ok":"is-risk")}>{fabric.pool?.backend}</span></td></tr>
             <tr><td>Lỗi gần nhất</td><td>{fabric.pool?.error
-              ? <><span className="tag redTag">{fabric.pool.error}</span>{" "}thử lại sau {fabric.pool.retry_in}s</>
+              ? <><span className="ui-pill is-risk">{fabric.pool.error}</span>{" "}thử lại sau {fabric.pool.retry_in}s</>
               : <span style={{opacity:.5}}>—</span>}</td></tr>
             <tr><td>Kết nối lại</td><td>{fabric.pool?.reconnects} lần / {fabric.pool?.failures} lần hỏng</td></tr>
             <tr><td>Chỉ mục lease</td><td><code>{fabric.lease?.index_key}</code>{" "}
               đã dọn {fabric.lease?.index_pruned} mục hết hạn</td></tr>
             <tr><td>Sổ đối soát</td><td>TTL {fabric.reconcile_ledger?.ttl_seconds}s,{" "}
               chống dội {fabric.reconcile_ledger?.cooldown_seconds}s{" "}
-              <span className={"tag "+(fabric.reconcile_ledger?.cluster_wide?"greenTag":"orangeTag")}>
+              <span className={"ui-pill "+(fabric.reconcile_ledger?.cluster_wide?"is-ok":"is-wait")}>
                 {fabric.reconcile_ledger?.cluster_wide?"dùng chung":"cục bộ"}</span></td></tr>
           </tbody>
         </table>}
         <p style={{opacity:.8,marginBottom:0}}>
           Mất kết nối không còn là cửa một chiều: pool tự thử lại mỗi {fabric?.retry_seconds||10}s.{" "}
-          <button className="ghost" disabled={busy}
+          <button className="ui-btn" disabled={busy}
             onClick={async()=>{ setBusy(true);
               try{ await apiV26.reconnect(); await load(); }
               catch(e:any){ setErr(e?.message||"Không kết nối lại được Redis"); setBusy(false); } }}>
@@ -195,14 +195,14 @@ export function LiveRunsConsole(){
       </div>
     </div>
 
-    <div className="panel">
-      <div className="panelHead"><b>Đối soát tự động (v25)</b></div>
-      <div className="pad">
+    <div className="ui-panel">
+      <div className="ui-panel-head"><b>Đối soát tự động (v25)</b></div>
+      <div className="ui-panel-body">
         <p style={{marginTop:0}}>
           Mỗi lần một worker bám vào phiên (khởi động lại, tiếp quản, đổi chủ lease), hệ thống tự
           ghi khoảng trống rồi hỏi gateway những yêu cầu quyền phát sinh lúc không ai nghe —
           không cần ai bấm nút.{" "}
-          <span className={"tag "+(reconcileInfo?.enabled?"greenTag":"orangeTag")}>
+          <span className={"ui-pill "+(reconcileInfo?.enabled?"is-ok":"is-wait")}>
             {reconcileInfo?.enabled?"đang bật":"đang tắt"}
           </span>
         </p>
@@ -218,27 +218,27 @@ export function LiveRunsConsole(){
         {(reconcileInfo?.history||[]).length===0 && <p style={{opacity:.7,marginBottom:0}}>
           Worker này chưa chạy lượt đối soát nào.
         </p>}
-        {(reconcileInfo?.history||[]).length>0 && <table className="dataTable">
+        {(reconcileInfo?.history||[]).length>0 && <table className="ui-table">
           <thead><tr><th>Session key</th><th>Lý do</th><th>Khoảng trống</th><th>Lấy lại</th><th>Lỗi</th></tr></thead>
           <tbody>
             {reconcileInfo.history.map((h:any)=><tr key={h.session_key+h.at}>
               <td><code>{h.session_key}</code></td>
-              <td>{h.reason}{h.skipped && <> <span className="tag orangeTag">{h.skipped}</span></>}</td>
-              <td>{h.gap ? <span className="tag redTag">{Math.round((h.gap.gap_seconds||0)/60)} phút</span>
+              <td>{h.reason}{h.skipped && <> <span className="ui-pill is-wait">{h.skipped}</span></>}</td>
+              <td>{h.gap ? <span className="ui-pill is-risk">{Math.round((h.gap.gap_seconds||0)/60)} phút</span>
                           : <span style={{opacity:.6}}>không đáng kể</span>}</td>
               <td>{h.backfill?.supported
                     ? <>{(h.backfill.recorded||[]).length} yêu cầu</>
-                    : <span className="tag orangeTag">không hỗ trợ</span>}</td>
-              <td>{h.error ? <span className="tag redTag">{h.error}</span> : <span style={{opacity:.5}}>—</span>}</td>
+                    : <span className="ui-pill is-wait">không hỗ trợ</span>}</td>
+              <td>{h.error ? <span className="ui-pill is-risk">{h.error}</span> : <span style={{opacity:.5}}>—</span>}</td>
             </tr>)}
           </tbody>
         </table>}
       </div>
     </div>
 
-    <div className="panel">
-      <div className="panelHead"><b>Khoảng trống quan sát (v24)</b></div>
-      <div className="pad">
+    <div className="ui-panel">
+      <div className="ui-panel-head"><b>Khoảng trống quan sát (v24)</b></div>
+      <div className="ui-panel-body">
         <p style={{marginTop:0}}>
           Tiếp quản một phiên <b>không</b> phát lại những gì đã xảy ra lúc không ai theo dõi.
           OpenClaw không replay sự kiện cũ, nên phần đó vĩnh viễn thiếu trong nhật ký công ty —
@@ -246,13 +246,13 @@ export function LiveRunsConsole(){
         </p>
         {backfillReady && <p style={{opacity:.8}}>
           Lấy lại yêu cầu quyền (<code>{backfillReady.method}</code>):{" "}
-          <span className={"tag "+(backfillReady.ready?"greenTag":"orangeTag")}>
+          <span className={"ui-pill "+(backfillReady.ready?"is-ok":"is-wait")}>
             {backfillReady.ready?"sẵn sàng":"chưa dùng được"}
           </span>
           {!backfillReady.ready && <> — thiếu: {backfillReady.missing.join(", ")}</>}
         </p>}
         {gaps.length===0 && <p style={{opacity:.7,marginBottom:0}}>Không có phiên nào đang bỏ trống.</p>}
-        {gaps.length>0 && <table className="dataTable">
+        {gaps.length>0 && <table className="ui-table">
           <thead><tr><th>Nhiệm vụ</th><th>Session key</th><th>Không quan sát</th><th>Sự kiện cuối</th><th></th></tr></thead>
           <tbody>
             {gaps.map(g=><tr key={g.session_key}>
@@ -260,20 +260,20 @@ export function LiveRunsConsole(){
               <td><code>{g.session_key}</code></td>
               <td>
                 {!g.observed
-                  ? <span className="tag orangeTag">chưa từng ghi nhận</span>
-                  : <span className={"tag "+(g.significant?"redTag":"greenTag")}>
+                  ? <span className="ui-pill is-wait">chưa từng ghi nhận</span>
+                  : <span className={"ui-pill "+(g.significant?"is-risk":"is-ok")}>
                       {Math.round((g.gap_seconds||0)/60)} phút
                     </span>}
               </td>
               <td>{g.last_event_at ? new Date(g.last_event_at).toLocaleString() : "—"}</td>
               <td>
-                <button className="ghost" onClick={()=>backfill(g.task_id)}
+                <button className="ui-btn" onClick={()=>backfill(g.task_id)}
                         disabled={busy || !backfillReady?.ready}>
                   Lấy lại yêu cầu quyền
                 </button>{" "}
                 {/* v25: ghì cả hai nửa — ghi khoảng trống và lấy lại yêu cầu — trong một lượt,
                     bỏ qua chống dội vì ngưọi bấm biết rõ hơn giới hạn của chúng ta. */}
-                <button className="ghost" onClick={()=>reconcileNow(g.task_id)} disabled={busy}>
+                <button className="ui-btn" onClick={()=>reconcileNow(g.task_id)} disabled={busy}>
                   Đối soát lại
                 </button>
               </td>
@@ -283,16 +283,16 @@ export function LiveRunsConsole(){
       </div>
     </div>
 
-    <div className="panel">
-      <div className="panelHead"><b>Phiên OpenClaw đang mở</b></div>
-      <div className="pad">
-        <table className="dataTable">
+    <div className="ui-panel">
+      <div className="ui-panel-head"><b>Phiên OpenClaw đang mở</b></div>
+      <div className="ui-panel-body">
+        <table className="ui-table">
           <thead><tr><th>Session key</th><th>Nhiệm vụ</th><th>Trạng thái</th><th>Lease</th><th>Sự kiện</th><th>Phê duyệt</th><th>Sự kiện cuối</th></tr></thead>
           <tbody>
             {streams.map(s=><tr key={s.session_key}>
               <td><code>{s.session_key}</code></td>
               <td>{s.task_id ?? "—"}</td>
-              <td><span className={"tag "+(statusTag[s.status]||"blueTag")}>{s.status}</span>{s.error && <div style={{color:"var(--risk)"}}>{s.error}</div>}</td>
+              <td><span className={"ui-pill "+(statusTag[s.status]||"is-info")}>{s.status}</span>{s.error && <div style={{color:"var(--risk)"}}>{s.error}</div>}</td>
               <td>{s.lease_backend||"—"}</td>
               <td>{s.events}</td>
               <td>{s.approvals}</td>
@@ -304,33 +304,33 @@ export function LiveRunsConsole(){
       </div>
     </div>
 
-    <div className="panel">
-      <div className="panelHead"><b>Yêu cầu quyền từ gateway</b></div>
-      <div className="pad">
-        {readiness && !readiness.ready && <p style={{marginTop:0,color:"var(--warn)"}}>
+    <div className="ui-panel">
+      <div className="ui-panel-head"><b>Yêu cầu quyền từ gateway</b></div>
+      <div className="ui-panel-body">
+        {readiness && !readiness.ready && <p style={{marginTop:0,color:"var(--wait)"}}>
           Quyết định bấm ở đây sẽ được ghi lại nhưng <b>chưa gửi được tới OpenClaw</b>: thiếu {readiness.missing.join(", ")}.
           Tên RPC không được đoán — hãy lấy đúng tên từ tài liệu bản gateway đang dùng.
         </p>}
-        {readiness?.ready && <p style={{marginTop:0,fontSize:12,color:"var(--warn)"}}>
+        {readiness?.ready && <p style={{marginTop:0,fontSize:12,color:"var(--wait)"}}>
           OpenClaw không có trường lý do cho phê duyệt, nên <b>chỉ quyết định được gửi đi</b>; ghi chú chỉ nằm lại trong ClawCompany.
-          {" "}Method: <code>{readiness.method}</code> <span className="tag blueTag">{readiness.method_source||"—"}</span>
+          {" "}Method: <code>{readiness.method}</code> <span className="ui-pill is-info">{readiness.method_source||"—"}</span>
         </p>}
         <input value={note} onChange={e=>setNote(e.target.value)} placeholder="Ghi chú quyết định (chỉ lưu nội bộ)"
                style={{width:"100%",padding:8,marginBottom:10}} />
-        <table className="dataTable">
+        <table className="ui-table">
           <thead><tr><th>#</th><th>Hành động</th><th>Rủi ro</th><th>Khoá chính sách</th><th>Quyết định</th></tr></thead>
           <tbody>
             {approvals.map(a=><tr key={a.id}>
               <td>{a.id}</td><td>{a.action}</td>
-              <td><span className={"tag "+(riskTag[a.risk]||"orangeTag")}>{a.risk}</span></td>
+              <td><span className={"ui-pill "+(riskTag[a.risk]||"is-wait")}>{a.risk}</span></td>
               <td><code>{a.policy_key}</code></td>
               <td>
-                <button className="darkBtn" onClick={()=>decide(a.id,"approved")} disabled={busy}>Duyệt 1 lần</button>{" "}
+                <button className="ui-btn is-primary" onClick={()=>decide(a.id,"approved")} disabled={busy}>Duyệt 1 lần</button>{" "}
                 {readiness?.allow_always_enabled && <>
-                  <button className="ghost" onClick={()=>decide(a.id,"approved_always")} disabled={busy}
+                  <button className="ui-btn" onClick={()=>decide(a.id,"approved_always")} disabled={busy}
                           title="Tạo standing grant trên máy gateway, gắn với đúng lệnh và thư mục">Luôn cho phép</button>{" "}
                 </>}
-                <button className="ghost" onClick={()=>decide(a.id,"denied")} disabled={busy}>Từ chối</button>
+                <button className="ui-btn" onClick={()=>decide(a.id,"denied")} disabled={busy}>Từ chối</button>
               </td>
             </tr>)}
             {!approvals.length && <tr><td colSpan={5}>Không có yêu cầu nào đang chờ.</td></tr>}

@@ -195,7 +195,8 @@
   "dong": "Đóng",
   "dang_tai": "Đang tải…",
   "dong_thong_bao": "Đóng thông báo",
-  "be_cang": "Bé Càng"
+  "be_cang": "Bé Càng",
+  "tagline": "Điều hành công ty cùng đội agent"
  },
  "errors": {
   "sai_email_hoac_mat_khau": "Sai email hoặc mật khẩu.",
@@ -702,7 +703,10 @@
   "da_chay": "đã chạy",
   "chua_ly_do": "chưa — lý do `{p0}`",
   "phien": "Phiên:",
-  "viec_chua_co_san_pham": "Việc chưa có sản phẩm nào nên hệ thống đã tạo một phiếu bàn giao"
+  "viec_chua_co_san_pham": "Việc chưa có sản phẩm nào nên hệ thống đã tạo một phiếu bàn giao",
+  "page_title": "Chi tiết công việc",
+  "page_sub": "Sổ ghi theo thời gian, bàn giao kèm hướng dẫn, và gói ngữ cảnh mà agent sẽ nhận",
+  "bad_id": "Mã công việc trong đường dẫn không hợp lệ. Mở việc từ trang Công việc."
  },
  "taskGraph": {
   "ton_dong": "tồn đọng",
@@ -1117,7 +1121,10 @@
   "khong_doc_duoc_trang_thai": "Không đọc được trạng thái runtime — kiểm tra kết nối ở Cài đặt › OpenClaw.",
   "ky_nang_kha_dung": "Kỹ năng khả dụng",
   "khai_theo_to_chuc_chua": "Khai theo tổ chức, chưa gắn riêng từng agent (M5)",
-  "chua_khai_ky_nang_nao": "Chưa khai kỹ năng nào."
+  "chua_khai_ky_nang_nao": "Chưa khai kỹ năng nào.",
+  "page_title": "Hồ sơ nhân sự AI",
+  "page_sub": "Danh tính, tính cách, mô tả công việc, năng lực, quyền và hạn mức — ghi trực tiếp vào gateway OpenClaw",
+  "bad_id": "Mã agent trong đường dẫn không hợp lệ. Mở agent từ Đội ngũ › Agent."
  },
  "agentHr": {
   "dang_lam": "Đang làm",
@@ -1819,5 +1826,49 @@
   "khong_co_trang_nay": "Không có trang này",
   "ve_tong_quan": "Về Tổng quan",
   "duong_dan_co_the_da": "Đường dẫn có thể đã đổi. Dùng ô tìm kiếm (Ctrl K) để đi tới mọi trang, kể cả trang trong Phòng thí nghiệm."
+ },
+ "portal": {
+  "brand": "Cổng khách hàng",
+  "login_title": "Đăng nhập workspace",
+  "login_desc": "Trao đổi với đội AI, theo dõi dự án, báo cáo và mức dùng.",
+  "password": "Mật khẩu",
+  "sign_in": "Đăng nhập",
+  "signing_in": "Đang đăng nhập…",
+  "sign_out": "Đăng xuất",
+  "login_fail": "Đăng nhập cổng khách hàng",
+  "overview": "Tổng quan",
+  "conversations": "Trò chuyện",
+  "workspace": "Workspace",
+  "hello": "Chào {p0}",
+  "team_working": "Đội AI của anh/chị đang làm việc",
+  "team_working_desc": "Theo dõi tiến độ, trò chuyện với nhân sự AI và duyệt đề xuất trong cùng một nơi.",
+  "usage_month": "Mức dùng tháng này",
+  "ai_cost": "Chi phí AI nội bộ {p0}",
+  "your_team": "Đội AI",
+  "employees": "{p0} nhân sự",
+  "no_agents": "Chưa có nhân sự AI nào được gán cho anh/chị.",
+  "chat": "Trò chuyện",
+  "plan": "Gói & mức dùng",
+  "monthly": "Phí hằng tháng",
+  "usage_events": "Lượt dùng",
+  "renewal": "Gia hạn",
+  "status": "Trạng thái",
+  "projects": "Dự án đang chạy",
+  "projects_desc": "Chỉ dự án được chia sẻ với khách hàng",
+  "no_projects": "Chưa có dự án nào được chia sẻ.",
+  "back": "Về tổng quan",
+  "ai_conversations": "Cuộc trò chuyện với AI",
+  "no_chats": "Chưa có cuộc trò chuyện nào.",
+  "ai_employee": "Nhân sự AI",
+  "session_hint": "Phiên OpenClaw bắt đầu từ tin nhắn đầu tiên",
+  "start_with": "Bắt đầu làm việc với {p0}",
+  "start_desc": "Tin nhắn ở trong vùng dữ liệu của anh/chị và được chuyển tới đúng agent OpenClaw được gán.",
+  "you": "Anh/chị",
+  "working": "Nhân sự AI đang làm…",
+  "ask": "Nhắn cho nhân sự AI… (Enter để gửi)",
+  "send": "Gửi",
+  "send_fail": "Gửi tin",
+  "load_fail": "Tải cuộc trò chuyện",
+  "new_chat": "Trò chuyện với AI"
  }
 }

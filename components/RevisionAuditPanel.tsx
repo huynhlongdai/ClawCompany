@@ -57,14 +57,14 @@ export function RevisionAuditPanel(){
   }
 
   return (
-    <section className="panel">
-      <div className="panelHead">
+    <section className="ui-panel">
+      <div className="ui-panel-head">
         <b>Revision chính xác và sổ kiểm toán phân trang (v30)</b>
-        <span className="tag blueTag">migration 0013</span>
+        <span className="ui-pill is-info">migration 0013</span>
       </div>
-      <div className="pad">
-        {err && <p className="tag redTag">{err}</p>}
-        {msg && <p className="tag greenTag">{msg}</p>}
+      <div className="ui-panel-body">
+        {err && <p className="ui-pill is-risk">{err}</p>}
+        {msg && <p className="ui-pill is-ok">{msg}</p>}
 
         <h4>Revision của một hàng</h4>
         <div style={{display:"flex", gap:8, flexWrap:"wrap", alignItems:"center"}}>
@@ -73,15 +73,15 @@ export function RevisionAuditPanel(){
               <option key={k} value={k}>{k}</option>)}
           </select>
           <input value={id} onChange={e=>setId(e.target.value)} placeholder="id" style={{width:90}}/>
-          <button className="darkBtn" onClick={readRevision} disabled={!id}>Đọc revision</button>
+          <button className="ui-btn is-primary" onClick={readRevision} disabled={!id}>Đọc revision</button>
         </div>
         {rev && (
-          <table className="dataTable">
+          <table className="ui-table">
             <tbody>
               <tr><td>Token nên dùng</td><td><code>{rev.revision}</code></td></tr>
               <tr><td>Token cũ (v27)</td><td><code>{rev.legacy_revision}</code></td></tr>
               <tr><td>Chế độ</td><td>
-                <span className={rev.exact ? "tag greenTag" : "tag orangeTag"}>
+                <span className={rev.exact ? "ui-pill is-ok" : "ui-pill is-wait"}>
                   {rev.exact ? "counter · chính xác" : "timestamp · có thể nhập nhằng"}
                 </span>
               </td></tr>
@@ -94,16 +94,16 @@ export function RevisionAuditPanel(){
         <div style={{display:"flex", gap:8, alignItems:"center"}}>
           <input value={companyId} onChange={e=>setCompanyId(e.target.value)}
                  placeholder="company id" style={{width:120}}/>
-          <button className="ghost" onClick={previewBatch} disabled={!companyId}>Xem trước</button>
-          <button className="darkBtn" onClick={runBatch} disabled={!plan}>Mở lại tất cả</button>
+          <button className="ui-btn" onClick={previewBatch} disabled={!companyId}>Xem trước</button>
+          <button className="ui-btn is-primary" onClick={runBatch} disabled={!plan}>Mở lại tất cả</button>
         </div>
         {plan && (
           <div>
             <p>{plan.recorded_projects} dự án trong bản ghi lưu trữ ·
               mở lại {plan.will_restore.length} · bỏ qua {plan.will_skip.length}</p>
             {plan.company_still_archived &&
-              <p className="tag orangeTag">Công ty vẫn đang lưu trữ — mở lại bảng không mở lại công ty</p>}
-            <table className="dataTable">
+              <p className="ui-pill is-wait">Công ty vẫn đang lưu trữ — mở lại bảng không mở lại công ty</p>}
+            <table className="ui-table">
               <thead><tr><th>Dự án</th><th>Về trạng thái</th><th>Nhiệm vụ mở lại</th></tr></thead>
               <tbody>
                 {plan.will_restore.map((p:any)=>(
@@ -118,20 +118,20 @@ export function RevisionAuditPanel(){
         )}
 
         <h4>Sổ kiểm toán</h4>
-        <table className="dataTable">
+        <table className="ui-table">
           <thead><tr><th>Lúc</th><th>Phân loại</th><th>Đối tượng</th><th>Diễn giải</th></tr></thead>
           <tbody>
             {rows.map((r:any)=>(
               <tr key={r.id}>
                 <td>{r.occurred_at}</td>
-                <td><span className={r.category==="conflict" ? "tag redTag" : "tag blueTag"}>{r.category}</span></td>
+                <td><span className={r.category==="conflict" ? "ui-pill is-risk" : "ui-pill is-info"}>{r.category}</span></td>
                 <td>{r.entity_type} #{r.entity_id}</td>
                 <td>{r.summary}</td>
               </tr>))}
           </tbody>
         </table>
         <div style={{display:"flex", gap:8, alignItems:"center"}}>
-          <button className="ghost" onClick={()=>loadPage(next)} disabled={!next}>Tải thêm</button>
+          <button className="ui-btn" onClick={()=>loadPage(next)} disabled={!next}>Tải thêm</button>
           <span>{next ? `còn nữa (cursor ${next})` : "đã hết lịch sử khớp bộ lọc"}</span>
         </div>
       </div>

@@ -112,13 +112,13 @@ export function RecoveryPanel() {
     })
 
   return (
-    <div className="panel">
-      <div className="panelHead">
+    <div className="ui-panel">
+      <div className="ui-panel-head">
         <b>Khoi phuc &amp; truy xuat (v33)</b>
-        <span className="tag blueTag">dry run mac dinh</span>
+        <span className="ui-pill is-info">dry run mac dinh</span>
       </div>
-      <div className="pad">
-        {error ? <p className="tag redTag">{error}</p> : null}
+      <div className="ui-panel-body">
+        {error ? <p className="ui-pill is-risk">{error}</p> : null}
 
         <h4>Runtime con sot sau khi bo luu tru nhan su</h4>
         <input
@@ -126,10 +126,10 @@ export function RecoveryPanel() {
           onChange={(e) => setMemberId(e.target.value)}
           placeholder="Ma nhan su"
         />
-        <button className="ghost" onClick={previewRuntime} disabled={busy !== ""}>
+        <button className="ui-btn" onClick={previewRuntime} disabled={busy !== ""}>
           {busy === "runtime" ? "Dang xem..." : "Xem truoc"}
         </button>
-        <button className="darkBtn" onClick={parkRuntime} disabled={busy !== ""}>
+        <button className="ui-btn is-primary" onClick={parkRuntime} disabled={busy !== ""}>
           {busy === "park" ? "Dang xu ly..." : "Go session da chet"}
         </button>
         {runtime ? (
@@ -144,9 +144,9 @@ export function RecoveryPanel() {
                 : ""}
             </p>
             {runtime.blocked_reason ? (
-              <p className="tag orangeTag">{runtime.blocked_reason}</p>
+              <p className="ui-pill is-wait">{runtime.blocked_reason}</p>
             ) : null}
-            <table className="dataTable">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Nhiem vu</th>
@@ -162,7 +162,7 @@ export function RecoveryPanel() {
                     <td>{row.status}</td>
                     <td>{row.session_key}</td>
                     <td>
-                      <span className={row.lease_held ? "tag orangeTag" : "tag greenTag"}>
+                      <span className={row.lease_held ? "ui-pill is-wait" : "ui-pill is-ok"}>
                         {row.lease_held ? "dang giu" : "tu do"}
                       </span>
                     </td>
@@ -174,10 +174,10 @@ export function RecoveryPanel() {
         ) : null}
 
         <h4>Tien do du an lech so voi bang nhiem vu</h4>
-        <button className="ghost" onClick={previewDrift} disabled={busy !== ""}>
+        <button className="ui-btn" onClick={previewDrift} disabled={busy !== ""}>
           {busy === "drift" ? "Dang xem..." : "Xem do lech"}
         </button>
-        <button className="darkBtn" onClick={syncDrift} disabled={busy !== ""}>
+        <button className="ui-btn is-primary" onClick={syncDrift} disabled={busy !== ""}>
           {busy === "sync" ? "Dang dong bo..." : "Dong bo tien do"}
         </button>
         {drift ? (
@@ -190,7 +190,7 @@ export function RecoveryPanel() {
                 ? ` · da ghi ${drift.synced}`
                 : ""}
             </p>
-            <table className="dataTable">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Du an</th>
@@ -214,10 +214,10 @@ export function RecoveryPanel() {
         ) : null}
 
         <h4>Index lease runtime</h4>
-        <button className="ghost" onClick={loadLease} disabled={busy !== ""}>
+        <button className="ui-btn" onClick={loadLease} disabled={busy !== ""}>
           {busy === "lease" ? "Dang tai..." : "Xem index"}
         </button>
-        <button className="darkBtn" onClick={pruneLease} disabled={busy !== ""}>
+        <button className="ui-btn is-primary" onClick={pruneLease} disabled={busy !== ""}>
           {busy === "prune" ? "Dang don..." : "Don index"}
         </button>
         {lease ? (

@@ -64,12 +64,12 @@ export function WorkspaceOpsConsole(){
   const nz = (v:number) => (v ? v : undefined);
 
   return <div style={{display:"grid",gap:16}}>
-    {error && <div className="panel pad" style={{borderColor:"#b4453f",color:"#b4453f"}}>{error}</div>}
-    {note && <div className="panel pad" style={{borderColor:"#2f7d52",color:"#2f7d52"}}>{note}</div>}
+    {error && <div className="ui-panel ui-panel-body" style={{borderColor:"#b4453f",color:"#b4453f"}}>{error}</div>}
+    {note && <div className="ui-panel ui-panel-body" style={{borderColor:"#2f7d52",color:"#2f7d52"}}>{note}</div>}
 
-    <div className="companyGrid">
-      <div className="panel pad">
-        <div className="panelHead"><b>Lập công ty</b></div>
+    <div className="ui-grid is-2">
+      <div className="ui-panel ui-panel-body">
+        <div className="ui-panel-head"><b>Lập công ty</b></div>
         <Field label="Tên công ty"><input value={company.name} onChange={e=>setCompany({...company,name:e.target.value})}/></Field>
         <Field label="Ngành"><input value={company.industry} onChange={e=>setCompany({...company,industry:e.target.value})}/></Field>
         <Field label="Trạng thái">
@@ -77,11 +77,11 @@ export function WorkspaceOpsConsole(){
             {(vocab?.company_statuses||["active"]).map(s=><option key={s} value={s}>{s}</option>)}
           </select>
         </Field>
-        <button className="darkBtn" disabled={busy||!company.name} onClick={()=>run("Tạo công ty",()=>apiV18.createCompany(company))}>Tạo công ty</button>
+        <button className="ui-btn is-primary" disabled={busy||!company.name} onClick={()=>run("Tạo công ty",()=>apiV18.createCompany(company))}>Tạo công ty</button>
       </div>
 
-      <div className="panel pad">
-        <div className="panelHead"><b>Lập phòng ban</b></div>
+      <div className="ui-panel ui-panel-body">
+        <div className="ui-panel-head"><b>Lập phòng ban</b></div>
         <Field label="Công ty">
           <select value={dept.company_id} onChange={e=>setDept({...dept,company_id:Number(e.target.value)})}>
             <option value={0}>— chọn —</option>
@@ -94,11 +94,11 @@ export function WorkspaceOpsConsole(){
             {(vocab?.access_levels||["restricted"]).map(s=><option key={s} value={s}>{s}</option>)}
           </select>
         </Field>
-        <button className="darkBtn" disabled={busy||!dept.company_id||!dept.name} onClick={()=>run("Tạo phòng ban",()=>apiV18.createDepartment(dept))}>Tạo phòng ban</button>
+        <button className="ui-btn is-primary" disabled={busy||!dept.company_id||!dept.name} onClick={()=>run("Tạo phòng ban",()=>apiV18.createDepartment(dept))}>Tạo phòng ban</button>
       </div>
 
-      <div className="panel pad">
-        <div className="panelHead"><b>Tuyển nhân sự / đăng ký agent</b></div>
+      <div className="ui-panel ui-panel-body">
+        <div className="ui-panel-head"><b>Tuyển nhân sự / đăng ký agent</b></div>
         <Field label="Loại">
           <select value={member.member_type} onChange={e=>setMember({...member,member_type:e.target.value})}>
             <option value="human">Người</option>
@@ -119,12 +119,12 @@ export function WorkspaceOpsConsole(){
           </Field>
           <Field label="Model"><input value={member.model} onChange={e=>setMember({...member,model:e.target.value})} placeholder="openclaw-core"/></Field>
         </>}
-        <button className="darkBtn" disabled={busy||!member.name||(member.member_type==="agent"&&!member.runtime_agent_id)}
+        <button className="ui-btn is-primary" disabled={busy||!member.name||(member.member_type==="agent"&&!member.runtime_agent_id)}
           onClick={()=>run("Tạo nhân sự",()=>apiV18.createMember({...member,company_id:nz(member.company_id)}))}>Thêm vào tổ chức</button>
       </div>
 
-      <div className="panel pad">
-        <div className="panelHead"><b>Mở dự án</b></div>
+      <div className="ui-panel ui-panel-body">
+        <div className="ui-panel-head"><b>Mở dự án</b></div>
         <Field label="Công ty">
           <select value={project.company_id} onChange={e=>setProject({...project,company_id:Number(e.target.value)})}>
             <option value={0}>— chọn —</option>
@@ -138,14 +138,14 @@ export function WorkspaceOpsConsole(){
             {people.map(p=><option key={p.id} value={p.id}>{p.name} · {p.member_type}</option>)}
           </select>
         </Field>
-        <button className="darkBtn" disabled={busy||!project.company_id||!project.name}
+        <button className="ui-btn is-primary" disabled={busy||!project.company_id||!project.name}
           onClick={()=>run("Tạo dự án",()=>apiV18.createProject({...project,owner_member_id:nz(project.owner_member_id)}))}>Tạo dự án</button>
       </div>
     </div>
 
-    <div className="panel pad">
-      <div className="panelHead"><b>Giao nhiệm vụ</b></div>
-      <div className="companyGrid">
+    <div className="ui-panel ui-panel-body">
+      <div className="ui-panel-head"><b>Giao nhiệm vụ</b></div>
+      <div className="ui-grid is-2">
         <Field label="Dự án">
           <select value={task.project_id} onChange={e=>setTask({...task,project_id:Number(e.target.value)})}>
             <option value={0}>— chọn —</option>
@@ -165,7 +165,7 @@ export function WorkspaceOpsConsole(){
           </select>
         </Field>
       </div>
-      <button className="darkBtn" disabled={busy||!task.project_id||!task.title}
+      <button className="ui-btn is-primary" disabled={busy||!task.project_id||!task.title}
         onClick={()=>run("Tạo nhiệm vụ",()=>apiV18.createTask({...task,assignee_member_id:nz(task.assignee_member_id)}))}>Tạo nhiệm vụ</button>
     </div>
 
@@ -179,9 +179,9 @@ export function WorkspaceOpsConsole(){
       <ReplayPanel/>
       <SpendPushPanel/>
 
-    <div className="panel">
-      <div className="panelHead pad"><b>Hàng đợi nhiệm vụ</b><span style={{opacity:.6}}>{tasks.length} mục</span></div>
-      <table className="dataTable">
+    <div className="ui-panel">
+      <div className="ui-panel-head ui-panel-body"><b>Hàng đợi nhiệm vụ</b><span style={{opacity:.6}}>{tasks.length} mục</span></div>
+      <table className="ui-table">
         <thead><tr><th>Nhiệm vụ</th><th>Dự án</th><th>Phụ trách</th><th>Trạng thái</th><th>Chuyển sang</th></tr></thead>
         <tbody>
           {tasks.map((t:any)=>{
@@ -190,11 +190,11 @@ export function WorkspaceOpsConsole(){
               <td>{t.title}</td>
               <td>{t.project_name || t.project_id}</td>
               <td>{t.assignee_name || "—"}</td>
-              <td><span className="tag blueTag">{t.status}</span></td>
+              <td><span className="ui-pill is-info">{t.status}</span></td>
               <td style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {/* Only legal transitions are rendered; the server re-checks anyway. */}
                 {next.length===0 ? <i style={{opacity:.5}}>không còn bước</i> :
-                  next.map(s=><button key={s} className="ghost" disabled={busy}
+                  next.map(s=><button key={s} className="ui-btn" disabled={busy}
                     onClick={()=>run(`Chuyển "${t.title}" → ${s}`,()=>apiV18.moveTask(t.id,s))}>{s}</button>)}
               </td>
             </tr>;

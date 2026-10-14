@@ -76,26 +76,26 @@ export function HousekeepingPanel() {
     })
 
   return (
-    <div className="panel">
-      <div className="panelHead">
+    <div className="ui-panel">
+      <div className="ui-panel-head">
         <b>Don dep du lieu (v32)</b>
-        <span className="tag blueTag">xem truoc roi moi ghi</span>
+        <span className="ui-pill is-info">xem truoc roi moi ghi</span>
       </div>
-      <div className="pad">
-        {error && <p className="tag redTag">{error}</p>}
+      <div className="ui-panel-body">
+        {error && <p className="ui-pill is-risk">{error}</p>}
 
         <h4 style={{ margin: "4px 0 8px" }}>Luu tru su kien</h4>
         <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-          <button className="darkBtn" onClick={previewRetention} disabled={busy !== ""}>
+          <button className="ui-btn is-primary" onClick={previewRetention} disabled={busy !== ""}>
             {busy === "retention" ? "Dang tinh..." : "Xem truoc"}
           </button>
-          <button className="ghost" onClick={prune} disabled={busy !== "" || !retention?.deletable}>
+          <button className="ui-btn" onClick={prune} disabled={busy !== "" || !retention?.deletable}>
             {busy === "prune" ? "Dang xoa..." : "Xoa that"}
           </button>
         </div>
         {retention && (
           <>
-            <table className="dataTable">
+            <table className="ui-table">
               <tbody>
                 <tr>
                   <td>Tong su kien</td>
@@ -134,16 +134,16 @@ export function HousekeepingPanel() {
 
         <h4 style={{ margin: "16px 0 8px" }}>Revision counter con NULL</h4>
         <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-          <button className="darkBtn" onClick={previewRevisions} disabled={busy !== ""}>
+          <button className="ui-btn is-primary" onClick={previewRevisions} disabled={busy !== ""}>
             {busy === "revisions" ? "Dang tinh..." : "Xem truoc"}
           </button>
-          <button className="ghost" onClick={backfill} disabled={busy !== "" || !revisions?.ready_total}>
+          <button className="ui-btn" onClick={backfill} disabled={busy !== "" || !revisions?.ready_total}>
             {busy === "backfill" ? "Dang gan..." : "Gan counter"}
           </button>
         </div>
         {revisions && (
           <>
-            <table className="dataTable">
+            <table className="ui-table">
               <thead>
                 <tr>
                   <th>Loai</th>

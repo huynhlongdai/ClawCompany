@@ -68,30 +68,30 @@ export function ReplayPanel() {
   }
 
   return (
-    <div className="panel">
-      <div className="panelHead">
+    <div className="ui-panel">
+      <div className="ui-panel-head">
         <b>v34 · Phát lại & Lịch</b>
-        <span className="tag blueTag">1.24.0</span>
+        <span className="ui-pill is-info">1.24.0</span>
       </div>
-      <div className="pad">
+      <div className="ui-panel-body">
         {note ? <p>{note}</p> : null}
 
         <h4>Sự kiện tồn đọng</h4>
-        <p className="muted">
+        <p className="lab-muted">
           {coverage?.event_replay?.why_not || "Chỉ phát lại được sự kiện đã ghi xuống đĩa."}
         </p>
         <p>
           Đang kẹt: <b>{backlog?.stuck_total ?? "—"}</b> sự kiện
           {backlog?.oldest_age_seconds ? ` · cũ nhất ${Math.round(backlog.oldest_age_seconds / 60)} phút` : ""}
         </p>
-        <table className="dataTable">
+        <table className="ui-table">
           <thead><tr><th>ID</th><th>Loại</th><th>Trạng thái</th><th>Tuổi (giây)</th></tr></thead>
           <tbody>
             {(backlog?.rows || []).slice(0, 8).map((r: Row) => (
               <tr key={r.event_id}>
                 <td>{r.event_id}</td>
                 <td>{r.event_type}</td>
-                <td><span className={r.status === "error" ? "tag redTag" : "tag orangeTag"}>{r.status}</span></td>
+                <td><span className={r.status === "error" ? "ui-pill is-risk" : "ui-pill is-wait"}>{r.status}</span></td>
                 <td>{r.age_seconds}</td>
               </tr>
             ))}
@@ -99,20 +99,20 @@ export function ReplayPanel() {
           </tbody>
         </table>
         <p>
-          <button className="ghost" disabled={busy === "replay"} onClick={() => replay(true)}>Thử khan</button>{" "}
-          <button className="darkBtn" disabled={busy === "replay"} onClick={() => replay(false)}>Phát lại thật</button>
+          <button className="ui-btn" disabled={busy === "replay"} onClick={() => replay(true)}>Thử khan</button>{" "}
+          <button className="ui-btn is-primary" disabled={busy === "replay"} onClick={() => replay(false)}>Phát lại thật</button>
         </p>
 
         <h4>Lịch đồng bộ tiến độ</h4>
-        <p className="muted">{coverage?.progress_schedule?.scheduler_note || ""}</p>
-        <table className="dataTable">
+        <p className="lab-muted">{coverage?.progress_schedule?.scheduler_note || ""}</p>
+        <table className="ui-table">
           <thead><tr><th>#</th><th>Cron</th><th>Bật</th><th>Lần chạy cuối</th></tr></thead>
           <tbody>
             {(schedules?.rows || []).map((r: Row) => (
               <tr key={r.operation_id}>
                 <td>{r.operation_id}</td>
                 <td>{r.schedule}</td>
-                <td>{r.enabled ? <span className="tag greenTag">bật</span> : <span className="tag">tắt</span>}</td>
+                <td>{r.enabled ? <span className="ui-pill is-ok">bật</span> : <span className="ui-pill">tắt</span>}</td>
                 <td>{r.last_run_at || "chưa từng chạy"}</td>
               </tr>
             ))}
@@ -120,12 +120,12 @@ export function ReplayPanel() {
           </tbody>
         </table>
         <p>
-          <button className="darkBtn" disabled={busy === "schedule"} onClick={registerSchedule}>Đăng ký lịch</button>
+          <button className="ui-btn is-primary" disabled={busy === "schedule"} onClick={registerSchedule}>Đăng ký lịch</button>
         </p>
 
         <h4>Quyền thường trú (standing grant)</h4>
-        <p className="muted">{coverage?.grant_expiry?.why_not || ""}</p>
-        <table className="dataTable">
+        <p className="lab-muted">{coverage?.grant_expiry?.why_not || ""}</p>
+        <table className="ui-table">
           <thead><tr><th>Khoá</th><th>Phiên</th><th>Trạng thái</th><th>Còn (ngày)</th><th></th></tr></thead>
           <tbody>
             {(grants?.rows || []).slice(0, 8).map((r: Row) => (
@@ -133,13 +133,13 @@ export function ReplayPanel() {
                 <td>{r.tool}</td>
                 <td>{r.session_key}</td>
                 <td>
-                  <span className={r.status === "expired" ? "tag redTag" : r.status === "active" ? "tag greenTag" : "tag orangeTag"}>
+                  <span className={r.status === "expired" ? "ui-pill is-risk" : r.status === "is-active" ? "ui-pill is-ok" : "ui-pill is-wait"}>
                     {r.status}
                   </span>
                 </td>
                 <td>{r.days_remaining ?? "—"}</td>
                 <td>
-                  <button className="ghost" disabled={busy === "grant"} onClick={() => revokeGrant(r.grant_key)}>Đóng sổ</button>
+                  <button className="ui-btn" disabled={busy === "grant"} onClick={() => revokeGrant(r.grant_key)}>Đóng sổ</button>
                 </td>
               </tr>
             ))}

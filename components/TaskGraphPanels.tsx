@@ -3,6 +3,7 @@ import {useEffect, useState} from "react";
 import Link from "next/link";
 import {api, apiTask, apiV9, errorText} from "../lib/api";
 import {t as tr, lazy, intlLocale} from "../lib/i18n";
+import {ErrorBanner} from "./ui/EmptyState";
 
 /* D1.3 + D1.4 — hai panel của màn hình chi tiết công việc.
 
@@ -36,15 +37,15 @@ function when(iso?: string | null) {
 function TaskChip({t, onRemove}: {t: Row; onRemove?: () => void}) {
   const closed = t.status === "done" || t.status === "cancelled";
   return <span style={{display: "inline-flex", gap: 6, alignItems: "center",
-                       border: "1px solid var(--line)", borderRadius: 999,
+                       border: "1px solid var(--border)", borderRadius: 999,
                        padding: "3px 4px 3px 10px", fontSize: 12.5, margin: "0 6px 6px 0",
                        opacity: closed ? .7 : 1}}>
     <Link href={`/app/tasks/${t.id}`}>#{t.id} {t.title}</Link>
-    <small style={{color: closed ? "var(--muted)" : "var(--accent)"}}>
+    <small style={{color: closed ? "var(--text-muted)" : "var(--accent)"}}>
       {STATUS_VI[t.status] || t.status}</small>
     {onRemove && <button aria-label={tr("taskGraph.go", {p0: t.id})} onClick={onRemove}
       style={{border: "none", background: "none", padding: "0 6px", fontSize: 14,
-              color: "var(--muted)", cursor: "pointer"}}>×</button>}
+              color: "var(--text-muted)", cursor: "pointer"}}>×</button>}
   </span>;
 }
 
@@ -77,25 +78,25 @@ export function TaskLinksPanel({taskId, onChange}: {taskId: number; onChange?: (
     finally { setBusy(false); }
   }
 
-  if (!graph) return <div className="panel"><div className="v8Empty">
+  if (!graph) return <div className="ui-panel"><div className="ui-empty-line">
     {error || tr("taskGraph.dang_tai_lien_ket")}</div></div>;
 
   const linked = new Set<number>([taskId, ...graph.blocked_by.map((t: Row) => t.id)]);
   const parentId = graph.parents[0]?.id;
   const ownGoal = graph.goal && !graph.goal.inherited ? graph.goal.id : null;
 
-  return <div className="panel" data-testid="task-links">
-    <div className="panelHead">
+  return <div className="ui-panel" data-testid="task-links">
+    <div className="ui-panel-head">
       <div><b>{tr("taskGraph.lien_ket")}</b></div>
       <small>{tr("taskGraph.muc_tieu_cha_con_phu")}</small>
     </div>
 
-    <div style={{fontSize: 12.5, color: "var(--muted)"}}>{tr("taskGraph.chuoi_muc_tieu_agent_nhan")}</div>
+    <div style={{fontSize: 12.5, color: "var(--text-muted)"}}>{tr("taskGraph.chuoi_muc_tieu_agent_nhan")}</div>
     <div data-testid="goal-line" style={{fontSize: 13.5, margin: "4px 0 12px", lineHeight: 1.5}}>
       {graph.goal_line}
     </div>
 
-    {!!graph.open_blocker_ids.length && <div className="v8Error" style={{marginBottom: 10}}>
+    {!!graph.open_blocker_ids.length && <div className="ui-banner is-error" style={{marginBottom: 10}}>
       {tr("taskGraph.con_bi_chan_boi")} {graph.open_blocker_ids.map((i: number) => `#${i}`).join(", ")}{tr("taskGraph.chua_chuyen_sang_dang_lam")}
     </div>}
 
@@ -104,7 +105,7 @@ export function TaskLinksPanel({taskId, onChange}: {taskId: number; onChange?: (
             onChange={e => act(() => apiTask.setLinks(taskId,
               {goal_id: e.target.value ? Number(e.target.value) : null}))}
             style={{width: "100%", padding: 8, borderRadius: 9, margin: "4px 0 4px",
-                    border: "1px solid var(--line)"}}>
+                    border: "1px solid var(--border)"}}>
       <option value="">{graph.goal?.inherited ? tr("taskGraph.ke_thua", {p0: graph.goal.title})
                                               : tr("taskGraph.chua_gan_muc_tieu")}</option>
       {goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
@@ -115,7 +116,7 @@ export function TaskLinksPanel({taskId, onChange}: {taskId: number; onChange?: (
             onChange={e => act(() => apiTask.setLinks(taskId,
               {parent_task_id: e.target.value ? Number(e.target.value) : null}))}
             style={{width: "100%", padding: 8, borderRadius: 9, marginTop: 4,
-                    border: "1px solid var(--line)"}}>
+                    border: "1px solid var(--border)"}}>
       <option value="">{tr("taskGraph.khong_co")}</option>
       {tasks.map(t => <option key={t.id} value={t.id}>#{t.id} {t.title}</option>)}
     </select>
@@ -131,12 +132,12 @@ export function TaskLinksPanel({taskId, onChange}: {taskId: number; onChange?: (
         ? graph.blocked_by.map((t: Row) =>
             <TaskChip key={t.id} t={t}
                       onRemove={() => act(() => apiTask.removeBlocker(taskId, t.id))}/>)
-        : <small style={{color: "var(--muted)"}}>{tr("taskGraph.khong_cho_viec_nao")}</small>}
+        : <small style={{color: "var(--text-muted)"}}>{tr("taskGraph.khong_cho_viec_nao")}</small>}
     </div>
     <div style={{display: "flex", gap: 6, marginTop: 4}}>
       <select value={blocker} onChange={e => setBlocker(e.target.value)} disabled={busy}
               aria-label={tr("taskGraph.chon_viec_phai_xong_truoc")}
-              style={{flex: 1, padding: 8, borderRadius: 9, border: "1px solid var(--line)"}}>
+              style={{flex: 1, padding: 8, borderRadius: 9, border: "1px solid var(--border)"}}>
         <option value="">{tr("taskGraph.them_viec_phai_xong_truoc")}</option>
         {tasks.filter(t => !linked.has(t.id)).map(t =>
           <option key={t.id} value={t.id}>#{t.id} {t.title}</option>)}
@@ -159,12 +160,12 @@ export function TaskLinksPanel({taskId, onChange}: {taskId: number; onChange?: (
     <textarea value={criteria} onChange={e => setCriteria(e.target.value)} rows={3}
               placeholder={tr("taskGraph.the_nao_thi_coi_la")}
               style={{width: "100%", padding: 9, borderRadius: 9, marginTop: 4,
-                      border: "1px solid var(--line)", fontSize: 13}}/>
+                      border: "1px solid var(--border)", fontSize: 13}}/>
     <button disabled={busy || criteria === (graph.acceptance_criteria || "")}
             onClick={() => act(() => apiTask.setLinks(taskId, {acceptance_criteria: criteria}))}
             style={{marginTop: 6}}>{tr("taskGraph.luu_tieu_chi")}</button>
 
-    {error && <div className="v8Error" style={{marginTop: 10}}>{error}</div>}
+    {error && <ErrorBanner error={error}/>}
   </div>;
 }
 
@@ -176,29 +177,29 @@ export function TaskRunsPanel({taskId, refreshKey = 0}: {taskId: number; refresh
   }, [taskId, refreshKey]);
 
   const runs: Row[] = data?.runs || [];
-  return <div className="panel" data-testid="task-runs">
-    <div className="panelHead">
+  return <div className="ui-panel" data-testid="task-runs">
+    <div className="ui-panel-head">
       <div><b>{tr("taskGraph.luot_chay")}</b></div>
       <small>task_runs · {runs.length}</small>
     </div>
-    {error && <div className="v8Error">{error}</div>}
-    {!error && !runs.length && <div className="v8Empty">
+    {error && <ErrorBanner error={error}/>}
+    {!error && !runs.length && <div className="ui-empty-line">
       {tr("taskGraph.chua_co_luot_chay_nao")}
     </div>}
     <div style={{display: "grid", gap: 8}}>
       {runs.map(r => {
         const s = RUN_VI[r.status] || {text: r.status, cls: "mid"};
-        return <div key={r.id} style={{border: "1px solid var(--line)", borderRadius: 10,
+        return <div key={r.id} style={{border: "1px solid var(--border)", borderRadius: 10,
                                        padding: "8px 10px", fontSize: 12.5}}>
           <div style={{display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap"}}>
             <b>{tr("taskGraph.luot")}{r.id}</b>
-            <span className={`prio ${s.cls}`}>{s.text}</span>
+            <span className={`ui-pill ${s.cls}`}>{s.text}</span>
             {r.holds_task && <small style={{color: "var(--accent)"}}>{tr("taskGraph.dang_giu_viec")}</small>}
-            <small style={{color: "var(--muted)", marginLeft: "auto"}}>
+            <small style={{color: "var(--text-muted)", marginLeft: "auto"}}>
               {r.member_name || "—"} · {r.trigger_kind}
             </small>
           </div>
-          <div style={{color: "var(--muted)", marginTop: 3}}>
+          <div style={{color: "var(--text-muted)", marginTop: 3}}>
             {tr("taskGraph.bat_dau")} {when(r.started_at || r.created_at)} {tr("taskGraph.ket_thuc")} {when(r.ended_at)}
             {r.cost_usd ? ` · $${Number(r.cost_usd).toFixed(4)}` : ""}
           </div>
@@ -216,12 +217,12 @@ export function GoalTasks({goalId}: {goalId: number}) {
   useEffect(() => { if (!Number.isFinite(goalId)) { setRows([]); return; }
                     setRows(null); apiTask.byGoal(goalId).then(setRows).catch(() => setRows([])); },
             [goalId]);
-  if (rows === null) return <div className="v8Empty">{tr("taskGraph.dang_tai_viec")}</div>;
-  if (!rows.length) return <div className="v8Empty">
+  if (rows === null) return <div className="ui-empty-line">{tr("taskGraph.dang_tai_viec")}</div>;
+  if (!rows.length) return <div className="ui-empty-line">
     {tr("taskGraph.chua_co_viec_nao_gan")}
   </div>;
-  return <div className="v9List">{rows.map(t =>
-    <div className="v9Cycle" key={t.id}>
+  return <div className="ui-list">{rows.map(t =>
+    <div className="ui-row" key={t.id}>
       <div><b><Link href={`/app/tasks/${t.id}`}>#{t.id} {t.title}</Link></b>
         <small>{STATUS_VI[t.status] || t.status} {tr("taskGraph.uu_tien")} {t.priority}</small></div>
     </div>)}</div>;
@@ -270,29 +271,29 @@ export function TaskWakeupsPanel({taskId, refreshKey = 0}: {taskId: number; refr
     return () => clearTimeout(t);
   }, [pending, tick]);
   const list = rows || [];
-  return <div className="panel" data-testid="task-wakeups">
-    <div className="panelHead">
+  return <div className="ui-panel" data-testid="task-wakeups">
+    <div className="ui-panel-head">
       <div><b>{tr("taskGraph.danh_thuc")}</b></div>
       <small>wakeups · {list.length}</small>
     </div>
-    {error && <div className="v8Error">{error}</div>}
-    {!error && rows && !list.length && <div className="v8Empty">
+    {error && <ErrorBanner error={error}/>}
+    {!error && rows && !list.length && <div className="ui-empty-line">
       {tr("taskGraph.chua_co_ly_do_nao")}
     </div>}
     <div style={{display: "grid", gap: 8}}>
       {list.map(w => {
         const s = WAKE_STATUS_VI[w.status] || {text: w.status, cls: "mid"};
         return <div key={w.id} data-testid="wakeup-row"
-                    style={{border: "1px solid var(--line)", borderRadius: 10, padding: "8px 10px", fontSize: 12.5}}>
+                    style={{border: "1px solid var(--border)", borderRadius: 10, padding: "8px 10px", fontSize: 12.5}}>
           <div style={{display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap"}}>
             <b>{WAKE_REASON_VI[w.reason] || w.reason}</b>
-            <span className={`prio ${s.cls}`}>{s.text}</span>
-            <small style={{color: "var(--muted)", marginLeft: "auto"}}>
+            <span className={`ui-pill ${s.cls}`}>{s.text}</span>
+            <small style={{color: "var(--text-muted)", marginLeft: "auto"}}>
               {when(w.created_at)}{w.run_id ? tr("taskGraph.luot_2", {p0: w.run_id}) : ""}
             </small>
           </div>
           {w.skip_reason && <div style={{marginTop: 3}}>{tr("taskGraph.ly_do")} {skipText(w.skip_reason)}</div>}
-          {w.coalesced_into_id && <div style={{marginTop: 3, color: "var(--muted)"}}>
+          {w.coalesced_into_id && <div style={{marginTop: 3, color: "var(--text-muted)"}}>
             {tr("taskGraph.gop_cung_luot_voi_ly")}{w.coalesced_into_id} {tr("taskGraph.trong_cua_so_10_giay")}
           </div>}
         </div>;

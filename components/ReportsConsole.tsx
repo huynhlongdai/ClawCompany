@@ -3,6 +3,7 @@ import {useEffect, useState} from "react";
 import {api, apiV36} from "../lib/api";
 import {Icon} from "./Icon";
 import {intlLocale} from "../lib/i18n";
+import {ErrorBanner} from "./ui/EmptyState";
 
 /* Báo cáo — màn hình có trong mẫu nhưng app chưa có route.
    Dữ liệu thật: /api/analytics (chỉ số có trị hiện tại, trị trước và mục
@@ -30,7 +31,7 @@ function fmt(value: number, unit: string) {
 
    Một điểm thì không vẽ đường được — hiện đúng một dấu, và nói ra. */
 function HistoryLine({points, unit}: {points: {period: string; value: number}[]; unit: string}) {
-  if (!points.length) return <div className="v8Empty">Chưa có mẫu nào.</div>;
+  if (!points.length) return <div className="ui-empty-line">Chưa có mẫu nào.</div>;
 
   const width = 260, height = 110, pad = 26;
   const values = points.map(p => p.value);
@@ -87,31 +88,31 @@ export function ReportsConsole() {
   }
 
   return <div>
-    {error && <div className="v8Error" style={{marginBottom: 14}}>{error}</div>}
+    {error && <ErrorBanner error={error}/>}
 
-    <section className="v14Metrics" style={{gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))"}}>
+    <section className="lab-stats" style={{gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))"}}>
       {metrics.map(m => {
         const delta = m.previous_value
           ? ((m.current_value - m.previous_value) / Math.abs(m.previous_value)) * 100 : null;
-        return <div key={m.id} className="metric">
-          <div className="metricIcon"><Icon name="chart" size={16}/></div>
+        return <div key={m.id} className="lab-metric">
+          <div className="lab-icon"><Icon name="chart" size={16}/></div>
           <label>{m.metric_key}</label>
           <strong>{fmt(m.current_value, m.unit)}</strong>
-          {delta !== null && <span className={`delta${delta < 0 ? " down" : ""}`}>
+          {delta !== null && <span className={`lab-delta${delta < 0 ? " down" : ""}`}>
             {delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}% · mục tiêu {fmt(m.target_value, m.unit)}
           </span>}
         </div>;
       })}
-      {!metrics.length && <div className="v8Empty">Chưa có chỉ số nào trong analytics_metrics.</div>}
+      {!metrics.length && <div className="ui-empty-line">Chưa có chỉ số nào trong analytics_metrics.</div>}
     </section>
 
-    <section className="v13Split">
-      <div className="panel">
-        <div className="panelHead">
+    <section className="ui-grid is-2">
+      <div className="ui-panel">
+        <div className="ui-panel-head">
           <div><b>Báo cáo đã sinh</b></div>
           <small>{reports.length} bản · từ /api/reports</small>
         </div>
-        <table className="dataTable">
+        <table className="ui-table">
           <thead><tr><th>Tiêu đề</th><th>Loại</th><th>Chu kỳ</th><th>Người nhận</th><th>Trạng thái</th></tr></thead>
           <tbody>
             {reports.map(r => <tr key={r.id}>
@@ -119,17 +120,17 @@ export function ReportsConsole() {
               <td>{r.report_type || "—"}</td>
               <td>{r.period || "—"}</td>
               <td>{r.audience || "—"}</td>
-              <td><span className={`tag ${r.status === "ready" ? "greenTag" : "orangeTag"}`}>{r.status}</span></td>
+              <td><span className={`ui-pill ${r.status === "ready" ? "is-ok" : "is-wait"}`}>{r.status}</span></td>
             </tr>)}
-            {!reports.length && <tr><td colSpan={5}><div className="v8Empty">Chưa có báo cáo.</div></td></tr>}
+            {!reports.length && <tr><td colSpan={5}><div className="ui-empty-line">Chưa có báo cáo.</div></td></tr>}
           </tbody>
         </table>
       </div>
 
-      <div className="panel">
-        <div className="panelHead">
+      <div className="ui-panel">
+        <div className="ui-panel-head">
           <div><b>Lịch sử chỉ số</b></div>
-          <button className="v8Ghost" onClick={snapshot} disabled={busy}>
+          <button className="ui-btn" onClick={snapshot} disabled={busy}>
             {busy ? "Đang chốt…" : "Chốt số kỳ này"}
           </button>
         </div>
@@ -141,7 +142,7 @@ export function ReportsConsole() {
               <HistoryLine points={s.points || []} unit={unit}/>
             </div>;
           })}
-          {!history?.series?.length && <div className="v8Empty">
+          {!history?.series?.length && <div className="ui-empty-line">
             Chưa có mẫu nào trong metric_samples.
           </div>}
         </div>

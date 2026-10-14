@@ -3,6 +3,7 @@ import {useEffect, useState} from "react";
 import {api, apiV8} from "../lib/api";
 import {Icon} from "./Icon";
 import {intlLocale} from "../lib/i18n";
+import {ErrorBanner} from "./ui/EmptyState";
 
 /* Marketplace — có trong mẫu, app chưa có route.
    Dữ liệu thật: /api/marketplace (marketplace_templates: tên, loại, tác giả,
@@ -42,41 +43,41 @@ export function MarketplaceConsole() {
   }
 
   return <div>
-    {error && <div className="v8Error" style={{marginBottom: 14}}>{error}</div>}
-    {result && <div className="panel" style={{marginBottom: 14}}><small>{result}</small></div>}
+    {error && <ErrorBanner error={error}/>}
+    {result && <div className="ui-panel" style={{marginBottom: 14}}><small>{result}</small></div>}
 
-    <section className="v10Grid">
-      {rows.map(r => <div key={r.id} className="panel">
+    <section className="ui-grid is-2">
+      {rows.map(r => <div key={r.id} className="ui-panel">
         <div className="companyTop">
-          <div className={`iconTile ${KIND_TINT[r.template_type] || "blue"}`}>
+          <div className={`lab-icon ${KIND_TINT[r.template_type] || "blue"}`}>
             <Icon name={r.template_type === "company" ? "building" : "sparkle"} size={18}/>
           </div>
           <div style={{minWidth: 0, flex: 1}}>
             <b style={{display: "block", fontSize: 14}}>{r.name}</b>
             <small>{r.template_type} · v{r.version} · {r.author || "—"}</small>
           </div>
-          <span className={`tag ${r.status === "published" ? "greenTag" : "orangeTag"}`}>{r.status}</span>
+          <span className={`ui-pill ${r.status === "published" ? "is-ok" : "is-wait"}`}>{r.status}</span>
         </div>
 
-        <div className="divider"/>
+        <div className="lab-divider"/>
 
         <div className="companyMeta" style={{marginTop: 0}}>
           <span>{(r.installs || 0).toLocaleString(intlLocale())} lượt cài</span>
           <b>{r.price ? `$${r.price}` : "Miễn phí"}</b>
         </div>
 
-        <div className="heroActions" style={{marginTop: 12}}>
-          <button className="v8Primary" disabled={busy === r.id || r.template_type !== "company"}
+        <div className="ui-toolbar" style={{marginTop: 12}}>
+          <button className="ui-btn is-primary" disabled={busy === r.id || r.template_type !== "company"}
                   onClick={() => install(r)}
                   title={r.template_type !== "company"
                     ? "Chỉ template loại company có luồng cài đặt thật (v8 company factory)"
                     : "Cài vào tổ chức của bạn"}>
             {busy === r.id ? "Đang cài…" : "Cài đặt"}
           </button>
-          <a className="v8Ghost" href="/app/company-factory">Xem job cài đặt →</a>
+          <a className="ui-btn" href="/app/company-factory">Xem job cài đặt →</a>
         </div>
       </div>)}
-      {!rows.length && <div className="v8Empty">Chưa có template nào.</div>}
+      {!rows.length && <div className="ui-empty-line">Chưa có template nào.</div>}
     </section>
 
     <small style={{display: "block", marginTop: 14}}>

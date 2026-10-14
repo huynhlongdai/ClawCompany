@@ -492,3 +492,63 @@ a.org-node:hover{border-color:var(--text-muted);box-shadow:var(--shadow-2)}
   white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto}
 @media (max-width:640px){.lab-hide-sm{display:none}.lab-stat > b{font-size:var(--fs-16)}}
 .lab-list{margin:0;padding-left:20px;display:grid;gap:8px;line-height:1.5}
+
+/* ================================================================ KHỐI CŨ ĐÃ CHUYỂN SANG HỆ MỚI
+   Các console v8–v35 còn dùng (trang phụ, ruột hồ sơ agent, khối phụ chi tiết việc) giờ dùng class
+   của primitive (ui-panel, ui-table, ui-pill, ui-btn, ui-form, ui-grid…) — tools/legacy_codemod.mjs.
+   Dưới đây chỉ là vài helper bố cục mà primitive không có. Thay cho app/styles/legacy.css (đã xoá). */
+.lab-cardhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;min-width:0}
+.lab-cardhead > div:first-child{flex:1;min-width:0}
+.lab-cardhead b{display:block;font-size:var(--fs-14);font-weight:var(--fw-semibold)}
+.lab-cardhead :where(span,small){display:block;font-size:var(--fs-12);color:var(--text-muted);font-weight:var(--fw-regular)}
+.ui-panel:has(> .ui-table),.ui-panel-body:has(> .ui-table){overflow-x:auto}
+.ui-panel-body > .ui-panel-head{margin:-16px -16px 12px}
+.ui-panel.ui-panel-body + .ui-panel,.ui-panel + .ui-panel.ui-panel-body{margin-top:16px}
+.lab-stats > :not(.lab-stat){display:flex;flex-direction:column;gap:2px;padding:12px 14px;background:var(--surface);min-width:0}
+.lab-stats > * :where(b,strong){font-size:var(--fs-20);font-weight:var(--fw-bold);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.lab-stats > * :where(small,span){font-size:var(--fs-12);color:var(--text-muted)}
+.lab-stats{margin-bottom:16px}
+.lab-metric{display:flex !important;flex-direction:row !important;gap:12px;align-items:center}
+.lab-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:var(--radius-sm);background:var(--surface-2);color:var(--text);flex:none}
+.lab-big{font-size:var(--fs-28);font-weight:var(--fw-bold);font-variant-numeric:tabular-nums}
+.lab-delta{font-size:var(--fs-12);font-weight:var(--fw-semibold);color:var(--ok)}
+.lab-muted{color:var(--text-muted)}
+.lab-divider{height:1px;background:var(--border);margin:12px 0}
+.lab-person{display:flex;gap:10px;align-items:center;min-width:0}
+.lab-person :where(b,small){display:block}
+.lab-check{display:grid;gap:6px;font-size:var(--fs-13);color:var(--text-muted)}
+.lab-flowline{display:flex;gap:6px;flex-wrap:wrap;align-items:center;min-width:0}
+.lab-flowline > :where(b,div,span){padding:4px 10px;border-radius:var(--radius-full);background:var(--surface-2);font-size:var(--fs-12)}
+.lab-timeline{display:flex;flex-direction:column}
+.lab-timerow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:start;padding:10px 0;border-bottom:1px solid var(--border);font-size:var(--fs-13)}
+.lab-timerow:last-child{border-bottom:0}
+.lab-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}
+.lab-dot:is(.is-paused,.is-retired){background:var(--text-muted)}
+.lab-job{flex-direction:column;align-items:flex-start;border:1px solid var(--border);border-radius:var(--radius-sm)}
+.lab-dialog{padding:20px;max-height:90dvh;overflow:auto}
+/* nhãn: bổ nghĩa mức độ còn đi kèm dữ liệu backend (low/mid/high, ok/warn) */
+.ui-pill:is(.is-low,.low){background:var(--ok-bg);color:var(--ok)}
+.ui-pill:is(.is-mid,.medium,.mid){background:var(--wait-bg);color:var(--wait)}
+.ui-pill:is(.is-high,.high,.critical,.urgent){background:var(--risk-bg);color:var(--risk)}
+.ui-seg > button.is-active{background:var(--surface);color:var(--text);box-shadow:var(--shadow-1)}
+.ui-seg{flex-wrap:wrap}
+.ui-list > .ui-row.is-active,.ui-table tr.is-active td{background:var(--selected)}
+.ui-meter > :where(span,div){display:block;height:100%;background:var(--ok);border-radius:inherit}
+/* nút trơn (không class) trong khối cũ → giống ui-btn cỡ nhỏ */
+:where(.ui-panel,.ui-list,.ui-toolbar,.ui-form,.lab-cardhead,.ui-table) button:not([class]){
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 12px;border-radius:var(--radius-sm);
+  border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font:inherit;font-weight:var(--fw-medium);font-size:var(--fs-13);white-space:nowrap;cursor:pointer}
+:where(.ui-panel,.ui-list,.ui-toolbar,.ui-form,.lab-cardhead,.ui-table) button:not([class]):hover:not(:disabled){background:var(--hover);border-color:var(--text-muted)}
+:where(.ui-panel,.ui-list,.ui-toolbar,.ui-form,.lab-cardhead,.ui-table) button:not([class]):disabled{opacity:.5}
+/* cổng khách hàng + chat khách (portal) */
+.pt-shell{min-height:100dvh;background:var(--bg);display:grid;grid-template-columns:240px minmax(0,1fr)}
+.pt-side{border-right:1px solid var(--border);padding:16px;display:grid;gap:8px;align-content:start}
+.pt-main{padding:24px;display:grid;gap:16px;align-content:start;min-width:0}
+.pt-hero h1,.pt-hero h2{font-size:var(--fs-20);margin:4px 0}
+.pt-hero p{color:var(--text-muted);max-width:70ch}
+.pt-chat{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:100dvh;background:var(--bg)}
+.pt-chatmain{display:flex;flex-direction:column;min-width:0}
+.pt-messages{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+.pt-bubble{max-width:70ch;padding:10px 12px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--border)}
+.pt-orb{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:var(--text);color:var(--bg);font-weight:var(--fw-bold);font-size:22px}
+@media (max-width:760px){.pt-shell,.pt-chat{grid-template-columns:minmax(0,1fr)}.pt-side{border-right:0;border-bottom:1px solid var(--border)}}

@@ -1,4 +1,41 @@
 "use client";
-import {useEffect,useState} from "react";import {activeOrganizationId} from "../lib/auth";import {apiV10} from "../lib/api";
-type Any=Record<string,any>;
-export function AgentMessageBusConsole(){const [items,setItems]=useState<Any[]>([]),[from,setFrom]=useState(""),[to,setTo]=useState(""),[text,setText]=useState("Review the latest artifact and return findings."),[error,setError]=useState("");const load=async()=>{try{setItems(await apiV10.messages() as Any[])}catch(e:any){setError(e.message)}};useEffect(()=>{load()},[]);const send=async()=>{try{await apiV10.sendMessage({organization_id:activeOrganizationId(),sender_member_id:from?Number(from):null,recipient_member_id:to?Number(to):null,thread_key:"ops-demo",subject:"Agent delegation",content:text,priority:"high"});await load()}catch(e:any){setError(e.message)}};return <div className="v10Grid"><section className="v8Card"><div className="v8CardHead"><div><b>Send internal message</b><small>Works for agent→agent, Nina→manager and human→agent communication.</small></div></div><div className="v9Form"><div className="v9FormRow"><label>From member<input value={from} onChange={e=>setFrom(e.target.value)} placeholder="optional"/></label><label>To member<input value={to} onChange={e=>setTo(e.target.value)} placeholder="member id"/></label><label>Thread<input value="ops-demo" readOnly/></label></div><label>Message<textarea value={text} onChange={e=>setText(e.target.value)}/></label><button className="v8Primary" onClick={send}>Send through company bus</button></div>{error&&<div className="portalError">{error}</div>}</section><section className="v8Card"><div className="v8CardHead"><div><b>Recent traffic</b><small>Persistent internal messaging, independent of any single LLM chat.</small></div></div>{items.slice(0,30).map(x=><div className="v10Message" key={x.id}><div><b>{x.subject||x.message_type}</b><small>#{x.sender_member_id||'system'} → #{x.recipient_member_id||'broadcast'} · {x.thread_key}</small></div><span>{x.priority}</span><p>{x.content}</p></div>)}</section></div>}
+import {useState} from "react";
+import {activeOrganizationId} from "../lib/auth";
+import {apiV10} from "../lib/api";
+import {Button} from "./ui/Button";
+import {ErrorBanner} from "./ui/EmptyState";
+import {Field} from "./ui/Field";
+import {Any, Intro, LabBody, Panel, Pill, Table, useAction, useLoad} from "./lab/kit";
+
+/* Tin nhắn agent (v10): kênh tin nội bộ bền vững agent↔agent, Nina↔quản lý, người↔agent. */
+export function AgentMessageBusConsole() {
+  const q = useLoad(async () => (await apiV10.messages()) as Any[], []);
+  const [from, setFrom] = useState(""), [to, setTo] = useState(""), [text, setText] = useState("Xem artifact mới nhất và gửi lại nhận xét.");
+  const act = useAction();
+  const send = () => act.run("send", async () => {
+    await apiV10.sendMessage({organization_id: activeOrganizationId(), sender_member_id: from ? Number(from) : null, recipient_member_id: to ? Number(to) : null,
+      thread_key: "ops-demo", subject: "Giao việc giữa agent", content: text, priority: "high"}); await q.reload();
+  }, "Đã gửi tin");
+  return <LabBody q={q}>
+    <Intro>Tin nhắn nội bộ lưu lâu dài, không phụ thuộc vào một phiên chat LLM nào.</Intro>
+    {act.error ? <ErrorBanner error={act.error} context="Gửi tin" onClose={() => act.setError(null)}/> : null}
+    <div className="ui-grid is-side-l">
+      <Panel title="Gửi tin nội bộ">
+        <div className="ui-form">
+          <div className="ui-form-row">
+            <Field label="Từ (mã thành viên)"><input className="ui-input" inputMode="numeric" value={from} onChange={e => setFrom(e.target.value)} placeholder="không bắt buộc"/></Field>
+            <Field label="Tới (mã thành viên)"><input className="ui-input" inputMode="numeric" value={to} onChange={e => setTo(e.target.value)}/></Field>
+          </div>
+          <Field label="Nội dung"><textarea className="ui-textarea" rows={3} value={text} onChange={e => setText(e.target.value)}/></Field>
+          <div><Button variant="primary" busy={act.busy === "send"} onClick={send}>Gửi</Button></div>
+        </div>
+      </Panel>
+      <Panel title="Tin gần đây">
+        <Table rows={q.data.slice(0, 30)} empty="Chưa có tin nào." cols={[
+          {label: "Tin", render: x => <><b>{x.subject || x.message_type}</b><br/><small>#{x.sender_member_id || "hệ thống"} → #{x.recipient_member_id || "mọi người"} · {x.thread_key}</small><br/>{x.content}</>},
+          {label: "Ưu tiên", render: x => <Pill s={x.priority}/>},
+        ]}/>
+      </Panel>
+    </div>
+  </LabBody>;
+}

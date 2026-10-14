@@ -3,6 +3,7 @@ import {useEffect, useState} from "react";
 import {apiSeat} from "../lib/api";
 import {Icon, IconName} from "./Icon";
 import {t as tr, lazy, intlLocale} from "../lib/i18n";
+import {ErrorBanner} from "./ui/EmptyState";
 
 /* WP-2.1 + WP-2.2 — Hồ sơ nhân sự AI, sáu tab.
 
@@ -104,8 +105,8 @@ export function SeatProfileByMember({memberId}: {memberId: number}) {
     })();
   }, [memberId]);
 
-  if (error) return <div className="v8Error">{error}</div>;
-  if (agentId == null) return <div className="v8Empty">{tr("seat.dang_tra_seat")}</div>;
+  if (error) return <ErrorBanner error={error}/>;
+  if (agentId == null) return <div className="ui-empty-line">{tr("seat.dang_tra_seat")}</div>;
   return <SeatProfile agentId={agentId}/>;
 }
 
@@ -127,8 +128,8 @@ export function SeatProfile({agentId}: {agentId: number}) {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [agentId]);
 
-  if (loading && !data) return <div className="v8Empty">{tr("seat.dang_tai_ho_so")}</div>;
-  if (error && !data) return <div className="v8Error">{error}</div>;
+  if (loading && !data) return <div className="ui-empty-line">{tr("seat.dang_tai_ho_so")}</div>;
+  if (error && !data) return <ErrorBanner error={error}/>;
   if (!data) return null;
 
   const seat = data.seat || {};
@@ -137,8 +138,8 @@ export function SeatProfile({agentId}: {agentId: number}) {
 
   return <>
     {/* ---------- đầu trang: ai, ở đâu, và seat có thật trên gateway không --- */}
-    <div className="panel">
-      <div className="panelHead">
+    <div className="ui-panel">
+      <div className="ui-panel-head">
         <div>
           <b>{seat.name || tr("seat.khong_ten")}</b>
           <small style={{display: "block"}}>
@@ -146,14 +147,14 @@ export function SeatProfile({agentId}: {agentId: number}) {
             {seat.manager ? tr("seat.bao_cao_cho", {p0: seat.manager}) : ""}
           </small>
         </div>
-        <span className={`statusPill${data.roster_match === false ? " busy" : ""}`}>
+        <span className={`ui-pill${data.roster_match === false ? " busy" : ""}`}>
           {data.roster_match === true ? tr("seat.khop_gateway")
             : data.roster_match === false ? tr("seat.khong_co_tren_gateway")
             : tr("seat.chua_ro")}
         </span>
       </div>
 
-      <section className="v14Metrics"
+      <section className="lab-stats"
                style={{gridTemplateColumns: "repeat(auto-fit,minmax(178px,1fr))"}}>
         <Kpi label="Seat runtime" value={data.runtime_agent_id || "—"} icon="mesh" source="db"/>
         <Kpi label={tr("seat.vong_doi")} value={seat.lifecycle || "—"} icon="check" source="db"/>
@@ -170,17 +171,17 @@ export function SeatProfile({agentId}: {agentId: number}) {
       <div style={{marginTop: 14}}>
         <div style={{display: "flex", justifyContent: "space-between", fontSize: 13}}>
           <span>{tr("seat.tong_ho_so")} {budget.total_chars?.toLocaleString(intlLocale())} / {budget.total_max_chars?.toLocaleString(intlLocale())} {tr("seat.ky_tu")}</span>
-          <span style={{color: budget.over_budget ? "var(--risk)" : "var(--muted)"}}>
+          <span style={{color: budget.over_budget ? "var(--risk)" : "var(--text-muted)"}}>
             {pct(budget.total_chars || 0, budget.total_max_chars || 1)}%
           </span>
         </div>
-        <div className="progress" style={{marginTop: 6}}><span style={{
+        <div className="ui-meter" style={{marginTop: 6}}><span style={{
           width: `${pct(budget.total_chars || 0, budget.total_max_chars || 1)}%`,
           background: budget.over_budget ? "var(--risk)" : undefined,
         }}/></div>
       </div>
 
-      {!!(data.warnings || []).length && <div className="v8Error" style={{marginTop: 12}}>
+      {!!(data.warnings || []).length && <div className="ui-banner is-error" style={{marginTop: 12}}>
         <b>{tr("seat.can_biet")}</b>
         <ul style={{margin: "6px 0 0 18px"}}>
           {data.warnings.map((w: string, i: number) => <li key={i}>{w}</li>)}
@@ -189,10 +190,10 @@ export function SeatProfile({agentId}: {agentId: number}) {
     </div>
 
     {/* ---------- sáu tab ---------- */}
-    <div className="panel">
-      <div className="pillTabs">
+    <div className="ui-panel">
+      <div className="ui-seg">
         {TABS.map(t =>
-          <button key={t.id} className={tab === t.id ? "active" : ""}
+          <button key={t.id} className={tab === t.id ? "is-active" : ""}
                   onClick={() => setTab(t.id)} title={t.hint}>
             <Icon name={t.icon} size={14}/> {t.label}
           </button>)}
@@ -211,12 +212,12 @@ export function SeatProfile({agentId}: {agentId: number}) {
 function Kpi({label, value, source, note, icon}:
              {label: string; value: string; source: "db" | "gateway";
               note?: string; icon: IconName}) {
-  return <div className="metric">
-    <div className="metricIcon"><Icon name={icon} size={16}/></div>
+  return <div className="lab-metric">
+    <div className="lab-icon"><Icon name={icon} size={16}/></div>
     <label>{label}</label>
     <strong style={{fontSize: 15, wordBreak: "break-word"}}>{value}</strong>
     {/* Nguồn của từng con số, để không ai phải đọc code mới biết. */}
-    <small title={note || ""} style={{color: "var(--muted)", fontSize: 11}}>
+    <small title={note || ""} style={{color: "var(--text-muted)", fontSize: 11}}>
       {tr("seat.nguon")} {source === "db" ? "database" : "gateway"}{note ? " *" : ""}
     </small>
   </div>;
@@ -230,7 +231,7 @@ function FileTabs({agentId, tab, files, onSaved}:
     : tab === "personality" ? ["SOUL.md"]
     : ["AGENTS.md", "USER.md"];
   const mine = files.filter(f => names.includes(f.name));
-  if (!mine.length) return <div className="v8Empty">{tr("seat.khong_doc_duoc_file_nao")}</div>;
+  if (!mine.length) return <div className="ui-empty-line">{tr("seat.khong_doc_duoc_file_nao")}</div>;
   return <>{mine.map(f => <FileEditor key={f.name} agentId={agentId} file={f} onSaved={onSaved}/>)}</>;
 }
 
@@ -266,17 +267,17 @@ function FileEditor({agentId, file, onSaved}:
   return <div style={{marginBottom: 20}}>
     <div style={{display: "flex", justifyContent: "space-between", alignItems: "baseline"}}>
       <b>{file.name}</b>
-      <small style={{color: over ? "var(--risk)" : "var(--muted)"}}>
+      <small style={{color: over ? "var(--risk)" : "var(--text-muted)"}}>
         {text.length.toLocaleString(intlLocale())} / {max.toLocaleString(intlLocale())} {tr("seat.ky_tu")}
         {file.name === "USER.md" ? tr("seat.han_muc_rieng_nho_hon") : ""}
       </small>
     </div>
 
-    {file.missing && <div className="v8Empty" style={{margin: "8px 0"}}>
+    {file.missing && <div className="ui-empty-line" style={{margin: "8px 0"}}>
       {tr("seat.file_chua_ton_tai")}{file.expected_absent ? tr("seat.dieu_nay_binh_thuong") : ""}{tr("seat.luu_se_tao_moi")}
     </div>}
 
-    {file.looks_like_shipped_sample && <div className="v8Error" style={{margin: "8px 0"}}>
+    {file.looks_like_shipped_sample && <div className="ui-banner is-error" style={{margin: "8px 0"}}>
       {tr("seat.file_nay_van_la")} <b>{tr("seat.ban_mau_xuat_xuong_cua")}</b> {tr("seat.noi_dung_ve_c_3po")}
     </div>}
 
@@ -284,19 +285,19 @@ function FileEditor({agentId, file, onSaved}:
               spellCheck={false}
               style={{width: "100%", fontFamily: "ui-monospace, monospace", fontSize: 13,
                       padding: 12, borderRadius: 10,
-                      border: `1px solid ${over ? "var(--risk)" : "var(--line)"}`}}/>
+                      border: `1px solid ${over ? "var(--risk)" : "var(--border)"}`}}/>
 
-    {over && <div className="v8Error" style={{marginTop: 8}}>
+    {over && <div className="ui-banner is-error" style={{marginTop: 8}}>
       {tr("seat.vuot_han_muc")} {max.toLocaleString(intlLocale())} {tr("seat.ky_tu_openclaw_se")} <b>{tr("seat.cat_bot_khi_dung_prompt")}</b>{tr("seat.nen_agent_chi_doc_duoc")}
     </div>}
 
-    {conflict && <div className="v8Error" style={{marginTop: 8}}>
+    {conflict && <div className="ui-banner is-error" style={{marginTop: 8}}>
       {conflict}{" "}
       <button onClick={onSaved} style={{marginLeft: 8}}>{tr("seat.tai_lai_ban_moi")}</button>
     </div>}
 
     <div style={{display: "flex", gap: 10, alignItems: "center", marginTop: 10}}>
-      <button className="primary" onClick={save} disabled={busy || over || !dirty}>
+      <button className="ui-btn is-primary" onClick={save} disabled={busy || over || !dirty}>
         {busy ? tr("seat.dang_luu") : tr("seat.luu")}
       </button>
       {dirty && !busy && <small>{tr("seat.chua_luu")}</small>}
@@ -357,7 +358,7 @@ function ConfigTab({agentId, tab, config, onSaved}:
     } finally { setBusy(false); }
   }
 
-  if (!fields.length) return <div className="v8Empty">{tr("seat.tab_nay_chua_co_truong")}</div>;
+  if (!fields.length) return <div className="ui-empty-line">{tr("seat.tab_nay_chua_co_truong")}</div>;
 
   return <div>
     {fields.map(f => {
@@ -373,13 +374,13 @@ function ConfigTab({agentId, tab, config, onSaved}:
 
         {f.options
           ? <select value={value} onChange={e => setDraft({...draft, [f.key]: e.target.value})}
-                    style={{padding: 8, borderRadius: 8, border: "1px solid var(--line)"}}>
+                    style={{padding: 8, borderRadius: 8, border: "1px solid var(--border)"}}>
               <option value="">{tr("seat.chua_dat")}</option>
               {f.options.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           : <input value={value} onChange={e => setDraft({...draft, [f.key]: e.target.value})}
                    style={{width: "100%", padding: 8, borderRadius: 8,
-                           border: "1px solid var(--line)"}}/>}
+                           border: "1px solid var(--border)"}}/>}
 
         {f.advice && <small style={{display: "block", marginTop: 4, opacity: .85}}>
           <b>{tr("seat.goi_y")}</b> {f.advice}
@@ -395,7 +396,7 @@ function ConfigTab({agentId, tab, config, onSaved}:
     })}
 
     <div style={{display: "flex", gap: 10, alignItems: "center"}}>
-      <button className="primary" onClick={save} disabled={busy || !changed.length}>
+      <button className="ui-btn is-primary" onClick={save} disabled={busy || !changed.length}>
         {busy ? tr("seat.dang_luu") : tr("seat.luu_thay_doi", {p0: changed.length || ""})}
       </button>
       {msg && <small>{msg}</small>}

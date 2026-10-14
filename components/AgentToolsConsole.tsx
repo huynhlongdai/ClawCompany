@@ -3,6 +3,7 @@ import {useEffect, useMemo, useState} from "react";
 import {PageFrame} from "./shell/PageFrame";
 import {api, apiMcp, errorText} from "../lib/api";
 import {t as tr, lazy, intlLocale} from "../lib/i18n";
+import {ErrorBanner} from "./ui/EmptyState";
 
 /* D1.5 + D1.6 — "Công cụ của agent".
 
@@ -54,7 +55,7 @@ function payloadOf(ev: Row): Row {
 
 function Pill({level}: {level: string}) {
   const l = LEVEL_VI[level] || {text: level, cls: "mid"};
-  return <span className={`prio ${l.cls}`}>{l.text}</span>;
+  return <span className={`ui-pill ${l.cls}`}>{l.text}</span>;
 }
 
 export function AgentToolsConsole() {
@@ -124,50 +125,50 @@ export function AgentToolsConsole() {
 
   return <PageFrame title={tr("tools.cong_cu_cua_agent")}
       subtitle={tr("tools.may_chu_mcp_tool_company", {p0: catalog?.server?.name || "clawcompany", p1: catalog?.count ?? "…"})}>
-    {error && <div className="v8Error" data-testid="tools-error">{error}</div>}
+    {error && <ErrorBanner error={error}  testId="tools-error"/>}
 
-    <div className="v9Grid2">
-      <section className="v8Card">
-        <div className="v8CardHead"><div><b>{tr("tools.tom_tat_quyen")}</b>
+    <div className="ui-grid is-2">
+      <section className="ui-panel ui-panel-body">
+        <div className="lab-cardhead"><div><b>{tr("tools.tom_tat_quyen")}</b>
           <span>{tr("tools.agent_khong_co_dong_quyen")}</span></div></div>
         <div data-testid="tool-counts" style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12}}>
-          {tiers.map(tier => <div key={tier} style={{border: "1px solid var(--line)", borderRadius: 10, padding: "10px 12px"}}>
-            <div style={{fontSize: 12.5, color: "var(--muted)", marginBottom: 6}}>{TIER_VI[tier] || tier}</div>
+          {tiers.map(tier => <div key={tier} style={{border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px"}}>
+            <div style={{fontSize: 12.5, color: "var(--text-muted)", marginBottom: 6}}>{TIER_VI[tier] || tier}</div>
             <div style={{display: "flex", gap: 6, flexWrap: "wrap"}}>
-              <span className="prio low">{counts[tier]?.allowed ?? 0} {tr("tools.duoc_dung_2")}</span>
-              <span className="prio mid">{counts[tier]?.ask ?? 0} {tr("tools.hoi_duyet_2")}</span>
-              <span className="prio high">{counts[tier]?.off ?? 0} {tr("tools.tat_2")}</span>
+              <span className="ui-pill is-low">{counts[tier]?.allowed ?? 0} {tr("tools.duoc_dung_2")}</span>
+              <span className="ui-pill is-mid">{counts[tier]?.ask ?? 0} {tr("tools.hoi_duyet_2")}</span>
+              <span className="ui-pill is-high">{counts[tier]?.off ?? 0} {tr("tools.tat_2")}</span>
             </div></div>)}
         </div>
-        <p style={{fontSize: 13, color: "var(--muted)", margin: "12px 0 0"}}>
+        <p style={{fontSize: 13, color: "var(--text-muted)", margin: "12px 0 0"}}>
           {tr("tools.thu_tu_ap_dung_ngoai")} <code>{tr("tools.tool_lt_ten_gt")}</code> {tr("tools.trong_hop_viec_duyet_xong")}
           {perm?.member_overrides?.length ? tr("tools.dang_co_ngoai_le_theo", {p0: perm.member_overrides.length}) : ""}
         </p>
       </section>
-      <section className="v8Card">
-        <div className="v8CardHead"><div><b>{tr("tools.gan_vao_openclaw")}</b>
+      <section className="ui-panel ui-panel-body">
+        <div className="lab-cardhead"><div><b>{tr("tools.gan_vao_openclaw")}</b>
           <span>{tr("tools.moi_ghe_agent_dung_mot")}</span></div></div>
         <pre data-testid="mcp-snippet" style={{fontSize: 12, background: "var(--paper-2, #efeee9)",
           padding: 12, borderRadius: 8, overflowX: "auto", margin: 0}}>{snippet}</pre>
       </section>
     </div>
 
-    <section className="v8Card" data-testid="tool-matrix">
-      <div className="v8CardHead"><div><b>{tr("tools.ma_tran_quyen")}</b>
+    <section className="ui-panel ui-panel-body" data-testid="tool-matrix">
+      <div className="lab-cardhead"><div><b>{tr("tools.ma_tran_quyen")}</b>
         <span>{isAdmin ? tr("tools.chon_muc_cho_tung_tool") : tr("tools.chi_admin_duoc_doi_quyen")}</span></div>
         <input placeholder={tr("tools.loc_tool")} value={filter} onChange={e => setFilter(e.target.value)}
                style={{maxWidth: 220}}/></div>
       <div style={{overflowX: "auto"}}>
         <table style={{width: "100%", borderCollapse: "collapse", fontSize: 13}}>
-          <thead><tr style={{textAlign: "left", color: "var(--muted)"}}>
+          <thead><tr style={{textAlign: "left", color: "var(--text-muted)"}}>
             <th style={{padding: "6px 8px"}}>Tool</th><th style={{padding: "6px 8px"}}>{tr("tools.nhom")}</th>
             <th style={{padding: "6px 8px"}}>Scope</th>
             {tiers.map(t => <th key={t} style={{padding: "6px 8px"}}>{TIER_VI[t] || t}</th>)}
           </tr></thead>
-          <tbody>{tools.map(t => <tr key={t.name} style={{borderTop: "1px solid var(--line)"}}>
-            <td style={{padding: "8px"}}><code>{t.name}</code>{t.writes && <span className="prio mid"
+          <tbody>{tools.map(t => <tr key={t.name} style={{borderTop: "1px solid var(--border)"}}>
+            <td style={{padding: "8px"}}><code>{t.name}</code>{t.writes && <span className="ui-pill is-mid"
               style={{marginLeft: 6}}>ghi</span>}
-              <div style={{color: "var(--muted)", fontSize: 12}}>{t.description}</div></td>
+              <div style={{color: "var(--text-muted)", fontSize: 12}}>{t.description}</div></td>
             <td style={{padding: "8px"}}>{GROUP_VI[t.group] || t.group}</td>
             <td style={{padding: "8px"}}><small>{scopeOf[t.name] || "—"}</small></td>
             {tiers.map(tier => {
@@ -181,7 +182,7 @@ export function AgentToolsConsole() {
                         <option key={lv} value={lv}>{LEVEL_VI[lv]?.text || lv}</option>)}
                     </select>
                   : <Pill level={cell.level}/>}
-                {cell.source === "override" && <small style={{marginLeft: 6, color: "var(--muted)"}}>{tr("tools.da_chinh")}</small>}
+                {cell.source === "override" && <small style={{marginLeft: 6, color: "var(--text-muted)"}}>{tr("tools.da_chinh")}</small>}
               </td>;
             })}
           </tr>)}</tbody>
@@ -189,13 +190,13 @@ export function AgentToolsConsole() {
       </div>
     </section>
 
-    <section className="v8Card" data-testid="tool-log">
-      <div className="v8CardHead"><div><b>{tr("tools.nhat_ky_goi_tool")}</b>
+    <section className="ui-panel ui-panel-body" data-testid="tool-log">
+      <div className="lab-cardhead"><div><b>{tr("tools.nhat_ky_goi_tool")}</b>
         <span>{tr("tools.k40_luot_gan_nhat_tu")}</span></div>
         <button onClick={load}>{tr("tools.tai_lai")}</button></div>
       {log.length === 0
-        ? <div className="v9Empty">{tr("tools.chua_co_agent_nao_goi")}</div>
-        : <div className="v9List">{log.map(ev => {
+        ? <div className="ui-empty-line">{tr("tools.chua_co_agent_nao_goi")}</div>
+        : <div className="ui-list">{log.map(ev => {
             const p = payloadOf(ev);
             const denied = ev.event_type === "mcp.tool.denied";
             const ok = !denied && p.ok;
@@ -203,9 +204,9 @@ export function AgentToolsConsole() {
             const label = pending ? tr("tools.cho_duyet", {p0: p.approval_id ? ` · #${p.approval_id}` : ""})
               : denied ? tr("tools.tu_choi", {p0: REASON_VI[p.reason] || p.reason || ""})
               : ok ? `ok · ${p.ms ?? 0} ms` : tr("tools.loi", {p0: p.error || ""});
-            return <div className="v9LedgerRow" key={ev.id}>
+            return <div className="ui-row" key={ev.id}>
               <span><code>{p.tool || "?"}</code></span>
-              <b className={`prio ${ok ? "low" : pending ? "mid" : "high"}`}>{label}</b>
+              <b className={`ui-pill ${ok ? "is-low" : pending ? "is-mid" : "is-high"}`}>{label}</b>
               <small>{memberName[ev.actor_member_id] || tr("tools.ghe", {p0: ev.actor_member_id ?? "?"})}
                 {p.run_id ? tr("tools.luot_chay", {p0: p.run_id}) : ""} · {when(ev.occurred_at)}</small>
             </div>;

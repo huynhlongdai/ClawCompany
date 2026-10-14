@@ -1,5 +1,8 @@
+"use client";
 import {PageFrame} from "../../../../components/shell/PageFrame";
 import {TaskDetail} from "../../../../components/TaskDetail";
+import {Notice} from "../../../../components/ui/EmptyState";
+import {t} from "../../../../lib/i18n";
 
 /* Chi tiết một công việc.
 
@@ -9,11 +12,10 @@ import {TaskDetail} from "../../../../components/TaskDetail";
 export default function Page({params}: {params: {id: string}}) {
   const taskId = Number(params.id);
   return (
-    <PageFrame title="Chi tiết công việc"
-                 subtitle="Sổ ghi theo thời gian, bàn giao kèm hướng dẫn, và gói ngữ cảnh mà agent sẽ nhận">
+    <PageFrame title={t("task.page_title")} subtitle={t("task.page_sub")}>
       {Number.isFinite(taskId)
         ? <TaskDetail taskId={taskId}/>
-        : <div className="v8Error">Id công việc không hợp lệ.</div>}
+        : <Notice tone="error">{t("task.bad_id")}</Notice>}
     </PageFrame>
   );
 }

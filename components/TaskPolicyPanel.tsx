@@ -2,6 +2,7 @@
 import {useEffect, useState} from "react";
 import {apiTask, errorText} from "../lib/api";
 import {t, lazy} from "../lib/i18n";
+import {ErrorBanner} from "./ui/EmptyState";
 
 type Stage = {type: string; participants: number[]};
 type Member = {id?: number; name?: string; member_type?: string; [k: string]: any};
@@ -34,16 +35,16 @@ export function TaskPolicyPanel({taskId, members, onChange, refreshKey = 0}:
     finally { setBusy(false); }
   }
 
-  return <div className="panel" data-testid="task-policy">
-    <div className="panelHead">
+  return <div className="ui-panel" data-testid="task-policy">
+    <div className="ui-panel-head">
       <div><b>{t("taskPolicy.chang_duyet")}</b></div>
       <small>{stages.length ? t("taskPolicy.vong", {p0: st.round || 0, p1: STATE_VI[st.status] || st.status}) : t("taskPolicy.khong_co")}</small>
     </div>
-    {error && <div className="v8Error" data-testid="policy-error">{error}</div>}
-    {st.missing_report && <div className="v8Error" data-testid="policy-missing-report">
+    {error && <ErrorBanner error={error}  testId="policy-error"/>}
+    {st.missing_report && <div className="ui-banner is-error" data-testid="policy-missing-report">
       {t("taskPolicy.luot")}{String(st.missing_report)} {t("taskPolicy.ket_thuc_ma_nguoi_lam")}
     </div>}
-    {!stages.length && !draft && <div className="v8Empty">
+    {!stages.length && !draft && <div className="ui-empty-line">
       {t("taskPolicy.viec_nay_xong_la_xong")}
     </div>}
 
@@ -53,9 +54,9 @@ export function TaskPolicyPanel({taskId, members, onChange, refreshKey = 0}:
           : i === idx && st.status === "in_review" ? "current" : "pending";
         return <li key={i} data-testid="policy-stage" data-state={state} style={{fontSize: 13}}>
           <b>{s.type === "review" ? "Review" : t("taskPolicy.phe_duyet")}</b>{" "}
-          <span className={`prio ${state === "passed" ? "low" : state === "current" ? "mid" : ""}`}>
+          <span className={`ui-pill ${state === "passed" ? "is-low" : state === "current" ? "is-mid" : ""}`}>
             {state === "passed" ? t("taskPolicy.da_qua") : state === "current" ? t("taskPolicy.dang_cho") : t("taskPolicy.chua_toi")}</span>
-          <div style={{color: "var(--muted)"}}>
+          <div style={{color: "var(--text-muted)"}}>
             {s.participants.map(name).join(", ")}
             {state === "current" && st.reviewer_member_id ? t("taskPolicy.nguoi_quyet", {p0: name(st.reviewer_member_id)}) : ""}
             {state === "current" && st.approval_id ? t("taskPolicy.yeu_cau_duyet_hop_viec", {p0: st.approval_id}) : ""}
@@ -69,7 +70,7 @@ export function TaskPolicyPanel({taskId, members, onChange, refreshKey = 0}:
         <input data-testid="review-note" value={note} onChange={e => setNote(e.target.value)}
                placeholder={t("taskPolicy.nhan_xet_bat_buoc_khi")}/>
         <div style={{display: "flex", gap: 8}}>
-          <button className="primary" data-testid="review-approve" disabled={busy}
+          <button className="ui-btn is-primary" data-testid="review-approve" disabled={busy}
                   onClick={() => act(() => apiTask.review(taskId, "approve", note))}>{t("taskPolicy.duyet")}</button>
           <button data-testid="review-revise" disabled={busy || !note.trim()}
                   onClick={() => act(() => apiTask.review(taskId, "revise", note))}>{t("taskPolicy.yeu_cau_sua")}</button>
@@ -99,7 +100,7 @@ export function TaskPolicyPanel({taskId, members, onChange, refreshKey = 0}:
       </div>)}
       <div style={{display: "flex", gap: 8}}>
         <button data-testid="policy-add" onClick={() => setDraft([...draft, {type: "review", participants: []}])}>{t("taskPolicy.them_chang")}</button>
-        <button className="primary" data-testid="policy-save"
+        <button className="ui-btn is-primary" data-testid="policy-save"
                 disabled={busy || draft.some(s => !s.participants.length)}
                 onClick={() => act(async () => { await apiTask.setPolicy(taskId, draft); setDraft(null); })}>{t("taskPolicy.luu")}</button>
         <button onClick={() => setDraft(null)}>{t("taskPolicy.huy")}</button>

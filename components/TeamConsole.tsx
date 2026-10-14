@@ -149,8 +149,8 @@ function PeopleTab({me, people, chart, busy, act}: any) {
   return <div className="ui-grid is-2">
     <section className="ui-panel tm-card">
       <div className="tm-card-head"><div><b>{tr("team.nguoi_co_quyen")}</b><span>{tr("team.vai_quyet_dinh_ai_duoc")}</span></div></div>
-      <table className="tmTable" data-testid="people-table"><tbody>
-        {people.users.map((u: any) => <tr key={u.user_id} className={u.status !== "active" ? "is-off" : ""}>
+      <table className="ui-table" data-testid="people-table"><tbody>
+        {people.users.map((u: any) => <tr key={u.user_id} className={u.status !== "is-active" ? "is-off" : ""}>
           <td><b>{u.display_name || u.email}</b>{u.is_self && tr("team.ban")}<br/><small>{u.email}{u.member_name ? tr("team.ghe", {p0: u.member_name}) : ""}</small></td>
           <td>{u.status !== "active" ? <small>{tr("team.da_thu_hoi")}</small> : u.editable
             ? <select value={u.role} disabled={busy} data-testid={`role-${u.user_id}`}
@@ -212,7 +212,7 @@ function DepartmentsTab({chart, members, caps, busy, act}: any) {
             {members.map((m: any) => <option key={m.id} value={m.id}>{m.name}{m.department_id !== d.id ? ` (${m.department || tr("team.chua_xep_2")})` : ""}</option>)}
           </select></label>
         {d.guide && <small className="tmGuide">{d.guide}</small>}
-        <table className="tmTable"><tbody>
+        <table className="ui-table"><tbody>
           {inDept.map((m: any) => <tr key={m.id}>
             <td><b>{m.name}</b>{m.is_head && tr("team.truong_phong_2")}<br/><small>{m.role || "—"} · {m.type === "agent" ? "AI" : tr("team.nguoi")}</small></td>
             <td style={{textAlign: "right"}}><label className="tmInline">{tr("team.bao_cao_cho")}
@@ -280,7 +280,7 @@ function BuildTab({chart, caps, busy, act, onCompany}: any) {
       {report && <div className="tmReport" data-testid="csv-report">
         <small>{report.summary.rows} {tr("team.dong")} {report.summary.create} {tr("team.tao_moi")} {report.summary.update} {tr("team.cap_nhat")} {report.summary.agents} agent · {report.summary.invitations} {tr("team.loi_moi")}
           {report.summary.departments_new?.length ? tr("team.phong_moi", {p0: report.summary.departments_new.join(", ")}) : ""}</small>
-        <table className="tmTable"><tbody>
+        <table className="ui-table"><tbody>
           {report.rows.map((r: any) => <tr key={r.line} className={r.errors.length ? "is-err" : ""}>
             <td><small>{tr("team.dong_2")} {r.line}</small></td><td><b>{r.name || "—"}</b> <small>{r.type === "agent" ? "AI" : tr("team.nguoi")} · {r.department || tr("team.chua_xep_2")}{r.manager ? ` → ${r.manager}` : ""}{r.is_head ? tr("team.truong_phong_2") : ""}</small></td>
             <td><small>{r.errors.length ? r.errors.join("; ") : r.action === "create" ? tr("team.tao_moi_2") : tr("team.cap_nhat_2")}{r.warnings.length ? ` (${r.warnings.join("; ")})` : ""}</small></td>

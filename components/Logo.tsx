@@ -1,3 +1,4 @@
+import {t} from "../lib/i18n";
 /* Logo ClawCompany — bản đã chốt ở design/brand/ (plan-v2 §6): chữ C hình chiếc
    càng nắm 3 chấm (Đèn = việc, Rong = agent, Càng/Kem = người).
 
@@ -15,7 +16,8 @@ export function Logo({size = 34}: {size?: number; hole?: string; rounded?: boole
 }
 
 /* Logo kèm chữ — cửa đăng nhập, lời mời, onboarding. */
-export function LogoLockup({subtitle = "Điều hành công ty cùng đội agent"}: {hole?: string; subtitle?: string; dark?: boolean}) {
+export function LogoLockup({subtitle}: {hole?: string; subtitle?: string; dark?: boolean}) {
+  subtitle ??= t("ui.tagline");
   return <span className="logo-lockup">
     <Logo size={40}/>
     <span><b translate="no">ClawCompany</b><small>{subtitle}</small></span>

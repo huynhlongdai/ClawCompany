@@ -6,6 +6,7 @@
 import {useEffect, useState} from "react";
 import {PageFrame} from "./shell/PageFrame";
 import {api, apiV18, errorText} from "../lib/api";
+import {ErrorBanner} from "./ui/EmptyState";
 
 const EV_VI: Record<string, string> = {
   "task.routed_to_department": "Giao cho phòng",
@@ -66,15 +67,15 @@ export function RoutingConsole() {
 
   const head = data?.department?.head;
   return <PageFrame title="Định tuyến phòng ban" subtitle="Giao việc cho phòng · trưởng phòng chọn người, lý do ghi vào nhật ký sự kiện">
-    {error && <div className="v8Error" data-testid="routing-error">{error}</div>}
-    {note && <div className="v8Card" style={{padding: 10, marginBottom: 10, borderLeft: "3px solid #16794c"}} data-testid="routing-note">{note}</div>}
+    {error && <ErrorBanner error={error}  testId="routing-error"/>}
+    {note && <div className="ui-panel ui-panel-body" style={{padding: 10, marginBottom: 10, borderLeft: "3px solid #16794c"}} data-testid="routing-note">{note}</div>}
     <div style={{display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12}}>
-      {departments.map((d: any) => <button key={d.id} className={d.id === sel ? "v8Primary" : "v8Ghost"} onClick={() => setSel(d.id)} data-testid={`dept-${d.id}`}>{d.name}</button>)}
-      {!departments.length && <div className="v9Empty">Chưa có phòng ban nào.</div>}
+      {departments.map((d: any) => <button key={d.id} className={d.id === sel ? "ui-btn is-primary" : "ui-btn"} onClick={() => setSel(d.id)} data-testid={`dept-${d.id}`}>{d.name}</button>)}
+      {!departments.length && <div className="ui-empty-line">Chưa có phòng ban nào.</div>}
     </div>
-    {data && <div className="v9Grid2">
-      <section className="v8Card">
-        <div className="v8CardHead"><div><b>{data.department.name}</b>
+    {data && <div className="ui-grid is-2">
+      <section className="ui-panel ui-panel-body">
+        <div className="lab-cardhead"><div><b>{data.department.name}</b>
           <span>Trưởng phòng: {head ? `${head.name}${head.type === "human" ? " (người — không tự định tuyến)" : ""}` : "chưa có — việc giao cho phòng sẽ không ai nhận"}</span></div></div>
         <b style={{fontSize: 13}}>Nhân sự phòng</b>
         <table style={{width: "100%", fontSize: 13, borderCollapse: "collapse", marginTop: 4}} data-testid="routing-roster"><tbody>
@@ -84,33 +85,33 @@ export function RoutingConsole() {
             <td style={{textAlign: "right"}}><small>{m.open_tasks} việc mở · {m.open_runs} lượt chạy</small></td>
           </tr>)}
         </tbody></table>
-        <div className="v9Form" style={{marginTop: 12}}>
+        <div className="ui-form" style={{marginTop: 12}}>
           <b>Hướng dẫn phòng</b>
           <small>Trưởng phòng đọc phần này mỗi lượt định tuyến (mỗi dòng một quy tắc).</small>
           <textarea rows={5} value={guide} onChange={e => setGuide(e.target.value)} data-testid="routing-guide" style={{width: "100%"}}
             placeholder="VD: Bài SEO giao người viết nội dung; quảng cáo giao người chạy ads."/>
-          <button className="v8Primary" onClick={saveGuide}>Lưu hướng dẫn</button>
+          <button className="ui-btn is-primary" onClick={saveGuide}>Lưu hướng dẫn</button>
         </div>
       </section>
-      <section className="v8Card">
-        <div className="v8CardHead"><div><b>Việc phòng đang giữ</b><span>Chưa có người nhận thì trưởng phòng sẽ định tuyến</span></div></div>
-        <div className="v9List">
-          {data.tasks.map((t: any) => <div key={t.id} className="v9BudgetButton" data-testid={`routing-task-${t.id}`}>
+      <section className="ui-panel ui-panel-body">
+        <div className="lab-cardhead"><div><b>Việc phòng đang giữ</b><span>Chưa có người nhận thì trưởng phòng sẽ định tuyến</span></div></div>
+        <div className="ui-list">
+          {data.tasks.map((t: any) => <div key={t.id} className="ui-btn" data-testid={`routing-task-${t.id}`}>
             <div style={{display: "flex", justifyContent: "space-between"}}><b>#{t.id} {t.title}</b><small>{t.status}</small></div>
             <small>{t.unassigned ? "⏳ chờ trưởng phòng giao" : `Người nhận: ${names[t.assignee_member_id] || "#" + t.assignee_member_id}`}</small>
             {data.events.filter((e: any) => e.task_id === t.id).slice(0, 4).map((e: any) => <div key={e.id} style={{fontSize: 12, color: "#555", marginTop: 2}}>
               · {EV_VI[e.type] || e.type}: {evText(e, names)}</div>)}
           </div>)}
-          {!data.tasks.length && <div className="v9Empty">Phòng chưa giữ việc nào.</div>}
+          {!data.tasks.length && <div className="ui-empty-line">Phòng chưa giữ việc nào.</div>}
         </div>
-        <div className="v9Form" style={{marginTop: 12}}>
+        <div className="ui-form" style={{marginTop: 12}}>
           <b>Giao một việc cho phòng</b>
-          <div className="v9FormRow">
+          <div className="ui-form-row">
             <label>Việc<select value={pick} onChange={e => setPick(e.target.value)} data-testid="routing-pick">
               <option value="">— chọn —</option>{tasks.map((t: any) => <option key={t.id} value={t.id}>#{t.id} {t.title}</option>)}</select></label>
             <label>Ghi chú<input value={why} onChange={e => setWhy(e.target.value)} placeholder="VD: việc nội dung cho chiến dịch"/></label>
           </div>
-          <button className="v8Primary" onClick={route} disabled={!pick} data-testid="routing-submit">Giao cho phòng</button>
+          <button className="ui-btn is-primary" onClick={route} disabled={!pick} data-testid="routing-submit">Giao cho phòng</button>
         </div>
       </section>
     </div>}

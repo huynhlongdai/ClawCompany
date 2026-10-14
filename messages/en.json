@@ -195,7 +195,8 @@
   "dong": "Close",
   "dang_tai": "Loading…",
   "dong_thong_bao": "Dismiss notification",
-  "be_cang": "Bé Càng"
+  "be_cang": "Bé Càng",
+  "tagline": "Run your company with a team of agents"
  },
  "errors": {
   "sai_email_hoac_mat_khau": "Wrong email or password.",
@@ -702,7 +703,10 @@
   "da_chay": "ran",
   "chua_ly_do": "not yet — reason `{p0}`",
   "phien": "Session:",
-  "viec_chua_co_san_pham": "The task had no deliverable yet, so the system created a handoff note"
+  "viec_chua_co_san_pham": "The task had no deliverable yet, so the system created a handoff note",
+  "page_title": "Task details",
+  "page_sub": "Timeline journal, handoffs with instructions, and the context pack the agent will receive",
+  "bad_id": "The task ID in the link is not valid. Open the task from the Work page."
  },
  "taskGraph": {
   "ton_dong": "backlog",
@@ -1117,7 +1121,10 @@
   "khong_doc_duoc_trang_thai": "Could not read runtime status — check the connection in Settings › OpenClaw.",
   "ky_nang_kha_dung": "Available skills",
   "khai_theo_to_chuc_chua": "Declared per organization, not yet per agent (M5)",
-  "chua_khai_ky_nang_nao": "No skills declared."
+  "chua_khai_ky_nang_nao": "No skills declared.",
+  "page_title": "AI employee profile",
+  "page_sub": "Identity, personality, job description, capabilities, permissions and limits — written straight to the OpenClaw gateway",
+  "bad_id": "The agent ID in the link is not valid. Open the agent from Team › Agents."
  },
  "agentHr": {
   "dang_lam": "In progress",
@@ -1819,5 +1826,49 @@
   "khong_co_trang_nay": "This page doesn't exist",
   "ve_tong_quan": "Back to Overview",
   "duong_dan_co_the_da": "The link may have changed. Use search (Ctrl K) to reach any page, including Lab pages."
+ },
+ "portal": {
+  "brand": "Customer portal",
+  "login_title": "Sign in to your workspace",
+  "login_desc": "Talk to your AI team, follow projects, reports and usage.",
+  "password": "Password",
+  "sign_in": "Sign in",
+  "signing_in": "Signing in…",
+  "sign_out": "Sign out",
+  "login_fail": "Customer portal sign-in",
+  "overview": "Overview",
+  "conversations": "Conversations",
+  "workspace": "Workspace",
+  "hello": "Hello {p0}",
+  "team_working": "Your AI team is at work",
+  "team_working_desc": "Follow progress, chat with AI employees and approve proposals in one place.",
+  "usage_month": "Usage this month",
+  "ai_cost": "Internal AI cost {p0}",
+  "your_team": "Your AI team",
+  "employees": "{p0} employees",
+  "no_agents": "No AI employees are assigned to you yet.",
+  "chat": "Chat",
+  "plan": "Plan & usage",
+  "monthly": "Monthly fee",
+  "usage_events": "Usage events",
+  "renewal": "Renewal",
+  "status": "Status",
+  "projects": "Active projects",
+  "projects_desc": "Only projects shared with customers",
+  "no_projects": "No projects shared yet.",
+  "back": "Back to overview",
+  "ai_conversations": "AI conversations",
+  "no_chats": "No conversations yet.",
+  "ai_employee": "AI employee",
+  "session_hint": "The OpenClaw session starts with the first message",
+  "start_with": "Start working with {p0}",
+  "start_desc": "Messages stay inside your tenant and are routed to the assigned OpenClaw agent.",
+  "you": "You",
+  "working": "The AI employee is working…",
+  "ask": "Message your AI employee… (Enter to send)",
+  "send": "Send",
+  "send_fail": "Send message",
+  "load_fail": "Load conversations",
+  "new_chat": "AI chat"
  }
 }

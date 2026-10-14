@@ -18,7 +18,7 @@ const FILE_VI: Record<string, string> = lazy(() => ({in_sync: tr("agentHr.khop")
 const LEVEL_VI: Record<string, string> = lazy(() => ({allowed: tr("agentHr.cho_phep"), ask: tr("agentHr.hoi_duyet"), off: tr("agentHr.tat")}));
 
 function Pill({lc}: {lc: string}) {
-  return <span className={`statusPill ${LIFECYCLE_CLS[lc] ?? "busy"}`} data-testid="hr-lifecycle">{LIFECYCLE_VI[lc] || lc}</span>;
+  return <span className={`ui-pill ${LIFECYCLE_CLS[lc] ?? "busy"}`} data-testid="hr-lifecycle">{LIFECYCLE_VI[lc] || lc}</span>;
 }
 
 // ------------------------------------------------------------------ tab: danh sách + tuyển
@@ -34,14 +34,14 @@ export function AgentHRTab({companyId, caps}: {companyId: number | null; caps: a
   if (!roster) return <div className="ui-empty">{tr("agentHr.dang_tai")}</div>;
   const c = roster.counts || {};
   return <div className="hrWrap">
-    <section className="v8Card">
-      <div className="v8CardHead"><div><b>{tr("agentHr.nhan_su_ai")}</b>
+    <section className="ui-panel ui-panel-body">
+      <div className="lab-cardhead"><div><b>{tr("agentHr.nhan_su_ai")}</b>
         <span>{roster.items.length} agent · {c.active || 0} {tr("agentHr.dang_lam_2")}{c.paused ? tr("agentHr.tam_dung_2", {p0: c.paused}) : ""}{c.retired ? tr("agentHr.da_nghi_2", {p0: c.retired}) : ""}{c.runtime_missing ? tr("agentHr.cho_gateway_2", {p0: c.runtime_missing}) : ""}</span></div>
         {caps.invite && <button className="ui-btn is-primary" onClick={() => setWizard(true)} data-testid="hr-hire-open">{tr("agentHr.tuyen_nhan_su_ai")}</button>}
       </div>
       {roster.gateway_error && <div className="ui-banner is-error">{tr("agentHr.khong_doc_duoc_gateway")} {roster.gateway_error}</div>}
       {roster.unbound_on_gateway > 0 && <small className="tmGuide">{roster.unbound_on_gateway} {tr("agentHr.agent_tren_gateway_chua_gan")}</small>}
-      <div className="hrScroll"><table className="tmTable" data-testid="hr-roster"><thead><tr>
+      <div className="hrScroll"><table className="ui-table" data-testid="hr-roster"><thead><tr>
         <th>{tr("agentHr.ten")}</th><th>{tr("agentHr.phong_ban_quan_ly")}</th><th>Model</th><th>{tr("agentHr.trang_thai")}</th><th>Gateway</th></tr></thead>
         <tbody>{roster.items.map((a: any) => <tr key={a.agent_id} className={a.lifecycle === "retired" ? "is-off" : ""}>
           <td><Link href={`/app/agents/${a.member_id}`}><b>{a.name}</b></Link><br/><small>{a.role}{a.is_head ? tr("agentHr.truong_phong") : ""}</small></td>
@@ -84,14 +84,14 @@ function HireWizard({companyId, onClose, onDone}: {companyId: number | null; onC
       setResult(r); onDone();
     } catch (e: any) { setError(errorText(e)); } finally { setBusy(false); }
   }
-  return <section className="v8Card hrWizard" data-testid="hr-wizard">
-    <div className="v8CardHead"><div><b>{tr("agentHr.tuyen_nhan_su_ai")}</b><span>{tr("agentHr.tao_agent_tren_gateway_ghi")}</span></div>
+  return <section className="ui-panel ui-panel-body hrWizard" data-testid="hr-wizard">
+    <div className="lab-cardhead"><div><b>{tr("agentHr.tuyen_nhan_su_ai")}</b><span>{tr("agentHr.tao_agent_tren_gateway_ghi")}</span></div>
       <button className="ui-btn is-ghost is-sm" onClick={onClose}>{tr("agentHr.dong")}</button></div>
     {!result && <ol className="hrSteps">{STEPS.map((s, i) => <li key={s} className={i === step ? "is-on" : i < step ? "is-done" : ""}>
       <span>{i + 1}</span>{s}</li>)}</ol>}
     {error && <div className="ui-banner is-error" data-testid="hr-wizard-error">{error}</div>}
     {!opt && !error && <div className="ui-empty">{tr("agentHr.dang_tai")}</div>}
-    {opt && !result && <div className="v9Form">
+    {opt && !result && <div className="ui-form">
       {step === 0 && <>
         <label>{tr("agentHr.ten")}<input value={f.name} onChange={e => set("name", e.target.value)} placeholder="VD: Thu Trang" data-testid="hr-name"/></label>
         <label>{tr("agentHr.chuc_danh")}<input value={f.role} onChange={e => set("role", e.target.value)} placeholder={tr("agentHr.vd_nhan_vien_cham_soc")} data-testid="hr-role"/></label>
@@ -134,7 +134,7 @@ function HireWizard({companyId, onClose, onDone}: {companyId: number | null; onC
       </div>
     </div>}
     {result && <div className="hrResult" data-testid="hr-result">
-      <div className={`ui-banner ${result.status === "active" ? "tmNote" : "is-error"}`}>
+      <div className={`ui-banner ${result.status === "is-active" ? "tmNote" : "is-error"}`}>
         {result.status === "active" ? <>{tr("agentHr.da_tuyen")} <b>{f.name}</b> — agent <code>{result.runtime_agent_id}</code> {tr("agentHr.da_co_tren_gateway")}</>
           : <>{tr("agentHr.da_luu_ho_so")} <b>{f.name}</b> {tr("agentHr.nhung_gateway_chua_tao_agent")}{result.status}).</>}</div>
       <ul className="hrFiles">{result.files.map((x: any) => <li key={x.name}><span className={x.written ? "is-ok" : "is-warn"}>{x.written ? "✓" : "…"}</span>
@@ -173,10 +173,10 @@ export function AgentHRPanel({memberId}: {memberId: number}) {
   if (seat === false) return null;
   const canEdit = !!me?.capabilities?.invite && seat.lifecycle !== "retired";
   const isAdmin = ["admin", "owner"].includes(me?.role);
-  return <div className="hrPanel" data-testid="hr-panel">
+  return <div className="ui-panel ui-panel-body" data-testid="hr-panel">
     {error && <div className="ui-banner is-error" data-testid="hr-error">{error}</div>}
     {note && <div className="ui-banner tmNote" data-testid="hr-note">{note}</div>}
-    <div className="v9Grid2">
+    <div className="ui-grid is-2">
       <HrForm seat={seat} opt={opt} canEdit={canEdit} busy={busy} act={act}/>
       <Lifecycle seat={seat} all={all} canEdit={!!me?.capabilities?.invite} busy={busy} act={act}/>
     </div>
@@ -212,14 +212,14 @@ function HrForm({seat, opt, canEdit, busy, act}: any) {
       <> <button className="ui-btn is-ghost is-sm" onClick={() => act(() => apiAgentsHR.update(seat.agent_id, {regenerate_files:
         Object.entries(r.files).filter(([, v]: any) => v.reason === "customized").map(([k]) => k)}), report)} data-testid="hr-regen">{tr("agentHr.sinh_lai_tu_ho_so")}</button></>}
   </span>;
-  return <section className="v8Card" data-testid="hr-form">
-    <div className="v8CardHead"><div><b>{tr("agentHr.ho_so_nhan_su")}</b><span>{tr("agentHr.luu_ghi_database_gateway_agents")}</span></div></div>
-    <div className="v9Form">
-      <div className="v9FormRow">
+  return <section className="ui-panel ui-panel-body" data-testid="hr-form">
+    <div className="lab-cardhead"><div><b>{tr("agentHr.ho_so_nhan_su")}</b><span>{tr("agentHr.luu_ghi_database_gateway_agents")}</span></div></div>
+    <div className="ui-form">
+      <div className="ui-form-row">
         <label>{tr("agentHr.ten")}<input value={f.name || ""} disabled={!canEdit} onChange={e => set("name", e.target.value)} data-testid="hr-edit-name"/></label>
         <label>{tr("agentHr.chuc_danh")}<input value={f.role || ""} disabled={!canEdit} onChange={e => set("role", e.target.value)} data-testid="hr-edit-role"/></label>
       </div>
-      <div className="v9FormRow">
+      <div className="ui-form-row">
         <label>{tr("agentHr.phong_ban")}<select value={f.department_id} disabled={!canEdit || !opt} onChange={e => set("department_id", e.target.value)}>
           <option value="">{tr("agentHr.ban_dieu_hanh")}</option>
           {depts.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -229,7 +229,7 @@ function HrForm({seat, opt, canEdit, busy, act}: any) {
           {managers.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
           {!opt && seat.manager_id && <option value={seat.manager_id}>{seat.manager}</option>}</select></label>
       </div>
-      <div className="v9FormRow">
+      <div className="ui-form-row">
         <label>Model<select value={f.model} disabled={!canEdit || !opt} onChange={e => set("model", e.target.value)} data-testid="hr-edit-model">
           {!(opt?.models || []).some((m: any) => m.id === f.model) && <option value={f.model}>{f.model || "—"}</option>}
           {(opt?.models || []).map((m: any) => <option key={m.id} value={m.id}>{m.id}</option>)}</select></label>
@@ -260,8 +260,8 @@ function Lifecycle({seat, all, canEdit, busy, act}: any) {
     return <span>{r.action === "pause" ? tr("agentHr.da_tam_dung_agent_khong", {p0: r.aborted?.tasks?.length ? `, dừng ${r.aborted.tasks.length} việc đang chạy` : ""})
       : tr("agentHr.da_cho_lam_tiep", {p0: LIFECYCLE_VI[r.lifecycle] || r.lifecycle})}{r.warnings?.map((w: string, i: number) => <span key={i} className="hrWarn"> {w}</span>)}</span>;
   };
-  return <section className="v8Card" data-testid="hr-lifecycle-card">
-    <div className="v8CardHead"><div><b>{tr("agentHr.vong_doi")}</b><span>{tr("agentHr.tam_dung_chan_luot_moi")}</span></div><Pill lc={lc}/></div>
+  return <section className="ui-panel ui-panel-body" data-testid="hr-lifecycle-card">
+    <div className="lab-cardhead"><div><b>{tr("agentHr.vong_doi")}</b><span>{tr("agentHr.tam_dung_chan_luot_moi")}</span></div><Pill lc={lc}/></div>
     <dl className="hrFacts"><dt>Agent</dt><dd><code>{seat.runtime_agent_id}</code></dd>
       <dt>{tr("agentHr.tren_gateway")}</dt><dd>{seat.on_gateway === null ? tr("agentHr.khong_doc_duoc") : seat.on_gateway ? tr("agentHr.co_phien", {p0: seat.sessions, p1: seat.running ? " · đang chạy" : ""}) : tr("agentHr.khong_co")}</dd></dl>
     {canEdit && lc !== "retired" && <div className="tmRow">
@@ -271,7 +271,7 @@ function Lifecycle({seat, all, canEdit, busy, act}: any) {
           onClick={() => act(() => apiAgentsHR.lifecycle(seat.agent_id, {action: "pause"}), said)}>{tr("agentHr.tam_dung")}</button>}
       <button className="ui-btn is-sm is-danger" disabled={busy} onClick={() => setRetire(!retire)} data-testid="hr-retire-open">{tr("agentHr.cho_nghi_viec")}</button>
     </div>}
-    {retire && lc !== "retired" && <div className="hrConfirm v9Form" data-testid="hr-retire-confirm">
+    {retire && lc !== "retired" && <div className="hrConfirm ui-form" data-testid="hr-retire-confirm">
       <b>Cho {seat.name} {tr("agentHr.nghi_viec")}</b>
       <small>{tr("agentHr.dung_viec_dang_chay_xoa")}</small>
       <label>{tr("agentHr.viec_dang_mo_giao_cho")}<select value={to} onChange={e => setTo(e.target.value)} data-testid="hr-retire-to">
@@ -299,8 +299,8 @@ function Drift({seat, canEdit, busy, act, tick}: any) {
     });
   const drifted = (d?.files || []).filter((f: any) => f.counts_as_drift);
   const fieldsBad = (d?.fields || []).filter((f: any) => !f.match);
-  return <section className="v8Card" data-testid="hr-drift">
-    <div className="v8CardHead"><div><b>{tr("agentHr.dong_bo_voi_gateway")}</b>
+  return <section className="ui-panel ui-panel-body" data-testid="hr-drift">
+    <div className="lab-cardhead"><div><b>{tr("agentHr.dong_bo_voi_gateway")}</b>
       <span>{!d ? tr("agentHr.dang_kiem") : d.in_sync ? tr("agentHr.khop_ban_clawcompany_va_gateway") : tr("agentHr.lech_muc", {p0: d.drift_count})}</span></div>
       <div className="tmRow"><button className="ui-btn is-ghost is-sm" onClick={load} disabled={busy}>{tr("agentHr.kiem_tra_lai")}</button>
         {canEdit && d && !d.in_sync && d.roster_match && <>
@@ -308,7 +308,7 @@ function Drift({seat, canEdit, busy, act, tick}: any) {
           <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => sync("pull")} data-testid="hr-pull-all">{tr("agentHr.nhan_ban_gateway")}</button></>}</div></div>
     {err && <div className="ui-banner is-error">{err}</div>}
     {d?.warnings?.map((w: string, i: number) => <small key={i} className="tmGuide">{w}</small>)}
-    {d && <table className="tmTable"><tbody>
+    {d && <table className="ui-table"><tbody>
       {(d.fields || []).map((f: any) => <tr key={f.field} className={f.match ? "" : "is-err"}>
         <td><b>{f.label}</b></td><td><small>ClawCompany: {f.clawcompany || "—"}<br/>Gateway: {f.gateway || "—"}</small></td>
         <td>{f.match ? tr("agentHr.khop") : <span className="is-warn">{tr("agentHr.lech")}</span>}</td>
@@ -344,12 +344,12 @@ function Tools({seat, isAdmin, busy, act, tick}: any) {
   const [t, setT] = useState<any>(null), [err, setErr] = useState("");
   useEffect(() => { apiAgentsHR.tools(seat.agent_id).then(setT).catch(e => setErr(errorText(e))); }, [seat.agent_id, tick]);
   const src = (s: string) => s === "member" ? tr("agentHr.rieng_ghe_nay") : s.startsWith("tier") ? tr("agentHr.theo_bac") : s.startsWith("default") ? tr("agentHr.mac_dinh_2") : s;
-  return <section className="v8Card" data-testid="hr-tools">
-    <div className="v8CardHead"><div><b>{tr("agentHr.quyen_dung_tool_cong_ty")}</b>
+  return <section className="ui-panel ui-panel-body" data-testid="hr-tools">
+    <div className="lab-cardhead"><div><b>{tr("agentHr.quyen_dung_tool_cong_ty")}</b>
       <span>{t ? tr("agentHr.bac_ghe_dat_rieng_cho", {p0: t.tier_label}) : tr("agentHr.dang_tai")}</span></div>
-      <Link className="v8Ghost" href="/app/agent-tools">{tr("agentHr.ma_tran_theo_bac")}</Link></div>
+      <Link className="ui-btn" href="/app/agent-tools">{tr("agentHr.ma_tran_theo_bac")}</Link></div>
     {err && <div className="ui-banner is-error">{err}</div>}
-    {t && <div className="hrScroll"><table className="tmTable"><tbody>{t.tools.map((x: any) => <tr key={x.name}>
+    {t && <div className="hrScroll"><table className="ui-table"><tbody>{t.tools.map((x: any) => <tr key={x.name}>
       <td><b>{x.name}</b><br/><small>{x.description}</small></td>
       <td><small>{x.group}{x.writes ? " · ghi" : ""}</small></td>
       <td>{isAdmin && seat.lifecycle !== "retired" ? <select value={x.source === "member" ? x.level : "inherit"} disabled={busy} data-testid={`hr-tool-${x.name}`}

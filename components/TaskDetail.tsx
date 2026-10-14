@@ -6,6 +6,7 @@ import {Icon, IconName} from "./Icon";
 import {TaskLinksPanel, TaskRunsPanel, TaskWakeupsPanel} from "./TaskGraphPanels";
 import {TaskPolicyPanel} from "./TaskPolicyPanel";
 import {t, lazy, intlLocale} from "../lib/i18n";
+import {ErrorBanner} from "./ui/EmptyState";
 
 /* WP-4.3 UI — Chi tiết một công việc: sổ ghi, bàn giao, và gói ngữ cảnh.
 
@@ -89,7 +90,7 @@ export function TaskDetail({taskId}: {taskId: number}) {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [taskId]);
 
-  if (loading) return <div className="v8Empty">{t("task.dang_tai_cong_viec")}</div>;
+  if (loading) return <div className="ui-empty-line">{t("task.dang_tai_cong_viec")}</div>;
 
   const digest = journal?.digest || {};
   const entries: Row[] = journal?.entries || [];
@@ -97,8 +98,8 @@ export function TaskDetail({taskId}: {taskId: number}) {
 
   return <div className="tdPage">
     {/* ---------------- công việc này là gì, của ai ---------------- */}
-    <div className="panel">
-      <div className="panelHead">
+    <div className="ui-panel">
+      <div className="ui-panel-head">
         <div>
           <b>{task?.title || t("task.cong_viec_2", {p0: taskId})}</b>
           <small style={{display: "block"}}>
@@ -114,31 +115,31 @@ export function TaskDetail({taskId}: {taskId: number}) {
         {task.description}
       </p>}
 
-      <section className="v14Metrics"
+      <section className="lab-stats"
                style={{gridTemplateColumns: "repeat(auto-fit,minmax(168px,1fr))"}}>
-        <div className="metric">
-          <div className="metricIcon"><Icon name="doc" size={16}/></div>
+        <div className="lab-metric">
+          <div className="lab-icon"><Icon name="doc" size={16}/></div>
           <label>{t("task.muc_trong_so_ghi")}</label><strong>{digest.entries ?? 0}</strong>
         </div>
-        <div className="metric">
-          <div className="metricIcon"><Icon name="users" size={16}/></div>
+        <div className="lab-metric">
+          <div className="lab-icon"><Icon name="users" size={16}/></div>
           <label>{t("task.da_qua_tay")}</label>
           <strong>{(digest.hands || []).length || 0}</strong>
-          <small style={{color: "var(--muted)", fontSize: 11}}>
+          <small style={{color: "var(--text-muted)", fontSize: 11}}>
             {(digest.hands || []).join(" → ") || t("task.chua_ai")}
           </small>
         </div>
-        <div className="metric">
-          <div className="metricIcon"><Icon name="chart" size={16}/></div>
+        <div className="lab-metric">
+          <div className="lab-icon"><Icon name="chart" size={16}/></div>
           <label>{t("task.ti_le_dat")}</label>
           <strong>{digest.success_rate == null ? t("task.chua_do_duoc")
             : `${digest.success_rate}%`}</strong>
-          <small style={{color: "var(--muted)", fontSize: 11}}>
+          <small style={{color: "var(--text-muted)", fontSize: 11}}>
             {digest.measurable_outcomes ?? 0}/{digest.entries ?? 0} {t("task.muc_do_duoc")}
           </small>
         </div>
-        <div className="metric">
-          <div className="metricIcon"><Icon name="pulse" size={16}/></div>
+        <div className="lab-metric">
+          <div className="lab-icon"><Icon name="pulse" size={16}/></div>
           <label>{t("task.phien_runtime")}</label>
           <strong style={{fontSize: 13, wordBreak: "break-all"}}>
             {task?.runtime_session_key ? task.runtime_session_key.split(":").slice(-1)[0] : "—"}
@@ -147,11 +148,11 @@ export function TaskDetail({taskId}: {taskId: number}) {
       </section>
 
       {digest.success_rate == null && (digest.entries ?? 0) > 0 &&
-        <small style={{display: "block", marginTop: 10, color: "var(--muted)"}}>
+        <small style={{display: "block", marginTop: 10, color: "var(--text-muted)"}}>
           {t("task.chua_do_duoc_khac_voi")}
         </small>}
 
-      {!!failed.length && <div className="v8Error" style={{marginTop: 12}}>
+      {!!failed.length && <div className="ui-banner is-error" style={{marginTop: 12}}>
         {t("task.khong_tai_duoc")} {failed.join(", ")}{t("task.cac_phan_con_lai_van")}
       </div>}
     </div>
@@ -198,8 +199,8 @@ function JournalPanel({entries, kinds, taskId, onDone}: {entries: Row[]; kinds: 
   const shown = filter ? entries.filter(e => e.kind === filter) : entries;
   const present = kinds.filter(k => entries.some(e => e.kind === k));
 
-  return <div className="panel">
-    <div className="panelHead">
+  return <div className="ui-panel">
+    <div className="ui-panel-head">
       <div><b>{t("task.so_ghi_cong_viec")}</b></div>
       <small>task_journal_entries</small>
     </div>
@@ -208,21 +209,21 @@ function JournalPanel({entries, kinds, taskId, onDone}: {entries: Row[]; kinds: 
       <input data-testid="journal-input" value={note} onChange={e => setNote(e.target.value)}
              placeholder={t("task.ghi_mot_dong_go_ten")}
              onKeyDown={e => { if (e.key === "Enter") send(); }}
-             style={{flex: 1, padding: "7px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13}}/>
-      <button className="primary" data-testid="journal-send" disabled={sending || !note.trim()} onClick={send}>
+             style={{flex: 1, padding: "7px 10px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13}}/>
+      <button className="ui-btn is-primary" data-testid="journal-send" disabled={sending || !note.trim()} onClick={send}>
         {sending ? t("task.dang_ghi") : "Ghi"}
       </button>
     </div>
-    {sent && <small data-testid="journal-sent" style={{display: "block", marginBottom: 8, color: "var(--muted)"}}>{sent}</small>}
+    {sent && <small data-testid="journal-sent" style={{display: "block", marginBottom: 8, color: "var(--text-muted)"}}>{sent}</small>}
 
-    {!!present.length && <div className="pillTabs">
-      <button className={filter === "" ? "active" : ""} onClick={() => setFilter("")}>
+    {!!present.length && <div className="ui-seg">
+      <button className={filter === "" ? "is-active" : ""} onClick={() => setFilter("")}>
         {t("task.tat_ca")}{entries.length})
       </button>
       {present.map(kind => {
         const style = KIND_STYLE[kind] || KIND_STYLE.note;
         const count = entries.filter(e => e.kind === kind).length;
-        return <button key={kind} className={filter === kind ? "active" : ""}
+        return <button key={kind} className={filter === kind ? "is-active" : ""}
                        onClick={() => setFilter(kind)}>
           {style.label} ({count})
         </button>;
@@ -230,18 +231,18 @@ function JournalPanel({entries, kinds, taskId, onDone}: {entries: Row[]; kinds: 
     </div>}
 
     {!shown.length
-      ? <div className="v8Empty">
+      ? <div className="ui-empty-line">
           {t("task.so_ghi_trong_viec_nay")}
         </div>
-      : <div className="timeline">
+      : <div className="lab-timeline">
           {shown.map(entry => {
             const style = KIND_STYLE[entry.kind] || KIND_STYLE.note;
             const outcome = OUTCOME_LABEL[entry.outcome];
             const expanded = open === entry.seq;
-            return <div key={entry.seq} className="timeRow">
+            return <div key={entry.seq} className="lab-timerow">
               <span>{stamp(entry.created_at)}</span>
               <div>
-                <i><span className={`iconTile ${style.tint}`}
+                <i><span className={`lab-icon ${style.tint}`}
                          style={{width: 22, height: 22, borderRadius: 7}}>
                   <Icon name={style.icon} size={12}/>
                 </span></i>
@@ -249,7 +250,7 @@ function JournalPanel({entries, kinds, taskId, onDone}: {entries: Row[]; kinds: 
                              flexWrap: "wrap", marginLeft: 18}}>
                   <b style={{display: "inline"}}>{entry.actor_name}</b>
                   <small>{style.label}</small>
-                  {outcome && <span className={`prio ${outcome.cls}`}>{outcome.text}</span>}
+                  {outcome && <span className={`ui-pill ${outcome.cls}`}>{outcome.text}</span>}
                   {!entry.outcome && <small style={{opacity: .65}}>{t("task.chua_do_ket_qua")}</small>}
                 </div>
                 <div style={{marginLeft: 18, marginTop: 2, fontSize: 13}}>
@@ -263,7 +264,7 @@ function JournalPanel({entries, kinds, taskId, onDone}: {entries: Row[]; kinds: 
                   </button>
                   {expanded && <pre style={{
                     whiteSpace: "pre-wrap", fontSize: 12, marginTop: 6,
-                    background: "var(--cream)", padding: 10, borderRadius: 8,
+                    background: "var(--surface-2)", padding: 10, borderRadius: 8,
                     fontFamily: "ui-monospace, monospace",
                   }}>{entry.detail}</pre>}
                 </div>}
@@ -272,7 +273,7 @@ function JournalPanel({entries, kinds, taskId, onDone}: {entries: Row[]; kinds: 
           })}
         </div>}
 
-    <small style={{display: "block", marginTop: 12, color: "var(--muted)"}}>
+    <small style={{display: "block", marginTop: 12, color: "var(--text-muted)"}}>
       {t("task.chi_dong_tom_tat_di")}
     </small>
   </div>;
@@ -282,7 +283,7 @@ function JournalPanel({entries, kinds, taskId, onDone}: {entries: Row[]; kinds: 
 
 function ContextPackPanel({pack}: {pack: Row | null}) {
   const [showText, setShowText] = useState(false);
-  if (!pack) return <div className="panel"><div className="v8Empty">
+  if (!pack) return <div className="ui-panel"><div className="ui-empty-line">
     {t("task.khong_doc_duoc_goi_ngu")}
   </div></div>;
 
@@ -290,15 +291,15 @@ function ContextPackPanel({pack}: {pack: Row | null}) {
   const total = Math.max(1, pack.chars || 1);
   const never: number[] = pack.never_trimmed || [];
 
-  return <div className="panel">
-    <div className="panelHead">
+  return <div className="ui-panel">
+    <div className="ui-panel-head">
       <div><b>{t("task.goi_ngu_canh_agent_se")}</b></div>
       <small>{pack.chars}/{pack.budget_chars} {t("task.ky_tu")}</small>
     </div>
 
     {/* Thanh ngân sách: mỗi đoạn rộng theo số ký tự THẬT của khối đó. */}
     <div style={{display: "flex", height: 10, borderRadius: 999, overflow: "hidden",
-                 border: "1px solid var(--line)", marginBottom: 12}}>
+                 border: "1px solid var(--border)", marginBottom: 12}}>
       {blocks.filter(b => b.chars > 0).map(b =>
         <div key={b.index} title={t("task.ky_tu_2", {p0: b.index, p1: b.title, p2: b.chars})}
              style={{width: `${(b.chars / total) * 100}%`,
@@ -318,28 +319,28 @@ function ContextPackPanel({pack}: {pack: Row | null}) {
         }}>
           <span style={{width: 10, height: 10, borderRadius: 3,
                         background: b.chars ? BLOCK_TINT[(b.index - 1) % BLOCK_TINT.length]
-                                            : "var(--line)"}}/>
-          <b style={{fontWeight: 600, color: "var(--muted)"}}>{b.index}.</b>
+                                            : "var(--border)"}}/>
+          <b style={{fontWeight: 600, color: "var(--text-muted)"}}>{b.index}.</b>
           <span style={{overflow: "hidden", textOverflow: "ellipsis",
                         whiteSpace: "nowrap"}}>{b.title}</span>
           <span style={{fontSize: 11, textAlign: "right", whiteSpace: "nowrap",
-                        color: locked ? "var(--accent)" : "var(--muted)"}}>
+                        color: locked ? "var(--accent)" : "var(--text-muted)"}}>
             {b.trimmed ? t("task.da_luoc")
               : locked ? t("task.khong_cat")
               : b.empty ? t("task.trong") : ""}
           </span>
-          <span style={{color: "var(--muted)", textAlign: "right",
+          <span style={{color: "var(--text-muted)", textAlign: "right",
                         fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap"}}>
             {b.chars}/{b.budget}
           </span>
         </div>;
       })}
     </div>
-    <small style={{display: "block", marginTop: 8, color: "var(--muted)"}}>
+    <small style={{display: "block", marginTop: 8, color: "var(--text-muted)"}}>
       {t("task.khong_cat_khoi_luon_duoc")}
     </small>
 
-    {!!(pack.trimmed || []).length && <div className="v8Error" style={{marginTop: 10}}>
+    {!!(pack.trimmed || []).length && <div className="ui-banner is-error" style={{marginTop: 10}}>
       {t("task.da_luoc_de_vua_ngan")} {(pack.trimmed || []).join("; ")}{t("task.thu_tu_cat_la_khoi")}
     </div>}
 
@@ -349,12 +350,12 @@ function ContextPackPanel({pack}: {pack: Row | null}) {
       </button>
       {showText && <pre style={{
         whiteSpace: "pre-wrap", fontSize: 12, marginTop: 10, maxHeight: 420,
-        overflow: "auto", background: "var(--cream)", padding: 12, borderRadius: 10,
+        overflow: "auto", background: "var(--surface-2)", padding: 12, borderRadius: 10,
         fontFamily: "ui-monospace, monospace",
       }}>{pack.text}</pre>}
     </div>
 
-    <small style={{display: "block", marginTop: 10, color: "var(--muted)"}}>
+    <small style={{display: "block", marginTop: 10, color: "var(--text-muted)"}}>
       {t("task.day_la_nguyen_van_prompt")}
     </small>
   </div>;
@@ -392,8 +393,8 @@ function HandoffPanel({taskId, members, ownerId, onDone}:
     } finally { setBusy(false); }
   }
 
-  return <div className="panel">
-    <div className="panelHead">
+  return <div className="ui-panel">
+    <div className="ui-panel-head">
       <div><b>{t("task.ban_giao_cho_nguoi_khac")}</b></div>
       <small>artifact_handoffs</small>
     </div>
@@ -401,7 +402,7 @@ function HandoffPanel({taskId, members, ownerId, onDone}:
     <label style={{fontSize: 12.5, fontWeight: 600}}>Giao cho ai</label>
     <select value={to} onChange={e => setTo(e.target.value)}
             style={{width: "100%", padding: 9, borderRadius: 9, marginTop: 4,
-                    border: "1px solid var(--line)"}}>
+                    border: "1px solid var(--border)"}}>
       <option value="">{t("task.chon_nguoi_nhan")}</option>
       {candidates.map(m =>
         <option key={m.id} value={m.id}>
@@ -410,7 +411,7 @@ function HandoffPanel({taskId, members, ownerId, onDone}:
         </option>)}
     </select>
     {target && target.member_type !== "agent" &&
-      <small style={{display: "block", marginTop: 6, color: "var(--muted)"}}>
+      <small style={{display: "block", marginTop: 6, color: "var(--text-muted)"}}>
         {target.name} {t("task.la_nhan_su_nguoi_ban")}
       </small>}
 
@@ -419,7 +420,7 @@ function HandoffPanel({taskId, members, ownerId, onDone}:
     </label>
     <select value={purpose} onChange={e => setPurpose(e.target.value)}
             style={{width: "100%", padding: 9, borderRadius: 9, marginTop: 4,
-                    border: "1px solid var(--line)"}}>
+                    border: "1px solid var(--border)"}}>
       <option value="continue_work">{t("task.lam_tiep")}</option>
       <option value="review">{t("task.soat_lai")}</option>
       <option value="approve">{t("task.phe_duyet")}</option>
@@ -432,8 +433,8 @@ function HandoffPanel({taskId, members, ownerId, onDone}:
     <textarea value={instructions} onChange={e => setInstructions(e.target.value)}
               rows={6} placeholder={t("task.viec_gi_can_lam_tiep")}
               style={{width: "100%", padding: 10, borderRadius: 9, marginTop: 4,
-                      border: "1px solid var(--line)", fontSize: 13}}/>
-    <small style={{display: "block", marginTop: 4, color: "var(--muted)"}}>
+                      border: "1px solid var(--border)", fontSize: 13}}/>
+    <small style={{display: "block", marginTop: 4, color: "var(--text-muted)"}}>
       {t("task.noi_dung_nay_vao_khoi")}
     </small>
 
@@ -443,19 +444,19 @@ function HandoffPanel({taskId, members, ownerId, onDone}:
              onChange={e => setDispatch(e.target.checked)}/>
       <span>
         {t("task.giao_viec_luon_cho_nguoi")}
-        <small style={{display: "block", color: "var(--muted)"}}>
+        <small style={{display: "block", color: "var(--text-muted)"}}>
           {t("task.bo_chon_thi_chi_ghi")}
         </small>
       </span>
     </label>
 
-    <button className="primary" onClick={submit}
+    <button className="ui-btn is-primary" onClick={submit}
             disabled={busy || !to}
             style={{marginTop: 14, width: "100%"}}>
       {busy ? t("task.dang_ban_giao") : t("task.ban_giao")}
     </button>
 
-    {error && <div className="v8Error" style={{marginTop: 10}}>{error}</div>}
+    {error && <ErrorBanner error={error}/>}
 
     {result && <HandoffResult result={result}/>}
   </div>;
@@ -466,7 +467,7 @@ function HandoffResult({result}: {result: Row}) {
   const ok = d.dispatched;
   // `.v8Empty` căn giữa (đúng cho trạng thái trống, sai cho một danh sách kết
   // quả) — thấy rõ trong _reports/ui/task-handoff-result.png. Ghi đè tại chỗ.
-  return <div className={ok ? "v8Empty" : "v8Error"}
+  return <div className={ok ? "ui-empty-line" : "ui-banner is-error"}
               style={{marginTop: 12, textAlign: "left"}}>
     <b>{t("task.da_ban_giao_cho")} {result.to_member_name}.</b>
     <ul style={{margin: "6px 0 0 18px", fontSize: 12.5}}>

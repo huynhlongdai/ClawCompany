@@ -117,26 +117,26 @@ export function SpendPushPanel(){
   const over = rows.filter(row => row.spend_status === "over");
   const warn = rows.filter(row => row.spend_status === "warning");
 
-  return <div className="panel pad">
-    <div className="panelHead">
+  return <div className="ui-panel ui-panel-body">
+    <div className="ui-panel-head">
       <h3>Ngân sách delegation & kênh live (v35)</h3>
       <div style={{display:"flex",gap:8}}>
-        <button className="ghost" onClick={loadSpend} disabled={busy}>Tải lại</button>
-        <button className="ghost" onClick={()=>flag(true)} disabled={busy}>Thử gắn cờ</button>
-        <button className="darkBtn" onClick={()=>flag(false)} disabled={busy}>Gắn cờ thật</button>
+        <button className="ui-btn" onClick={loadSpend} disabled={busy}>Tải lại</button>
+        <button className="ui-btn" onClick={()=>flag(true)} disabled={busy}>Thử gắn cờ</button>
+        <button className="ui-btn is-primary" onClick={()=>flag(false)} disabled={busy}>Gắn cờ thật</button>
       </div>
     </div>
 
     {note && <p style={{fontSize:13,marginTop:0}}>{note}</p>}
 
-    {rollup && <div className="kpi4" style={{marginBottom:12}}>
+    {rollup && <div className="lab-stats" style={{marginBottom:12}}>
       <div><span>Tổng trần</span><b>{money(rollup.budget_total_usd)}</b></div>
       <div><span>Đã tiêu (quy được)</span><b>{money(rollup.spent_total_usd)}</b></div>
       <div><span>Vượt trần</span><b>{rollup.over_count}</b></div>
       <div><span>Không quy được</span><b>{rollup.unattributable}</b></div>
     </div>}
 
-    <table className="dataTable">
+    <table className="ui-table">
       <thead><tr>
         <th>#</th><th>Contract</th><th>Trần</th><th>Đã tiêu</th><th>Tỷ lệ</th><th>Trạng thái</th><th>Usage</th><th></th>
       </tr></thead>
@@ -147,9 +147,9 @@ export function SpendPushPanel(){
           <td>{row.max_cost_usd > 0 ? money(row.max_cost_usd) : "—"}</td>
           <td>{row.attributable ? money(row.spent_usd) : "—"}</td>
           <td>{row.used_ratio === null ? "—" : `${Math.round(row.used_ratio*100)}%`}</td>
-          <td><span className={`tag ${STATUS_TAG[row.spend_status] ?? ""}`}>{row.spend_status}</span></td>
+          <td><span className={`ui-pill ${STATUS_TAG[row.spend_status] ?? ""}`}>{row.spend_status}</span></td>
           <td>{row.usage_rows}</td>
-          <td><button className="ghost" onClick={()=>openDetail(row.delegation_id)}>Chi tiết</button></td>
+          <td><button className="ui-btn" onClick={()=>openDetail(row.delegation_id)}>Chi tiết</button></td>
         </tr>)}
         {!rows.length && <tr><td colSpan={8} style={{opacity:.6}}>Chưa có delegation contract nào đang mở.</td></tr>}
       </tbody>
@@ -160,16 +160,16 @@ export function SpendPushPanel(){
       Vượt trần <b>không chặn</b> công việc đang chạy.
     </p>}
 
-    {detail && <div className="panel pad" style={{marginTop:12}}>
-      <div className="panelHead">
+    {detail && <div className="ui-panel ui-panel-body" style={{marginTop:12}}>
+      <div className="ui-panel-head">
         <h4>Contract #{detail.contract?.delegation_id} · {detail.contract?.title}</h4>
-        <button className="ghost" onClick={()=>setDetail(null)}>Đóng</button>
+        <button className="ui-btn" onClick={()=>setDetail(null)}>Đóng</button>
       </div>
       <p style={{fontSize:12,opacity:.75,marginTop:0}}>
         Cửa sổ quy chi phí: {detail.contract?.window_start} → {detail.contract?.window_end}.
         Tối đa {detail.usage_events_capped_at} dòng usage.
       </p>
-      <table className="dataTable">
+      <table className="ui-table">
         <thead><tr><th>#</th><th>Loại</th><th>SL</th><th>Tiền</th><th>Run</th><th>Lúc</th></tr></thead>
         <tbody>
           {(detail.usage_events ?? []).map((item:any) => <tr key={item.usage_event_id}>
@@ -184,23 +184,23 @@ export function SpendPushPanel(){
       </table>
     </div>}
 
-    <div className="panel pad" style={{marginTop:12}}>
-      <div className="panelHead">
+    <div className="ui-panel ui-panel-body" style={{marginTop:12}}>
+      <div className="ui-panel-head">
         <h4>Kênh live (SSE) · cursor {cursor}</h4>
         <div style={{display:"flex",gap:8}}>
-          <button className="ghost" onClick={startStream} disabled={streaming}>Mở kênh</button>
-          <button className="ghost" onClick={stopStream} disabled={!streaming}>Đóng kênh</button>
+          <button className="ui-btn" onClick={startStream} disabled={streaming}>Mở kênh</button>
+          <button className="ui-btn" onClick={stopStream} disabled={!streaming}>Đóng kênh</button>
         </div>
       </div>
       <p style={{fontSize:12,opacity:.75,marginTop:0}}>
         {streaming ? "Đang mở một kết nối SSE. Trình duyệt không còn poll."
                    : "Kênh đang đóng. Mở lại sẽ nối tiếp từ cursor hiện tại."}
       </p>
-      <table className="dataTable">
+      <table className="ui-table">
         <thead><tr><th>Frame</th><th>Cursor</th><th>Số event</th><th>Lúc</th></tr></thead>
         <tbody>
           {frames.map((item,index) => <tr key={`${item.at}-${index}`}>
-            <td><span className={`tag ${item.kind === "closed" ? "orangeTag" : item.kind === "events" ? "greenTag" : "blueTag"}`}>{item.kind}</span></td>
+            <td><span className={`ui-pill ${item.kind === "closed" ? "is-wait" : item.kind === "events" ? "is-ok" : "is-info"}`}>{item.kind}</span></td>
             <td>{item.cursor}</td><td>{item.count}</td><td>{item.at}</td>
           </tr>)}
           {!frames.length && <tr><td colSpan={4} style={{opacity:.6}}>Chưa có frame nào.</td></tr>}

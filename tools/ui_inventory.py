@@ -62,7 +62,8 @@ def scan(path, legacy):
         used.update(s.split())
     # className={cond?"a":"b"} và cx("a", …)
     for m in re.finditer(r"""className=\{[^}]*\}""", txt):
-        used.update(re.findall(r'"([a-zA-Z][a-zA-Z0-9_-]*)"', m.group(0)))
+        expr = re.sub(r'[!=]==?\s*"[^"]*"|"[^"]*"\s*[!=]==?', " ", m.group(0))  # bỏ toán hạng so sánh
+        used.update(re.findall(r'"([a-zA-Z][a-zA-Z0-9_-]*)"', expr))
     leg = sorted(c for c in used if c in legacy and not c.startswith("ui-"))
     # chữ trong JSX: >text< không chứa { }
     texts = [t.strip() for t in re.findall(r">([^<>{}]+)<", txt) if re.search(r"[A-Za-z]{3,}", t)]

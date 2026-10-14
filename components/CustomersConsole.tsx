@@ -3,6 +3,7 @@ import {useEffect, useState} from "react";
 import {api} from "../lib/api";
 import {Icon} from "./Icon";
 import {intlLocale} from "../lib/i18n";
+import {ErrorBanner} from "./ui/EmptyState";
 
 /* Khách hàng — màn hình có trong mẫu nhưng app chưa có route.
    Dữ liệu thật: GET /api/customers, /api/customers/{id}/agents,
@@ -34,35 +35,35 @@ export function CustomersConsole() {
   const active = rows.filter(r => r.status === "active").length;
 
   return <div>
-    {error && <div className="v8Error" style={{marginBottom: 14}}>{error}</div>}
+    {error && <ErrorBanner error={error}/>}
 
-    <section className="v14Metrics" style={{gridTemplateColumns: "repeat(auto-fit,minmax(178px,1fr))"}}>
-      <div className="metric">
-        <div className="metricIcon"><Icon name="users" size={16}/></div>
+    <section className="lab-stats" style={{gridTemplateColumns: "repeat(auto-fit,minmax(178px,1fr))"}}>
+      <div className="lab-metric">
+        <div className="lab-icon"><Icon name="users" size={16}/></div>
         <label>Khách hàng</label><strong>{rows.length}</strong>
       </div>
-      <div className="metric">
-        <div className="metricIcon"><Icon name="check" size={16}/></div>
+      <div className="lab-metric">
+        <div className="lab-icon"><Icon name="check" size={16}/></div>
         <label>Đang hoạt động</label><strong>{active}</strong>
       </div>
-      <div className="metric">
-        <div className="metricIcon"><Icon name="chart" size={16}/></div>
+      <div className="lab-metric">
+        <div className="lab-icon"><Icon name="chart" size={16}/></div>
         <label>Ghế đã bán</label>
         <strong>{rows.reduce((s, r) => s + (r.seats || 0), 0)}</strong>
       </div>
-      <div className="metric">
-        <div className="metricIcon"><Icon name="doc" size={16}/></div>
+      <div className="lab-metric">
+        <div className="lab-icon"><Icon name="doc" size={16}/></div>
         <label>Giá tháng</label>
         <strong>${rows.reduce((s, r) => s + (r.monthly_price || 0), 0).toLocaleString(intlLocale())}</strong>
       </div>
     </section>
 
-    <section className="panel">
-      <div className="panelHead">
+    <section className="ui-panel">
+      <div className="ui-panel-head">
         <div><b>Danh sách khách hàng</b></div>
         <small>{rows.length} bản ghi · từ /api/customers</small>
       </div>
-      <table className="dataTable">
+      <table className="ui-table">
         <thead><tr>
           <th>Khách hàng</th><th>Đội phụ trách</th><th>Mã</th><th>Ghế</th>
           <th>Giá tháng</th><th>Chi phí AI</th><th>Trạng thái</th>
@@ -70,8 +71,8 @@ export function CustomersConsole() {
         <tbody>
           {rows.map(r => <tr key={r.id}>
             <td>
-              <div className="person">
-                <span className="avatarSm">{(r.name || "?").slice(0, 1)}</span>
+              <div className="lab-person">
+                <span className="ui-ava">{(r.name || "?").slice(0, 1)}</span>
                 <div><b>{r.name}</b><small>{r.portal_enabled ? "có cổng riêng" : "chưa mở cổng"}</small></div>
               </div>
             </td>
@@ -80,9 +81,9 @@ export function CustomersConsole() {
             <td>{r.seats ?? "—"}</td>
             <td>${(r.monthly_price || 0).toLocaleString(intlLocale())}</td>
             <td>{usage[r.id] ? `$${Number(usage[r.id].total_amount ?? usage[r.id].amount ?? 0).toFixed(2)}` : "—"}</td>
-            <td><span className={`tag ${r.status === "active" ? "greenTag" : "orangeTag"}`}>{r.status}</span></td>
+            <td><span className={`ui-pill ${r.status === "is-active" ? "is-ok" : "is-wait"}`}>{r.status}</span></td>
           </tr>)}
-          {!rows.length && <tr><td colSpan={7}><div className="v8Empty">Chưa có khách hàng nào.</div></td></tr>}
+          {!rows.length && <tr><td colSpan={7}><div className="ui-empty-line">Chưa có khách hàng nào.</div></td></tr>}
         </tbody>
       </table>
     </section>

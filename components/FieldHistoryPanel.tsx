@@ -45,12 +45,12 @@ export function FieldHistoryPanel() {
   }
 
   return (
-    <section className="panel">
-      <div className="panelHead">
+    <section className="ui-panel">
+      <div className="ui-panel-head">
         <strong>Lich su gia tri tung truong (v31)</strong>
-        <span className="tag blueTag">field audit</span>
+        <span className="ui-pill is-info">field audit</span>
       </div>
-      <div className="pad">
+      <div className="ui-panel-body">
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
           <select value={entityType} onChange={(e) => setEntityType(e.target.value)}>
             <option value="company">company</option>
@@ -64,23 +64,23 @@ export function FieldHistoryPanel() {
             onChange={(e) => setEntityId(e.target.value)}
             placeholder="ID hang, vi du 12"
           />
-          <button className="darkBtn" onClick={load} disabled={loading}>
+          <button className="ui-btn is-primary" onClick={load} disabled={loading}>
             {loading ? "Dang tai..." : "Xem lich su"}
           </button>
         </div>
 
-        {error ? <p className="tag redTag">{error}</p> : null}
+        {error ? <p className="ui-pill is-risk">{error}</p> : null}
 
         {data ? (
           <>
-            {data.note ? <p className="tag orangeTag">{data.note}</p> : null}
+            {data.note ? <p className="ui-pill is-wait">{data.note}</p> : null}
             {data.field_names.length === 0 ? (
               <p>Chua co thay doi nao duoc ghi lai cho hang nay.</p>
             ) : (
               data.field_names.map((field) => (
                 <div key={field} style={{ marginBottom: 14 }}>
                   <strong>{field}</strong>
-                  <table className="dataTable">
+                  <table className="ui-table">
                     <thead>
                       <tr>
                         <th>Truoc</th>
@@ -104,7 +104,7 @@ export function FieldHistoryPanel() {
               ))
             )}
             {data.writes_without_values > 0 ? (
-              <p className="tag orangeTag">
+              <p className="ui-pill is-wait">
                 {data.writes_without_values} lan ghi truoc v31 khong luu gia tri cu.
               </p>
             ) : null}

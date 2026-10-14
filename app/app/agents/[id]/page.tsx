@@ -1,6 +1,9 @@
+"use client";
 import {PageFrame} from "../../../../components/shell/PageFrame";
 import {Suspense} from "react";
 import {AgentProfile} from "../../../../components/AgentProfile";
+import {Notice} from "../../../../components/ui/EmptyState";
+import {t} from "../../../../lib/i18n";
 
 /* Chi tiết một nhân sự AI.
 
@@ -19,11 +22,10 @@ import {AgentProfile} from "../../../../components/AgentProfile";
 export default function Page({params}: {params: {id: string}}) {
   const memberId = Number(params.id);
   return (
-    <PageFrame title="Hồ sơ nhân sự AI"
-                 subtitle="Danh tính, tính cách, mô tả công việc, năng lực, quyền và hạn mức — ghi trực tiếp vào gateway OpenClaw">
+    <PageFrame title={t("agent.page_title")} subtitle={t("agent.page_sub")}>
       {Number.isFinite(memberId)
         ? <Suspense><AgentProfile memberId={memberId}/></Suspense>
-        : <div className="ui-banner is-error">Mã agent trong đường dẫn không hợp lệ. Mở agent từ Đội ngũ › Agent.</div>}
+        : <Notice tone="error">{t("agent.bad_id")}</Notice>}
     </PageFrame>
   );
 }

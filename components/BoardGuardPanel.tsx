@@ -38,31 +38,31 @@ export function BoardGuardPanel({projects}:{projects:any[]}){
   const restore = history?.restore;
   const truth = history?.truth;
 
-  return <div className="panel">
-    <div className="panelHead pad">
+  return <div className="ui-panel">
+    <div className="ui-panel-head ui-panel-body">
       <b>Ghi có bảo vệ &amp; hoàn tác lưu trữ (v28)</b>
       <span style={{opacity:.6}}>{guardSummary(guards)}</span>
     </div>
-    <div className="pad" style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+    <div className="ui-panel-body" style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
       <select value={projectId??""} onChange={e=>setProjectId(e.target.value?Number(e.target.value):undefined)}>
         <option value="">— chọn dự án —</option>
         {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
       </select>
       <input placeholder="Tên mới của dự án" value={name} onChange={e=>setName(e.target.value)}/>
-      <button className="darkBtn" disabled={busy||!projectId||!name}
+      <button className="ui-btn is-primary" disabled={busy||!projectId||!name}
         onClick={()=>run("Đổi tên có bảo vệ", async ()=>{
           const fresh = await apiV28.history(projectId!);
           return apiV28.guardedProject(projectId!, fresh.truth.revision, {name});
         })}>Ghi có bảo vệ</button>
-      <button className="ghost" disabled={busy||!restore?.is_archived}
+      <button className="ui-btn" disabled={busy||!restore?.is_archived}
         onClick={()=>run("Hoàn tác lưu trữ",()=>apiV28.restore(projectId!))}>Hoàn tác lưu trữ</button>
     </div>
 
-    {truth && <table className="dataTable">
+    {truth && <table className="ui-table">
       <thead><tr><th>Revision hiện tại</th><th>Đang lưu trữ</th><th>Trạng thái cũ</th><th>Nhiệm vụ sẽ mở lại</th><th>Sẽ bỏ qua</th></tr></thead>
       <tbody><tr>
         <td><code>{truth.revision}</code></td>
-        <td>{restore?.is_archived ? <span className="tag orangeTag">có</span> : <span className="tag greenTag">không</span>}</td>
+        <td>{restore?.is_archived ? <span className="ui-pill is-wait">có</span> : <span className="ui-pill is-ok">không</span>}</td>
         <td>{restore?.previous_status}{restore?.previous_status_known ? "" : " (không có trong bản ghi cũ)"}</td>
         <td>{restore?.will_restore_tasks?.length ?? 0}</td>
         <td>{restore?.will_skip_tasks?.length ?? 0}</td>
@@ -70,17 +70,17 @@ export function BoardGuardPanel({projects}:{projects:any[]}){
     </table>}
 
     {restore && restore.is_archived && restore.archive_event_id===null &&
-      <div className="pad" style={{opacity:.75}}>
+      <div className="ui-panel-body" style={{opacity:.75}}>
         Dự án đang ở trạng thái lưu trữ nhưng không có bản ghi lưu trữ nào, nên không
         thể biết đã huỷ những nhiệm vụ nào. Phải mở lại từng nhiệm vụ bằng tay.
       </div>}
 
-    {restore?.will_skip_tasks?.length ? <div className="pad" style={{opacity:.75}}>
+    {restore?.will_skip_tasks?.length ? <div className="ui-panel-body" style={{opacity:.75}}>
       Những nhiệm vụ đã được người khác chuyển trạng thái sau khi lưu trữ sẽ được giữ nguyên.
     </div> : null}
 
-    {msg && <div className="pad" style={{opacity:.8}}>{msg}</div>}
-    {err && <div className="pad" style={{color:"var(--risk)"}}>{err}</div>}
+    {msg && <div className="ui-panel-body" style={{opacity:.8}}>{msg}</div>}
+    {err && <div className="ui-panel-body" style={{color:"var(--risk)"}}>{err}</div>}
   </div>;
 }
 
