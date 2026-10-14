@@ -70,9 +70,9 @@ if not project:
     project = Project(company_id=fashion.id, name="Summer Dress Campaign", owner_member_id=sophia_m.id, status="active", progress=68)
     db.add(project); db.commit(); db.refresh(project)
 
-task = db.query(Task).filter(Task.project_id == project.id, Task.title == "Create 20 TikTok hooks").first()
+task = db.query(Task).filter(Task.project_id == project.id, Task.title == "Viết 20 câu mở đầu TikTok").first()
 if not task:
-    task = Task(project_id=project.id, title="Create 20 TikTok hooks", description="Generate 20 hooks based on current trend research.", assignee_member_id=mia_m.id, status="backlog", priority="high")
+    task = Task(project_id=project.id, title="Viết 20 câu mở đầu TikTok", description="Viết 20 câu mở đầu (hook) dựa trên nghiên cứu xu hướng hiện tại.", assignee_member_id=mia_m.id, status="backlog", priority="high")
     db.add(task); db.commit(); db.refresh(task)
 
 # Knowledge + chunks/vectors

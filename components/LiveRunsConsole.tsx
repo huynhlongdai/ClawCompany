@@ -121,7 +121,7 @@ export function LiveRunsConsole(){
           · TTL {lease.ttl_seconds}s · chủ sở hữu <code>{lease.owner}</code>
         </p>}
         {lease?.single_process_only && <p style={{opacity:.75,marginBottom:0}}>
-          Không kết nối được Redis nên lease chỉ có hiệu lực trong tiến trình này ({lease.redis_error || "không rõ lý do"}).
+          Không kết nối được Redis nên lease chỉ có hiệu lực trong tiến trình này (<code translate="no">{lease.redis_error || "không rõ lý do"}</code>).
           Hãy chạy một worker duy nhất cho tới khi Redis hoạt động, nếu không hai worker có thể cùng theo một phiên.
         </p>}
       </div>
@@ -146,7 +146,7 @@ export function LiveRunsConsole(){
           </span>
         </p>}
         {cluster && !cluster.registry.cluster_wide && <p style={{opacity:.75,marginBottom:0}}>
-          Không có Redis nên bảng dưới chỉ là các phiên của tiến trình này ({cluster.registry.redis_error || "không rõ lý do"}).
+          Không có Redis nên bảng dưới chỉ là các phiên của tiến trình này (<code translate="no">{cluster.registry.redis_error || "không rõ lý do"}</code>).
           Con số phiên đang chạy vì thế có thể thiếu, không phải là toàn bộ hệ thống.
         </p>}
         {orphans.length>0 && <p style={{marginBottom:0}}>
@@ -172,7 +172,7 @@ export function LiveRunsConsole(){
             <tr><td>Kết nối</td><td><code>{fabric.pool?.url}</code>{" "}
               <span className={"ui-pill "+(fabric.pool?.available?"is-ok":"is-risk")}>{fabric.pool?.backend}</span></td></tr>
             <tr><td>Lỗi gần nhất</td><td>{fabric.pool?.error
-              ? <><span className="ui-pill is-risk">{fabric.pool.error}</span>{" "}thử lại sau {fabric.pool.retry_in}s</>
+              ? <><code className="ui-pill is-risk" translate="no">{fabric.pool.error}</code>{" "}thử lại sau {fabric.pool.retry_in}s</>
               : <span style={{opacity:.5}}>—</span>}</td></tr>
             <tr><td>Kết nối lại</td><td>{fabric.pool?.reconnects} lần / {fabric.pool?.failures} lần hỏng</td></tr>
             <tr><td>Chỉ mục lease</td><td><code>{fabric.lease?.index_key}</code>{" "}
@@ -229,7 +229,7 @@ export function LiveRunsConsole(){
               <td>{h.backfill?.supported
                     ? <>{(h.backfill.recorded||[]).length} yêu cầu</>
                     : <span className="ui-pill is-wait">không hỗ trợ</span>}</td>
-              <td>{h.error ? <span className="ui-pill is-risk">{h.error}</span> : <span style={{opacity:.5}}>—</span>}</td>
+              <td>{h.error ? <code className="ui-pill is-risk" translate="no">{h.error}</code> : <span style={{opacity:.5}}>—</span>}</td>
             </tr>)}
           </tbody>
         </table>}
@@ -292,7 +292,7 @@ export function LiveRunsConsole(){
             {streams.map(s=><tr key={s.session_key}>
               <td><code>{s.session_key}</code></td>
               <td>{s.task_id ?? "—"}</td>
-              <td><span className={"ui-pill "+(statusTag[s.status]||"is-info")}>{s.status}</span>{s.error && <div style={{color:"var(--risk)"}}>{s.error}</div>}</td>
+              <td><span className={"ui-pill "+(statusTag[s.status]||"is-info")}>{s.status}</span>{s.error && <div style={{color:"var(--risk)"}} translate="no">{s.error}</div>}</td>
               <td>{s.lease_backend||"—"}</td>
               <td>{s.events}</td>
               <td>{s.approvals}</td>
