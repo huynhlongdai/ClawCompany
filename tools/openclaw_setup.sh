@@ -14,7 +14,11 @@ chmod 600 .env.openclaw
 # không riêng tư. Dùng docker (không cần sudo) để đặt chủ sở hữu.
 mkdir -p secrets
 docker run --rm --user 0 -v "$PWD/secrets:/s" --entrypoint sh "$IMG" -c \
-  'touch /s/provider_key; chown 1000:1000 /s /s/provider_key; chmod 700 /s; chmod 600 /s/provider_key'
+  'touch /s/provider_key; [ -s /s/provider_key ] || printf %s PLACEHOLDER_NO_KEY_run_tools_set_provider.sh > /s/provider_key;
+   chown 1000:1000 /s /s/provider_key; chmod 700 /s; chmod 600 /s/provider_key'
+# Gateway từ chối khởi động nếu SecretRef rỗng ("required secrets are unavailable"), nên khi chưa có key
+# thật thì ghi một chuỗi giữ chỗ rõ ràng: gateway lên, lượt agent lỗi xác thực 401 của provider cho tới khi
+# chạy tools/set_provider.sh.
 # openclaw.json ban đầu (chỉ khi volume chưa có) rồi provider mặc định CometAPI.
 if ! tools/oc_compose.sh run --rm --no-deps -T openclaw sh -c 'test -s /home/node/.openclaw/openclaw.json'; then
   tools/oc_compose.sh run --rm --no-deps -T openclaw sh -c \
