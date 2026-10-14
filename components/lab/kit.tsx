@@ -6,6 +6,7 @@ import {EmptyState, ErrorBanner, ErrorState} from "../ui/EmptyState";
 import {SkeletonRows} from "../ui/Skeleton";
 import {useToast} from "../ui/Toast";
 import {viStatus} from "../../lib/labels";
+import {t} from "../../lib/i18n";
 
 /* Bộ dựng trang Phòng thí nghiệm + trang phụ: đầu trang do PageFrame lo; ở đây chỉ có
    đoạn giới thiệu ngắn, dải số, bảng, danh sách, rỗng/lỗi — đều trên primitive components/ui.
@@ -43,7 +44,7 @@ export function useAction() {
 
 /** Khung trạng thái cho cả trang: chưa tải được lần nào → lỗi cả trang (có Thử lại) hoặc khung xương;
     đã có dữ liệu mà lần tải lại lỗi → dải báo lỗi trên đầu, giữ nội dung cũ. */
-export function LabBody({q, children, context = "Tải dữ liệu"}: {
+export function LabBody({q, children, context = t("lab.tai_du_lieu")}: {
   q: {loading: boolean; loaded: boolean; error: unknown; reload: () => void}; children: ReactNode; context?: string;
 }) {
   if (!q.loaded && q.error) return <ErrorState error={q.error} onRetry={q.reload} context={context}/>;
@@ -55,7 +56,7 @@ export function LabBody({q, children, context = "Tải dữ liệu"}: {
 export function Intro({children, flow}: {children: ReactNode; flow?: string[]}) {
   return <div className="lab-intro">
     <p>{children}</p>
-    {flow && <ol className="lab-flow" aria-label="Các bước">{flow.map((s, i) => <li key={i}>{s}</li>)}</ol>}
+    {flow && <ol className="lab-flow" aria-label={t("lab.cac_buoc")}>{flow.map((s, i) => <li key={i}>{s}</li>)}</ol>}
   </div>;
 }
 

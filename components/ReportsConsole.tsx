@@ -2,6 +2,7 @@
 import {useEffect, useState} from "react";
 import {api, apiV36} from "../lib/api";
 import {Icon} from "./Icon";
+import {intlLocale} from "../lib/i18n";
 
 /* Báo cáo — màn hình có trong mẫu nhưng app chưa có route.
    Dữ liệu thật: /api/analytics (chỉ số có trị hiện tại, trị trước và mục
@@ -19,9 +20,9 @@ function fmt(value: number, unit: string) {
   if (unit === "USD") {
     if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
     if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
-    return `$${value.toLocaleString("vi-VN")}`;
+    return `$${value.toLocaleString(intlLocale())}`;
   }
-  return `${value.toLocaleString("vi-VN")}${unit === "%" ? "%" : unit ? ` ${unit}` : ""}`;
+  return `${value.toLocaleString(intlLocale())}${unit === "%" ? "%" : unit ? ` ${unit}` : ""}`;
 }
 
 /* Đường lịch sử chỉ số, vẽ bằng SVG thuần từ metric_samples. Không thêm thư

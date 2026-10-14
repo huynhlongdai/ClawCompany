@@ -2,6 +2,7 @@
 import {useEffect, useState} from "react";
 import {api} from "../lib/api";
 import {Icon} from "./Icon";
+import {intlLocale} from "../lib/i18n";
 
 /* Khách hàng — màn hình có trong mẫu nhưng app chưa có route.
    Dữ liệu thật: GET /api/customers, /api/customers/{id}/agents,
@@ -52,7 +53,7 @@ export function CustomersConsole() {
       <div className="metric">
         <div className="metricIcon"><Icon name="doc" size={16}/></div>
         <label>Giá tháng</label>
-        <strong>${rows.reduce((s, r) => s + (r.monthly_price || 0), 0).toLocaleString("vi-VN")}</strong>
+        <strong>${rows.reduce((s, r) => s + (r.monthly_price || 0), 0).toLocaleString(intlLocale())}</strong>
       </div>
     </section>
 
@@ -77,7 +78,7 @@ export function CustomersConsole() {
             <td>{r.account_team || "—"}</td>
             <td><code>{r.external_ref || "—"}</code></td>
             <td>{r.seats ?? "—"}</td>
-            <td>${(r.monthly_price || 0).toLocaleString("vi-VN")}</td>
+            <td>${(r.monthly_price || 0).toLocaleString(intlLocale())}</td>
             <td>{usage[r.id] ? `$${Number(usage[r.id].total_amount ?? usage[r.id].amount ?? 0).toFixed(2)}` : "—"}</td>
             <td><span className={`tag ${r.status === "active" ? "greenTag" : "orangeTag"}`}>{r.status}</span></td>
           </tr>)}

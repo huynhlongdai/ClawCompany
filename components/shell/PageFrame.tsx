@@ -4,6 +4,7 @@ import {usePathname, useSearchParams} from "next/navigation";
 import {LinkTabs} from "../ui/Tabs";
 import {StatusPill} from "../ui/StatusPill";
 import {activeTab, isLabPath, pageFor, sectionFor} from "../../lib/nav";
+import {t as tr} from "../../lib/i18n";
 
 /* Khung một trang: tiêu đề + mô tả + nút + tab của mục + (tuỳ chọn) cột phải.
 
@@ -33,12 +34,12 @@ export function PageFrame({title = "", subtitle = "", action, actions, rail, chi
   const body = <div className="ui-page-body">{children}</div>;
   return <>
     {!hideHead && <div className="ui-pagehead">
-      <div><h1>{h1}{lab && <> <StatusPill tone="wait">Phòng thí nghiệm</StatusPill></>}</h1>{p && <p>{p}</p>}</div>
+      <div><h1>{h1}{lab && <> <StatusPill tone="wait">{tr("shell.phong_thi_nghiem")}</StatusPill></>}</h1>{p && <p>{p}</p>}</div>
       {(action || actions) && <div className="ui-pagehead-actions">{actions}{action}</div>}
     </div>}
-    {tabs && <div className="ui-page-tabs"><LinkTabs label={`Các phần của ${section!.label}`} active={tab?.href}
+    {tabs && <div className="ui-page-tabs"><LinkTabs label={tr("shell.cac_phan_cua", {p0: section!.label})} active={tab?.href}
       tabs={tabs.map(t => ({href: t.href, label: t.label}))}/></div>}
-    {rail ? <div className={"ui-with-rail" + (wide ? " is-wide" : "")}>{body}<aside aria-label="Thông tin bên">{rail}</aside></div> : body}
+    {rail ? <div className={"ui-with-rail" + (wide ? " is-wide" : "")}>{body}<aside aria-label={tr("shell.thong_tin_ben")}>{rail}</aside></div> : body}
   </>;
 }
 

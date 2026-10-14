@@ -4,6 +4,7 @@ import {BeCang, BeCangMood} from "../BeCang";
 import {explain} from "../../lib/errors";
 import {Button} from "./Button";
 import {Icon} from "../Icon";
+import {t} from "../../lib/i18n";
 
 /* Trạng thái rỗng/lỗi có Bé Càng — 5 trạng thái theo plan §6:
    chào (mới bắt đầu), làm việc (đang chạy), duyệt xong (hết việc), lỗi, ngủ (trống, chưa có gì). */
@@ -26,8 +27,8 @@ export function EmptyState({mood = "ngu", title, children, action, compact, test
 export function ErrorState({error, onRetry, context, compact}: {error: unknown; onRetry?: () => void; context?: string; compact?: boolean}) {
   const x = explain(error, context);
   return <EmptyState mood="loi" title={x.title} compact={compact}
-    action={onRetry && x.retry ? <Button variant="primary" icon="arrow-right" onClick={onRetry}>Thử lại</Button> : undefined}>
-    {x.fix}{x.detail && x.detail !== x.title ? <><br/><small style={{opacity: .85}}>Chi tiết: {x.detail}</small></> : null}
+    action={onRetry && x.retry ? <Button variant="primary" icon="arrow-right" onClick={onRetry}>{t("ui.thu_lai")}</Button> : undefined}>
+    {x.fix}{x.detail && x.detail !== x.title ? <><br/><small style={{opacity: .85}}>{t("ui.chi_tiet")} {x.detail}</small></> : null}
   </EmptyState>;
 }
 
@@ -37,8 +38,8 @@ export function ErrorBanner({error, onRetry, onClose, context, testId}: {error: 
   return <div className="ui-banner is-error" role="alert" data-testid={testId}>
     <Icon name="alert" size={16}/>
     <div><b>{x.title}.</b> {x.detail && x.detail !== x.title ? x.detail : ""}<span className="ui-banner-fix">{x.fix}</span></div>
-    {onRetry && x.retry && <Button size="sm" variant="ghost" onClick={onRetry}>Thử lại</Button>}
-    {onClose && <Button size="sm" variant="ghost" onClick={onClose}>Đóng</Button>}
+    {onRetry && x.retry && <Button size="sm" variant="ghost" onClick={onRetry}>{t("ui.thu_lai")}</Button>}
+    {onClose && <Button size="sm" variant="ghost" onClick={onClose}>{t("ui.dong")}</Button>}
   </div>;
 }
 

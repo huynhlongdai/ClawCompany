@@ -2,6 +2,7 @@
 import {useEffect, useState} from "react";
 import {api, apiV8} from "../lib/api";
 import {Icon} from "./Icon";
+import {intlLocale} from "../lib/i18n";
 
 /* Marketplace — có trong mẫu, app chưa có route.
    Dữ liệu thật: /api/marketplace (marketplace_templates: tên, loại, tác giả,
@@ -60,7 +61,7 @@ export function MarketplaceConsole() {
         <div className="divider"/>
 
         <div className="companyMeta" style={{marginTop: 0}}>
-          <span>{(r.installs || 0).toLocaleString("vi-VN")} lượt cài</span>
+          <span>{(r.installs || 0).toLocaleString(intlLocale())} lượt cài</span>
           <b>{r.price ? `$${r.price}` : "Miễn phí"}</b>
         </div>
 

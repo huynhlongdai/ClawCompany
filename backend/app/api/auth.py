@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models import User, UserOrganizationAccess, APIKey, Member
-from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserOut, APIKeyCreate, APIKeyCreated, OrganizationAccessGrant
+from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserOut, APIKeyCreate, APIKeyCreated, OrganizationAccessGrant, UserPrefsIn
 from app.core.security import hash_password, verify_password, create_access_token, pwd_context
 from app.core.authz import get_principal, Principal, require_role, enforce_org
 
@@ -47,6 +47,16 @@ def me(principal: Principal = Depends(get_principal), db: Session = Depends(get_
     if principal.user_id is None:
         raise HTTPException(400, "API key has no user profile")
     return db.get(User, principal.user_id)
+
+@router.patch("/me", response_model=UserOut)
+def update_me(payload: UserPrefsIn, principal: Principal = Depends(get_principal), db: Session = Depends(get_db)):
+    """i18n: lưu ngôn ngữ giao diện vào hồ sơ để đi theo tài khoản sang máy khác."""
+    if principal.user_id is None:
+        raise HTTPException(400, "API key has no user profile")
+    user = db.get(User, principal.user_id)
+    user.locale = payload.locale
+    db.add(user); db.commit(); db.refresh(user)
+    return user
 
 @router.post("/organization-access")
 def grant_organization_access(payload: OrganizationAccessGrant, principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):

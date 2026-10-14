@@ -1,6 +1,6 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, EmailStr, Field, StringConstraints
+from pydantic import BaseModel, EmailStr, Field, StringConstraints, field_validator
 
 # Email của một identity ĐÃ LƯU: chỉ kiểm hình dạng, không kiểm khả năng gửi
 # thư. Lý do rất cụ thể: seed.py tạo ``admin@clawcompany.local`` và README
@@ -45,6 +45,16 @@ class UserOut(BaseModel):
     display_name: str
     is_active: bool
     is_superuser: bool
+    locale: str = "vi"
+
+    @field_validator("locale", mode="before")
+    @classmethod
+    def _locale(cls, v):
+        return v if v in ("vi", "en") else "vi"
+
+
+class UserPrefsIn(BaseModel):
+    locale: Literal["vi", "en"]
 
 class APIKeyCreate(BaseModel):
     organization_id: int

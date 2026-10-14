@@ -1,5 +1,6 @@
 "use client";
 import type {ReactNode} from "react";
+import {t} from "../lib/i18n";
 
 /* Bé Càng — ốc mượn hồn mang vỏ là toà nhà văn phòng (design/mascot, bản đã chốt).
    Cửa sổ sáng = agent đang làm. Năm trạng thái theo plan-v2 §6; M4b dùng cho trạng
@@ -16,7 +17,7 @@ export function BeCang({mood = "hello", size = 96, title, lit: litCount}: {mood?
   const windows = [[44, 22], [57, 22], [44, 36], [57, 36], [44, 50], [57, 50]]
     .map(([x, y], i) => win(x, y, litCount !== undefined ? i < litCount : lit && (mood === "done" || i % 2 === 0)));
   return <svg className={`bc-svg bc-${mood}`} width={size} height={size} viewBox="0 0 100 100" role="img"
-    aria-label={title || "Bé Càng"}>
+    aria-label={title || t("ui.be_cang")}>
     {/* vỏ: toà nhà */}
     <rect x="38" y="12" width="34" height="56" rx="4" fill="#FFFFFF" stroke="#1A1C2B" strokeWidth="2.5"/>
     <rect x="49" y="6" width="12" height="7" rx="1.5" fill="#1A1C2B"/>

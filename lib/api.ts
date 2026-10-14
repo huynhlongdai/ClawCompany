@@ -1,3 +1,5 @@
+import {getLocale} from "./i18n";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api";
 
 // T mặc định là any: 288 lời gọi request(...) trong file này không truyền type
@@ -42,7 +44,7 @@ async function request<T = any>(path:string, init?:RequestInit):Promise<T>{
   try{
     res = await fetch(`${API_BASE}${path}`, {
       ...init,
-      headers: {"Content-Type":"application/json", ...(token?{Authorization:`Bearer ${token}`}:{ }), ...(init?.headers||{})},
+      headers: {"Content-Type":"application/json", "Accept-Language": getLocale(), ...(token?{Authorization:`Bearer ${token}`}:{ }), ...(init?.headers||{})},
       cache: "no-store",
     });
   }catch{
@@ -58,6 +60,8 @@ export const api = {
   // Người đang đăng nhập — sidebar cần để hiện tên thật thay vì chữ ghim cứng.
   me: () => request<any>(`/auth/me`),
   // Cờ LAB_JOBS_ENABLED của backend: 6 job nền Phòng thí nghiệm có chạy không.
+  // i18n: ngôn ngữ giao diện lưu theo tài khoản.
+  updateMe: (body:{locale:"vi"|"en"}) => request<any>(`/auth/me`, {method:"PATCH", body: JSON.stringify(body)}),
   labStatus: () => request<{lab_jobs_enabled:boolean; env:string; jobs:string[]}>(`/health/lab`),
   dashboard: (organizationId=1) => request(`/dashboard/summary?organization_id=${organizationId}`),
   companies: (organizationId=1) => request(`/companies?organization_id=${organizationId}`),

@@ -5,6 +5,7 @@ import {Icon, IconName} from "../Icon";
 import {apiV17} from "../../lib/api";
 import {LAB_PAGES, MORE_PAGES, SECTIONS} from "../../lib/nav";
 import {useLab, useThemePref} from "../../lib/prefs";
+import {t as tr} from "../../lib/i18n";
 
 /* ⌘K — đi tới MỌI trang: 8 mục + tab của chúng, trang ngoài menu, và (khi bật
    cờ) 27 trang Phòng thí nghiệm; cộng việc, agent, người lấy từ API; cộng vài
@@ -21,12 +22,12 @@ async function loadRemote(): Promise<Hit[]> {
   const [tasks, members] = await Promise.allSettled([apiV17.tasks(), apiV17.people()]);
   const out: Hit[] = [];
   if (tasks.status === "fulfilled") for (const t of tasks.value || []) out.push({
-    id: "t" + t.id, kind: "Việc", label: t.title, icon: "check", href: `/app/work?peek=${t.id}`,
+    id: "t" + t.id, kind: tr("shell.viec"), label: t.title, icon: "check", href: `/app/work?peek=${t.id}`,
     hint: [`#${t.id}`, t.project_name, t.assignee_name].filter(Boolean).join(" · "), search: fold(`${t.id} ${t.title} ${t.project_name || ""} ${t.assignee_name || ""}`),
   });
   if (members.status === "fulfilled") for (const m of (members.value as any[]) || []) {
     const agent = m.member_type === "agent", name = m.name || m.display_name || `#${m.id}`;
-    out.push({id: "m" + m.id, kind: agent ? "Agent" : "Người", label: name, icon: agent ? "sparkle" : "user", hint: m.role || "",
+    out.push({id: "m" + m.id, kind: agent ? "Agent" : tr("shell.nguoi"), label: name, icon: agent ? "sparkle" : "user", hint: m.role || "",
       href: agent ? `/app/agents/${m.id}` : "/app/team?tab=people", search: fold(`${name} ${m.role || ""}`)});
   }
   remoteCache = out;
@@ -39,10 +40,10 @@ const PAGES: Hit[] = [
     ...s.tabs.slice(1).map(t => ({id: "t" + t.href, kind: "Trang", label: `${s.label} › ${t.label}`, icon: s.icon, href: t.href, hint: t.desc || "",
       search: fold(`${s.label} ${t.label} ${s.keywords}`)})),
   ]),
-  ...MORE_PAGES.map(p => ({id: "p" + p.href, kind: "Trang khác", label: p.label, icon: p.icon, href: p.href, hint: `${p.area} · ${p.desc}`,
+  ...MORE_PAGES.map(p => ({id: "p" + p.href, kind: tr("shell.trang_khac"), label: p.label, icon: p.icon, href: p.href, hint: `${p.area} · ${p.desc}`,
     search: fold(`${p.label} ${p.desc} ${p.keywords || ""} ${p.area}`)})),
 ];
-const LAB_HITS: Hit[] = LAB_PAGES.map(p => ({id: "l" + p.href, kind: "Phòng thí nghiệm", lab: true, label: p.label, icon: p.icon, href: p.href,
+const LAB_HITS: Hit[] = LAB_PAGES.map(p => ({id: "l" + p.href, kind: tr("shell.phong_thi_nghiem"), lab: true, label: p.label, icon: p.icon, href: p.href,
   hint: `${p.area} · ${p.desc}`, search: fold(`${p.label} ${p.desc} ${p.area} lab phong thi nghiem`)}));
 
 export function CommandPalette({onClose}: {onClose: () => void}) {
@@ -64,12 +65,12 @@ export function CommandPalette({onClose}: {onClose: () => void}) {
   }, []);
 
   const actions: Hit[] = useMemo(() => [
-    {id: "a-new", kind: "Lệnh", label: "Tạo việc mới", icon: "plus", href: "/app/work?new=1", hint: "Mở form tạo việc", search: fold("tao viec moi task new")},
-    {id: "a-goal", kind: "Lệnh", label: "Giao mục tiêu cho Nina", icon: "target", href: "/app/strategy", hint: "Nina lập kế hoạch, anh duyệt", search: fold("muc tieu nina ke hoach goal")},
-    {id: "a-theme", kind: "Lệnh", label: theme === "dark" ? "Chuyển giao diện sáng" : "Chuyển giao diện tối", icon: "sparkle",
-     run: () => setTheme(theme === "dark" ? "light" : "dark"), hint: "Giao diện", search: fold("giao dien toi sang dark light theme")},
-    {id: "a-lab", kind: "Lệnh", label: lab ? "Tắt Phòng thí nghiệm" : "Bật Phòng thí nghiệm", icon: "flag", run: () => setLab(!lab),
-     hint: `${LAB_PAGES.length} trang ít dùng`, search: fold("phong thi nghiem lab bat tat")},
+    {id: "a-new", kind: tr("shell.lenh"), label: tr("shell.tao_viec_moi"), icon: "plus", href: "/app/work?new=1", hint: tr("shell.mo_form_tao_viec"), search: fold("tao viec moi task new")},
+    {id: "a-goal", kind: tr("shell.lenh"), label: tr("shell.giao_muc_tieu_cho_nina"), icon: "target", href: "/app/strategy", hint: tr("shell.nina_lap_ke_hoach_anh"), search: fold("muc tieu nina ke hoach goal")},
+    {id: "a-theme", kind: tr("shell.lenh"), label: theme === "dark" ? tr("shell.chuyen_giao_dien_sang") : tr("shell.chuyen_giao_dien_toi"), icon: "sparkle",
+     run: () => setTheme(theme === "dark" ? "light" : "dark"), hint: tr("shell.giao_dien"), search: fold("giao dien toi sang dark light theme")},
+    {id: "a-lab", kind: tr("shell.lenh"), label: lab ? tr("shell.tat_phong_thi_nghiem") : tr("shell.bat_phong_thi_nghiem"), icon: "flag", run: () => setLab(!lab),
+     hint: tr("shell.trang_it_dung", {p0: LAB_PAGES.length}), search: fold("phong thi nghiem lab bat tat")},
   ], [lab, theme, setLab, setTheme]);
 
   const hits = useMemo(() => {
@@ -92,17 +93,17 @@ export function CommandPalette({onClose}: {onClose: () => void}) {
   };
 
   return <div className="ui-palette-scrim" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
-    <div className="ui-palette" role="dialog" aria-modal="true" aria-label="Tìm kiếm và đi tới" onKeyDown={onKey} data-testid="palette">
+    <div className="ui-palette" role="dialog" aria-modal="true" aria-label={tr("shell.tim_kiem_va_di_toi")} onKeyDown={onKey} data-testid="palette">
       <div className="ui-palette-input">
         <Icon name="search" size={17}/>
-        <input ref={input} value={q} onChange={e => setQ(e.target.value)} placeholder="Gõ tên trang, việc, agent hoặc lệnh…" aria-label="Tìm kiếm"
+        <input ref={input} value={q} onChange={e => setQ(e.target.value)} placeholder={tr("shell.go_ten_trang_viec_agent")} aria-label={tr("shell.tim_kiem")}
                role="combobox" aria-expanded="true" aria-controls="ui-palette-list" autoComplete="off" spellCheck={false}
                aria-activedescendant={hits[sel] ? "ui-hit-" + sel : undefined}/>
         <kbd>Esc</kbd>
       </div>
       <div className="ui-palette-list" id="ui-palette-list" role="listbox" ref={list}>
-        {!q && <p className="ui-palette-section">Đi tới</p>}
-        {hits.length === 0 && <p className="ui-palette-empty">Không có kết quả cho “{q}”.{!lab && " Trang ít dùng đang ẩn — gõ “phòng thí nghiệm” để bật."}</p>}
+        {!q && <p className="ui-palette-section">{tr("shell.di_toi")}</p>}
+        {hits.length === 0 && <p className="ui-palette-empty">{tr("shell.khong_co_ket_qua_cho")}{q}”.{!lab && tr("shell.trang_it_dung_dang_an")}</p>}
         {hits.map((h, i) =>
           <button key={h.id} id={"ui-hit-" + i} data-i={i} role="option" aria-selected={i === sel}
                   className={"ui-hit" + (i === sel ? " is-sel" : "")} onMouseMove={() => setSel(i)} onClick={() => go(h)}>
@@ -112,8 +113,8 @@ export function CommandPalette({onClose}: {onClose: () => void}) {
             <span className={"ui-hit-kind" + (h.lab ? " is-lab" : "")}>{h.kind}</span>
           </button>)}
       </div>
-      <div className="ui-palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span>
-        <span style={{marginLeft: "auto"}}>{lab ? `Phòng thí nghiệm: bật (${LAB_PAGES.length} trang)` : "Phòng thí nghiệm: tắt"}</span></div>
+      <div className="ui-palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd> {tr("shell.chon")}</span><span><kbd>Enter</kbd> {tr("shell.mo")}</span><span><kbd>Esc</kbd> {tr("shell.dong")}</span>
+        <span style={{marginLeft: "auto"}}>{lab ? tr("shell.phong_thi_nghiem_bat_trang", {p0: LAB_PAGES.length}) : tr("shell.phong_thi_nghiem_tat")}</span></div>
     </div>
   </div>;
 }

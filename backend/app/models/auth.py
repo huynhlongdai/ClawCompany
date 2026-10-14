@@ -12,6 +12,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
     member_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True, unique=True)
+    locale: Mapped[str | None] = mapped_column(String(8), nullable=True)  # i18n: "vi" | "en"; NULL = vi
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 class UserOrganizationAccess(Base):

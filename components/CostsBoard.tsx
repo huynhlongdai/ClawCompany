@@ -7,6 +7,7 @@ import {EmptyState, ErrorState} from "./ui/EmptyState";
 import {SkeletonRows} from "./ui/Skeleton";
 import {useToast} from "./ui/Toast";
 import {apiCosts, errorText} from "../lib/api";
+import {t as tr, intlLocale} from "../lib/i18n";
 
 /* M4b — Chi phí: tổng chi model (usage_events từ gateway) + ngân sách 3 nấc
    theo công ty / phòng ban / nhóm / agent. Nấc: cảnh báo → dừng mềm (lượt chạy
@@ -29,32 +30,32 @@ function Overview() {
   const [d, setD] = useState<any>(null), [err, setErr] = useState<unknown>(null);
   const load = useCallback(() => { setErr(null); apiCosts.overview(30).then(setD).catch(setErr); }, []);
   useEffect(() => { load(); }, [load]);
-  if (err) return <ErrorState error={err} onRetry={load} context="Đọc sổ chi phí"/>;
+  if (err) return <ErrorState error={err} onRetry={load} context={tr("costs.doc_so_chi_phi")}/>;
   if (!d) return <SkeletonRows n={2} h={76}/>;
   const t = d.totals;
   return <div className="cst-overview">
     <div className="cst-tiles">
-      <div><small>Hôm nay</small><b>{money(t.today)}</b></div>
-      <div><small>7 ngày</small><b>{money(t.d7)}</b></div>
-      <div><small>{d.days} ngày</small><b>{money(t.window)}</b></div>
-      <div><small>Lượt gọi model</small><b>{t.model_calls.toLocaleString("vi-VN")}</b><em>{t.tokens.toLocaleString("vi-VN")} token</em></div>
+      <div><small>{tr("costs.hom_nay")}</small><b>{money(t.today)}</b></div>
+      <div><small>{tr("costs.k7_ngay")}</small><b>{money(t.d7)}</b></div>
+      <div><small>{d.days} {tr("costs.ngay")}</small><b>{money(t.window)}</b></div>
+      <div><small>{tr("costs.luot_goi_model")}</small><b>{t.model_calls.toLocaleString(intlLocale())}</b><em>{t.tokens.toLocaleString(intlLocale())} token</em></div>
     </div>
     {d.alerts > 0 && <Link className="cst-alert" href="?tab=budgets"><Icon name="alert" size={16}/>
-      {d.alerts} ngân sách đang ở nấc cảnh báo trở lên — xem tab Ngân sách</Link>}
-    {t.model_calls === 0 && <EmptyState mood="ngu" title="Chưa có chi phí model nào trong kỳ">
-      Chi phí được ghi khi agent chạy việc qua gateway OpenClaw (mỗi câu trả lời của model mang số tiền của nó).
+      {d.alerts} {tr("costs.ngan_sach_dang_o_nac")}</Link>}
+    {t.model_calls === 0 && <EmptyState mood="ngu" title={tr("costs.chua_co_chi_phi_model")}>
+      {tr("costs.chi_phi_duoc_ghi_khi")}
     </EmptyState>}
     {t.model_calls > 0 && <div className="cst-cols">
       <section><h3>Theo agent</h3><Bars rows={d.by_agent} empty="—"/></section>
-      <section><h3>Theo phòng ban</h3><Bars rows={d.by_department} empty="—"/></section>
-      <section><h3>Theo công ty</h3><Bars rows={d.by_company} empty="—"/></section>
+      <section><h3>{tr("costs.theo_phong_ban")}</h3><Bars rows={d.by_department} empty="—"/></section>
+      <section><h3>{tr("costs.theo_cong_ty")}</h3><Bars rows={d.by_company} empty="—"/></section>
     </div>}
-    <p className="cst-source">Nguồn: {d.source}.</p>
+    <p className="cst-source">{tr("costs.nguon")} {d.source}.</p>
   </div>;
 }
 
 function Meter({b}: {b: any}) {
-  return <div className="cst-meter" aria-label={`Đã dùng ${b.pct}% hạn mức`}>
+  return <div className="cst-meter" aria-label={tr("costs.da_dung_han_muc", {p0: b.pct})}>
     <i className={LEVEL_CLS[b.threshold_state] || ""} style={{width: `${Math.min(100, b.pct)}%`}}/>
     {b.levels.filter((l: any) => l.pct < 100).map((l: any) =>
       <span key={l.key} className="cst-mark" style={{left: `${l.pct}%`}} title={`${l.label} ${l.pct}%`}/>)}
@@ -80,40 +81,40 @@ function BudgetCard({b, manage, onChanged}: {b: any; manage: boolean; onChanged:
     <Meter b={b}/>
     <div className="cst-figures">
       <span><b className="ui-num">{money(b.amount_spent)}</b> / {money(b.amount_limit)} ({b.pct}%)</span>
-      {b.amount_reserved > 0 && <span>đang giữ chỗ {money(b.amount_reserved)}</span>}
-      <span>Nấc: cảnh báo {b.warn_pct}%{b.soft_stop_pct ? ` · dừng mềm ${b.soft_stop_pct}%` : ""} · dừng cứng 100%</span>
+      {b.amount_reserved > 0 && <span>{tr("costs.dang_giu_cho")} {money(b.amount_reserved)}</span>}
+      <span>{tr("costs.nac_canh_bao")} {b.warn_pct}%{b.soft_stop_pct ? tr("costs.dung_mem", {p0: b.soft_stop_pct}) : ""} {tr("costs.dung_cung_100")}</span>
     </div>
     {b.pending_approvals > 0 && <Link className="cst-alert" href="/app/inbox?group=approvals">
-      <Icon name="check" size={14}/>{b.pending_approvals} yêu cầu chi tiếp đang chờ duyệt</Link>}
+      <Icon name="check" size={14}/>{b.pending_approvals} {tr("costs.yeu_cau_chi_tiep_dang")}</Link>}
     {err && <p className="ui-inline-error" role="alert">{err}</p>}
     {manage && mode === "edit" && <div className="cst-form">
-      <label>Hạn mức (USD)<input inputMode="decimal" value={limit} onChange={e => setLimit(e.target.value)} disabled={hard}/></label>
-      <label>Cảnh báo (%)<input inputMode="numeric" value={warn} onChange={e => setWarn(e.target.value)}/></label>
-      <label>Dừng mềm (%)<input inputMode="numeric" value={soft} placeholder="tắt" onChange={e => setSoft(e.target.value)}/></label>
-      {hard && <small>Ngân sách đã dừng cứng — đổi hạn mức bằng "Nâng hạn mức".</small>}
+      <label>{tr("costs.han_muc_usd")}<input inputMode="decimal" value={limit} onChange={e => setLimit(e.target.value)} disabled={hard}/></label>
+      <label>{tr("costs.canh_bao")}<input inputMode="numeric" value={warn} onChange={e => setWarn(e.target.value)}/></label>
+      <label>{tr("costs.dung_mem_2")}<input inputMode="numeric" value={soft} placeholder={tr("costs.tat")} onChange={e => setSoft(e.target.value)}/></label>
+      {hard && <small>{tr("costs.ngan_sach_da_dung_cung")}</small>}
       <div className="cst-form-actions">
-        <button className="ui-btn is-ghost" onClick={() => setMode("")}>Huỷ</button>
+        <button className="ui-btn is-ghost" onClick={() => setMode("")}>{tr("costs.huy")}</button>
         <button className="ui-btn is-primary" disabled={busy} onClick={() => run(() => apiCosts.update(b.id, {
           ...(hard ? {} : {amount_limit: Number(limit)}), warn_pct: Number(warn), soft_stop_pct: soft ? Number(soft) : null,
-        }), "Đã lưu ngân sách")}>Lưu</button>
+        }), tr("costs.da_luu_ngan_sach"))}>{tr("costs.luu")}</button>
       </div>
     </div>}
     {manage && mode === "raise" && <div className="cst-form">
-      <label>Cộng thêm (USD)<input inputMode="decimal" value={add} onChange={e => setAdd(e.target.value)}/></label>
-      <label className="is-wide">Lý do (lưu vào nhật ký)<input value={reason} onChange={e => setReason(e.target.value)}
-        placeholder="VD: chạy chiến dịch hè"/></label>
+      <label>{tr("costs.cong_them_usd")}<input inputMode="decimal" value={add} onChange={e => setAdd(e.target.value)}/></label>
+      <label className="is-wide">{tr("costs.ly_do_luu_vao_nhat")}<input value={reason} onChange={e => setReason(e.target.value)}
+        placeholder={tr("costs.vd_chay_chien_dich_he")}/></label>
       <div className="cst-form-actions">
-        <button className="ui-btn is-ghost" onClick={() => setMode("")}>Huỷ</button>
+        <button className="ui-btn is-ghost" onClick={() => setMode("")}>{tr("costs.huy")}</button>
         <button className="ui-btn is-primary" disabled={busy || !Number(add)} onClick={() => run(() =>
-          apiCosts.override(b.id, {add_usd: Number(add), reason}), "Đã nâng hạn mức — seat và việc bị chặn được mở lại")}>Nâng hạn mức</button>
+          apiCosts.override(b.id, {add_usd: Number(add), reason}), tr("costs.da_nang_han_muc_seat"))}>{tr("costs.nang_han_muc")}</button>
       </div>
     </div>}
     {manage && !mode && <div className="cst-actions">
-      <button className="ui-btn is-ghost is-sm" onClick={() => setMode("edit")}>Sửa nấc</button>
-      <button className={"ui-btn is-sm " + (hard ? "is-primary" : "is-ghost")} onClick={() => setMode("raise")}>Nâng hạn mức</button>
+      <button className="ui-btn is-ghost is-sm" onClick={() => setMode("edit")}>{tr("costs.sua_nac")}</button>
+      <button className={"ui-btn is-sm " + (hard ? "is-primary" : "is-ghost")} onClick={() => setMode("raise")}>{tr("costs.nang_han_muc")}</button>
       {!hard && <button className="ui-btn is-ghost is-sm" disabled={busy}
-        onClick={() => window.confirm(`Lưu trữ ngân sách "${b.name}"? Phạm vi này sẽ không còn hạn mức.`)
-          && run(() => apiCosts.archive(b.id), "Đã lưu trữ ngân sách")}>Lưu trữ</button>}
+        onClick={() => window.confirm(tr("costs.luu_tru_ngan_sach_pham", {p0: b.name}))
+          && run(() => apiCosts.archive(b.id), tr("costs.da_luu_tru_ngan_sach"))}>{tr("costs.luu_tru")}</button>}
     </div>}
   </article>;
 }
@@ -128,20 +129,20 @@ function CreateBudget({scopes, onDone}: {scopes: any; onDone: (msg: string) => v
     try {
       await apiCosts.create({scope_type: type, scope_id: sid ? Number(sid) : null, amount_limit: Number(limit),
         warn_pct: Number(warn), soft_stop_pct: soft ? Number(soft) : null});
-      onDone("Đã tạo ngân sách");
+      onDone(tr("costs.da_tao_ngan_sach"));
     } catch (e2) { setErr(errorText(e2)); } finally { setBusy(false); }
   }
   return <form className="cst-form cst-create" onSubmit={submit}>
-    <label>Phạm vi<select value={type} onChange={e => { setType(e.target.value); setSid(""); }}>
-      <option value="company">Công ty</option><option value="department">Phòng ban</option>
-      <option value="team">Nhóm</option><option value="member">Agent</option></select></label>
-    <label className="is-wide">Áp cho<select value={sid} onChange={e => setSid(e.target.value)} required>
-      <option value="">— chọn —</option>{opts.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>
-    <label>Hạn mức (USD)<input inputMode="decimal" value={limit} onChange={e => setLimit(e.target.value)} required/></label>
-    <label>Cảnh báo (%)<input inputMode="numeric" value={warn} onChange={e => setWarn(e.target.value)}/></label>
-    <label>Dừng mềm (%)<input inputMode="numeric" value={soft} placeholder="tắt" onChange={e => setSoft(e.target.value)}/></label>
+    <label>{tr("costs.pham_vi")}<select value={type} onChange={e => { setType(e.target.value); setSid(""); }}>
+      <option value="company">{tr("costs.cong_ty")}</option><option value="department">{tr("costs.phong_ban")}</option>
+      <option value="team">{tr("costs.nhom")}</option><option value="member">Agent</option></select></label>
+    <label className="is-wide">{tr("costs.ap_cho")}<select value={sid} onChange={e => setSid(e.target.value)} required>
+      <option value="">{tr("costs.chon")}</option>{opts.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>
+    <label>{tr("costs.han_muc_usd")}<input inputMode="decimal" value={limit} onChange={e => setLimit(e.target.value)} required/></label>
+    <label>{tr("costs.canh_bao")}<input inputMode="numeric" value={warn} onChange={e => setWarn(e.target.value)}/></label>
+    <label>{tr("costs.dung_mem_2")}<input inputMode="numeric" value={soft} placeholder={tr("costs.tat")} onChange={e => setSoft(e.target.value)}/></label>
     {err && <p className="ui-inline-error" role="alert">{err}</p>}
-    <div className="cst-form-actions"><button className="ui-btn is-primary" disabled={busy}>{busy ? "Đang tạo…" : "Tạo ngân sách"}</button></div>
+    <div className="cst-form-actions"><button className="ui-btn is-primary" disabled={busy}>{busy ? tr("costs.dang_tao") : tr("costs.tao_ngan_sach")}</button></div>
   </form>;
 }
 
@@ -152,16 +153,16 @@ function Budgets() {
   const load = useCallback(() => { setErr(null); apiCosts.budgets().then(setD).catch(setErr); }, []);
   useEffect(() => { load(); }, [load]);
   const changed = (msg: string) => { toast(msg); setCreating(false); load(); };
-  if (err) return <ErrorState error={err} onRetry={load} context="Mở sổ ngân sách"/>;
+  if (err) return <ErrorState error={err} onRetry={load} context={tr("costs.mo_so_ngan_sach")}/>;
   if (!d) return <SkeletonRows n={2} h={120}/>;
   return <div className="cst-budgets">
-    <p className="cst-help">Ba nấc trên mỗi ngân sách: <b>cảnh báo</b> (báo vào Hộp việc, agent chỉ làm việc critical) →
-      <b> dừng mềm</b> (mỗi lượt chạy mới cần anh duyệt — duyệt cho một việc, cả seat hoặc cả phòng) →
-      <b> dừng cứng</b> ở 100% (seat tạm dừng, việc bị chặn, chỉ mở lại bằng Nâng hạn mức có lý do).</p>
+    <p className="cst-help">{tr("costs.ba_nac_tren_moi_ngan")} <b>{tr("costs.canh_bao_2")}</b> {tr("costs.bao_vao_hop_viec_agent")}
+      <b> {tr("costs.dung_mem_3")}</b> {tr("costs.moi_luot_chay_moi_can")}
+      <b> {tr("costs.dung_cung")}</b> {tr("costs.o_100_seat_tam_dung")}</p>
     {d.caps.manage && (creating ? <CreateBudget scopes={d.scopes} onDone={changed}/>
-      : <button className="ui-btn is-primary" onClick={() => setCreating(true)}><Icon name="plus" size={14}/>Thêm ngân sách</button>)}
-    {!d.budgets.length && !creating && <EmptyState mood="chao" title="Chưa có ngân sách nào">
-      Đặt hạn mức cho công ty, phòng ban, nhóm hoặc từng agent để chi phí model không vượt ngoài ý anh.
+      : <button className="ui-btn is-primary" onClick={() => setCreating(true)}><Icon name="plus" size={14}/>{tr("costs.them_ngan_sach")}</button>)}
+    {!d.budgets.length && !creating && <EmptyState mood="chao" title={tr("costs.chua_co_ngan_sach_nao")}>
+      {tr("costs.dat_han_muc_cho_cong")}
     </EmptyState>}
     <div className="cst-list">{d.budgets.map((b: any) => <BudgetCard key={b.id} b={b} manage={d.caps.manage} onChanged={changed}/>)}</div>
   </div>;

@@ -1,6 +1,7 @@
 "use client";
 import {ReactNode, useEffect, useRef} from "react";
 import {IconButton} from "./Button";
+import {t} from "../../lib/i18n";
 
 /* Hộp thoại + side-peek (Sheet). Cả hai: Esc đóng, bấm nền đóng, khoá cuộn trang,
    giữ focus bên trong (Tab vòng), trả focus về nút đã mở khi đóng. */
@@ -36,7 +37,7 @@ export function Dialog({title, onClose, children, actions, testId, as = "div", o
   return <div className="ui-dialog-wrap" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
     <Tag ref={ref} className="ui-dialog" role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : undefined}
          tabIndex={-1} data-testid={testId} onSubmit={onSubmit} style={wide ? {width: "min(720px,100%)"} : undefined}>
-      <header><h2>{title}</h2><IconButton icon="x" label="Đóng (Esc)" onClick={onClose}/></header>
+      <header><h2>{title}</h2><IconButton icon="x" label={t("ui.dong_esc")} onClick={onClose}/></header>
       {children}
       {actions && <div className="ui-dialog-actions">{actions}</div>}
     </Tag>
@@ -50,7 +51,7 @@ export function Sheet({label, onClose, head, children, testId}: {
   useOverlay(onClose, ref, false);
   return <div className="ui-sheet-wrap" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
     <aside ref={ref} className="ui-sheet" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} data-testid={testId}>
-      <header className="ui-sheet-head">{head}<span className="ui-grow"/><IconButton icon="x" label="Đóng (Esc)" onClick={onClose} data-testid={testId ? testId + "-close" : undefined}/></header>
+      <header className="ui-sheet-head">{head}<span className="ui-grow"/><IconButton icon="x" label={t("ui.dong_esc")} onClick={onClose} data-testid={testId ? testId + "-close" : undefined}/></header>
       <div className="ui-sheet-body">{children}</div>
     </aside>
   </div>;

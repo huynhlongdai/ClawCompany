@@ -1,19 +1,20 @@
 /* Mọi lỗi hiện cho người dùng = chuyện gì xảy ra + làm gì tiếp, bằng tiếng Việt.
    Dùng chung cho ErrorState, Banner, Toast và error boundary của app. */
 import {ApiError} from "./api";
+import {t, lazy} from "./i18n";
 
 export type Explained = {title: string; detail: string; fix: string; code?: string; requestId?: string; retry: boolean};
 
 /* Một số câu tiếng Anh cố định từ backend (FastAPI) — dịch lại khi gặp. */
-const EN_VI: [RegExp, string][] = [
-  [/^invalid credentials$/i, "Sai email hoặc mật khẩu."],
-  [/^not authenticated$/i, "Chưa đăng nhập."],
-  [/^no access to organization$/i, "Tài khoản không có quyền vào tổ chức này."],
-  [/could not validate credentials|token (has )?expired|signature has expired/i, "Phiên đăng nhập đã hết hạn."],
-  [/^not found$/i, "Không tìm thấy dữ liệu."],
-  [/^forbidden$|insufficient role|permission denied/i, "Bạn chưa có quyền làm việc này."],
-  [/failed to fetch|networkerror|load failed/i, "Không kết nối được máy chủ API."],
-];
+const EN_VI: [RegExp, string][] = lazy(() => ([
+  [/^invalid credentials$/i, t("errors.sai_email_hoac_mat_khau")],
+  [/^not authenticated$/i, t("errors.chua_dang_nhap")],
+  [/^no access to organization$/i, t("errors.tai_khoan_khong_co_quyen")],
+  [/could not validate credentials|token (has )?expired|signature has expired/i, t("errors.phien_dang_nhap_da_het")],
+  [/^not found$/i, t("errors.khong_tim_thay_du_lieu")],
+  [/^forbidden$|insufficient role|permission denied/i, t("errors.ban_chua_co_quyen_lam")],
+  [/failed to fetch|networkerror|load failed/i, t("errors.khong_ket_noi_duoc_may")],
+]));
 
 export function translate(msg: string): string {
   const m = msg.trim();
@@ -21,27 +22,27 @@ export function translate(msg: string): string {
   return m;
 }
 
-export function explain(e: unknown, context = "Thao tác"): Explained {
+export function explain(e: unknown, context = t("errors.thao_tac")): Explained {
   const err = e as ApiError & {message?: string};
   const status = typeof err?.status === "number" ? err.status : -1;
   const code = err?.code || "";
   const detail = translate(String(err?.message || e || "")).slice(0, 400);
   const base = {detail, code, requestId: err?.requestId, retry: true};
   if (status === 0 || code === "network" || /kết nối được máy chủ/i.test(detail))
-    return {...base, title: "Không kết nối được máy chủ", fix: "Kiểm tra mạng và dịch vụ API (cổng 8000) đang chạy, rồi bấm Thử lại."};
+    return {...base, title: t("errors.khong_ket_noi_duoc_may_2"), fix: t("errors.kiem_tra_mang_va_dich")};
   if (status === 401)
-    return {...base, title: "Phiên đăng nhập đã hết hạn", fix: "Đăng nhập lại để tiếp tục — dữ liệu chưa lưu trên trang này sẽ mất.", retry: false};
+    return {...base, title: t("errors.phien_dang_nhap_da_het_2"), fix: t("errors.dang_nhap_lai_de_tiep"), retry: false};
   if (status === 403)
-    return {...base, title: "Bạn chưa có quyền", fix: "Nhờ chủ công ty hoặc Quản trị nâng vai trong Đội ngũ › Người & quyền.", retry: false};
+    return {...base, title: t("errors.ban_chua_co_quyen"), fix: t("errors.nho_chu_cong_ty_hoac"), retry: false};
   if (status === 404)
-    return {...base, title: "Không tìm thấy", fix: "Mục này có thể đã bị xoá hoặc chuyển. Quay lại danh sách và tải lại."};
+    return {...base, title: t("errors.khong_tim_thay"), fix: t("errors.muc_nay_co_the_da")};
   if (status === 409 || code === "stale_revision" || code === "already_decided")
-    return {...base, title: "Dữ liệu vừa thay đổi", fix: "Ai đó (hoặc agent) vừa cập nhật mục này. Tải lại để xem bản mới rồi làm lại."};
+    return {...base, title: t("errors.du_lieu_vua_thay_doi"), fix: t("errors.ai_do_hoac_agent_vua")};
   if (status === 422 || status === 400)
-    return {...base, title: "Dữ liệu chưa hợp lệ", fix: "Xem lại các ô vừa nhập theo gợi ý bên dưới rồi gửi lại.", retry: false};
+    return {...base, title: t("errors.du_lieu_chua_hop_le"), fix: t("errors.xem_lai_cac_o_vua"), retry: false};
   if (status === 429)
-    return {...base, title: "Thao tác quá nhanh", fix: "Đợi vài giây rồi thử lại."};
+    return {...base, title: t("errors.thao_tac_qua_nhanh"), fix: t("errors.doi_vai_giay_roi_thu")};
   if (status >= 500)
-    return {...base, title: "Máy chủ gặp lỗi", fix: `Thử lại sau ít giây. Nếu lặp lại, gửi${err?.requestId ? ` mã yêu cầu ${err.requestId}` : " ảnh màn hình này"} cho người quản trị.`};
-  return {...base, title: `${context} chưa thành công`, fix: "Thử lại. Nếu vẫn lỗi, tải lại trang."};
+    return {...base, title: t("errors.may_chu_gap_loi"), fix: t("errors.thu_lai_sau_it_giay", {p0: err?.requestId ? ` mã yêu cầu ${err.requestId}` : " ảnh màn hình này"})};
+  return {...base, title: t("errors.chua_thanh_cong", {p0: context}), fix: t("errors.thu_lai_neu_van_loi")};
 }

@@ -126,3 +126,16 @@ def test_catalog_templates_are_consistent():
         for i in range(holes):
             assert "{%d}" % i in en, (pat.pattern, en)
     assert translate("Không thấy routine", "vi") == "Không thấy routine"
+
+
+def test_user_locale_persists_on_profile(client):
+    email = "ngon-ngu@gommoc.vn"
+    client.post("/api/auth/register", json={"email": email, "password": "ExamplePass123!", "display_name": "Lan"})
+    tok = client.post("/api/auth/login", json={"email": email, "password": "ExamplePass123!"}).json()["access_token"]
+    h = {"Authorization": f"Bearer {tok}"}
+    assert client.get("/api/auth/me", headers=h).json()["locale"] == "vi"  # mặc định
+    assert client.patch("/api/auth/me", json={"locale": "en"}, headers=h).json()["locale"] == "en"
+    assert client.get("/api/auth/me", headers=h).json()["locale"] == "en"
+    bad = client.patch("/api/auth/me", json={"locale": "fr"}, headers=h)
+    assert bad.status_code == 422
+    assert client.get("/api/auth/me", headers=h).json()["locale"] == "en"

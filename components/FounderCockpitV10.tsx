@@ -4,6 +4,7 @@ import {apiV10} from "../lib/api";
 import {viTime} from "../lib/labels";
 import {Button} from "./ui/Button";
 import {Any, Intro, LabBody, Panel, Pill, Stats, Table, useLoad} from "./lab/kit";
+import {intlLocale} from "../lib/i18n";
 
 /* Phòng thí nghiệm · Buồng lái founder (v10): luồng sự kiện, tin nhắn agent, artifact, QA, SLA và vòng quyết định của Nina. Tự tải lại mỗi 15 giây. */
 export function FounderCockpitV10() {
@@ -13,7 +14,7 @@ export function FounderCockpitV10() {
   return <LabBody q={q}>
     <Intro>Bus sự kiện gộp runtime, tin nhắn giữa agent, artifact, QA, SLA và vòng quyết định của Nina thành một luồng quan sát được. Tự tải lại mỗi 15 giây.</Intro>
     <Stats items={[["Sự kiện chờ", m.pending_events], ["Tin nhắn agent 24 giờ", m.messages_24h], ["Artifact sẵn sàng", m.ready_artifacts], ["QA cần sửa", m.qa_changes_requested],
-      ["Vi phạm SLA", m.sla_breaches], ["Sự cố", m.open_recovery_incidents], ["Chờ duyệt", m.pending_approvals], ["Mục tiêu đang chạy", m.active_goals]].map(([a, b]) => [a, Number(b || 0).toLocaleString("vi-VN")])}/>
+      ["Vi phạm SLA", m.sla_breaches], ["Sự cố", m.open_recovery_incidents], ["Chờ duyệt", m.pending_approvals], ["Mục tiêu đang chạy", m.active_goals]].map(([a, b]) => [a, Number(b || 0).toLocaleString(intlLocale())])}/>
     <div className="ui-grid is-2">
       <Panel title="Luồng sự kiện công ty" desc="Sự kiện bền vững đang chờ hoặc đã được trigger xử lý"
         actions={<Button size="sm" icon="arrow-right" busy={q.loading} onClick={q.reload}>Tải lại</Button>}>

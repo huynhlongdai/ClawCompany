@@ -2,6 +2,7 @@
 import {useEffect, useState} from "react";
 import {apiSeat} from "../lib/api";
 import {Icon, IconName} from "./Icon";
+import {t as tr, lazy, intlLocale} from "../lib/i18n";
 
 /* WP-2.1 + WP-2.2 — Hồ sơ nhân sự AI, sáu tab.
 
@@ -24,54 +25,54 @@ import {Icon, IconName} from "./Icon";
 type Row = Record<string, any>;
 type TabId = "profile" | "personality" | "job" | "capability" | "permission" | "budget";
 
-const TABS: {id: TabId; label: string; icon: IconName; hint: string}[] = [
-  {id: "profile", label: "Hồ sơ", icon: "users",
-   hint: "Tên, chức danh, emoji — IDENTITY.md và identity.* trong config"},
-  {id: "personality", label: "Tính cách", icon: "sparkle",
-   hint: "SOUL.md — giọng điệu và cách làm việc, nạp vào mọi phiên"},
-  {id: "job", label: "Công việc", icon: "doc",
-   hint: "AGENTS.md là quy tắc/SOP; USER.md là sở thích của người quản lý"},
-  {id: "capability", label: "Năng lực", icon: "chart",
-   hint: "Model, mức suy nghĩ, nén ngữ cảnh"},
-  {id: "permission", label: "Quyền", icon: "shield",
-   hint: "Tool, sandbox, skill — tab nguy hiểm nhất"},
-  {id: "budget", label: "Hạn mức", icon: "pulse",
-   hint: "Heartbeat và khối lượng việc song song — đây là tiền"},
-];
+const TABS: {id: TabId; label: string; icon: IconName; hint: string}[] = lazy(() => ([
+  {id: "profile", label: tr("seat.ho_so"), icon: "users",
+   hint: tr("seat.ten_chuc_danh_emoji_identity")},
+  {id: "personality", label: tr("seat.tinh_cach"), icon: "sparkle",
+   hint: tr("seat.soul_md_giong_dieu_va")},
+  {id: "job", label: tr("seat.cong_viec"), icon: "doc",
+   hint: tr("seat.agents_md_la_quy_tac")},
+  {id: "capability", label: tr("seat.nang_luc"), icon: "chart",
+   hint: tr("seat.model_muc_suy_nghi_nen")},
+  {id: "permission", label: tr("seat.quyen"), icon: "shield",
+   hint: tr("seat.tool_sandbox_skill_tab_nguy")},
+  {id: "budget", label: tr("seat.han_muc"), icon: "pulse",
+   hint: tr("seat.heartbeat_va_khoi_luong_viec")},
+]));
 
 /* Trường cấu hình của ba tab sau. Nhãn tiếng Việt, kèm gợi ý đủ để người không
    phải kỹ sư quyết định được. `advice` là khuyến nghị của lượt tiếp nhận, dựa
    trên mục 7 của docs/ARCHITECTURE_TREE.md. */
 const CONFIG_FIELDS: Record<string, {key: string; label: string; hint?: string;
-                                     options?: string[]; advice?: string}[]> = {
+                                     options?: string[]; advice?: string}[]> = lazy(() => ({
   capability: [
-    {key: "model", label: "Model chính",
-     hint: "Dạng provider/model. Khai bằng chuỗi là chế độ nghiêm — không có model dự phòng."},
-    {key: "thinkingDefault", label: "Mức suy nghĩ",
+    {key: "model", label: tr("seat.model_chinh"),
+     hint: tr("seat.dang_provider_model_khai_bang")},
+    {key: "thinkingDefault", label: tr("seat.muc_suy_nghi"),
      options: ["off", "minimal", "low", "medium", "high", "xhigh", "adaptive", "max"],
-     advice: "Seat quản lý: high. Seat thừa hành: medium — nghĩ sâu là tiền."},
-    {key: "timeoutSeconds", label: "Thời gian tối đa mỗi lượt (giây)"},
-    {key: "compaction.notifyUser", label: "Báo khi nén ngữ cảnh",
-     options: ["true", "false"], advice: "Nên bật: người dùng biết vì sao agent 'quên'."},
+     advice: tr("seat.seat_quan_ly_high_seat")},
+    {key: "timeoutSeconds", label: tr("seat.thoi_gian_toi_da_moi")},
+    {key: "compaction.notifyUser", label: tr("seat.bao_khi_nen_ngu_canh"),
+     options: ["true", "false"], advice: tr("seat.nen_bat_nguoi_dung_biet")},
   ],
   permission: [
-    {key: "sandbox.mode", label: "Chế độ sandbox", options: ["off", "non-main", "all"],
-     advice: "Nên 'all'. Mặc định của OpenClaw là 'off', và workspace KHÔNG phải hàng rào cứng — đường dẫn tuyệt đối đi ra ngoài được."},
-    {key: "sandbox.workspaceAccess", label: "Quyền vào workspace",
+    {key: "sandbox.mode", label: tr("seat.che_do_sandbox"), options: ["off", "non-main", "all"],
+     advice: tr("seat.nen_all_mac_dinh_cua")},
+    {key: "sandbox.workspaceAccess", label: tr("seat.quyen_vao_workspace"),
      options: ["none", "ro", "rw"]},
-    {key: "sandbox.docker.network", label: "Mạng của sandbox", options: ["none", "bridge"],
-     advice: "'none' trừ khi seat này thật sự cần Internet."},
-    {key: "tools.profile", label: "Bộ tool"},
+    {key: "sandbox.docker.network", label: tr("seat.mang_cua_sandbox"), options: ["none", "bridge"],
+     advice: tr("seat.none_tru_khi_seat_nay")},
+    {key: "tools.profile", label: tr("seat.bo_tool")},
   ],
   budget: [
-    {key: "heartbeat.every", label: "Nhịp heartbeat",
-     hint: "Ví dụ 30m, 1h, hoặc 0m để tắt.",
-     advice: "Tắt cho seat thừa hành. 50 seat × 48 lần/ngày là hoá đơn không ai ký."},
-    {key: "heartbeat.activeHours.start", label: "Giờ bắt đầu (HH:MM)"},
-    {key: "heartbeat.activeHours.end", label: "Giờ kết thúc (HH:MM)"},
-    {key: "maxConcurrent", label: "Số lượt chạy song song tối đa"},
+    {key: "heartbeat.every", label: tr("seat.nhip_heartbeat"),
+     hint: tr("seat.vi_du_30m_1h_hoac"),
+     advice: tr("seat.tat_cho_seat_thua_hanh")},
+    {key: "heartbeat.activeHours.start", label: tr("seat.gio_bat_dau_hh_mm")},
+    {key: "heartbeat.activeHours.end", label: tr("seat.gio_ket_thuc_hh_mm")},
+    {key: "maxConcurrent", label: tr("seat.so_luot_chay_song_song")},
   ],
-};
+}));
 
 function pct(part: number, whole: number) {
   return Math.min(100, Math.round((part / Math.max(1, whole)) * 100));
@@ -92,19 +93,19 @@ export function SeatProfileByMember({memberId}: {memberId: number}) {
         const list = (await rows.agents()) as Row[];
         const found = (list || []).find(a => a.member_id === memberId);
         if (!found) {
-          setError(`Member #${memberId} không có seat agent nào. `
-            + `Đây có thể là một nhân sự người, hoặc seat chưa được tạo.`);
+          setError(tr("seat.member_khong_co_seat_agent", {p0: memberId})
+            + tr("seat.day_co_the_la_mot"));
           return;
         }
         setAgentId(found.id);
       } catch (e: any) {
-        setError(e?.message || "Không tra được seat của member này");
+        setError(e?.message || tr("seat.khong_tra_duoc_seat_cua"));
       }
     })();
   }, [memberId]);
 
   if (error) return <div className="v8Error">{error}</div>;
-  if (agentId == null) return <div className="v8Empty">Đang tra seat…</div>;
+  if (agentId == null) return <div className="v8Empty">{tr("seat.dang_tra_seat")}</div>;
   return <SeatProfile agentId={agentId}/>;
 }
 
@@ -120,13 +121,13 @@ export function SeatProfile({agentId}: {agentId: number}) {
       setData(await apiSeat.profile(agentId));
       setError("");
     } catch (e: any) {
-      setError(e?.message || "Không tải được hồ sơ seat");
+      setError(e?.message || tr("seat.khong_tai_duoc_ho_so"));
     } finally { setLoading(false); }
   }
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [agentId]);
 
-  if (loading && !data) return <div className="v8Empty">Đang tải hồ sơ…</div>;
+  if (loading && !data) return <div className="v8Empty">{tr("seat.dang_tai_ho_so")}</div>;
   if (error && !data) return <div className="v8Error">{error}</div>;
   if (!data) return null;
 
@@ -139,28 +140,28 @@ export function SeatProfile({agentId}: {agentId: number}) {
     <div className="panel">
       <div className="panelHead">
         <div>
-          <b>{seat.name || "(không tên)"}</b>
+          <b>{seat.name || tr("seat.khong_ten")}</b>
           <small style={{display: "block"}}>
             {[seat.role, seat.department, seat.company].filter(Boolean).join(" · ")}
-            {seat.manager ? ` · báo cáo cho ${seat.manager}` : ""}
+            {seat.manager ? tr("seat.bao_cao_cho", {p0: seat.manager}) : ""}
           </small>
         </div>
         <span className={`statusPill${data.roster_match === false ? " busy" : ""}`}>
-          {data.roster_match === true ? "khớp gateway"
-            : data.roster_match === false ? "không có trên gateway"
-            : "chưa rõ"}
+          {data.roster_match === true ? tr("seat.khop_gateway")
+            : data.roster_match === false ? tr("seat.khong_co_tren_gateway")
+            : tr("seat.chua_ro")}
         </span>
       </div>
 
       <section className="v14Metrics"
                style={{gridTemplateColumns: "repeat(auto-fit,minmax(178px,1fr))"}}>
         <Kpi label="Seat runtime" value={data.runtime_agent_id || "—"} icon="mesh" source="db"/>
-        <Kpi label="Vòng đời" value={seat.lifecycle || "—"} icon="check" source="db"/>
-        <Kpi label="Model đang chạy"
+        <Kpi label={tr("seat.vong_doi")} value={seat.lifecycle || "—"} icon="check" source="db"/>
+        <Kpi label={tr("seat.model_dang_chay")}
              value={modelOf(data.config?.effective?.model) || seat.model_recorded_in_db || "—"}
              icon="sparkle"
              source={modelOf(data.config?.effective?.model) ? "gateway" : "db"}/>
-        <Kpi label="Chi phí 30 ngày"
+        <Kpi label={tr("seat.chi_phi_30_ngay")}
              value={seat.cost_30d != null ? `$${Number(seat.cost_30d).toFixed(2)}` : "—"}
              icon="chart" source="db" note={seat.cost_source}/>
       </section>
@@ -168,7 +169,7 @@ export function SeatProfile({agentId}: {agentId: number}) {
       {/* Hạn mức ký tự của toàn bộ hồ sơ. Vượt là bị cắt âm thầm. */}
       <div style={{marginTop: 14}}>
         <div style={{display: "flex", justifyContent: "space-between", fontSize: 13}}>
-          <span>Tổng hồ sơ: {budget.total_chars?.toLocaleString("vi-VN")} / {budget.total_max_chars?.toLocaleString("vi-VN")} ký tự</span>
+          <span>{tr("seat.tong_ho_so")} {budget.total_chars?.toLocaleString(intlLocale())} / {budget.total_max_chars?.toLocaleString(intlLocale())} {tr("seat.ky_tu")}</span>
           <span style={{color: budget.over_budget ? "var(--risk)" : "var(--muted)"}}>
             {pct(budget.total_chars || 0, budget.total_max_chars || 1)}%
           </span>
@@ -180,7 +181,7 @@ export function SeatProfile({agentId}: {agentId: number}) {
       </div>
 
       {!!(data.warnings || []).length && <div className="v8Error" style={{marginTop: 12}}>
-        <b>Cần biết:</b>
+        <b>{tr("seat.can_biet")}</b>
         <ul style={{margin: "6px 0 0 18px"}}>
           {data.warnings.map((w: string, i: number) => <li key={i}>{w}</li>)}
         </ul>
@@ -216,7 +217,7 @@ function Kpi({label, value, source, note, icon}:
     <strong style={{fontSize: 15, wordBreak: "break-word"}}>{value}</strong>
     {/* Nguồn của từng con số, để không ai phải đọc code mới biết. */}
     <small title={note || ""} style={{color: "var(--muted)", fontSize: 11}}>
-      nguồn: {source === "db" ? "database" : "gateway"}{note ? " *" : ""}
+      {tr("seat.nguon")} {source === "db" ? "database" : "gateway"}{note ? " *" : ""}
     </small>
   </div>;
 }
@@ -229,7 +230,7 @@ function FileTabs({agentId, tab, files, onSaved}:
     : tab === "personality" ? ["SOUL.md"]
     : ["AGENTS.md", "USER.md"];
   const mine = files.filter(f => names.includes(f.name));
-  if (!mine.length) return <div className="v8Empty">Không đọc được file nào cho tab này.</div>;
+  if (!mine.length) return <div className="v8Empty">{tr("seat.khong_doc_duoc_file_nao")}</div>;
   return <>{mine.map(f => <FileEditor key={f.name} agentId={agentId} file={f} onSaved={onSaved}/>)}</>;
 }
 
@@ -250,14 +251,14 @@ function FileEditor({agentId, file, onSaved}:
     setBusy(true); setMsg(""); setConflict("");
     try {
       const out = await apiSeat.writeFile(agentId, file.name, text, file.hash || null);
-      setMsg(`Đã lưu. ${out.note || ""}`);
+      setMsg(tr("seat.da_luu", {p0: out.note || ""}));
       onSaved();
     } catch (e: any) {
       const detail = e?.detail || e?.body?.detail;
       if (detail?.reason === "file_conflict") {
-        setConflict(detail.message || "File vừa bị người khác sửa.");
+        setConflict(detail.message || tr("seat.file_vua_bi_nguoi_khac"));
       } else {
-        setMsg(detail?.message || e?.message || "Lưu thất bại");
+        setMsg(detail?.message || e?.message || tr("seat.luu_that_bai"));
       }
     } finally { setBusy(false); }
   }
@@ -266,19 +267,17 @@ function FileEditor({agentId, file, onSaved}:
     <div style={{display: "flex", justifyContent: "space-between", alignItems: "baseline"}}>
       <b>{file.name}</b>
       <small style={{color: over ? "var(--risk)" : "var(--muted)"}}>
-        {text.length.toLocaleString("vi-VN")} / {max.toLocaleString("vi-VN")} ký tự
-        {file.name === "USER.md" ? " (hạn mức riêng, nhỏ hơn các file khác)" : ""}
+        {text.length.toLocaleString(intlLocale())} / {max.toLocaleString(intlLocale())} {tr("seat.ky_tu")}
+        {file.name === "USER.md" ? tr("seat.han_muc_rieng_nho_hon") : ""}
       </small>
     </div>
 
     {file.missing && <div className="v8Empty" style={{margin: "8px 0"}}>
-      File chưa tồn tại{file.expected_absent ? " — điều này bình thường" : ""}. Lưu sẽ tạo mới.
+      {tr("seat.file_chua_ton_tai")}{file.expected_absent ? tr("seat.dieu_nay_binh_thuong") : ""}{tr("seat.luu_se_tao_moi")}
     </div>}
 
     {file.looks_like_shipped_sample && <div className="v8Error" style={{margin: "8px 0"}}>
-      File này vẫn là <b>bản mẫu xuất xưởng của OpenClaw</b> (nội dung về "C-3PO"),
-      nghĩa là tính cách của seat chưa từng được cấu hình. Viết lại theo đúng
-      nhân sự bạn muốn.
+      {tr("seat.file_nay_van_la")} <b>{tr("seat.ban_mau_xuat_xuong_cua")}</b> {tr("seat.noi_dung_ve_c_3po")}
     </div>}
 
     <textarea value={text} onChange={e => setText(e.target.value)} rows={16}
@@ -288,21 +287,19 @@ function FileEditor({agentId, file, onSaved}:
                       border: `1px solid ${over ? "var(--risk)" : "var(--line)"}`}}/>
 
     {over && <div className="v8Error" style={{marginTop: 8}}>
-      Vượt hạn mức {max.toLocaleString("vi-VN")} ký tự. OpenClaw sẽ <b>cắt bớt khi
-      dựng prompt mà không báo</b>, nên agent chỉ đọc được phần đầu. Server sẽ từ
-      chối lưu — hãy viết ngắn lại thay vì để hệ thống chọn hộ phần bị mất.
+      {tr("seat.vuot_han_muc")} {max.toLocaleString(intlLocale())} {tr("seat.ky_tu_openclaw_se")} <b>{tr("seat.cat_bot_khi_dung_prompt")}</b>{tr("seat.nen_agent_chi_doc_duoc")}
     </div>}
 
     {conflict && <div className="v8Error" style={{marginTop: 8}}>
       {conflict}{" "}
-      <button onClick={onSaved} style={{marginLeft: 8}}>Tải lại bản mới</button>
+      <button onClick={onSaved} style={{marginLeft: 8}}>{tr("seat.tai_lai_ban_moi")}</button>
     </div>}
 
     <div style={{display: "flex", gap: 10, alignItems: "center", marginTop: 10}}>
       <button className="primary" onClick={save} disabled={busy || over || !dirty}>
-        {busy ? "Đang lưu…" : "Lưu"}
+        {busy ? tr("seat.dang_luu") : tr("seat.luu")}
       </button>
-      {dirty && !busy && <small>Chưa lưu</small>}
+      {dirty && !busy && <small>{tr("seat.chua_luu")}</small>}
       {msg && <small>{msg}</small>}
       <small style={{marginLeft: "auto", opacity: .7}}>
         hash {String(file.hash || "").slice(0, 12) || "—"}…
@@ -349,18 +346,18 @@ function ConfigTab({agentId, tab, config, onSaved}:
       }
       const out = await apiSeat.writeConfig(agentId, tab, values,
                                             {baseHash: config.hash});
-      setMsg(out.no_op ? "Không có gì thay đổi."
-        : `Đã lưu ${(out.changed_paths || []).length} thiết lập.`
-          + (out.requires_restart ? " Cần khởi động lại gateway." : " Áp dụng ngay."));
+      setMsg(out.no_op ? tr("seat.khong_co_gi_thay_doi")
+        : tr("seat.da_luu_thiet_lap", {p0: (out.changed_paths || []).length})
+          + (out.requires_restart ? tr("seat.can_khoi_dong_lai_gateway") : tr("seat.ap_dung_ngay")));
       setDraft({});
       onSaved();
     } catch (e: any) {
       const detail = e?.detail || e?.body?.detail;
-      setMsg(detail?.message || e?.message || "Lưu thất bại");
+      setMsg(detail?.message || e?.message || tr("seat.luu_that_bai"));
     } finally { setBusy(false); }
   }
 
-  if (!fields.length) return <div className="v8Empty">Tab này chưa có trường nào.</div>;
+  if (!fields.length) return <div className="v8Empty">{tr("seat.tab_nay_chua_co_truong")}</div>;
 
   return <div>
     {fields.map(f => {
@@ -369,7 +366,7 @@ function ConfigTab({agentId, tab, config, onSaved}:
         <div style={{display: "flex", justifyContent: "space-between"}}>
           <b style={{fontSize: 14}}>{f.label}</b>
           <small style={{opacity: .7}}>
-            {isInherited(f.key) ? "thừa hưởng từ agents.defaults" : "của riêng seat này"}
+            {isInherited(f.key) ? tr("seat.thua_huong_tu_agents_defaults") : tr("seat.cua_rieng_seat_nay")}
           </small>
         </div>
         {f.hint && <small style={{display: "block", marginBottom: 4}}>{f.hint}</small>}
@@ -377,7 +374,7 @@ function ConfigTab({agentId, tab, config, onSaved}:
         {f.options
           ? <select value={value} onChange={e => setDraft({...draft, [f.key]: e.target.value})}
                     style={{padding: 8, borderRadius: 8, border: "1px solid var(--line)"}}>
-              <option value="">(chưa đặt)</option>
+              <option value="">{tr("seat.chua_dat")}</option>
               {f.options.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           : <input value={value} onChange={e => setDraft({...draft, [f.key]: e.target.value})}
@@ -385,21 +382,21 @@ function ConfigTab({agentId, tab, config, onSaved}:
                            border: "1px solid var(--line)"}}/>}
 
         {f.advice && <small style={{display: "block", marginTop: 4, opacity: .85}}>
-          <b>Gợi ý:</b> {f.advice}
+          <b>{tr("seat.goi_y")}</b> {f.advice}
         </small>}
 
         {/* Đổi giá trị thừa hưởng nghĩa là tạo giá trị riêng cho seat — nói ra,
             vì người dùng dễ tưởng mình đang sửa cho cả công ty (hoặc ngược lại). */}
         {draft[f.key] !== undefined && isInherited(f.key) &&
           <small style={{display: "block", marginTop: 4}}>
-            Lưu sẽ tạo giá trị riêng cho seat này, không đổi agents.defaults.
+            {tr("seat.luu_se_tao_gia_tri")}
           </small>}
       </div>;
     })}
 
     <div style={{display: "flex", gap: 10, alignItems: "center"}}>
       <button className="primary" onClick={save} disabled={busy || !changed.length}>
-        {busy ? "Đang lưu…" : `Lưu ${changed.length || ""} thay đổi`}
+        {busy ? tr("seat.dang_luu") : tr("seat.luu_thay_doi", {p0: changed.length || ""})}
       </button>
       {msg && <small>{msg}</small>}
     </div>

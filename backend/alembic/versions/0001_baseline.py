@@ -96,6 +96,7 @@ COLUMNS_OWNED_BY_LATER_MIGRATIONS = {
     "approvals": ["expires_at", "escalate_to_member_id", "escalated_at",   # 0025
                   "payload", "revision"],                                 # 0027_strategy_plans
     "user_organization_access": ["status"],                                 # 0028_team_invitations
+    "users": ["locale"],                                                    # 0031_user_locale
 }
 
 # 0014 tự tạo index unique này; model cũng khai nó, nên create_all sẽ tạo

@@ -15,12 +15,13 @@ import {StatusPill, Tone} from "./ui/StatusPill";
 import {EmptyState, ErrorBanner, ErrorState} from "./ui/EmptyState";
 import {SkeletonRows} from "./ui/Skeleton";
 import {useToast} from "./ui/Toast";
+import {t as tr, lazy} from "../lib/i18n";
 
-const GOAL_VI: Record<string, string> = {draft: "mới tạo", plan_pending: "kế hoạch chờ duyệt", plan_revision: "Nina đang sửa kế hoạch",
-  plan_rejected: "kế hoạch bị từ chối", active: "đang thực hiện", completed: "hoàn thành"};
-const PLAN_VI: Record<string, string> = {pending: "chờ duyệt", revision_requested: "đã yêu cầu sửa", approved: "đã duyệt", rejected: "từ chối"};
+const GOAL_VI: Record<string, string> = lazy(() => ({draft: tr("strategy.moi_tao"), plan_pending: tr("strategy.ke_hoach_cho_duyet"), plan_revision: tr("strategy.nina_dang_sua_ke_hoach"),
+  plan_rejected: tr("strategy.ke_hoach_bi_tu_choi"), active: tr("strategy.dang_thuc_hien"), completed: tr("strategy.hoan_thanh")}));
+const PLAN_VI: Record<string, string> = lazy(() => ({pending: tr("strategy.cho_duyet"), revision_requested: tr("strategy.da_yeu_cau_sua"), approved: tr("strategy.da_duyet"), rejected: tr("strategy.tu_choi")}));
 const PLAN_TONE: Record<string, Tone> = {pending: "wait", revision_requested: "info", approved: "ok", rejected: "risk"};
-const TASK_VI: Record<string, string> = {backlog: "Tồn đọng", todo: "Cần làm", in_progress: "Đang làm", review: "Chờ duyệt", blocked: "Bị chặn", done: "Xong", cancelled: "Đã huỷ"};
+const TASK_VI: Record<string, string> = lazy(() => ({backlog: tr("strategy.ton_dong"), todo: tr("strategy.can_lam"), in_progress: tr("strategy.dang_lam"), review: tr("strategy.cho_duyet_2"), blocked: tr("strategy.bi_chan"), done: "Xong", cancelled: tr("strategy.da_huy")}));
 
 export function StrategyConsole() {
   const toast = useToast();
@@ -56,7 +57,7 @@ export function StrategyConsole() {
     try {
       const g: any = await apiV9.createGoal({organization_id: activeOrganizationId(), company_id: form.company_id ? Number(form.company_id) : null,
         title: form.title, objective: form.objective, budget_limit: form.budget ? Number(form.budget) : null, currency: "USD"});
-      toast(`Đã tạo mục tiêu #${g.id}. Nina được đánh thức để lập kế hoạch.`); setForm({...form, title: "", objective: ""});
+      toast(tr("strategy.da_tao_muc_tieu_nina", {p0: g.id})); setForm({...form, title: "", objective: ""});
       await load(); setSel(g.id);
     } catch (e2) { setError(e2); } finally { setBusy(false); }
   }
@@ -66,59 +67,59 @@ export function StrategyConsole() {
     {error ? <ErrorBanner error={error} onClose={() => setError(null)} testId="strategy-error"/> : null}
     <div className="ui-grid is-side-l">
       <div className="ui-grid">
-        <Panel title="Mục tiêu" desc={goals ? `${goals.length} mục tiêu` : "Đang tải…"} flush>
+        <Panel title={tr("strategy.muc_tieu")} desc={goals ? tr("strategy.muc_tieu_2", {p0: goals.length}) : tr("strategy.dang_tai")} flush>
           {loadErr ? <ErrorState error={loadErr} onRetry={load} compact/> : !goals ? <div className="ui-panel-body"><SkeletonRows n={3}/></div>
-            : goals.length === 0 ? <EmptyState compact mood="chao" title="Chưa có mục tiêu">Tạo mục tiêu bên dưới — Nina sẽ gửi kế hoạch để anh duyệt.</EmptyState>
+            : goals.length === 0 ? <EmptyState compact mood="chao" title={tr("strategy.chua_co_muc_tieu")}>{tr("strategy.tao_muc_tieu_ben_duoi")}</EmptyState>
             : <div className="ui-list">{goals.map((v: any) => { const p = v.plans[0];
               return <button key={v.goal.id} className="ui-row" onClick={() => setSel(v.goal.id)} aria-pressed={v.goal.id === sel} data-testid={`goal-${v.goal.id}`}
                 style={v.goal.id === sel ? {background: "var(--selected)"} : undefined}>
                 <span className="ui-row-main"><span className="ui-row-title">#{v.goal.id} {v.goal.title}</span>
-                  <span className="ui-row-meta">{p ? `Kế hoạch bản ${p.revision} · ${p.tasks.length} việc` : v.planning_task ? `Chờ ${v.planning_task.assignee || "seat"} lập kế hoạch` : "Chưa có seat lập kế hoạch"}</span></span>
+                  <span className="ui-row-meta">{p ? tr("strategy.ke_hoach_ban_viec", {p0: p.revision, p1: p.tasks.length}) : v.planning_task ? tr("strategy.cho_lap_ke_hoach", {p0: v.planning_task.assignee || "seat"}) : tr("strategy.chua_co_seat_lap_ke")}</span></span>
                 {p ? <StatusPill tone={PLAN_TONE[p.status] || "neutral"}>{PLAN_VI[p.status] || p.status}</StatusPill> : <StatusPill tone="neutral">{GOAL_VI[v.goal.status] || v.goal.status}</StatusPill>}
               </button>; })}</div>}
         </Panel>
-        <Panel title="Giao mục tiêu cho Nina" desc="Nina được đánh thức và gửi kế hoạch theo phòng ban">
+        <Panel title={tr("strategy.giao_muc_tieu_cho_nina")} desc={tr("strategy.nina_duoc_danh_thuc_va")}>
           <form className="ui-form" onSubmit={createGoal}>
-            <Field label="Mục tiêu"><input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="VD: Ra mắt bộ sưu tập hè…" data-testid="goal-title" autoComplete="off"/></Field>
-            <Field label="Kết quả mong đợi"><textarea rows={3} value={form.objective} onChange={e => setForm({...form, objective: e.target.value})} placeholder="Mô tả mục tiêu, kết quả mong đợi…"/></Field>
+            <Field label={tr("strategy.muc_tieu")}><input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder={tr("strategy.vd_ra_mat_bo_suu")} data-testid="goal-title" autoComplete="off"/></Field>
+            <Field label={tr("strategy.ket_qua_mong_doi")}><textarea rows={3} value={form.objective} onChange={e => setForm({...form, objective: e.target.value})} placeholder={tr("strategy.mo_ta_muc_tieu_ket")}/></Field>
             <FormRow>
-              <Field label="Công ty"><select value={form.company_id} onChange={e => setForm({...form, company_id: e.target.value})}>
+              <Field label={tr("strategy.cong_ty")}><select value={form.company_id} onChange={e => setForm({...form, company_id: e.target.value})}>
                 {companies.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
-              <Field label="Ngân sách (USD)"><input type="number" inputMode="decimal" min={0} value={form.budget} onChange={e => setForm({...form, budget: e.target.value})}/></Field>
+              <Field label={tr("strategy.ngan_sach_usd")}><input type="number" inputMode="decimal" min={0} value={form.budget} onChange={e => setForm({...form, budget: e.target.value})}/></Field>
             </FormRow>
             <Button type="submit" variant="primary" busy={busy} disabled={form.title.length < 2 || form.objective.length < 4} data-testid="goal-create">Giao cho Nina</Button>
           </form>
         </Panel>
       </div>
 
-      <Panel title={view ? `#${view.goal.id} ${view.goal.title}` : "Kế hoạch"} testId="strategy-plan"
-        desc={view ? `${GOAL_VI[view.goal.status] || view.goal.status}${view.goal.budget_usd != null ? ` · ngân sách $${view.goal.budget_usd.toFixed(2)}` : ""}` : "Chọn một mục tiêu"}>
-        {!view ? <EmptyState compact mood="ngu" title="Chọn một mục tiêu">Kế hoạch Nina gửi sẽ hiện ở đây để anh duyệt.</EmptyState> : <div className="gl-plan">
-          {!plan && <EmptyState compact mood={view.planning_task ? "lam-viec" : "loi"} title={view.planning_task ? "Nina đang lập kế hoạch" : "Chưa có seat lập kế hoạch"}>
-            {view.planning_task ? `Việc lập kế hoạch #${view.planning_task.id} (${TASK_VI[view.planning_task.status] || view.planning_task.status}) — chờ ${view.planning_task.assignee} gửi kế hoạch.`
-              : "Không có seat chiến lược (Nina) trong công ty này. Tuyển Nina ở Đội ngũ › Agent rồi tạo lại mục tiêu."}</EmptyState>}
+      <Panel title={view ? `#${view.goal.id} ${view.goal.title}` : tr("strategy.ke_hoach")} testId="strategy-plan"
+        desc={view ? `${GOAL_VI[view.goal.status] || view.goal.status}${view.goal.budget_usd != null ? tr("strategy.ngan_sach", {p0: view.goal.budget_usd.toFixed(2)}) : ""}` : tr("strategy.chon_mot_muc_tieu")}>
+        {!view ? <EmptyState compact mood="ngu" title={tr("strategy.chon_mot_muc_tieu")}>{tr("strategy.ke_hoach_nina_gui_se")}</EmptyState> : <div className="gl-plan">
+          {!plan && <EmptyState compact mood={view.planning_task ? "lam-viec" : "loi"} title={view.planning_task ? tr("strategy.nina_dang_lap_ke_hoach") : tr("strategy.chua_co_seat_lap_ke")}>
+            {view.planning_task ? tr("strategy.viec_lap_ke_hoach_cho", {p0: view.planning_task.id, p1: TASK_VI[view.planning_task.status] || view.planning_task.status, p2: view.planning_task.assignee})
+              : tr("strategy.khong_co_seat_chien_luoc")}</EmptyState>}
           {plan && <>
-            <div className="ui-toolbar"><b>Kế hoạch bản {plan.revision}</b><StatusPill tone={PLAN_TONE[plan.status] || "neutral"}>{PLAN_VI[plan.status] || plan.status}</StatusPill>
-              {plan.approver && <span className="ui-row-meta">người duyệt: {plan.approver}</span>}</div>
+            <div className="ui-toolbar"><b>{tr("strategy.ke_hoach_ban")} {plan.revision}</b><StatusPill tone={PLAN_TONE[plan.status] || "neutral"}>{PLAN_VI[plan.status] || plan.status}</StatusPill>
+              {plan.approver && <span className="ui-row-meta">{tr("strategy.nguoi_duyet")} {plan.approver}</span>}</div>
             {plan.summary && <p className="gl-summary">{plan.summary}</p>}
             <ol className="gl-steps" data-testid="plan-tasks">{plan.tasks.map((t: any) => <li key={t.key}>
-              <div><b>{t.title}</b>{t.acceptance_criteria && <small>Nghiệm thu: {t.acceptance_criteria}</small>}{t.depends_on.length > 0 && <small>Chờ: {t.depends_on.join(", ")}</small>}</div>
-              <div style={{textAlign: "right"}}><small>{t.department_id ? `Phòng ${dept[t.department_id] || "#" + t.department_id}` : t.member_id ? (who[t.member_id] || "#" + t.member_id) : "Tự chọn theo tải"}</small>
+              <div><b>{t.title}</b>{t.acceptance_criteria && <small>{tr("strategy.nghiem_thu")} {t.acceptance_criteria}</small>}{t.depends_on.length > 0 && <small>{tr("strategy.cho")} {t.depends_on.join(", ")}</small>}</div>
+              <div style={{textAlign: "right"}}><small>{t.department_id ? tr("strategy.phong", {p0: dept[t.department_id] || "#" + t.department_id}) : t.member_id ? (who[t.member_id] || "#" + t.member_id) : tr("strategy.tu_chon_theo_tai")}</small>
                 {t.budget_usd ? <small className="ui-num">${Number(t.budget_usd).toFixed(2)}</small> : null}</div>
             </li>)}</ol>
             {plan.status === "pending" && <div className="ui-form">
-              <Field label="Ghi chú cho Nina" hint="Bắt buộc khi yêu cầu sửa (ít nhất 5 ký tự)"><textarea rows={2} value={note} onChange={e => setNote(e.target.value)} placeholder="VD: Gộp bước 2 và 3, giảm ngân sách quảng cáo…" data-testid="plan-note"/></Field>
+              <Field label={tr("strategy.ghi_chu_cho_nina")} hint={tr("strategy.bat_buoc_khi_yeu_cau")}><textarea rows={2} value={note} onChange={e => setNote(e.target.value)} placeholder={tr("strategy.vd_gop_buoc_2_va")} data-testid="plan-note"/></Field>
               <div className="ui-confirm-actions">
-                <Button variant="primary" busy={busy} onClick={() => act(() => apiInbox.resolveApproval(plan.approval_id, "approved", note), "Đã duyệt — việc con đã được tạo và giao.")} data-testid="plan-approve">Duyệt kế hoạch</Button>
-                <Button disabled={busy || note.trim().length < 5} onClick={() => act(() => apiStrategy.requestRevision(plan.approval_id, note), "Đã gửi yêu cầu sửa — Nina được đánh thức.")} data-testid="plan-revise">Yêu cầu sửa</Button>
-                <Button variant="danger" disabled={busy} onClick={() => act(() => apiInbox.resolveApproval(plan.approval_id, "rejected", note), "Đã từ chối kế hoạch.")}>Từ chối</Button>
+                <Button variant="primary" busy={busy} onClick={() => act(() => apiInbox.resolveApproval(plan.approval_id, "approved", note), tr("strategy.da_duyet_viec_con_da"))} data-testid="plan-approve">{tr("strategy.duyet_ke_hoach")}</Button>
+                <Button disabled={busy || note.trim().length < 5} onClick={() => act(() => apiStrategy.requestRevision(plan.approval_id, note), tr("strategy.da_gui_yeu_cau_sua"))} data-testid="plan-revise">{tr("strategy.yeu_cau_sua")}</Button>
+                <Button variant="danger" disabled={busy} onClick={() => act(() => apiInbox.resolveApproval(plan.approval_id, "rejected", note), tr("strategy.da_tu_choi_ke_hoach"))}>{tr("strategy.tu_choi_2")}</Button>
               </div></div>}
-            {plan.history.length > 0 && <div className="gl-history"><b>Các lần sửa</b>{plan.history.map((h: any) => <span key={h.revision}>Bản {h.revision} ({h.tasks} việc): “{h.note}”</span>)}</div>}
+            {plan.history.length > 0 && <div className="gl-history"><b>{tr("strategy.cac_lan_sua")}</b>{plan.history.map((h: any) => <span key={h.revision}>{tr("strategy.ban")} {h.revision} ({h.tasks} {tr("strategy.viec")}{h.note}”</span>)}</div>}
           </>}
-          {view.tasks.length > 0 && <div><b style={{fontSize: 13}}>Việc đã giao</b>
+          {view.tasks.length > 0 && <div><b style={{fontSize: 13}}>{tr("strategy.viec_da_giao")}</b>
             <div className="ui-list">{view.tasks.map((t: any) => <Link key={t.id} href={`/app/work?peek=${t.id}`} className="ui-row" data-testid={`goal-task-${t.id}`} style={{paddingLeft: 0, paddingRight: 0}}>
               <span className="ui-row-main"><span className="ui-row-title">#{t.id} {t.title}</span>
-                <span className="ui-row-meta">{t.assignee ? t.assignee : t.department ? `Phòng ${t.department} — chờ trưởng phòng giao` : "Chưa có người nhận"}</span></span>
+                <span className="ui-row-meta">{t.assignee ? t.assignee : t.department ? tr("strategy.phong_cho_truong_phong_giao", {p0: t.department}) : tr("strategy.chua_co_nguoi_nhan")}</span></span>
               <span className={"ui-sdot is-" + t.status}/><span className="ui-row-meta">{TASK_VI[t.status] || t.status}</span></Link>)}</div></div>}
         </div>}
       </Panel>

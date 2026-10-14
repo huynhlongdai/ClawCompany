@@ -4,6 +4,7 @@ import {useCallback, useEffect, useState} from "react";
 import {Icon, IconName} from "./Icon";
 import {api, apiInbox, apiV17} from "../lib/api";
 import {refreshCounts} from "../lib/counts";
+import {intlLocale} from "../lib/i18n";
 
 /* Hộp việc — trả lời câu "có cần mình không?" ở một chỗ.
 
@@ -105,7 +106,7 @@ function ApprovalRow({a, who, onDone}: {a: any; who: string; onDone: (id: number
         background: "var(--paper-2, #efeee9)", borderRadius: 8, whiteSpace: "pre-wrap", fontSize: 12.5}}>{gw.command}</pre>}
       <p className="ui-row-meta">
         {gw ? <>{gw.cwd && <><span>thư mục <code>{gw.cwd}</code></span><span>·</span></>}
-                {gw.expires && <><span>hết hạn {new Date(gw.expires).toLocaleTimeString("vi-VN", {hour: "2-digit", minute: "2-digit"})}</span><span>·</span></>}</>
+                {gw.expires && <><span>hết hạn {new Date(gw.expires).toLocaleTimeString(intlLocale(), {hour: "2-digit", minute: "2-digit"})}</span><span>·</span></>}</>
             : <><code>{a.action}</code><span>·</span>
                 {a.expires_at && <><span>{deadline(a.expires_at)}</span><span>·</span></>}
                 {a.escalated_at && <><span className="ui-status is-blocked">đã chuyển lên quản lý</span><span>·</span></>}</>}
@@ -155,7 +156,7 @@ function NoticeRow({n, onRead}: {n: any; onRead: (id: number) => void}) {
   const unread = n.status === "unread";
   const [busy, setBusy] = useState(false), [open, setOpen] = useState(false);
   const at = n.updated_at || n.created_at;
-  const when = at ? new Date(at + (String(at).endsWith("Z") ? "" : "Z")).toLocaleString("vi-VN", {day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit"}) : "";
+  const when = at ? new Date(at + (String(at).endsWith("Z") ? "" : "Z")).toLocaleString(intlLocale(), {day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit"}) : "";
   const lines: string[] = n.lines || [];
   return <article className={"ui-row" + (unread ? " is-unread" : "")} data-testid={`inbox-item-${n.id}`}>
     <span className="ui-row-icon"><Icon name={String(n.kind).startsWith("approval") ? "shield" : n.kind === "run_failed" ? "alert" : "bell"} size={16}/></span>

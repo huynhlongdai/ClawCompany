@@ -5,6 +5,7 @@ import {api, apiTask} from "../lib/api";
 import {Icon, IconName} from "./Icon";
 import {TaskLinksPanel, TaskRunsPanel, TaskWakeupsPanel} from "./TaskGraphPanels";
 import {TaskPolicyPanel} from "./TaskPolicyPanel";
+import {t, lazy, intlLocale} from "../lib/i18n";
 
 /* WP-4.3 UI — Chi tiết một công việc: sổ ghi, bàn giao, và gói ngữ cảnh.
 
@@ -29,26 +30,26 @@ import {TaskPolicyPanel} from "./TaskPolicyPanel";
 type Row = Record<string, any>;
 
 /* Loại mục sổ ghi: icon và màu mang nghĩa, không phải để đẹp. */
-const KIND_STYLE: Record<string, {label: string; icon: IconName; tint: string}> = {
-  attempt:  {label: "Bắt tay làm",   icon: "pulse",  tint: "blue"},
-  result:   {label: "Kết quả",       icon: "check",  tint: "green"},
-  review:   {label: "Nhận xét",      icon: "shield", tint: "amber"},
-  handoff:  {label: "Bàn giao",      icon: "users",  tint: "violet"},
-  decision: {label: "Quyết định",    icon: "crown",  tint: "pink"},
-  blocker:  {label: "Vướng",         icon: "bell",   tint: "pink"},
-  note:     {label: "Ghi chú",       icon: "doc",    tint: "blue"},
-};
+const KIND_STYLE: Record<string, {label: string; icon: IconName; tint: string}> = lazy(() => ({
+  attempt:  {label: t("task.bat_tay_lam"),   icon: "pulse",  tint: "blue"},
+  result:   {label: t("task.ket_qua"),       icon: "check",  tint: "green"},
+  review:   {label: t("task.nhan_xet"),      icon: "shield", tint: "amber"},
+  handoff:  {label: t("task.ban_giao"),      icon: "users",  tint: "violet"},
+  decision: {label: t("task.quyet_dinh"),    icon: "crown",  tint: "pink"},
+  blocker:  {label: t("task.vuong"),         icon: "bell",   tint: "pink"},
+  note:     {label: t("task.ghi_chu"),       icon: "doc",    tint: "blue"},
+}));
 
 /* Kết quả đo được. Rỗng nghĩa là CHƯA ĐO ĐƯỢC — khác với thất bại, nên nó có
    nhãn riêng chứ không bị bỏ trống. */
-const OUTCOME_LABEL: Record<string, {text: string; cls: string}> = {
-  success:   {text: "đạt",        cls: "low"},
-  partial:   {text: "một phần",  cls: "mid"},
-  failed:    {text: "không đạt", cls: "high"},
-  rejected:  {text: "bị từ chối", cls: "high"},
-  blocked:   {text: "bị chặn",   cls: "high"},
-  cancelled: {text: "đã huỷ",    cls: "mid"},
-};
+const OUTCOME_LABEL: Record<string, {text: string; cls: string}> = lazy(() => ({
+  success:   {text: t("task.dat"),        cls: "low"},
+  partial:   {text: t("task.mot_phan"),  cls: "mid"},
+  failed:    {text: t("task.khong_dat"), cls: "high"},
+  rejected:  {text: t("task.bi_tu_choi"), cls: "high"},
+  blocked:   {text: t("task.bi_chan"),   cls: "high"},
+  cancelled: {text: t("task.da_huy"),    cls: "mid"},
+}));
 
 const BLOCK_TINT = ["#6366f1", "#0ea5e9", "#14b8a6", "#f59e0b", "#a855f7",
                     "#ef4444", "#64748b"];
@@ -57,13 +58,13 @@ function stamp(iso?: string) {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString("vi-VN", {day: "2-digit", month: "2-digit",
+  return d.toLocaleString(intlLocale(), {day: "2-digit", month: "2-digit",
                                     hour: "2-digit", minute: "2-digit"});
 }
 
 /* UI v2: nhãn tiếng Việt thay cho mã enum thô (in_progress, high) ở dòng tiêu đề. */
-const STATUS_VI: Record<string, string> = {backlog: "Tồn đọng", todo: "Cần làm", in_progress: "Đang làm", review: "Chờ duyệt", blocked: "Bị chặn", done: "Xong", cancelled: "Đã huỷ"};
-const PRIO_VI: Record<string, string> = {urgent: "Khẩn", high: "Cao", medium: "Vừa", low: "Thấp"};
+const STATUS_VI: Record<string, string> = lazy(() => ({backlog: t("task.ton_dong"), todo: t("task.can_lam"), in_progress: t("task.dang_lam"), review: t("task.cho_duyet"), blocked: t("task.bi_chan_2"), done: "Xong", cancelled: t("task.da_huy_2")}));
+const PRIO_VI: Record<string, string> = lazy(() => ({urgent: t("task.khan"), high: "Cao", medium: t("task.vua"), low: t("task.thap")}));
 
 export function TaskDetail({taskId}: {taskId: number}) {
   const [task, setTask] = useState<Row | null>(null);
@@ -77,10 +78,10 @@ export function TaskDetail({taskId}: {taskId: number}) {
   async function load() {
     const miss: string[] = [];
     // Mỗi nguồn hỏng độc lập: màn hình không được trắng vì một endpoint lỗi.
-    try { setTask(await apiTask.get(taskId)); } catch { miss.push("công việc"); }
-    try { setJournal(await apiTask.journal(taskId)); } catch { miss.push("sổ ghi"); }
-    try { setPack(await apiTask.contextPack(taskId)); } catch { miss.push("gói ngữ cảnh"); }
-    try { setMembers((await api.members() as Row[]) || []); } catch { miss.push("nhân sự"); }
+    try { setTask(await apiTask.get(taskId)); } catch { miss.push(t("task.cong_viec")); }
+    try { setJournal(await apiTask.journal(taskId)); } catch { miss.push(t("task.so_ghi")); }
+    try { setPack(await apiTask.contextPack(taskId)); } catch { miss.push(t("task.goi_ngu_canh")); }
+    try { setMembers((await api.members() as Row[]) || []); } catch { miss.push(t("task.nhan_su")); }
     setFailed(miss);
     setLoading(false);
     setTick(n => n + 1);
@@ -88,7 +89,7 @@ export function TaskDetail({taskId}: {taskId: number}) {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [taskId]);
 
-  if (loading) return <div className="v8Empty">Đang tải công việc…</div>;
+  if (loading) return <div className="v8Empty">{t("task.dang_tai_cong_viec")}</div>;
 
   const digest = journal?.digest || {};
   const entries: Row[] = journal?.entries || [];
@@ -99,14 +100,14 @@ export function TaskDetail({taskId}: {taskId: number}) {
     <div className="panel">
       <div className="panelHead">
         <div>
-          <b>{task?.title || `Công việc #${taskId}`}</b>
+          <b>{task?.title || t("task.cong_viec_2", {p0: taskId})}</b>
           <small style={{display: "block"}}>
-            {task?.status ? `Trạng thái: ${STATUS_VI[task.status] || task.status}` : ""}
-            {task?.priority ? ` · ưu tiên: ${PRIO_VI[task.priority] || task.priority}` : ""}
-            {owner ? ` · đang thuộc ${owner.name}` : " · chưa có người nhận"}
+            {task?.status ? t("task.trang_thai", {p0: STATUS_VI[task.status] || task.status}) : ""}
+            {task?.priority ? t("task.uu_tien", {p0: PRIO_VI[task.priority] || task.priority}) : ""}
+            {owner ? t("task.dang_thuoc", {p0: owner.name}) : t("task.chua_co_nguoi_nhan")}
           </small>
         </div>
-        <Link href={`/app/work?peek=${taskId}`}>Về Công việc →</Link>
+        <Link href={`/app/work?peek=${taskId}`}>{t("task.ve_cong_viec")}</Link>
       </div>
 
       {task?.description && <p style={{margin: "4px 0 12px", fontSize: 13.5}}>
@@ -117,28 +118,28 @@ export function TaskDetail({taskId}: {taskId: number}) {
                style={{gridTemplateColumns: "repeat(auto-fit,minmax(168px,1fr))"}}>
         <div className="metric">
           <div className="metricIcon"><Icon name="doc" size={16}/></div>
-          <label>Mục trong sổ ghi</label><strong>{digest.entries ?? 0}</strong>
+          <label>{t("task.muc_trong_so_ghi")}</label><strong>{digest.entries ?? 0}</strong>
         </div>
         <div className="metric">
           <div className="metricIcon"><Icon name="users" size={16}/></div>
-          <label>Đã qua tay</label>
+          <label>{t("task.da_qua_tay")}</label>
           <strong>{(digest.hands || []).length || 0}</strong>
           <small style={{color: "var(--muted)", fontSize: 11}}>
-            {(digest.hands || []).join(" → ") || "chưa ai"}
+            {(digest.hands || []).join(" → ") || t("task.chua_ai")}
           </small>
         </div>
         <div className="metric">
           <div className="metricIcon"><Icon name="chart" size={16}/></div>
-          <label>Tỉ lệ đạt</label>
-          <strong>{digest.success_rate == null ? "chưa đo được"
+          <label>{t("task.ti_le_dat")}</label>
+          <strong>{digest.success_rate == null ? t("task.chua_do_duoc")
             : `${digest.success_rate}%`}</strong>
           <small style={{color: "var(--muted)", fontSize: 11}}>
-            {digest.measurable_outcomes ?? 0}/{digest.entries ?? 0} mục đo được
+            {digest.measurable_outcomes ?? 0}/{digest.entries ?? 0} {t("task.muc_do_duoc")}
           </small>
         </div>
         <div className="metric">
           <div className="metricIcon"><Icon name="pulse" size={16}/></div>
-          <label>Phiên runtime</label>
+          <label>{t("task.phien_runtime")}</label>
           <strong style={{fontSize: 13, wordBreak: "break-all"}}>
             {task?.runtime_session_key ? task.runtime_session_key.split(":").slice(-1)[0] : "—"}
           </strong>
@@ -147,12 +148,11 @@ export function TaskDetail({taskId}: {taskId: number}) {
 
       {digest.success_rate == null && (digest.entries ?? 0) > 0 &&
         <small style={{display: "block", marginTop: 10, color: "var(--muted)"}}>
-          "Chưa đo được" khác với 0%: chưa có mục nào trong sổ ghi kết quả đo
-          được, nên mọi tỉ lệ tính ra đều là số nói dối.
+          {t("task.chua_do_duoc_khac_voi")}
         </small>}
 
       {!!failed.length && <div className="v8Error" style={{marginTop: 12}}>
-        Không tải được: {failed.join(", ")}. Các phần còn lại vẫn là dữ liệu thật.
+        {t("task.khong_tai_duoc")} {failed.join(", ")}{t("task.cac_phan_con_lai_van")}
       </div>}
     </div>
 
@@ -189,9 +189,9 @@ function JournalPanel({entries, kinds, taskId, onDone}: {entries: Row[]; kinds: 
     try {
       const out = await apiTask.comment(taskId, note.trim());
       setNote("");
-      setSent(out?.woke?.length ? `Đã ghi. Đánh thức ${out.woke.length} seat được nhắc tên.` : "Đã ghi vào sổ.");
+      setSent(out?.woke?.length ? t("task.da_ghi_danh_thuc_seat", {p0: out.woke.length}) : t("task.da_ghi_vao_so"));
       onDone();
-    } catch (e: any) { setSent(`Không ghi được: ${e?.message || e}`); }
+    } catch (e: any) { setSent(t("task.khong_ghi_duoc", {p0: e?.message || e})); }
     setSending(false);
   }
 
@@ -200,24 +200,24 @@ function JournalPanel({entries, kinds, taskId, onDone}: {entries: Row[]; kinds: 
 
   return <div className="panel">
     <div className="panelHead">
-      <div><b>Sổ ghi công việc</b></div>
+      <div><b>{t("task.so_ghi_cong_viec")}</b></div>
       <small>task_journal_entries</small>
     </div>
 
     <div style={{display: "flex", gap: 8, marginBottom: 10}}>
       <input data-testid="journal-input" value={note} onChange={e => setNote(e.target.value)}
-             placeholder="Ghi một dòng… gõ @Tên để gọi seat agent"
+             placeholder={t("task.ghi_mot_dong_go_ten")}
              onKeyDown={e => { if (e.key === "Enter") send(); }}
              style={{flex: 1, padding: "7px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13}}/>
       <button className="primary" data-testid="journal-send" disabled={sending || !note.trim()} onClick={send}>
-        {sending ? "Đang ghi…" : "Ghi"}
+        {sending ? t("task.dang_ghi") : "Ghi"}
       </button>
     </div>
     {sent && <small data-testid="journal-sent" style={{display: "block", marginBottom: 8, color: "var(--muted)"}}>{sent}</small>}
 
     {!!present.length && <div className="pillTabs">
       <button className={filter === "" ? "active" : ""} onClick={() => setFilter("")}>
-        Tất cả ({entries.length})
+        {t("task.tat_ca")}{entries.length})
       </button>
       {present.map(kind => {
         const style = KIND_STYLE[kind] || KIND_STYLE.note;
@@ -231,8 +231,7 @@ function JournalPanel({entries, kinds, taskId, onDone}: {entries: Row[]; kinds: 
 
     {!shown.length
       ? <div className="v8Empty">
-          Sổ ghi trống. Việc này chưa có lượt nào — đó là sự thật, không phải lỗi
-          tải dữ liệu.
+          {t("task.so_ghi_trong_viec_nay")}
         </div>
       : <div className="timeline">
           {shown.map(entry => {
@@ -251,7 +250,7 @@ function JournalPanel({entries, kinds, taskId, onDone}: {entries: Row[]; kinds: 
                   <b style={{display: "inline"}}>{entry.actor_name}</b>
                   <small>{style.label}</small>
                   {outcome && <span className={`prio ${outcome.cls}`}>{outcome.text}</span>}
-                  {!entry.outcome && <small style={{opacity: .65}}>chưa đo kết quả</small>}
+                  {!entry.outcome && <small style={{opacity: .65}}>{t("task.chua_do_ket_qua")}</small>}
                 </div>
                 <div style={{marginLeft: 18, marginTop: 2, fontSize: 13}}>
                   {entry.summary}
@@ -260,7 +259,7 @@ function JournalPanel({entries, kinds, taskId, onDone}: {entries: Row[]; kinds: 
                   <button onClick={() => setOpen(expanded ? null : entry.seq)}
                           style={{background: "none", border: "none", padding: 0,
                                   color: "var(--accent)", fontSize: 12}}>
-                    {expanded ? "Ẩn chi tiết" : "Xem chi tiết"}
+                    {expanded ? t("task.an_chi_tiet") : t("task.xem_chi_tiet")}
                   </button>
                   {expanded && <pre style={{
                     whiteSpace: "pre-wrap", fontSize: 12, marginTop: 6,
@@ -274,8 +273,7 @@ function JournalPanel({entries, kinds, taskId, onDone}: {entries: Row[]; kinds: 
         </div>}
 
     <small style={{display: "block", marginTop: 12, color: "var(--muted)"}}>
-      Chỉ dòng tóm tắt đi vào prompt của agent; phần chi tiết ở lại đây. Nhờ vậy
-      một việc chạy 50 lần vẫn không làm nổ ngân sách ký tự.
+      {t("task.chi_dong_tom_tat_di")}
     </small>
   </div>;
 }
@@ -285,7 +283,7 @@ function JournalPanel({entries, kinds, taskId, onDone}: {entries: Row[]; kinds: 
 function ContextPackPanel({pack}: {pack: Row | null}) {
   const [showText, setShowText] = useState(false);
   if (!pack) return <div className="panel"><div className="v8Empty">
-    Không đọc được gói ngữ cảnh.
+    {t("task.khong_doc_duoc_goi_ngu")}
   </div></div>;
 
   const blocks: Row[] = pack.blocks || [];
@@ -294,15 +292,15 @@ function ContextPackPanel({pack}: {pack: Row | null}) {
 
   return <div className="panel">
     <div className="panelHead">
-      <div><b>Gói ngữ cảnh agent sẽ nhận</b></div>
-      <small>{pack.chars}/{pack.budget_chars} ký tự</small>
+      <div><b>{t("task.goi_ngu_canh_agent_se")}</b></div>
+      <small>{pack.chars}/{pack.budget_chars} {t("task.ky_tu")}</small>
     </div>
 
     {/* Thanh ngân sách: mỗi đoạn rộng theo số ký tự THẬT của khối đó. */}
     <div style={{display: "flex", height: 10, borderRadius: 999, overflow: "hidden",
                  border: "1px solid var(--line)", marginBottom: 12}}>
       {blocks.filter(b => b.chars > 0).map(b =>
-        <div key={b.index} title={`${b.index}. ${b.title} — ${b.chars} ký tự`}
+        <div key={b.index} title={t("task.ky_tu_2", {p0: b.index, p1: b.title, p2: b.chars})}
              style={{width: `${(b.chars / total) * 100}%`,
                      background: BLOCK_TINT[(b.index - 1) % BLOCK_TINT.length]}}/>)}
     </div>
@@ -326,9 +324,9 @@ function ContextPackPanel({pack}: {pack: Row | null}) {
                         whiteSpace: "nowrap"}}>{b.title}</span>
           <span style={{fontSize: 11, textAlign: "right", whiteSpace: "nowrap",
                         color: locked ? "var(--accent)" : "var(--muted)"}}>
-            {b.trimmed ? "đã lược"
-              : locked ? "không cắt"
-              : b.empty ? "trống" : ""}
+            {b.trimmed ? t("task.da_luoc")
+              : locked ? t("task.khong_cat")
+              : b.empty ? t("task.trong") : ""}
           </span>
           <span style={{color: "var(--muted)", textAlign: "right",
                         fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap"}}>
@@ -338,19 +336,16 @@ function ContextPackPanel({pack}: {pack: Row | null}) {
       })}
     </div>
     <small style={{display: "block", marginTop: 8, color: "var(--muted)"}}>
-      "không cắt" = khối luôn được giữ nguyên khi gói vượt ngân sách. Thứ tự cắt
-      là 4 → 3 → 5 → 1.
+      {t("task.khong_cat_khoi_luon_duoc")}
     </small>
 
     {!!(pack.trimmed || []).length && <div className="v8Error" style={{marginTop: 10}}>
-      Đã lược để vừa ngân sách: {(pack.trimmed || []).join("; ")}.
-      Thứ tự cắt là khối 4 → 3 → 5 → 1; khối 2 (việc), 6 (luật) và 7 (thoả thuận)
-      không bao giờ bị cắt.
+      {t("task.da_luoc_de_vua_ngan")} {(pack.trimmed || []).join("; ")}{t("task.thu_tu_cat_la_khoi")}
     </div>}
 
     <div style={{marginTop: 12}}>
       <button onClick={() => setShowText(!showText)}>
-        {showText ? "Ẩn nội dung gói" : "Xem nguyên văn gói sẽ gửi"}
+        {showText ? t("task.an_noi_dung_goi") : t("task.xem_nguyen_van_goi_se")}
       </button>
       {showText && <pre style={{
         whiteSpace: "pre-wrap", fontSize: 12, marginTop: 10, maxHeight: 420,
@@ -360,8 +355,7 @@ function ContextPackPanel({pack}: {pack: Row | null}) {
     </div>
 
     <small style={{display: "block", marginTop: 10, color: "var(--muted)"}}>
-      Đây là nguyên văn prompt mà agent nhận, dựng bằng đúng hàm mà lệnh giao
-      việc dùng — không phải bản mô phỏng.
+      {t("task.day_la_nguyen_van_prompt")}
     </small>
   </div>;
 }
@@ -394,13 +388,13 @@ function HandoffPanel({taskId, members, ownerId, onDone}:
       onDone();
     } catch (e: any) {
       const detail = e?.detail || e?.body?.detail;
-      setError(detail?.message || detail || e?.message || "Bàn giao thất bại");
+      setError(detail?.message || detail || e?.message || t("task.ban_giao_that_bai"));
     } finally { setBusy(false); }
   }
 
   return <div className="panel">
     <div className="panelHead">
-      <div><b>Bàn giao cho người khác</b></div>
+      <div><b>{t("task.ban_giao_cho_nguoi_khac")}</b></div>
       <small>artifact_handoffs</small>
     </div>
 
@@ -408,41 +402,39 @@ function HandoffPanel({taskId, members, ownerId, onDone}:
     <select value={to} onChange={e => setTo(e.target.value)}
             style={{width: "100%", padding: 9, borderRadius: 9, marginTop: 4,
                     border: "1px solid var(--line)"}}>
-      <option value="">— chọn người nhận —</option>
+      <option value="">{t("task.chon_nguoi_nhan")}</option>
       {candidates.map(m =>
         <option key={m.id} value={m.id}>
-          {m.name} · {m.role || "chưa có chức danh"}
+          {m.name} · {m.role || t("task.chua_co_chuc_danh")}
           {m.member_type === "agent" ? " (AI)" : ""}
         </option>)}
     </select>
     {target && target.member_type !== "agent" &&
       <small style={{display: "block", marginTop: 6, color: "var(--muted)"}}>
-        {target.name} là nhân sự người: bàn giao sẽ vào hộp thư của họ, hệ thống
-        không tự làm việc thay người.
+        {target.name} {t("task.la_nhan_su_nguoi_ban")}
       </small>}
 
     <label style={{fontSize: 12.5, fontWeight: 600, display: "block", marginTop: 14}}>
-      Mục đích
+      {t("task.muc_dich")}
     </label>
     <select value={purpose} onChange={e => setPurpose(e.target.value)}
             style={{width: "100%", padding: 9, borderRadius: 9, marginTop: 4,
                     border: "1px solid var(--line)"}}>
-      <option value="continue_work">Làm tiếp</option>
-      <option value="review">Soát lại</option>
-      <option value="approve">Phê duyệt</option>
-      <option value="publish">Đăng/phát hành</option>
+      <option value="continue_work">{t("task.lam_tiep")}</option>
+      <option value="review">{t("task.soat_lai")}</option>
+      <option value="approve">{t("task.phe_duyet")}</option>
+      <option value="publish">{t("task.dang_phat_hanh")}</option>
     </select>
 
     <label style={{fontSize: 12.5, fontWeight: 600, display: "block", marginTop: 14}}>
-      Hướng dẫn cho người nhận
+      {t("task.huong_dan_cho_nguoi_nhan")}
     </label>
     <textarea value={instructions} onChange={e => setInstructions(e.target.value)}
-              rows={6} placeholder="Việc gì cần làm tiếp, điều gì đã thử rồi, cái gì phải tránh…"
+              rows={6} placeholder={t("task.viec_gi_can_lam_tiep")}
               style={{width: "100%", padding: 10, borderRadius: 9, marginTop: 4,
                       border: "1px solid var(--line)", fontSize: 13}}/>
     <small style={{display: "block", marginTop: 4, color: "var(--muted)"}}>
-      Nội dung này vào khối 5 của gói ngữ cảnh, nên người nhận đọc được nó ngay
-      khi bắt tay làm.
+      {t("task.noi_dung_nay_vao_khoi")}
     </small>
 
     <label style={{display: "flex", gap: 8, alignItems: "flex-start",
@@ -450,10 +442,9 @@ function HandoffPanel({taskId, members, ownerId, onDone}:
       <input type="checkbox" checked={dispatch} style={{marginTop: 3}}
              onChange={e => setDispatch(e.target.checked)}/>
       <span>
-        Giao việc luôn cho người nhận
+        {t("task.giao_viec_luon_cho_nguoi")}
         <small style={{display: "block", color: "var(--muted)"}}>
-          Bỏ chọn thì chỉ ghi sổ và chuyển hồ sơ. Mỗi lượt giao việc cho agent là
-          một lời gọi model có phí.
+          {t("task.bo_chon_thi_chi_ghi")}
         </small>
       </span>
     </label>
@@ -461,7 +452,7 @@ function HandoffPanel({taskId, members, ownerId, onDone}:
     <button className="primary" onClick={submit}
             disabled={busy || !to}
             style={{marginTop: 14, width: "100%"}}>
-      {busy ? "Đang bàn giao…" : "Bàn giao"}
+      {busy ? t("task.dang_ban_giao") : t("task.ban_giao")}
     </button>
 
     {error && <div className="v8Error" style={{marginTop: 10}}>{error}</div>}
@@ -477,16 +468,16 @@ function HandoffResult({result}: {result: Row}) {
   // quả) — thấy rõ trong _reports/ui/task-handoff-result.png. Ghi đè tại chỗ.
   return <div className={ok ? "v8Empty" : "v8Error"}
               style={{marginTop: 12, textAlign: "left"}}>
-    <b>Đã bàn giao cho {result.to_member_name}.</b>
+    <b>{t("task.da_ban_giao_cho")} {result.to_member_name}.</b>
     <ul style={{margin: "6px 0 0 18px", fontSize: 12.5}}>
-      <li>Ghi sổ: {d.journal?.recorded
-        ? `xong (mục #${d.journal.journal_seq})` : `không — ${d.journal?.reason}`}</li>
+      <li>{t("task.ghi_so")} {d.journal?.recorded
+        ? t("task.xong_muc", {p0: d.journal.journal_seq}) : t("task.khong", {p0: d.journal?.reason})}</li>
       {d.reassign?.reassigned &&
-        <li>Chủ việc đã chuyển sang người nhận</li>}
-      <li>Giao việc: {ok ? "đã chạy" : `chưa — lý do \`${d.reason}\``}</li>
-      {d.runtime_session_key && <li>Phiên: <code>{d.runtime_session_key}</code></li>}
+        <li>{t("task.chu_viec_da_chuyen_sang")}</li>}
+      <li>{t("task.giao_viec")} {ok ? t("task.da_chay") : t("task.chua_ly_do", {p0: d.reason})}</li>
+      {d.runtime_session_key && <li>{t("task.phien")} <code>{d.runtime_session_key}</code></li>}
       {result.created_handoff_note &&
-        <li>Việc chưa có sản phẩm nào nên hệ thống đã tạo một phiếu bàn giao</li>}
+        <li>{t("task.viec_chua_co_san_pham")}</li>}
     </ul>
     {!ok && d.note && <small style={{display: "block", marginTop: 6}}>{d.note}</small>}
   </div>;
