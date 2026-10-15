@@ -53,6 +53,8 @@ class Member(Base, TimestampMixin, RevisionMixin):
     role: Mapped[str] = mapped_column(String(160), default="")
     manager_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="active")
+    # M2b (0038): chức danh mà người/agent này đang ngồi. NULL = chưa xếp ghế.
+    position_id: Mapped[int | None] = mapped_column(ForeignKey("positions.id"), nullable=True, index=True)
 
 class Agent(Base, TimestampMixin):
     __tablename__ = "agents"

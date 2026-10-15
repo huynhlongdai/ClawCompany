@@ -82,7 +82,8 @@ BASELINE_TABLES = [
 # index ``ix_api_keys_member_id`` mà model khai -- một việc vô ích.
 COLUMNS_OWNED_BY_LATER_MIGRATIONS = {
     "companies": ["row_revision"],                  # 0013_v30_row_revision_counter
-    "members": ["row_revision"],                    # 0013
+    "members": ["row_revision",                     # 0013
+                "position_id"],                     # 0038_company_foundation
     "projects": ["row_revision", "due_date"],       # 0013, 0016
     "tasks": ["row_revision",                       # 0013
               "parent_task_id", "goal_id", "due_at",  # 0018_task_graph
