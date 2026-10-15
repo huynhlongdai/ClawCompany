@@ -492,7 +492,7 @@ def approval_detail(db: Session, organization_id: int, principal: Principal, app
 
 TASK_STATUS_VI = {"todo": "Cần làm", "in_progress": "Đang làm", "review": "Chờ duyệt", "done": "Xong",
                   "blocked": "Bị chặn", "cancelled": "Đã huỷ", "failed": "Lỗi"}
-JOURNAL_VI = {"note": "Ghi chú", "plan": "Kế hoạch", "progress": "Tiến độ", "result": "Kết quả",
+JOURNAL_VI = {"attempt": "Lần chạy", "comment": "Bình luận", "note": "Ghi chú", "plan": "Kế hoạch", "progress": "Tiến độ", "result": "Kết quả",
               "decision": "Quyết định", "handoff": "Bàn giao", "review": "Duyệt", "error": "Lỗi",
               "blocker": "Vướng mắc", "question": "Câu hỏi"}
 
