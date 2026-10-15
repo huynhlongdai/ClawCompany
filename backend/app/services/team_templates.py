@@ -124,6 +124,8 @@ async def create_from_template(db: Session, principal: Principal, org_id: int, k
     if not job.company_id:
         raise HTTPException(502, f"Dựng công ty thất bại: {job.error or job.status}")
     company = db.get(Company, job.company_id)
+    from app.services import authority
+    authority.seed_defaults(db, org_id, company.id, template=key, replace=True)   # M2b: ma trận theo mẫu
     depts = {d.name: d for d in db.query(Department).filter(Department.company_id == company.id).all()}
     guides = {d["name"]: d.get("guide", "") for d in t["departments"]}
     by_rid = {a.runtime_agent_id: a for a in db.query(Agent).filter(Agent.runtime_agent_id.in_(list(roles))).all()}
@@ -144,6 +146,9 @@ async def create_from_template(db: Session, principal: Principal, org_id: int, k
         if director is not None and head.id != director.id:
             head.manager_id = director.id; _bump(head); db.add(head); db.commit()
         set_department_head(db, org_id, dept, head.id, actor=actor)
+    from app.services import company_foundation   # M2b: mỗi vai trong mẫu thành một chức danh có JD
+    jd = {spec["role"]: spec["system_prompt"] for d in t["departments"] for spec in [d["head"], *d.get("staff", [])]}
+    company_foundation.positions_from_members(db, org_id, company.id, jd_by_title=jd)
     issues = []
     for rid, ag in by_rid.items():
         if ag.lifecycle != "active":

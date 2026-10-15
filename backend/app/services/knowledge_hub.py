@@ -447,9 +447,14 @@ def core_docs(db: Session, org_id: int, *, company_id: int | None, department_id
 def core_section(db: Session, org_id: int, *, company_id: int | None, department_id: int | None, role: str,
                  agent_id: int | None) -> str:
     docs = core_docs(db, org_id, company_id=company_id, department_id=department_id, role=role, agent_id=agent_id)
-    if not docs:
+    # M2b: hiến chương công ty đứng đầu phần cốt lõi (không bị cắt bởi CORE_BUDGET ở cuối).
+    from app.services.company_foundation import charter_block
+    charter = charter_block(db, company_id)
+    if not docs and not charter:
         return ""
     parts = ["## Kiến thức cốt lõi (luôn áp dụng khi trả lời; chi tiết khác: company_knowledge_search)"]
+    if charter:
+        parts.append(charter)
     for layer in ("personal", "profession", "company"):
         mine = [d for d in docs if layer_of(d) == layer]
         if not mine:

@@ -109,7 +109,8 @@ def render_files(*, name: str, role: str, company: str, department: str, manager
                  personality: str = DEFAULT_PERSONALITY, emoji: str = "", job_description: str = "",
                  manager_notes: str = "", monthly_budget: float | None = None,
                  hired_on: str | None = None, address_style: str = DEFAULT_ADDRESS_STYLE,
-                 daily_cap_usd: float | None = None, core_knowledge: str = "") -> dict[str, str]:
+                 daily_cap_usd: float | None = None, core_knowledge: str = "",
+                 position: dict | None = None) -> dict[str, str]:
     """5 file tiếng Việt từ hồ sơ. Vượt hạn mức ký tự → 422 (không cắt hộ)."""
     p = PERSONALITIES.get(personality) or PERSONALITIES[DEFAULT_PERSONALITY]
     a = ADDRESS_STYLES.get(address_style) or ADDRESS_STYLES[DEFAULT_ADDRESS_STYLE]
@@ -139,9 +140,30 @@ def render_files(*, name: str, role: str, company: str, department: str, manager
         "- Không bịa số liệu; chưa chắc thì nói \"chưa xác minh\" và nêu cách kiểm chứng.\n"
         "- Việc vượt quyền, tốn tiền hoặc gửi ra ngoài công ty: hỏi người quản lý trước.\n"
         "- Giữ bí mật dữ liệu công ty.\n")
-    duties = (job_description or "").strip()
-    if duties and not duties.lstrip().startswith(("-", "*", "1.")):
-        duties = "\n".join(f"- {line.strip()}" for line in duties.splitlines() if line.strip())
+    def _as_bullets(text: str) -> str:
+        text = (text or "").strip()
+        if text and not text.lstrip().startswith(("-", "*", "1.")):
+            text = "\n".join(f"- {line.strip()}" for line in text.splitlines() if line.strip())
+        return text
+    own = _as_bullets(job_description)
+    pos_block = ""
+    if position:   # M2b: JD/KPI của chức danh là phần chính; JD riêng của seat thêm vào sau
+        from app.services.company_foundation import kpi_line
+        resp = "\n".join(f"- {r}" for r in position.get("responsibilities") or [])
+        jd = (position.get("job_description") or "").strip()
+        duties = "\n\n".join(x for x in (jd, resp) if x)
+        if own and own not in duties:
+            duties = (duties + "\n\n### Riêng ghế này\n" + own) if duties else own
+        kpis = "\n".join(kpi_line(k) for k in position.get("kpis") or [])
+        tools = ", ".join(position.get("allowed_tools") or [])
+        skills = ", ".join(position.get("allowed_skills") or [])
+        pos_block = (f"## Chức danh\n{position['title']}" + (f" · báo cáo cho chức danh {position['reports_to']}"
+                                                             if position.get("reports_to") else "") + "\n\n"
+                     + (f"## KPI của chức danh\n{kpis}\nBáo cáo tiến độ theo đúng các chỉ số này.\n\n" if kpis else "")
+                     + (f"## Công cụ & kỹ năng của chức danh\n" + (f"- Công cụ công ty được dùng: {tools}\n" if tools else "")
+                        + (f"- Kỹ năng: {skills}\n" if skills else "") + "\n" if tools or skills else ""))
+    else:
+        duties = own
     duties = duties or (f"- Làm các việc được giao cho vị trí {role} trên bảng công việc.\n"
                         "- Chủ động đề xuất cải tiến trong phạm vi phòng ban.")
     budget_line = (f"Hạn mức chi phí: {monthly_budget:g} USD/tháng. Gần chạm hạn mức thì báo người quản lý."
@@ -152,6 +174,7 @@ def render_files(*, name: str, role: str, company: str, department: str, manager
         f"# AGENTS.md — Công việc của {name}\n\n"
         f"## Vai trò\n{role} · {dept_line} · {company}\nBáo cáo cho: {boss}\n\n"
         f"## Nhiệm vụ chính\n{duties}\n\n"
+        + pos_block +
         "## Nhận và trả việc\n"
         "- Việc đến từ bảng công việc ClawCompany; mỗi việc là một phiên riêng.\n"
         "- Xong việc: tóm tắt kết quả, nêu cái đã kiểm chứng và cái chưa.\n"
@@ -397,6 +420,18 @@ async def hire(db: Session, principal: Principal, org_id: int, runtime: Any, dat
     name = (data.get("name") or "").strip()
     if not name:
         raise HTTPException(422, "Cần tên nhân sự AI")
+    position = None
+    if data.get("position_id"):     # M2b: tuyển vào một chức danh — chức danh quyết tên vai, phòng ban
+        from app.services import company_foundation
+        position = company_foundation._position(db, org_id, int(data["position_id"]))
+        if data.get("company_id") and data["company_id"] != position.company_id:
+            raise HTTPException(422, "Chức danh thuộc công ty khác với công ty đang tuyển.")
+        filled = len(company_foundation.seats_of(db, position.id))
+        if filled >= (position.headcount or 0):
+            raise HTTPException(409, f"Chức danh \"{position.title}\" đã đủ định biên ({filled}/{position.headcount}). "
+                                     "Tăng định biên ở Đội ngũ → Chức danh rồi tuyển lại.")
+        data = {**data, "role": position.title, "company_id": position.company_id,
+                "department_id": data.get("department_id") or position.department_id}
     role = (data.get("role") or "").strip() or "Nhân sự AI"
     personality = data.get("personality") or DEFAULT_PERSONALITY
     if personality not in PERSONALITIES:
@@ -405,6 +440,8 @@ async def hire(db: Session, principal: Principal, org_id: int, runtime: Any, dat
         db, org_id, data.get("company_id"), data.get("department_id"), data.get("manager_member_id"))
     if not company_id:
         raise HTTPException(422, "Cần chọn công ty cho nhân sự AI")
+    from app.services import authority
+    authority.require_hire_right(db, principal, company_id)   # M2b: ai được tuyển theo ma trận
     dept = db.get(Department, department_id) if department_id else None
     if manager_id is None and dept is not None and dept.head_member_id:
         manager_id = dept.head_member_id            # mặc định báo cáo trưởng phòng
@@ -435,7 +472,8 @@ async def hire(db: Session, principal: Principal, org_id: int, runtime: Any, dat
                          job_description=data.get("job_description") or "",
                          manager_notes=data.get("manager_notes") or "", monthly_budget=budget,
                          address_style=address_style, daily_cap_usd=daily_cap,
-                         core_knowledge=_core_at_hire(db, org_id, co.id, dept.id if dept else None, role))
+                         core_knowledge=_core_at_hire(db, org_id, co.id, dept.id if dept else None, role),
+                         position=_brief_of_position(db, position))
     rid = _unique_runtime_id(db, name)
     spec = {"personality": personality, "emoji": emoji, "address_style": address_style,
             "daily_cap_usd": daily_cap, "model_policy": model_policy,
@@ -453,6 +491,9 @@ async def hire(db: Session, principal: Principal, org_id: int, runtime: Any, dat
         raise HTTPException(502, {"message": f"Gateway lỗi khi tạo agent: {job.error}", **out})
     agent = db.get(Agent, job.agent_id)
     member = db.get(Member, job.member_id)
+    if position is not None:
+        member.position_id = position.id; db.add(member); db.commit()
+        out["position_id"] = position.id
     if budget:
         env = BudgetEnvelope(organization_id=org_id, company_id=company_id, name=f"Hạn mức · {name}",
                              amount_limit=budget, scope_type="member", scope_id=member.id,
@@ -519,6 +560,22 @@ def _core_for(db: Session, member: Member, agent: Agent) -> str:
         return ""
 
 
+def _position_for(db: Session, member: Member | None) -> dict | None:
+    from app.services import company_foundation
+    try:
+        return company_foundation.position_brief(db, member)
+    except Exception as exc:  # noqa: BLE001 — thiếu chức danh không được chặn sinh file
+        print(f"[position] {exc}")
+        return None
+
+
+def _brief_of_position(db: Session, position) -> dict | None:
+    if position is None:
+        return None
+    from app.services import company_foundation
+    return company_foundation.brief_of(db, position)
+
+
 def _core_at_hire(db: Session, org_id: int, company_id: int | None, department_id: int | None, role: str) -> str:
     from app.services import knowledge_hub
     try:
@@ -546,7 +603,7 @@ async def _regen(db: Session, runtime: Any, agent: Agent, member: Member, names:
                          monthly_budget=spec.get("monthly_budget"),
                          address_style=spec.get("address_style") or DEFAULT_ADDRESS_STYLE,
                          daily_cap_usd=spec.get("daily_cap_usd"), core_knowledge=_core_for(db, member, agent),
-                         **_ctx(db, member))
+                         position=_position_for(db, member), **_ctx(db, member))
     snaps = snapshots(db, agent.id)
     result: dict[str, dict] = {}
     for fname in names:

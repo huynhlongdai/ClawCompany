@@ -60,6 +60,7 @@ class HireIn(BaseModel):
     model_policy: dict = Field(default_factory=dict)
     monthly_budget: float | None = Field(default=None, ge=0)
     tools: dict[str, str] = Field(default_factory=dict)
+    position_id: int | None = None      # M2b: ngồi vào chức danh có sẵn (JD/KPI của chức danh vào AGENTS.md)
 
 
 class HrPatchIn(BaseModel):
