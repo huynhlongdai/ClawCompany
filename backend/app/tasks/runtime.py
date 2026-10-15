@@ -48,6 +48,22 @@ def escalate_overdue_approvals():
         db.close()
 
 
+@celery_app.task(name="approvals.sweep_gateway")
+def sweep_gateway_approvals():
+    """Đưa mọi lệnh shell đang chờ duyệt trên gateway vào hộp duyệt (cả phiên chat trực tiếp)."""
+    import asyncio
+    from app.core.config import settings
+    from app.db.session import SessionLocal
+    from app.services import approval_backfill
+    if (settings.openclaw_mode or "").lower() not in ("native", "gateway"):
+        return {"skipped": "not native"}
+    db = SessionLocal()
+    try:
+        return asyncio.run(approval_backfill.sweep_all(db))
+    finally:
+        db.close()
+
+
 @celery_app.task(name="routines.tick")
 def tick_routines():
     """D3.4: kích hoạt routine tới giờ (idempotency_key UNIQUE chặn chạy trùng)."""

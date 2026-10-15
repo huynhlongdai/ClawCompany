@@ -61,7 +61,9 @@ def entries_from(result: object) -> list[dict]:
     """
     raw: object = result
     if isinstance(result, dict):
-        for key in ("approvals", "items", "pending", "result", "data"):
+        # Gateway 2026.9.8 thật trả {"payload": [...]} (đo trên VM 2026-10-15);
+        # thiếu khoá này thì mọi lần backfill đều "không thấy gì".
+        for key in ("payload", "approvals", "items", "pending", "result", "data"):
             if isinstance(result.get(key), list):
                 raw = result[key]
                 break
@@ -142,3 +144,41 @@ async def backfill_session(
     )
     outcome.update({"supported": True, "readiness": ready})
     return outcome
+
+
+async def sweep_all(db: Session, runtime=None) -> dict:
+    """Quét MỌI yêu cầu duyệt gateway đang giữ, gắn đúng ghế/việc, đưa vào hộp duyệt.
+
+    Follower chỉ theo phiên của việc; lệnh shell của Nina khi anh chat trực
+    tiếp (phiên ``agent:nina:main``) thì không ai theo, nên exec cứ treo tới
+    hết hạn. ``exec.approval.list`` không lọc theo phiên được (handler không
+    nhận params), nên lấy hết rồi chia theo ``request.sessionKey`` ở đây.
+    """
+    from collections import defaultdict
+    from app.models import Agent
+    ready = readiness()
+    if not ready["ready"]:
+        return {"supported": False, "readiness": ready}
+    runtime = runtime or get_runtime()
+    entries = entries_from(await runtime.list_approvals())
+    groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for e in entries:
+        req = e.get("request") if isinstance(e.get("request"), dict) else {}
+        groups[(str(req.get("agentId") or ""), str(req.get("sessionKey") or ""))].append(e)
+    out = {"supported": True, "seen": len(entries), "recorded": [], "unmapped": []}
+    for (agent_id, session_key), items in groups.items():
+        agent = db.query(Agent).filter(Agent.runtime_agent_id == agent_id).first() if agent_id else None
+        member = db.get(Member, agent.member_id) if agent else None
+        if member is None or not session_key:
+            out["unmapped"] += [str(i.get("id")) for i in items]
+            continue
+        task = db.query(Task).filter(Task.runtime_session_key == session_key).first()
+        state = _state_for(db, organization_id=member.organization_id, session_key=session_key,
+                           task_id=task.id if task else None)
+        for entry in items:
+            event = {"type": ocp.M_EXEC_APPROVAL_LIST, "family": "approval", "raw": entry}
+            approval = stream.record_approval(db, state, event, member=member)
+            if approval is not None:
+                out["recorded"].append(approval.id)
+    out["recorded"] = sorted(set(out["recorded"]))
+    return out

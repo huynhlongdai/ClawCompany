@@ -435,3 +435,28 @@ def test_shell_permission_shows_in_matrix_but_is_not_an_mcp_tool(db, org):
     assert mx["matrix"]["lead"]["gateway_shell"]["level"] == "ask"
     assert mx["matrix"]["executor"]["gateway_shell"]["level"] == "off"
     assert "gateway_shell" not in company_mcp.TOOLS
+
+
+@pytest.mark.asyncio
+async def test_shell_prompt_from_direct_chat_lands_in_the_inbox(db, org, monkeypatch):
+    """Đo trên VM: gateway trả {"payload": [...]}, phiên agent:nina:main không thuộc việc nào."""
+    from app.models import Approval
+    from app.services import approval_backfill
+    monkeypatch.setattr(approval_backfill, "readiness", lambda: {"ready": True})
+    _, m = seat(db, org, "nina", "Nina", "Chief of Staff")
+
+    class RT:
+        async def list_approvals(self, **_):
+            return {"payload": [{"id": "b86b", "approvalKind": "exec",
+                                 "allowedDecisions": ["allow-once", "allow-always", "deny"],
+                                 "request": {"command": "uname -a", "agentId": "nina",
+                                             "sessionKey": "agent:nina:main"}},
+                                {"id": "zzz", "request": {"command": "ls", "agentId": "la",
+                                                          "sessionKey": "agent:la:main"}}]}
+
+    out = await approval_backfill.sweep_all(db, RT())
+    assert out["seen"] == 2 and out["unmapped"] == ["zzz"] and len(out["recorded"]) == 1
+    a = db.get(Approval, out["recorded"][0])
+    assert a.status == "pending" and a.requester_member_id == m.id and "uname -a" in a.action
+    again = await approval_backfill.sweep_all(db, RT())
+    assert again["recorded"] == out["recorded"]          # không tạo trùng

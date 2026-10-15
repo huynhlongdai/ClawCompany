@@ -27,6 +27,8 @@ CORE_BEAT_SCHEDULE = {
     # D2.1: biến lý do đánh thức thành lượt chạy (gộp trong cửa sổ 10 giây).
     "drain-wakeups": {"task": "wakeups.drain", "schedule": 5.0},
     # D3.5: approval quá hạn → chuyển lên quản lý (audit approval.escalated).
+    # Lệnh shell chờ duyệt (exec.mode=ask) → hộp duyệt, kể cả khi chat trực tiếp.
+    "sweep-gateway-approvals": {"task": "approvals.sweep_gateway", "schedule": 10.0},
     "escalate-overdue-approvals": {"task": "approvals.escalate_overdue", "schedule": 60.0},
     # D3.4: routines — giờ hẹn cron theo múi giờ, chạy bù, kết cục từng lần chạy.
     "tick-routines": {"task": "routines.tick", "schedule": 30.0},
