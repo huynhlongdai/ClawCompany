@@ -66,3 +66,29 @@ period_key?}`, `POST /team/kpis/sync-positions`.
 Giới hạn tự khai: "việc xong trong kỳ" dùng `tasks.updated_at` làm mốc xong (chưa có cột `done_at`); KPI tính
 khi đọc (chưa lưu lịch sử số tự tính theo kỳ); AGENTS.md vẫn chỉ ghi mục tiêu KPI của chức danh (D2), số thực tế
 nằm ở scorecard.
+
+## D6. Nhịp vận hành — migration `0041_operating_rhythm`
+
+**Dữ liệu**: `rhythm_configs` (một hàng / công ty: giao ban sáng bật + giờ, báo cáo tuần bật + thứ + giờ, múi giờ,
+gửi riêng từng phòng, để agent trưởng phòng viết), `rhythm_reports` (bản đã gửi: phạm vi `c<id>`/`d<id>`, loại
+`standup|weekly`, kỳ `2026-10-16`/`2026-W42`, nội dung, bản xác định, số liệu JSON, người viết, ghi chú, người nhận;
+UNIQUE công ty × phạm vi × loại × kỳ).
+
+**Số liệu** (`operating_rhythm.collect`, 24 giờ / 7 ngày): việc xong (tên 5 việc), đang làm/chờ duyệt, bị chặn,
+trễ hạn, việc mới; quy trình D4 (lần chạy xong, đang chạy, chu trình TB, bước trễ so với thời lượng kỳ vọng); KPI
+D5 chậm/cần chú ý của phạm vi; phê duyệt đang chờ (lâu nhất bao nhiêu giờ); chi phí lượt chạy (USD); lượt chạy lỗi.
+`summarize` → bản tóm tắt **xác định** (không cần model).
+
+**Người viết**: bật `agent_author` và trưởng phòng (cấp công ty: trưởng Ban điều hành) là seat agent còn hoạt động +
+gateway thật → agent viết lại từ đúng số liệu (prompt cấm bịa số, phiên `agent:<rid>:rhythm-<phạm vi>-<loại>-<kỳ>`,
+75 s, các phạm vi chạy song song); lỗi/không gateway/trưởng phòng là người → bản xác định, ghi lý do. Bản xác định
+luôn lưu kèm (`fallback`).
+
+**Gửi**: một `inbox_items` (loại `standup` / `weekly_report`, nhóm `rhythm:<id>`, thân = toàn văn) cho người phụ
+trách là người: phòng → trưởng phòng (agent → người quản lý gần nhất là người, `inbox.human_recipients`); công ty →
+chủ doanh nghiệp. **Lịch**: Celery beat `rhythm.tick` 300 s, gửi trong 2 giờ kể từ giờ hẹn theo múi giờ công ty
+(khởi động muộn không gửi bù lúc nửa đêm). Công ty dựng từ mẫu được bật sẵn; công ty khác bật ở tab Giao ban.
+(`operating_cycles` gắn với mục tiêu nên không dùng lại được cho giao ban; dùng chung beat + Hộp việc.)
+
+API: `GET /team/rhythm`, `PUT /team/rhythm/config`, `POST /team/rhythm/run {kind, department_id? | all_departments}`,
+`GET /team/rhythm/reports/{id}`.

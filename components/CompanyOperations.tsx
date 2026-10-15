@@ -301,3 +301,71 @@ function KpiForm({d, edit, busy, onCancel, onSave}: any) {
     </div>
   </section>;
 }
+
+// ===================================================================== Nhịp vận hành (D6)
+
+const DOW = [0, 1, 2, 3, 4, 5, 6];
+
+export function RhythmTab({companyId, caps}: {companyId: number | null; caps: any}) {
+  const {data, error, reload, setError} = useLoad(() => apiOps.rhythm(companyId), [companyId]);
+  const [f, setF] = useState<any>(null), [busy, setBusy] = useState(false);
+  const toast = useToast();
+  const can = !!caps?.invite || !!caps?.manage_roles;
+  useEffect(() => { if (data) setF({...(data as any).config}); }, [data]);
+  if (error && !data) return <ErrorBanner error={error} onRetry={reload} testId="rh-error"/>;
+  if (!data || !f) return <SkeletonRows n={4} h={44}/>;
+  const d: any = data;
+  const set = (k: string, v: any) => setF({...f, [k]: v});
+  async function run(fn: () => Promise<any>, ok: string | ((r: any) => string)) {
+    setBusy(true); setError(null);
+    try { const r = await fn(); toast(typeof ok === "string" ? ok : ok(r)); await reload(); return r; }
+    catch (e) { setError(e); } finally { setBusy(false); }
+  }
+  const cid = companyId ?? d.company_id;
+  return <section className="ui-section" data-testid="rhythm">
+    {error ? <ErrorBanner error={error} onClose={() => setError(null)}/> : null}
+    <p className="tmGuide">{tr("ops.rh_explain")}</p>
+    <div className="ui-grid is-2">
+      <section className="ui-panel tm-card">
+        <div className="tm-card-head"><div><b>{tr("ops.rh_schedule")}</b><span>{f.enabled ? tr("ops.rh_on") : tr("ops.rh_off")}</span></div>
+          <span className={"ui-pill " + (f.enabled ? "is-ok" : "")}>{f.enabled ? tr("ops.rh_auto") : tr("ops.rh_manual")}</span></div>
+        <fieldset disabled={!can || busy} className="ui-form cf-form">
+          <label className="tmInline"><input type="checkbox" checked={!!f.standup_enabled} onChange={e => set("standup_enabled", e.target.checked)} data-testid="rh-standup"/>
+            {tr("ops.rh_standup_at")} <input className="ops-min" inputMode="numeric" value={f.standup_hour} onChange={e => set("standup_hour", Number(e.target.value) || 0)}/> {tr("ops.rh_hour")}</label>
+          <label className="tmInline"><input type="checkbox" checked={!!f.weekly_enabled} onChange={e => set("weekly_enabled", e.target.checked)}/>
+            {tr("ops.rh_weekly_on")} <select value={f.weekly_dow} onChange={e => set("weekly_dow", Number(e.target.value))}>
+              {DOW.map(x => <option key={x} value={x}>{tr(`ops.dow_${x}` as Key)}</option>)}</select>
+            <input className="ops-min" inputMode="numeric" value={f.weekly_hour} onChange={e => set("weekly_hour", Number(e.target.value) || 0)}/> {tr("ops.rh_hour")}</label>
+          <label className="tmInline"><input type="checkbox" checked={!!f.per_department} onChange={e => set("per_department", e.target.checked)}/>{tr("ops.rh_per_dept")}</label>
+          <label className="tmInline"><input type="checkbox" checked={!!f.agent_author} onChange={e => set("agent_author", e.target.checked)}/>{tr("ops.rh_agent")}</label>
+          <small className="tmGuide">{tr("ops.rh_tz", {p0: f.timezone})}</small>
+        </fieldset>
+        {can && <div className="tmRow"><button className="ui-btn is-primary" disabled={busy} data-testid="rh-save"
+          onClick={() => run(() => apiOps.saveRhythm({company_id: cid, standup_enabled: f.standup_enabled, standup_hour: f.standup_hour,
+            weekly_enabled: f.weekly_enabled, weekly_dow: f.weekly_dow, weekly_hour: f.weekly_hour, per_department: f.per_department,
+            agent_author: f.agent_author}), tr("ops.saved_short"))}>{tr("ops.save")}</button></div>}
+      </section>
+      <section className="ui-panel tm-card">
+        <div className="tm-card-head"><div><b>{tr("ops.rh_now")}</b><span>{tr("ops.rh_now_desc")}</span></div></div>
+        {can ? <div className="tmRow">
+          <button className="ui-btn is-ghost" disabled={busy} data-testid="rh-run-standup"
+            onClick={() => run(() => apiOps.runRhythm({company_id: cid, kind: "standup", all_departments: true}),
+              (r: any) => tr("ops.rh_sent", {p0: r.items.filter((x: any) => x.created).length}))}>{tr("ops.rh_run_standup")}</button>
+          <button className="ui-btn is-ghost" disabled={busy} data-testid="rh-run-weekly"
+            onClick={() => run(() => apiOps.runRhythm({company_id: cid, kind: "weekly", all_departments: true}),
+              (r: any) => tr("ops.rh_sent", {p0: r.items.filter((x: any) => x.created).length}))}>{tr("ops.rh_run_weekly")}</button>
+        </div> : <small>{tr("ops.need_manager")}</small>}
+        {busy && <small className="tmGuide">{tr("ops.rh_busy")}</small>}
+      </section>
+    </div>
+    <h3 className="ops-cat">{tr("ops.rh_recent")}</h3>
+    {!d.reports.length ? <EmptyState mood="ngu" title={tr("ops.rh_empty")} testId="rh-empty">{tr("ops.rh_empty_hint")}</EmptyState>
+      : <div className="ops-inst">{d.reports.map((r: any) => <details key={r.id} data-testid={`rh-${r.id}`}>
+        <summary><b>{r.title}</b> <span className={"ui-pill " + (r.by_agent ? "is-info" : "")}>{r.by_agent ? tr("ops.rh_by_agent") : tr("ops.rh_by_system")}</span>
+          {" "}<small>→ {r.recipients.join(", ") || "—"} · {new Date(r.created_at + "Z").toLocaleString()}</small></summary>
+        <pre className="ibx-pre ops-report">{r.content}</pre>
+        {r.author_note && <small className="tmGuide">{r.author_note}</small>}
+        {r.by_agent && <details><summary><small>{tr("ops.rh_fallback")}</small></summary><pre className="ibx-pre ops-report">{r.fallback}</pre></details>}
+      </details>)}</div>}
+  </section>;
+}

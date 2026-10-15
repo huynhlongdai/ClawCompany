@@ -34,7 +34,8 @@ from app.models.extended import InboxItem
 
 KINDS = ("approval_pending", "approval_escalated", "run_failed", "task_review", "mention",
          "budget_warned", "budget_soft_stopped", "budget_exhausted", "routine_paused", "goal_completed",
-         "lesson_proposal")   # M5 sẽ ghi: agent đề xuất bài học → người duyệt → MEMORY.md
+         "lesson_proposal",   # M5 sẽ ghi: agent đề xuất bài học → người duyệt → MEMORY.md
+         "standup", "weekly_report", "compliance_due")   # M2c D6 giao ban/báo cáo tuần, D7 hạn tuân thủ
 KIND_VI = {
     "approval_pending": "Chờ duyệt", "approval_escalated": "Duyệt quá hạn — chuyển lên anh",
     "run_failed": "Run lỗi", "task_review": "Vào review", "mention": "Được nhắc tên",
@@ -43,6 +44,7 @@ KIND_VI = {
     "routine_paused": "Routine tự dừng",
     "goal_completed": "Mục tiêu hoàn thành",
     "lesson_proposal": "Bài học đề xuất",
+    "standup": "Giao ban ngày", "weekly_report": "Báo cáo tuần", "compliance_due": "Hạn tuân thủ",
 }
 PRIO = {"low": 0, "normal": 1, "medium": 1, "high": 2, "urgent": 3}
 OPEN = ("unread", "read")

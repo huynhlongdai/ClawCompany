@@ -7,7 +7,7 @@ Quy trình KHÔNG có động cơ riêng: mỗi bước của một lần chạy
 Bảng ở đây chỉ ghi định nghĩa và thời gian chu trình."""
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -129,4 +129,46 @@ class KpiMeasurement(Base):
     source: Mapped[str] = mapped_column(String(16), default="manual")
     note: Mapped[str] = mapped_column(String(400), default="")
     recorded_by_member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+# ------------------------------------------------------------------ D6 nhịp vận hành
+
+class RhythmConfig(Base):
+    """Giao ban ngày / báo cáo tuần tự động của một công ty (giờ địa phương)."""
+    __tablename__ = "rhythm_configs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), unique=True, index=True)
+    standup_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    standup_hour: Mapped[int] = mapped_column(Integer, default=8)
+    weekly_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    weekly_dow: Mapped[int] = mapped_column(Integer, default=4)               # 0 = thứ Hai … 4 = thứ Sáu
+    weekly_hour: Mapped[int] = mapped_column(Integer, default=17)
+    timezone: Mapped[str] = mapped_column(String(64), default="Asia/Ho_Chi_Minh")
+    per_department: Mapped[bool] = mapped_column(Boolean, default=True)
+    agent_author: Mapped[bool] = mapped_column(Boolean, default=True)        # trưởng phòng là agent viết (qua gateway)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class RhythmReport(Base):
+    """Một bản giao ban / báo cáo tuần đã gửi. ``scope_key`` = ``c<id>`` (công ty) | ``d<id>`` (phòng);
+    UNIQUE(công ty, scope, loại, kỳ) — beat và nút "Gửi ngay" không sinh hai bản cho cùng kỳ."""
+    __tablename__ = "rhythm_reports"
+    __table_args__ = (UniqueConstraint("company_id", "scope_key", "kind", "period_key", name="uq_rhythm_report_period"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    department_id: Mapped[int | None] = mapped_column(ForeignKey("departments.id"), nullable=True)
+    scope_key: Mapped[str] = mapped_column(String(24), default="")
+    kind: Mapped[str] = mapped_column(String(16), default="standup")          # standup | weekly
+    period_key: Mapped[str] = mapped_column(String(16), default="")
+    title: Mapped[str] = mapped_column(String(220), default="")
+    content: Mapped[str] = mapped_column(Text, default="")
+    fallback: Mapped[str] = mapped_column(Text, default="")
+    data_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    author: Mapped[str] = mapped_column(String(120), default="system")
+    author_note: Mapped[str] = mapped_column(String(400), default="")
+    recipients: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

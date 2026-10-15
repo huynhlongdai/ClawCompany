@@ -169,3 +169,65 @@ def record_kpi(kpi_id: int, payload: MeasureIn, principal: Principal = Depends(r
 @router.post("/kpis/sync-positions")
 def sync_position_kpis(payload: CompanyIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
     return kc.sync_positions(db, active_org(principal), payload.company_id)
+
+
+# ------------------------------------------------------------------ D6 nhịp vận hành
+
+from app.services import operating_rhythm as rh  # noqa: E402
+
+
+class RhythmConfigIn(BaseModel):
+    company_id: int | None = None
+    standup_enabled: bool | None = None
+    standup_hour: int | None = None
+    weekly_enabled: bool | None = None
+    weekly_dow: int | None = None
+    weekly_hour: int | None = None
+    timezone: str | None = Field(default=None, max_length=64)
+    per_department: bool | None = None
+    agent_author: bool | None = None
+
+
+class RhythmRunIn(BaseModel):
+    company_id: int | None = None
+    kind: str = Field(default="standup", pattern="^(standup|weekly)$")
+    department_id: int | None = None
+    all_departments: bool = False
+    use_agent: bool | None = None
+
+
+def _runtime():
+    from app.core.config import settings
+    if (settings.openclaw_mode or "").lower() not in ("native", "gateway"):
+        return None
+    from app.runtime.factory import get_runtime
+    return get_runtime()
+
+
+@router.get("/rhythm")
+def rhythm(company_id: int | None = None, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+    return rh.overview(db, active_org(principal), company_id)
+
+
+@router.put("/rhythm/config")
+def rhythm_config(payload: RhythmConfigIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    data = payload.model_dump(exclude_unset=True)
+    return rh.save_config(db, active_org(principal), data.pop("company_id", None), data)
+
+
+@router.post("/rhythm/run")
+async def rhythm_run(payload: RhythmRunIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    """Gửi ngay giao ban / báo cáo tuần của kỳ hiện tại (đã gửi kỳ này thì trả bản cũ, không gửi lại)."""
+    from app.services.company_foundation import _company
+    org = active_org(principal)
+    co = _company(db, org, payload.company_id)
+    if payload.all_departments:
+        items = await rh.generate_all(db, org, co.id, payload.kind, runtime=_runtime())
+        return {"items": items}
+    return await rh.generate(db, org, co.id, payload.kind, department_id=payload.department_id, runtime=_runtime(),
+                             use_agent=payload.use_agent)
+
+
+@router.get("/rhythm/reports/{report_id}")
+def rhythm_report(report_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+    return rh.get_report(db, active_org(principal), report_id)

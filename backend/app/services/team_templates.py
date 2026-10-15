@@ -152,6 +152,8 @@ async def create_from_template(db: Session, principal: Principal, org_id: int, k
     try:   # M2c D4: bộ quy trình mẫu (bước gắn chức danh vừa tạo); lỗi gieo không làm hỏng việc dựng công ty
         from app.services import process_map
         process_map.seed_templates(db, org_id, company.id, key)
+        from app.services import operating_rhythm   # D6: giao ban sáng + báo cáo tuần bật sẵn
+        operating_rhythm.config(db, org_id, company.id, create=True)
     except Exception as exc:  # noqa: BLE001
         db.rollback(); print(f"[m2c] seed processes company #{company.id}: {exc}")
     issues = []

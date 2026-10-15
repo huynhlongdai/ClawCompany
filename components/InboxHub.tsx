@@ -2,6 +2,10 @@
 import {riskLabel} from "@/lib/risk";
 import {kindLabel, deadlineText} from "@/lib/approvalText";
 import {actLabel, bandText, whoLabel} from "./CompanyFoundation";
+import {t as tk, type Key as TKey} from "../lib/i18n";
+/* M2c: loại mục mới (giao ban, báo cáo tuần, hạn tuân thủ) có nhãn theo ngôn ngữ; loại cũ giữ nhãn máy chủ. */
+const KIND_KEY: Record<string, TKey> = {standup: "inbox.kind_standup", weekly_report: "inbox.kind_weekly", compliance_due: "inbox.kind_compliance"};
+const kindsText = (c: any) => (c.kinds || []).map((k: string, i: number) => KIND_KEY[k] ? tk(KIND_KEY[k]) : (c.kinds_vi || [])[i] || k).join(" · ");
 import Link from "next/link";
 import {useCallback, useEffect, useState} from "react";
 import {usePathname, useRouter, useSearchParams} from "next/navigation";
@@ -168,7 +172,7 @@ function ItemDetail({det, err}: {det: any; err: string}) {
   const b = det.budget;
   return <div className="ibx-detail" data-testid={`ibx-item-detail-${det.id}`}>
     <dl className="ibx-dl">
-      <dt>{t("inbox.loai_yeu_cau")}</dt><dd>{(det.kinds_vi || []).join(" · ")}{det.count > 1 ? ` (×${det.count})` : ""}</dd>
+      <dt>{t("inbox.loai_yeu_cau")}</dt><dd>{kindsText(det)}{det.count > 1 ? ` (×${det.count})` : ""}</dd>
       <dt>{t("inbox.gui_luc")}</dt><dd>{fmtTime(det.updated_at || det.created_at)}</dd>
       {b && <><dt>{t("inbox.ngan_sach")}</dt><dd>{b.name}</dd>
         <dt>{t("inbox.da_chi")}</dt><dd>{b.spent} / {b.limit} {b.currency}{b.pct != null ? ` (${b.pct}%)` : ""}</dd></>}
@@ -236,7 +240,7 @@ function NoticeCard({c, onChange}: {c: Card; onChange: (msg?: string) => void}) 
   };
   return <>
   {open && <Sheet label={c.title} onClose={close} testId={`ibx-item-sheet-${c.id}`}
-    head={<span className="ibx-sheet-kind">{(c.kinds_vi || []).join(" · ")}</span>}>
+    head={<span className="ibx-sheet-kind">{kindsText(c)}</span>}>
     <div className="ibx-full">
       <h2 className="ibx-full-title">{c.title}</h2>
       <ItemDetail det={det} err={detErr}/>
@@ -247,11 +251,11 @@ function NoticeCard({c, onChange}: {c: Card; onChange: (msg?: string) => void}) 
   <article className={"ibx-card" + (c.id ? " is-clickable" : "") + (c.status === "unread" ? " is-unread" : "")} data-testid={`ibx-item-${c.id}`}
     onClick={onCardClick}>
     <header className="ibx-top">
-      <span>{(c.kinds_vi || []).join(" · ")}{c.count > 1 ? ` · ×${c.count}` : ""}</span>
+      <span>{kindsText(c)}{c.count > 1 ? ` · ×${c.count}` : ""}</span>
       {c.priority === "urgent" || c.priority === "high" ? <span className="ibx-risk is-hot">{t("inbox.uu_tien_cao")}</span> : null}
     </header>
     <h3 className="ibx-title">{c.id ? <button type="button" className="ibx-title-btn" onClick={openFull}>{c.title}</button> : c.title}</h3>
-    {c.lines?.[0] && <p className="ibx-summary">{c.lines[0]}</p>}
+    {c.lines?.[0] && <p className="ibx-summary">{c.lines[0].replace(/^#+\s*/, "")}</p>}
     <div className="ibx-meta">
       {c.seat?.name && <span><Icon name="sparkle" size={13}/>{c.seat.name}</span>}
       {c.department?.name && <span><Icon name="users" size={13}/>{c.department.name}</span>}

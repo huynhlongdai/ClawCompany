@@ -2,7 +2,7 @@ from celery import Celery
 from app.core.config import settings
 
 celery_app = Celery("clawcompany", broker=settings.celery_broker_url, backend=settings.celery_result_backend)
-celery_app.conf.imports = ("app.tasks.knowledge", "app.tasks.runtime", "app.tasks.operations", "app.tasks.events", "app.tasks.delivery", "app.tasks.webhooks", "app.tasks.dev_cloud", "app.tasks.engineering", "app.tasks.v14", "app.tasks.v15")
+celery_app.conf.imports = ("app.tasks.knowledge", "app.tasks.runtime", "app.tasks.operations", "app.tasks.events", "app.tasks.delivery", "app.tasks.webhooks", "app.tasks.dev_cloud", "app.tasks.engineering", "app.tasks.v14", "app.tasks.v15", "app.tasks.company_ops")
 
 # Job nền của các module Phòng thí nghiệm (plan-v2-modules §2). Chỉ lập lịch khi
 # LAB_JOBS_ENABLED=true; thân task cũng tự kiểm cờ (app.core.lab.lab_job) nên gọi tay
@@ -36,6 +36,8 @@ CORE_BEAT_SCHEDULE = {
     "tick-courses": {"task": "courses.tick", "schedule": 600.0},
     # M5b việc 10: đề xuất kỹ năng của agent (Skill Workshop) → Hộp việc.
     "sync-skill-proposals": {"task": "skills.sync_workshop", "schedule": 300.0},
+    # M2c D6: giao ban sáng / báo cáo tuần theo giờ địa phương của từng công ty.
+    "tick-operating-rhythm": {"task": "rhythm.tick", "schedule": 300.0},
 }
 
 

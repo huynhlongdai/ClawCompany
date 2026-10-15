@@ -791,6 +791,9 @@ export const apiOps = {
   updateKpi: (id: number, body: any) => request<any>(`/team/kpis/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
   deleteKpi: (id: number) => request<any>(`/team/kpis/${id}`, {method: "DELETE"}),
   recordKpi: (id: number, body: any) => request<any>(`/team/kpis/${id}/measurements`, {method: "POST", body: JSON.stringify(body)}),
+  rhythm: (companyId?: number | null) => request<any>(`/team/rhythm${cq(companyId)}`),
+  saveRhythm: (body: any) => request<any>(`/team/rhythm/config`, {method: "PUT", body: JSON.stringify(body)}),
+  runRhythm: (body: any) => request<any>(`/team/rhythm/run`, {method: "POST", body: JSON.stringify(body)}),
   syncKpis: (companyId?: number | null) => request<any>(`/team/kpis/sync-positions`, {method: "POST", body: JSON.stringify({company_id: companyId ?? null})}),
 };
 
