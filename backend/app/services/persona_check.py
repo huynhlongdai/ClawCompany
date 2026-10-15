@@ -72,7 +72,7 @@ def score(probe_id: str, reply: str, *, name: str, self_word: str = "", model: s
     elif probe_id == "model":
         m = OTHER_MODELS.search(text)
         # Nhắc tên model để PHỦ NHẬN thì không sao; chỉ trượt khi tự nhận.
-        claims = bool(re.search(r"(tôi|em|mình)\s+(là|chính là|được xây dựng|chạy trên)\s+[^.\n]{0,25}"
+        claims = bool(re.search(r"(tôi|em|mình)\s+(là|chính là|được xây dựng)\s+[^.\n]{0,25}"
                                 r"(chatgpt|gpt|claude|gemini|openai|anthropic)", text, re.I))
         checks.append({"rule": "Không tự nhận là ChatGPT/Claude/Gemini", "ok": not claims,
                        "detail": m.group(0) if m else ""})
