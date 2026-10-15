@@ -2,7 +2,7 @@ import {t, type Key} from "@/lib/i18n";
 
 /* Nhãn loại phê duyệt và hạn duyệt theo ngôn ngữ đang dùng, dựng từ dữ liệu thô
    (kind, seconds_left, escalate_to, escalated_at) thay vì kind_vi/deadline_vi của backend. */
-const KINDS = ["stage", "plan", "budget", "gateway", "lesson"];
+const KINDS = ["stage", "plan", "budget", "gateway", "lesson", "authority"];
 
 export function kindLabel(kind?: string | null): string {
   return t(`inbox.kind_${KINDS.includes(kind || "") ? kind : "other"}` as Key);

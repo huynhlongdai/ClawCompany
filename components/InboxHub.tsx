@@ -1,6 +1,7 @@
 "use client";
 import {riskLabel} from "@/lib/risk";
 import {kindLabel, deadlineText} from "@/lib/approvalText";
+import {actLabel, bandText, whoLabel} from "./CompanyFoundation";
 import Link from "next/link";
 import {useCallback, useEffect, useState} from "react";
 import {usePathname, useRouter, useSearchParams} from "next/navigation";
@@ -116,6 +117,7 @@ function ApprovalCard({c, onDone}: {c: Card; onDone: (msg: string, reload?: bool
       <h3 className="ibx-title"><button type="button" className="ibx-title-btn" onClick={openFull}
         data-testid={`ibx-detail-toggle-${a.id}`}>{a.action}</button></h3>
       {a.summary && <p className="ibx-summary">{a.summary}</p>}
+      {a.authority && <AuthorityRuleLine au={a.authority} id={a.id}/>}
       {meta}
       {!open && decision}
     </article>
@@ -123,6 +125,7 @@ function ApprovalCard({c, onDone}: {c: Card; onDone: (msg: string, reload?: bool
       head={<span className="ibx-sheet-kind">{kindLabel(a.kind)}<span className={"ibx-risk " + riskCls(a.risk)}>{riskLabel(a.risk)}</span></span>}>
       <div className="ibx-full">
         <h2 className="ibx-full-title">{a.action}</h2>
+        {a.authority && <AuthorityRuleLine au={a.authority} id={a.id}/>}
         {meta}
         <ApprovalDetail det={det} err={detErr}/>
         {decision}
@@ -175,6 +178,13 @@ function ItemDetail({det, err}: {det: any; err: string}) {
     {!det.approval_detail && det.task_detail && <TaskContext td={det.task_detail}/>}
     {b && <Link href="/app/costs?tab=budgets">{t("inbox.xem_ngan_sach")}</Link>}
   </div>;
+}
+
+/* M2b: luật nào của ma trận phân quyền sinh ra yêu cầu duyệt này. */
+function AuthorityRuleLine({au, id}: {au: any; id: number}) {
+  return <p className="ibx-rule" data-testid={`ibx-rule-${id}`}><Icon name="shield" size={13}/>
+    <Link href="/app/team?tab=authority">{t("inbox.theo_luat", {p0: au.rule_id})}</Link>
+    <span>{actLabel(au.action_type)} · {bandText(au.min_amount_usd, au.max_amount_usd)} → {au.approver_name || whoLabel(au.approver_kind)}</span></p>;
 }
 
 function ApprovalDetail({det, err}: {det: any; err: string}) {

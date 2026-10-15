@@ -756,6 +756,26 @@ export const apiTeam = {
     request<any>(`/team/import-csv`, {method: "POST", body: JSON.stringify({company_id, csv_text, dry_run})}),
 };
 
+// M2b: nền công ty — hồ sơ pháp nhân + hiến chương, chức danh, ma trận phân quyền (tiền: USD).
+const cq = (companyId?: number | null) => (companyId ? `?company_id=${companyId}` : "");
+export const apiCompany = {
+  profile: (companyId?: number | null) => request<any>(`/team/company-profile${cq(companyId)}`),
+  saveProfile: (body: any) => request<any>(`/team/company-profile`, {method: "PUT", body: JSON.stringify(body)}),
+  positions: (companyId?: number | null) => request<any>(`/team/positions${cq(companyId)}`),
+  createPosition: (body: any) => request<any>(`/team/positions`, {method: "POST", body: JSON.stringify(body)}),
+  updatePosition: (id: number, body: any) => request<any>(`/team/positions/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  archivePosition: (id: number) => request<any>(`/team/positions/${id}`, {method: "DELETE"}),
+  positionsFromMembers: (companyId?: number | null) => request<any>(`/team/positions/from-members${cq(companyId)}`, {method: "POST"}),
+  assign: (id: number, member_id: number) => request<any>(`/team/positions/${id}/seats`, {method: "POST", body: JSON.stringify({member_id})}),
+  unassign: (id: number, memberId: number) => request<any>(`/team/positions/${id}/seats/${memberId}`, {method: "DELETE"}),
+  authority: (companyId?: number | null) => request<any>(`/team/authority${cq(companyId)}`),
+  createRule: (body: any) => request<any>(`/team/authority/rules`, {method: "POST", body: JSON.stringify(body)}),
+  updateRule: (id: number, body: any) => request<any>(`/team/authority/rules/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  deleteRule: (id: number) => request<any>(`/team/authority/rules/${id}`, {method: "DELETE"}),
+  seedDefaults: (body: any) => request<any>(`/team/authority/seed-defaults`, {method: "POST", body: JSON.stringify(body)}),
+  evaluate: (body: any) => request<any>(`/team/authority/evaluate`, {method: "POST", body: JSON.stringify(body)}),
+};
+
 // M3: Nhân sự AI — tuyển (wizard), sửa hồ sơ 2 chiều, lệch & đồng bộ lại, vòng đời, quyền tool theo seat.
 // agentId ở đây là id của bảng agents (seat), không phải member id.
 export const apiSharedMemory = {

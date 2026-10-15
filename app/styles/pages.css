@@ -591,3 +591,19 @@ a.org-node:hover{border-color:var(--text-muted);box-shadow:var(--shadow-2)}
 .ibx-journal small{color:var(--text-muted)}
 .ibx-lesson-edit{display:flex;flex-direction:column;gap:4px}.ibx-lesson-edit textarea{width:100%;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;font:inherit}
 .ui-grid.is-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}@media (max-width:720px){.ui-grid.is-4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* M2b — nền công ty (Hồ sơ công ty · Chức danh · Phân quyền) */
+.cf-form{border:0;padding:0;margin:0;display:grid;gap:10px}
+.cf-form textarea,.cf-form input,.cf-form select{width:100%}
+.cf-preview{margin-top:12px}
+.cf-preview pre{white-space:pre-wrap;font-family:var(--font-mono);font-size:12px;background:var(--surface-sunken,var(--bg));padding:10px;border-radius:8px;max-height:320px;overflow:auto}
+.cf-kpis{margin:4px 0 8px;padding-left:18px;font-size:13px}
+.cf-vacant td{color:var(--text-muted);font-style:italic}
+.cf-edit{margin-bottom:12px;border-color:var(--accent,#D63A2F)}
+.cf-kpi-row input,.cf-kpi-row select{width:auto}
+.cf-kpi-row input:first-child{flex:1}
+.cf-tools{display:flex;flex-wrap:wrap;gap:6px 14px;max-height:180px;overflow:auto}
+.cf-tools code{font-size:12px}
+.cf-matrix tr.is-off td{opacity:.5}
+.cf-id{color:var(--text-muted);margin-right:6px}
+.ibx-rule{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);margin:2px 0 6px}
