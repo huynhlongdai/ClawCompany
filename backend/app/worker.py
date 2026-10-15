@@ -32,6 +32,8 @@ CORE_BEAT_SCHEDULE = {
     "escalate-overdue-approvals": {"task": "approvals.escalate_overdue", "schedule": 60.0},
     # D3.4: routines — giờ hẹn cron theo múi giờ, chạy bù, kết cục từng lần chạy.
     "tick-routines": {"task": "routines.tick", "schedule": 30.0},
+    # M5b việc 9: tới giờ học của khoá → mỗi agent học/thi một bước mỗi ngày.
+    "tick-courses": {"task": "courses.tick", "schedule": 600.0},
 }
 
 

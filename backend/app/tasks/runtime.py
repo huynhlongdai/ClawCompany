@@ -74,3 +74,20 @@ def tick_routines():
         return routines.tick(db)
     finally:
         db.close()
+
+
+@celery_app.task(name="courses.tick")
+def tick_courses():
+    """M5b việc 9: buổi học / bài thi tới giờ (chỉ chạy với gateway thật)."""
+    import asyncio
+    from app.core.config import settings
+    from app.db.session import SessionLocal
+    from app.runtime.factory import get_runtime
+    from app.services import courses
+    if (settings.openclaw_mode or "").lower() not in ("native", "gateway"):
+        return {"skipped": "not native"}
+    db = SessionLocal()
+    try:
+        return asyncio.run(courses.tick(db, get_runtime()))
+    finally:
+        db.close()

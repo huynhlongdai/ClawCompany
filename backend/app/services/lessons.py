@@ -25,7 +25,8 @@ from sqlalchemy.orm import Session
 
 from app.models import Agent, Approval, Member, Task
 
-SOURCES_VI = {"review": "Góp ý của người duyệt", "self": "Agent tự đề xuất", "extract": "Rút từ nhật ký làm việc"}
+SOURCES_VI = {"review": "Góp ý của người duyệt", "self": "Agent tự đề xuất", "extract": "Rút từ nhật ký làm việc",
+              "course": "Rút từ buổi học"}
 MAX_LESSON = 600
 PREFIX = "[Bài học]"
 

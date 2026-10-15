@@ -46,7 +46,7 @@ export async function request<T = any>(path:string, init?:RequestInit):Promise<T
   try{
     res = await fetch(`${API_BASE}${path}`, {
       ...init,
-      headers: {"Content-Type":"application/json", "Accept-Language": getLocale(), ...(token?{Authorization:`Bearer ${token}`}:{ }), ...(init?.headers||{})},
+      headers: {...(typeof FormData!=="undefined" && init?.body instanceof FormData ? {} : {"Content-Type":"application/json"}), "Accept-Language": getLocale(), ...(token?{Authorization:`Bearer ${token}`}:{ }), ...(init?.headers||{})},
       cache: "no-store",
     });
   }catch{

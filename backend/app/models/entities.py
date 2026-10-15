@@ -124,6 +124,11 @@ class KnowledgeDocument(Base, TimestampMixin):
     access_level: Mapped[str] = mapped_column(String(32), default="restricted")
     content: Mapped[str] = mapped_column(Text, default="")
     indexed: Mapped[bool] = mapped_column(Boolean, default=False)
+    # M5b việc 9: nguồn đồng bộ + khoá trùng + phạm vi riêng một agent.
+    source_url: Mapped[str] = mapped_column(String(1000), default="", server_default="")
+    content_hash: Mapped[str] = mapped_column(String(64), default="", server_default="", index=True)
+    synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    agent_id: Mapped[int | None] = mapped_column(ForeignKey("agents.id"), nullable=True, index=True)
 
 class Approval(Base, TimestampMixin):
     __tablename__ = "approvals"

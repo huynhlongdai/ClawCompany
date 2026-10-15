@@ -413,15 +413,28 @@ def _doc_visible(ctx: ToolContext, doc: KnowledgeDocument | None) -> bool:
     return doc.department_id is None or doc.department_id == ctx.member.department_id
 
 
-@tool("company_knowledge_search", "knowledge", "Tìm trong kho tri thức công ty.",
+@tool("company_knowledge_search", "knowledge",
+      "Tìm trong kho tri thức công ty (tài liệu, quy định, sổ tay, khoá học) trong phạm vi của bạn. Mỗi kết quả có "
+      "\"cite\" — khi trả lời dựa vào tài liệu, ghi kèm cite đó. found=false nghĩa là kho chưa có câu trả lời: "
+      "nói rõ là chưa có tài liệu, đừng đoán.",
       "company.knowledge:read", {"query": {"type": "string"}, "limit": {"type": "integer"}},
       ("query",))
 def _knowledge_search(ctx: ToolContext, args: dict) -> dict:
-    from app.services.vector_search import search_vectors
-    hits = search_vectors(ctx.db, ctx.org, _str(args, "query", limit=500),
-                          company_id=ctx.member.company_id,
-                          department_id=ctx.member.department_id, limit=_limit(args, 8))
-    return {"hits": hits}
+    from app.services import knowledge_hub
+    return knowledge_hub.search(ctx.db, ctx.org, _str(args, "query", limit=500), member=ctx.member, agent=ctx.agent,
+                                limit=_limit(args, 6), task_id=ctx.run.task_id if ctx.run else None)
+
+
+@tool("company_knowledge_gap_report", "knowledge",
+      "Báo kho tri thức đang thiếu tài liệu để làm việc (ví dụ khách hỏi chính sách chưa có trong kho). "
+      "Người quản lý thấy trong danh sách Lỗ hổng kiến thức để bổ sung.",
+      "company.knowledge:read", {"question": {"type": "string"}, "task_id": {"type": "integer"}}, ("question",),
+      writes=True)
+def _knowledge_gap_report(ctx: ToolContext, args: dict) -> dict:
+    from app.services import knowledge_hub
+    g = knowledge_hub.record_gap(ctx.db, ctx.org, ctx.member.id, _str(args, "question", limit=2000), source="report",
+                                 task_id=_int(args, "task_id", required=False, default=None))
+    return {"gap_id": g.id, "count": g.count, "message": "Đã ghi lỗ hổng kiến thức cho người quản lý bổ sung tài liệu"}
 
 
 @tool("company_memory_search", "knowledge",

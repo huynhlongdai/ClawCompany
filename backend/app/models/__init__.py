@@ -33,3 +33,4 @@ from .agent_hr import *  # noqa: E402,F401,F403  (M3)
 # đóng dòng inbox). Đăng ký ở đây để mọi đường tạo approval — API, worker, test
 # chỉ dùng ORM — đều đi qua cùng một chỗ.
 from app.services import inbox as _inbox_hooks  # noqa: E402,F401
+from .learning import *  # noqa: E402,F401,F403  (M5b việc 9)

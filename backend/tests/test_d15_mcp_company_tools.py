@@ -107,8 +107,8 @@ def test_initialize_and_list_all_26_tools(env):
     assert n.status_code == 202
     tools = env["rpc"](k, "tools/list").json()["result"]["tools"]
     names = {t["name"] for t in tools}
-    # 27 = 26 + company_lesson_propose (M5b)
-    assert len(tools) == 27 and all(n.startswith("company_") for n in names)
+    # 28 = 26 + company_lesson_propose + company_knowledge_gap_report (M5b)
+    assert len(tools) == 28 and all(n.startswith("company_") for n in names)
     assert "company_task_checkout" in names and "company_memory_search" in names
 
 
@@ -233,7 +233,7 @@ def test_executor_seat_gets_403_on_budget_check_even_with_full_scopes(env):
     lead, junior = _lead_and_executor(env)
     k = env["key"](junior, scopes=("*",))     # gateway/scope đều cho qua
     names = {t["name"] for t in env["rpc"](k, "tools/list").json()["result"]["tools"]}
-    assert "company_budget_check" not in names and len(names) == 24   # +company_lesson_propose (M5b)
+    assert "company_budget_check" not in names and len(names) == 25   # +company_lesson_propose, company_knowledge_gap_report (M5b)
     r = env["rpc"](k, "tools/call", {"name": "company_budget_check", "arguments": {}})
     assert r.status_code == 403 and r.json()["error"]["data"]["level"] == "off"
     # Trưởng phòng thì được.

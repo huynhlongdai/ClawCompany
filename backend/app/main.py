@@ -13,6 +13,7 @@ from app.api.agents import router as agents_router
 from app.api.projects import router as projects_router
 from app.api.tasks import router as tasks_router
 from app.api.knowledge import router as knowledge_router
+from app.api.learning import router as learning_router
 from app.api.approvals import router as approvals_router
 from app.api.extended import router as extended_router
 from app.api.dashboard import router as dashboard_router
@@ -165,6 +166,7 @@ app.include_router(strategy_router, prefix="/api")
 app.include_router(team_router, prefix="/api")
 app.include_router(work_router, prefix="/api")
 app.include_router(inbox_router, prefix="/api")
+app.include_router(learning_router, prefix="/api")
 app.include_router(costs_router, prefix="/api")
 
 

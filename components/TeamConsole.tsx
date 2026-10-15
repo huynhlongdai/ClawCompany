@@ -8,6 +8,7 @@ import {useRouter, useSearchParams} from "next/navigation";
 import {PageFrame} from "./shell/PageFrame";
 import {apiTeam, errorText} from "../lib/api";
 import {AgentHRTab} from "./AgentHR";
+import {LearningHub} from "./LearningHub";
 import {Notice, EmptyState, ErrorBanner} from "./ui/EmptyState";
 import {SkeletonRows} from "./ui/Skeleton";
 import {useToast} from "./ui/Toast";
@@ -99,10 +100,11 @@ export function TeamConsole() {
 }
 
 function TrainingTab() {
-  return <div className="ui-grid is-2">
-    <EmptyState mood="lam-viec" title={tr("team.dao_tao_agent_dang_duoc")}>
-      {tr("team.skill_studio_bo_bai_thu")}
-    </EmptyState>
+  return <><LearningHub/><TrainingLinks/></>;
+}
+
+function TrainingLinks() {
+  return <div style={{marginTop: 16}}>
     <section className="ui-panel"><header className="ui-panel-head"><div className="ui-grow"><h2>{tr("team.dung_duoc_ngay")}</h2><p>{tr("team.nhung_phan_dao_tao_da")}</p></div></header>
       <div className="ui-list">
         <Link className="ui-row" href="/app/agent-tools"><Icon name="shield" size={16}/><span className="ui-row-main"><span className="ui-row-title">{tr("team.ky_nang_cong_cu")}</span><span className="ui-row-meta">{tr("team.cong_cu_agent_duoc_goi")}</span></span><Icon name="chevron-right" size={14}/></Link>

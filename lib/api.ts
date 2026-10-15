@@ -772,6 +772,35 @@ export const apiSharedMemory = {
   forget: (id: number) => request<any>(`/shared-memory/${id}`, {method: "DELETE"}),
 };
 
+// M5b việc 9: kho tri thức hợp nhất + lỗ hổng + khoá học.
+export const apiLearning = {
+  docs: () => request<any>(`/learning/docs`),
+  addDoc: (body: any) => request<any>(`/learning/docs`, {method: "POST", body: JSON.stringify(body)}),
+  upload: (file: File, scope: Record<string, any> = {}) => {
+    const fd = new FormData(); fd.append("file", file);
+    Object.entries(scope).forEach(([k, v]) => { if (v !== null && v !== undefined && v !== "") fd.append(k, String(v)); });
+    return request<any>(`/learning/docs/upload`, {method: "POST", body: fd});
+  },
+  resync: (id: number) => request<any>(`/learning/docs/${id}/resync`, {method: "POST"}),
+  removeDoc: (id: number) => request<any>(`/learning/docs/${id}`, {method: "DELETE"}),
+  search: (q: string) => request<any>(`/learning/search?q=${encodeURIComponent(q)}`),
+  gaps: (status = "open") => request<any>(`/learning/gaps?status=${status}`),
+  resolveGap: (id: number, body: {document_id?: number | null; dismiss?: boolean}) =>
+    request<any>(`/learning/gaps/${id}/resolve`, {method: "POST", body: JSON.stringify(body)}),
+  courses: () => request<any>(`/learning/courses`),
+  course: (id: number) => request<any>(`/learning/courses/${id}`),
+  createCourse: (body: any) => request<any>(`/learning/courses`, {method: "POST", body: JSON.stringify(body)}),
+  updateCourse: (id: number, body: any) => request<any>(`/learning/courses/${id}`, {method: "PUT", body: JSON.stringify(body)}),
+  enroll: (id: number, body: {agent_ids?: number[]; department_ids?: number[]}) =>
+    request<any>(`/learning/courses/${id}/enroll`, {method: "POST", body: JSON.stringify(body)}),
+  genQuiz: (id: number, body: {author_agent_id?: number | null; questions?: number} = {}) =>
+    request<any>(`/learning/courses/${id}/quiz/generate`, {method: "POST", body: JSON.stringify(body)}),
+  step: (enrollmentId: number) => request<any>(`/learning/enrollments/${enrollmentId}/step`, {method: "POST"}),
+  retake: (enrollmentId: number, from_start = false) =>
+    request<any>(`/learning/enrollments/${enrollmentId}/retake`, {method: "POST", body: JSON.stringify({from_start})}),
+  agent: (agentId: number) => request<any>(`/learning/agents/${agentId}`),
+};
+
 export const apiAgentsHR = {
   roster: (companyId?: number | null) => request<any>(`/agents/roster${companyId ? `?company_id=${companyId}` : ""}`),
   options: () => request<any>(`/agents/hire/options`),
