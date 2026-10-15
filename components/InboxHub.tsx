@@ -7,6 +7,7 @@ import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import {Icon} from "./Icon";
 import {EmptyState, ErrorState} from "./ui/EmptyState";
 import {SkeletonRows} from "./ui/Skeleton";
+import {Sheet} from "./ui/Dialog";
 import {useToast} from "./ui/Toast";
 import {apiInboxHub, errorText} from "../lib/api";
 import {refreshCounts} from "../lib/counts";
@@ -35,9 +36,9 @@ function ApprovalCard({c, onDone}: {c: Card; onDone: (msg: string, reload?: bool
   const [note, setNote] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState("");
   const [scope, setScope] = useState<"task" | "seat" | "department">("task");
   const [open, setOpen] = useState(false), [det, setDet] = useState<any>(null), [detErr, setDetErr] = useState("");
-  async function toggle() {
-    const next = !open; setOpen(next);
-    if (next && !det) {
+  async function openFull() {
+    setOpen(true);
+    if (!det) {
       setDetErr("");
       try { setDet(await apiInboxHub.approval(a.id)); } catch (e) { setDetErr(errorText(e, t("inbox.khong_tai_duoc_chi_tiet"))); }
     }
@@ -57,21 +58,7 @@ function ApprovalCard({c, onDone}: {c: Card; onDone: (msg: string, reload?: bool
     } finally { setBusy(false); }
   }
 
-  return <article className={"ibx-card is-approval" + (a.overdue ? " is-overdue" : "")} data-testid={`ibx-approval-${a.id}`}>
-    <header className="ibx-top">
-      <span>{kindLabel(a.kind)}{a.requester ? t("inbox.xin_duyet", {p0: a.requester}) : ""}</span>
-      <span className={"ibx-risk " + riskCls(a.risk)}>{riskLabel(a.risk)}</span>
-    </header>
-    <h3 className="ibx-title"><button type="button" className="ibx-title-btn" onClick={toggle} aria-expanded={open}>{a.action}</button></h3>
-    {a.summary && !open && <p className="ibx-summary">{a.summary}</p>}
-    <button type="button" className="ibx-more" onClick={toggle} aria-expanded={open} data-testid={`ibx-detail-toggle-${a.id}`}>
-      <Icon name={open ? "chevron-down" : "chevron-right"} size={14}/>{open ? t("inbox.an_chi_tiet") : t("inbox.xem_chi_tiet")}</button>
-    {open && <ApprovalDetail det={det} err={detErr}/>}
-    <div className="ibx-meta">
-      {c.department?.name && <span><Icon name="users" size={13}/>{c.department.name}</span>}
-      {a.task && <Link href={`/app/work?peek=${a.task.id}`}><Icon name="check" size={13}/>{t("inbox.viec")}{a.task.id}</Link>}
-      {deadlineText(a) && <span className={a.overdue || a.escalation_blocked ? "is-late" : ""}><Icon name="clock" size={13}/>{deadlineText(a)}</span>}
-    </div>
+  const decision = <>
     {!a.can_decide && <p className="ibx-note">{t("inbox.anh_chi_duoc_bao_nguoi")} {a.approver || t("inbox.quan_ly")}.</p>}
     {a.can_decide && a.kind === "budget" && mode !== "reject" &&
       <div className="ibx-scope" role="radiogroup" aria-label={t("inbox.duyet_chi_tiep_cho")}>
@@ -97,7 +84,41 @@ function ApprovalCard({c, onDone}: {c: Card; onDone: (msg: string, reload?: bool
           {busy ? t("inbox.dang_gui") : t("inbox.duyet")}</button>
       </>}
     </div>}
-  </article>;
+  </>;
+  const head = <header className="ibx-top">
+    <span>{kindLabel(a.kind)}{a.requester ? t("inbox.xin_duyet", {p0: a.requester}) : ""}</span>
+    <span className={"ibx-risk " + riskCls(a.risk)}>{riskLabel(a.risk)}</span>
+  </header>;
+  const meta = <div className="ibx-meta">
+    {c.department?.name && <span><Icon name="users" size={13}/>{c.department.name}</span>}
+    {a.task && <Link href={`/app/work?peek=${a.task.id}`}><Icon name="check" size={13}/>{t("inbox.viec")}{a.task.id}</Link>}
+    {deadlineText(a) && <span className={a.overdue || a.escalation_blocked ? "is-late" : ""}><Icon name="clock" size={13}/>{deadlineText(a)}</span>}
+  </div>;
+  // Bấm vào thẻ (trừ nút/link/ô nhập) mở bảng chi tiết đầy đủ bên phải; điện thoại thì phủ cả màn hình.
+  const onCardClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button,a,textarea,input,select,[role=radio]")) return;
+    openFull();
+  };
+  return <>
+    <article className={"ibx-card is-approval is-clickable" + (a.overdue ? " is-overdue" : "")} data-testid={`ibx-approval-${a.id}`}
+      onClick={onCardClick}>
+      {head}
+      <h3 className="ibx-title"><button type="button" className="ibx-title-btn" onClick={openFull}
+        data-testid={`ibx-detail-toggle-${a.id}`}>{a.action}</button></h3>
+      {a.summary && <p className="ibx-summary">{a.summary}</p>}
+      {meta}
+      {!open && decision}
+    </article>
+    {open && <Sheet label={a.action} onClose={() => setOpen(false)} testId={`ibx-sheet-${a.id}`}
+      head={<span className="ibx-sheet-kind">{kindLabel(a.kind)}<span className={"ibx-risk " + riskCls(a.risk)}>{riskLabel(a.risk)}</span></span>}>
+      <div className="ibx-full">
+        <h2 className="ibx-full-title">{a.action}</h2>
+        {meta}
+        <ApprovalDetail det={det} err={detErr}/>
+        {decision}
+      </div>
+    </Sheet>}
+  </>;
 }
 
 function fmtTime(iso?: string | null) {
