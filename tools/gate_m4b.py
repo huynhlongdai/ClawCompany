@@ -113,11 +113,14 @@ def main() -> int:
     print(f"   seat {seat['name']} #{seat['id']} · dự án {proj['name']}")
 
     # 1 ---- giao việc buộc agent gọi exec (seat lead: shell = ask)
-    _, t = api("POST", "/work/tasks", {
-        "title": f"Gate M4b {tag}: kiểm tra năm hiện tại trên máy chủ", "project_id": proj["id"], "priority": "high",
-        "assignee_member_id": seat["id"],
-        "description": "Dùng công cụ exec chạy đúng lệnh `date +%Y` (không dùng cách khác), rồi báo lại đúng con số in ra.",
-        "acceptance_criteria": "Có con số năm do lệnh in ra.", "start": True}, expect=(201,))
+    if os.environ.get("GATE_TASK"):                       # nối tiếp một việc đang chờ duyệt (seat bận 1 lượt/lần)
+        _, t = api("GET", f"/work/tasks/{os.environ['GATE_TASK']}")
+    else:
+        _, t = api("POST", "/work/tasks", {
+            "title": f"Gate M4b {tag}: kiểm tra năm hiện tại trên máy chủ", "project_id": proj["id"], "priority": "high",
+            "assignee_member_id": seat["id"],
+            "description": "Dùng công cụ exec chạy đúng lệnh `date +%Y` (không dùng cách khác), rồi báo lại đúng con số in ra.",
+            "acceptance_criteria": "Có con số năm do lệnh in ra.", "start": True}, expect=(201,))
     tid = t["id"]
     print(f"   việc #{tid}")
 
