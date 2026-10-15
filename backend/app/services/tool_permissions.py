@@ -25,11 +25,36 @@ ASK_GRANT_HOURS = 24
 _EXECUTOR_OFF = {"company_budget_check", "company_task_assign", "company_plan_submit"}  # D3.3: kế hoạch là của seat chiến lược  # D3.1: giao việc là của trưởng phòng
 
 
+class _GatewayTool:
+    """Tool của chính gateway OpenClaw (không qua MCP công ty) mà ClawCompany phân quyền.
+
+    Không gọi được qua MCP; mức quyền được biên dịch thành cấu hình gateway
+    (``seat_provision.seat_deny`` / ``exec.mode``)."""
+    def __init__(self, name: str, description: str):
+        self.name, self.group, self.writes, self.description = name, "gateway", True, description
+
+
+SHELL = "gateway_shell"
+GATEWAY_TOOLS = {
+    SHELL: _GatewayTool(SHELL, "Chạy lệnh shell trên máy chủ gateway (exec/process). "
+                               "Hỏi = lệnh chưa có trong danh sách cho phép phải chờ người duyệt; "
+                               "duyệt \"luôn cho phép\" thì lần sau lệnh đó chạy thẳng."),
+}
+# Ghế điều hành có shell nhưng mặc định phải hỏi; thừa hành không có.
+_GATEWAY_DEFAULTS = {"lead": {SHELL: "ask"}, "executor": {SHELL: "off"}}
+
+
+def all_tools() -> dict:
+    from app.services.company_mcp import TOOLS
+    return {**TOOLS, **GATEWAY_TOOLS}
+
+
 def _defaults() -> dict[str, dict[str, str]]:
     from app.services.company_mcp import TOOLS
     return {
-        "lead": {name: "allowed" for name in TOOLS},
-        "executor": {name: ("off" if name in _EXECUTOR_OFF else "allowed") for name in TOOLS},
+        "lead": {**{name: "allowed" for name in TOOLS}, **_GATEWAY_DEFAULTS["lead"]},
+        "executor": {**{name: ("off" if name in _EXECUTOR_OFF else "allowed") for name in TOOLS},
+                     **_GATEWAY_DEFAULTS["executor"]},
     }
 
 
@@ -113,7 +138,7 @@ def set_level(db: Session, organization_id: int, tool: str, level: str, *,
 
 
 def matrix(db: Session, organization_id: int) -> dict:
-    from app.services.company_mcp import TOOLS
+    TOOLS = all_tools()
     defaults = _defaults()
     rows = db.execute(select(ToolPermission).where(
         ToolPermission.organization_id == organization_id)).scalars().all()

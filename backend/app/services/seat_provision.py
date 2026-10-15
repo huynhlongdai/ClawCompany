@@ -166,7 +166,7 @@ def seat_deny(db: Session, member: Member, rid: str, all_servers: list[str], cur
     * máy chủ MCP của các ghế khác (``cc-<ghế khác>__*``);
     * tool công ty đang ở mức ``off`` với ghế này (``cc-<ghế>__<tool>``) —
       tầng 1 khớp tầng 2 (B-tool: "Tắt" phải thành ``tools.deny``);
-    * ``exec``/``process`` cho ghế thừa hành.
+    * ``exec``/``process`` khi quyền ``gateway_shell`` của ghế là ``off``.
     """
     from app.services import tool_permissions
     from app.services.company_mcp import TOOLS
@@ -174,9 +174,19 @@ def seat_deny(db: Session, member: Member, rid: str, all_servers: list[str], cur
     keep = [d for d in (current or []) if not str(d).startswith(MCP_PREFIX) and d not in _MANAGED]
     managed = [f"{s}__*" for s in all_servers if s != own]
     managed += [f"{own}__{t}" for t in sorted(TOOLS) if tool_permissions.resolve(db, member, t)[0] == "off"]
-    if tool_permissions.seat_tier(db, member) == "executor":
+    if tool_permissions.resolve(db, member, tool_permissions.SHELL)[0] == "off":
         managed += list(EXECUTOR_DENY)
     return keep + managed
+
+
+# Mức quyền shell → exec.mode của OpenClaw. "ask" = danh sách cho phép + hỏi
+# khi lệnh lạ; không có ai duyệt thì askFallback mặc định là từ chối.
+SHELL_MODE = {"allowed": "full", "ask": "ask", "off": "deny"}
+
+
+def seat_exec_mode(db: Session, member: Member) -> str:
+    from app.services import tool_permissions
+    return SHELL_MODE[tool_permissions.resolve(db, member, tool_permissions.SHELL)[0]]
 
 
 def _embed_remote(config: dict) -> dict | None:
@@ -279,6 +289,7 @@ async def wire_gateway(db: Session, principal, org_id: int, runtime: Any, *, mcp
                                      ((entry.get("tools") or {}).get("deny")) or [])
             replace.append(path)
             values[("agents", "entries", rid, "tools", "elevated", "enabled")] = False
+            values[("agents", "entries", rid, "tools", "exec", "mode")] = seat_exec_mode(db, member)
             # Tool đọc/ghi file chỉ trong workspace của ghế: không đọc được
             # openclaw.json (nơi có key MCP của mọi ghế) hay workspace ghế khác.
             # Chuyển key sang .env không giúp gì — OpenClaw ghi rõ .env cũng là
@@ -367,11 +378,14 @@ async def sync_tool_policy(db: Session, org_id: int, runtime: Any) -> dict:
             path = ("agents", "entries", rid, "tools", "deny")
             values[path] = new
             replace.append(path)
+        mode = seat_exec_mode(db, member)
+        if (((entries.get(rid) or {}).get("tools") or {}).get("exec") or {}).get("mode") != mode:
+            values[("agents", "entries", rid, "tools", "exec", "mode")] = mode
     if not values:
         return {"changed": []}
     result = await registry.patch(values, base_hash=snap["hash"] or None, replace_paths=replace,
                                   note="ClawCompany · đồng bộ quyền tool")
-    return {"changed": [p[2] for p in values], "changed_paths": result.get("changed_paths")}
+    return {"changed": sorted({p[2] for p in values}), "changed_paths": result.get("changed_paths")}
 
 
 def schedule_tool_policy_sync(org_id: int) -> None:

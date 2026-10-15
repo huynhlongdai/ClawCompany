@@ -210,6 +210,9 @@ async def test_wire_gateway_one_patch_with_seat_isolated_mcp_models_and_memory(d
         "cc-cskh__company_task_assign", "exec", "process"]
     assert tree["agents"]["entries"]["cskh"]["tools"]["elevated"] == {"enabled": False}
     assert tree["agents"]["entries"]["nina"]["tools"]["fs"] == {"workspaceOnly": True}
+    # Shell: điều hành mặc định phải hỏi, thừa hành tắt hẳn.
+    assert tree["agents"]["entries"]["nina"]["tools"]["exec"] == {"mode": "ask"}
+    assert tree["agents"]["entries"]["cskh"]["tools"]["exec"] == {"mode": "deny"}
     assert "agents.entries.nina.tools.deny" in patches[0]["replacePaths"]
     # Key riêng từng ghế, đã băm trong DB, không trả ra ngoài.
     key = servers["cc-nina"]["headers"]["X-API-Key"]
@@ -322,6 +325,7 @@ async def test_turning_a_tool_off_reaches_the_gateway_and_back(db, org):
     gw = FakeGateway(roster=("nina",))
     gw.config["mcp"] = {"servers": {"cc-nina": {}}}
     gw.config["agents"]["entries"]["nina"]["tools"]["deny"] = ["browser"]
+    gw.config["agents"]["entries"]["nina"]["tools"]["exec"] = {"mode": "ask"}
     assert (await seat_provision.sync_tool_policy(db, org[0].id, gw)) == {"changed": []}
     tool_permissions.set_level(db, org[0].id, "company_message_send", "off", member_id=m.id)
     out = await seat_provision.sync_tool_policy(db, org[0].id, gw)
@@ -402,3 +406,32 @@ async def test_rewiring_does_not_touch_memory_search_when_already_right(db, org)
     out = await seat_provision.wire_gateway(db, PRINCIPAL, org[0].id, gw, allow_restart=False)
     assert out["memory"] == "đã đúng, không đổi"
     assert "memory" not in json.loads(gw.sent(ocp.M_CONFIG_PATCH)[-1]["raw"])
+
+
+@pytest.mark.asyncio
+async def test_owner_can_give_nina_full_shell_or_take_it_away(db, org):
+    from app.services import tool_permissions
+    _, m = seat(db, org, "nina", "Nina", "Chief of Staff")
+    org[2].head_member_id = m.id; db.add(org[2]); db.commit()
+    gw = FakeGateway(roster=("nina",))
+    gw.config["mcp"] = {"servers": {"cc-nina": {}}}
+    gw.config["agents"]["entries"]["nina"]["tools"] = {"deny": [], "exec": {"mode": "ask"}}
+    assert (await seat_provision.sync_tool_policy(db, org[0].id, gw)) == {"changed": []}
+    tool_permissions.set_level(db, org[0].id, tool_permissions.SHELL, "allowed", member_id=m.id)
+    await seat_provision.sync_tool_policy(db, org[0].id, gw)
+    tree = json.loads(gw.sent(ocp.M_CONFIG_PATCH)[-1]["raw"])
+    assert tree["agents"]["entries"]["nina"]["tools"]["exec"] == {"mode": "full"}
+    gw.config["agents"]["entries"]["nina"]["tools"]["exec"] = {"mode": "full"}
+    tool_permissions.set_level(db, org[0].id, tool_permissions.SHELL, "off", member_id=m.id)
+    await seat_provision.sync_tool_policy(db, org[0].id, gw)
+    tree = json.loads(gw.sent(ocp.M_CONFIG_PATCH)[-1]["raw"])
+    assert tree["agents"]["entries"]["nina"]["tools"]["deny"] == ["exec", "process"]
+    assert tree["agents"]["entries"]["nina"]["tools"]["exec"] == {"mode": "deny"}
+
+
+def test_shell_permission_shows_in_matrix_but_is_not_an_mcp_tool(db, org):
+    from app.services import company_mcp, tool_permissions
+    mx = tool_permissions.matrix(db, org[0].id)
+    assert mx["matrix"]["lead"]["gateway_shell"]["level"] == "ask"
+    assert mx["matrix"]["executor"]["gateway_shell"]["level"] == "off"
+    assert "gateway_shell" not in company_mcp.TOOLS

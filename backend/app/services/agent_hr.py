@@ -381,7 +381,7 @@ async def hire(db: Session, principal: Principal, org_id: int, runtime: Any, dat
     if budget is not None and budget < 0:
         raise HTTPException(422, "Ngân sách không được âm")
     tools = data.get("tools") or {}
-    from app.services.company_mcp import TOOLS
+    TOOLS = perms.all_tools()
     for tool, level in tools.items():
         if tool not in TOOLS:
             raise HTTPException(422, f"Không có tool {tool}")
@@ -924,7 +924,7 @@ async def _retire(db: Session, principal: Principal, org_id: int, runtime: Any, 
 # --------------------------------------------------------------------- quyền tool theo seat
 
 def seat_tools(db: Session, org_id: int, agent_id: int) -> dict:
-    from app.services.company_mcp import TOOLS
+    TOOLS = perms.all_tools()
     agent, member = seat(db, org_id, agent_id)
     tier = perms.seat_tier(db, member)
     items = []

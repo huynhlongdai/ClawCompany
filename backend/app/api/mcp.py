@@ -257,7 +257,7 @@ def tool_permissions_read(principal: Principal = Depends(require_role("member"))
 def tool_permissions_write(payload: ToolPermissionIn, background: BackgroundTasks,
                            principal: Principal = Depends(require_role("admin")),
                            db: Session = Depends(get_db)):
-    if payload.tool not in company_mcp.TOOLS:
+    if payload.tool not in tool_permissions.all_tools():
         raise HTTPException(404, f"Không có tool {payload.tool}")
     if payload.member_id is not None:
         m = db.get(Member, payload.member_id)
