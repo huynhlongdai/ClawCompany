@@ -23,6 +23,7 @@ import {t, lazy} from "../../lib/i18n";
    Gồm: bộ đổi công ty · ô ⌘K · đúng 8 mục menu (lib/nav.ts) · tài khoản + giao
    diện sáng/tối · topbar có breadcrumb + chuông · thanh dưới 5 nút ở ≤900px. */
 
+const AskNina = dynamic(() => import("./AskNina").then(m => m.AskNina), {ssr: false});
 const CommandPalette = dynamic(() => import("./CommandPalette").then(m => m.CommandPalette), {ssr: false});
 
 export function useCounts() {
@@ -169,6 +170,7 @@ function BottomNav({onMore}: {onMore: () => void}) {
 export function Shell({children}: {children: ReactNode}) {
   const [drawer, setDrawer] = useState(false);
   const [palette, setPalette] = useState(false);
+  const [nina, setNina] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -212,6 +214,7 @@ export function Shell({children}: {children: ReactNode}) {
           </button>
           <div className="ui-top-actions">
             <span className="ui-mobile-search"><button className="ui-iconbtn" onClick={() => setPalette(true)} aria-label={t("shell.tim_kiem")}><Icon name="search" size={18}/></button></span>
+            <button className="ui-iconbtn" onClick={() => setNina(true)} aria-label={t("shell.hoi_nina")} title={t("shell.hoi_nina")} data-testid="open-ask-nina"><Icon name="sparkle" size={18}/></button>
             <Bell/>
           </div>
         </header>
@@ -221,6 +224,7 @@ export function Shell({children}: {children: ReactNode}) {
       </div>
       <BottomNav onMore={() => setDrawer(true)}/>
       {palette && <CommandPalette onClose={() => setPalette(false)}/>}
+      {nina && <AskNina onClose={() => setNina(false)}/>}
     </div>
   </ToastProvider>;
 }

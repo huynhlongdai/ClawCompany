@@ -412,6 +412,55 @@ def upcoming_deadlines(db: Session, organization_id: int, *, days: int = 30) -> 
 
 # ---------------------------------------------------------------- hỏi Nina
 
+async def _pick_nina_seat(db: Session, organization_id: int, runtime):
+    """Chọn ghế trả lời câu hỏi: ((agent, tên), None) hoặc (None, lỗi)."""
+    from app.models.entities import Agent, Member
+
+    # Scope theo ``members.organization_id``, KHÔNG join qua companies.
+    # Nina là Chief of Staff cấp holding nên ``company_id`` là NULL; một inner
+    # join qua companies lặng lẽ loại đúng cái ghế quan trọng nhất, và thông
+    # báo lỗi hoá ra vô nghĩa ("không ghế nào khớp roster" trong khi ghế có
+    # thật và đã bind đúng). Cùng lớp lỗi với live_channel/progress_autosync,
+    # chỉ khác chiều: ở đó thiếu join, ở đây join quá nhiều.
+    seats = list(db.execute(
+        select(Agent, Member.name)
+        .join(Member, Agent.member_id == Member.id)
+        .where(Member.organization_id == organization_id,
+               Agent.runtime_agent_id.isnot(None),
+               Agent.runtime_agent_id != "")
+    ).all())
+    if not seats:
+        return None, {"answered": False,
+                "reason": "Chưa có ghế agent nào bind vào gateway. Bind ở /app/openclaw trước."}
+
+    # HỎI GATEWAY xem agent nào thật sự tồn tại, thay vì tin cột lifecycle
+    # trong database. Bản đầu sắp xếp theo ``lifecycle.desc()`` và trúng ngay
+    # cái bẫy: chuỗi "detached" lớn hơn "active" theo thứ tự chữ, nên nó chọn
+    # đúng cái ghế mồ côi và gateway trả 'Unknown agent id "sophia-cmo"'.
+    # Trạng thái ghế trong database là ảnh chụp cũ; gateway mới là sự thật.
+    known: set[str] = set()
+    try:
+        roster = await runtime.list_agents()
+        known = {str(row.get("id") or row.get("agentId") or "") for row in roster}
+    except Exception:
+        known = set()
+
+    usable = [(a, n) for a, n in seats if a.runtime_agent_id in known] if known else []
+    if not usable:
+        return None, {
+            "answered": False,
+            "reason": "Không ghế nào khớp roster của gateway."
+                      + (f" Gateway đang biết: {sorted(known)}." if known else
+                         " Và không đọc được roster từ gateway."),
+            "company_seats": sorted({a.runtime_agent_id for a, _ in seats}),
+            "hint": "Chạy reconcile ở /app/openclaw rồi bind lại ghế.",
+        }
+
+    # Trong số ghế gateway biết, ưu tiên ghế database cũng cho là active.
+    usable.sort(key=lambda pair: 0 if pair[0].lifecycle == "active" else 1)
+    return usable[0], None
+
+
 async def ask_nina(db: Session, organization_id: int, *, message: str,
                    timeout_seconds: int = 60) -> dict:
     """Gửi một câu hỏi tới agent Nina qua gateway OpenClaw và chờ trả lời.
@@ -442,49 +491,10 @@ async def ask_nina(db: Session, organization_id: int, *, message: str,
                 "reason": "OPENCLAW_MODE không phải native, nên không có gateway để hỏi",
                 "mode": type(runtime).__name__}
 
-    # Scope theo ``members.organization_id``, KHÔNG join qua companies.
-    # Nina là Chief of Staff cấp holding nên ``company_id`` là NULL; một inner
-    # join qua companies lặng lẽ loại đúng cái ghế quan trọng nhất, và thông
-    # báo lỗi hoá ra vô nghĩa ("không ghế nào khớp roster" trong khi ghế có
-    # thật và đã bind đúng). Cùng lớp lỗi với live_channel/progress_autosync,
-    # chỉ khác chiều: ở đó thiếu join, ở đây join quá nhiều.
-    seats = list(db.execute(
-        select(Agent, Member.name)
-        .join(Member, Agent.member_id == Member.id)
-        .where(Member.organization_id == organization_id,
-               Agent.runtime_agent_id.isnot(None),
-               Agent.runtime_agent_id != "")
-    ).all())
-    if not seats:
-        return {"answered": False,
-                "reason": "Chưa có ghế agent nào bind vào gateway. Bind ở /app/openclaw trước."}
-
-    # HỎI GATEWAY xem agent nào thật sự tồn tại, thay vì tin cột lifecycle
-    # trong database. Bản đầu sắp xếp theo ``lifecycle.desc()`` và trúng ngay
-    # cái bẫy: chuỗi "detached" lớn hơn "active" theo thứ tự chữ, nên nó chọn
-    # đúng cái ghế mồ côi và gateway trả 'Unknown agent id "sophia-cmo"'.
-    # Trạng thái ghế trong database là ảnh chụp cũ; gateway mới là sự thật.
-    known: set[str] = set()
-    try:
-        roster = await runtime.list_agents()
-        known = {str(row.get("id") or row.get("agentId") or "") for row in roster}
-    except Exception:
-        known = set()
-
-    usable = [(a, n) for a, n in seats if a.runtime_agent_id in known] if known else []
-    if not usable:
-        return {
-            "answered": False,
-            "reason": "Không ghế nào khớp roster của gateway."
-                      + (f" Gateway đang biết: {sorted(known)}." if known else
-                         " Và không đọc được roster từ gateway."),
-            "company_seats": sorted({a.runtime_agent_id for a, _ in seats}),
-            "hint": "Chạy reconcile ở /app/openclaw rồi bind lại ghế.",
-        }
-
-    # Trong số ghế gateway biết, ưu tiên ghế database cũng cho là active.
-    usable.sort(key=lambda pair: 0 if pair[0].lifecycle == "active" else 1)
-    agent, agent_name = usable[0]
+    seat, problem = await _pick_nina_seat(db, organization_id, runtime)
+    if problem:
+        return problem
+    agent, agent_name = seat
     session_key = ocp.main_session_key(agent.runtime_agent_id)
 
     started = _time.monotonic()
@@ -538,3 +548,77 @@ async def ask_nina(db: Session, organization_id: int, *, message: str,
                 "Hết thời gian chờ không có nghĩa là thất bại — lượt chạy vẫn tiếp tục "
                 "trong phiên, xem ở /app/live-runs.",
     }
+
+
+def _sse(event: str, data: dict) -> str:
+    import json as _json
+    return f"event: {event}\ndata: {_json.dumps(data, ensure_ascii=False, default=str)}\n\n"
+
+
+async def ask_nina_stream(session_factory, organization_id: int, *, message: str,
+                          timeout_seconds: int = 60):
+    """Như ``ask_nina`` nhưng đẩy câu trả lời ra từng đoạn (SSE).
+
+    Sự kiện: ``meta`` (ghế nào trả lời) → ``tool``/``delta`` (toàn văn tích luỹ)
+    → đúng một trong ``final`` hoặc ``error``. ``final`` mang
+    ``first_token_seconds`` và ``elapsed_seconds`` để đo được cảm giác nhanh,
+    không chỉ tổng thời gian.
+
+    Khác bản poll: lỗi model (401, hết credit…) đi ra thành ``error`` thay vì
+    im lặng tới hết giờ rồi báo ``timed_out``.
+    """
+    import time as _time
+
+    from app.runtime.factory import get_runtime
+    from app.runtime.openclaw_native import NativeOpenClawRuntime
+    from app.runtime import openclaw_protocol as ocp
+
+    runtime = get_runtime()
+    if not isinstance(runtime, NativeOpenClawRuntime):
+        yield _sse("error", {"answered": False,
+                             "message": "OPENCLAW_MODE không phải native, nên không có gateway để hỏi"})
+        return
+    # Session riêng trong generator: dependency ``get_db`` của request đóng
+    # trước khi StreamingResponse bắt đầu chạy generator.
+    with session_factory() as db:
+        seat, problem = await _pick_nina_seat(db, organization_id, runtime)
+        if problem:
+            yield _sse("error", {**problem, "message": problem.get("reason")})
+            return
+        agent_id, agent_name = seat[0].runtime_agent_id, seat[1]
+    session_key = ocp.main_session_key(agent_id)
+    yield _sse("meta", {"agent": agent_name, "runtime_agent_id": agent_id,
+                        "session_key": session_key})
+    started = _time.monotonic()
+    first_token = None
+    text = ""
+    try:
+        async for event in runtime.chat_stream(agent_id, message,
+                                               session_key=session_key,
+                                               timeout_seconds=max(5, min(timeout_seconds, 120))):
+            kind = event["kind"]
+            if kind == "delta":
+                if first_token is None:
+                    first_token = round(_time.monotonic() - started, 2)
+                text = event["text"]
+                yield _sse("delta", {"text": text})
+            elif kind == "tool":
+                yield _sse("tool", {k: event.get(k) for k in ("name", "title", "phase")})
+            elif kind == "final":
+                text = event.get("text") or text
+                yield _sse("final", {"answered": bool(text.strip()), "reply": text,
+                                     "agent": agent_name,
+                                     "first_token_seconds": first_token,
+                                     "elapsed_seconds": round(_time.monotonic() - started, 2)})
+                return
+            else:
+                yield _sse("error", {"answered": False, "message": event.get("message"),
+                                     "timed_out": bool(event.get("timeout")),
+                                     "partial": event.get("text") or text,
+                                     "elapsed_seconds": round(_time.monotonic() - started, 2)})
+                return
+    except Exception as exc:  # noqa: BLE001 - lỗi gateway phải nói ra, không nuốt
+        yield _sse("error", {"answered": False, "message": f"gateway từ chối: {exc}"[:400]})
+        return
+    yield _sse("error", {"answered": False, "message": "Gateway đóng kết nối trước khi trả lời xong",
+                         "partial": text})

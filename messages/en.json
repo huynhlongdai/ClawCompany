@@ -187,7 +187,15 @@
   "phong_thi_nghiem_tat": "Lab: off",
   "cac_phan_cua": "Sections of {p0}",
   "thong_tin_ben": "Side information",
-  "ngon_ngu": "Language"
+  "ngon_ngu": "Language",
+  "hoi_nina": "Ask Nina",
+  "hoi_nina_placeholder": "Ask Nina anything about the company…",
+  "gui": "Send",
+  "dang_nghi": "Nina is thinking…",
+  "dang_dung_tool": "Using: {p0}",
+  "tra_loi_sau": "First words in {p0}s · done in {p1}s",
+  "loi_hoi_nina": "Nina couldn't answer: {p0}",
+  "dung": "Stop"
  },
  "ui": {
   "dong_esc": "Close (Esc)",

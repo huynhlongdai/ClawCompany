@@ -66,6 +66,15 @@ BLOCK_BUDGETS = {
 TRIM_ORDER = (4, 3, 5, 1)
 NEVER_TRIM = (2, 6, 7)
 
+# Thứ tự GHÉP vào prompt — khác thứ tự đánh số. Khối ít đổi đứng trước, khối
+# đổi mỗi lượt đứng sau, để phần đầu prompt giống nhau giữa các task của cùng
+# một ghế và giữa các lượt của cùng một task → nhà cung cấp tái dùng prompt
+# cache (OpenAI/Anthropic/Gemini đều cache theo tiền tố). Bài học từ FastClaw:
+# prompt ổn định là thứ làm agent nhanh và rẻ hơn, không phải model.
+#   7 thoả thuận (hằng) → 1 bạn là ai (theo ghế) → 6 luật (theo công ty)
+#   → 3 dự án → 2 việc → 5 bàn giao → 4 sổ ghi (đổi sau mỗi lượt)
+EMIT_ORDER = (7, 1, 6, 3, 2, 5, 4)
+
 MAX_JOURNAL_LINES = 8
 MAX_SOP_LINES = 4
 MAX_DECISION_LINES = 3
@@ -323,7 +332,8 @@ def build_pack(db: Session, task: Task, *, organization_id: int,
             block.trimmed = True
             trimmed.append(f"khối {index} lược {dropped} dòng")
 
-    text = "\n\n".join(b.text() for b in blocks if b.text())
+    by_index = {b.index: b for b in blocks}
+    text = "\n\n".join(by_index[i].text() for i in EMIT_ORDER if by_index[i].text())
     total = len(text)
 
     return {
@@ -332,6 +342,7 @@ def build_pack(db: Session, task: Task, *, organization_id: int,
         "budget_chars": budget_chars,
         "over_budget": total > budget_chars,
         "trimmed": trimmed,
+        "emit_order": list(EMIT_ORDER),
         "blocks": [{
             "index": b.index, "title": b.title, "chars": b.chars,
             "budget": BLOCK_BUDGETS.get(b.index, 0), "lines": len(b.lines),

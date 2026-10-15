@@ -451,6 +451,70 @@ class NativeOpenClawRuntime(AgentRuntime):
                 if event.get("terminal"):
                     break
 
+    async def chat_stream(self, runtime_agent_id: str, message: str, *,
+                          session_key: str | None = None,
+                          timeout_seconds: float = 120) -> AsyncIterator[dict]:
+        """Gửi một tin và stream câu trả lời trên CÙNG một WebSocket.
+
+        Vì sao: ``ask_nina`` cũ gửi rồi poll ``chat.history`` mỗi 2 giây, nên
+        người hỏi nhìn màn hình trống tới khi model viết xong, cộng thêm tới 2
+        giây trễ poll. Ở đây: handshake → subscribe phiên → ``chat.send`` →
+        đẩy từng ``chat.delta`` lên ngay (bài học từ FastClaw: cảm giác nhanh
+        đến từ token đầu, không phải từ tổng thời gian).
+
+        Sự kiện trả ra (đã chuẩn hoá, không lộ frame gốc):
+          {"kind": "delta", "text": <toàn văn tới lúc này>}
+          {"kind": "tool", "name", "title", "phase"}
+          {"kind": "final", "text"}
+          {"kind": "error", "message"}
+        ``text`` của delta là toàn văn tích luỹ (lấy từ ``message.content``),
+        nên client chỉ cần thay, không phải nối — mất một frame cũng không lệch.
+        ``runId`` của gateway chính là ``idempotencyKey`` ta gửi (đo trên
+        gateway 2026.9.x), nên lọc sự kiện của lượt khác trên cùng phiên được.
+        """
+        key = session_key or ocp.main_session_key(runtime_agent_id)
+        fingerprint = hashlib.sha256(message.encode("utf-8")).hexdigest()[:12]
+        run_id = f"clawcompany:{key}:{fingerprint}:{uuid.uuid4().hex[:8]}"
+        sub_id, send_id = str(uuid.uuid4()), str(uuid.uuid4())
+        deadline = time.monotonic() + timeout_seconds
+        async with websockets.connect(self.url, additional_headers=self._headers(),
+                                      max_size=settings.openclaw_max_frame_bytes) as ws:
+            await self._handshake(ws)
+            await _send(ws, json.dumps(self._request_frame(
+                ocp.M_SESSIONS_MESSAGES_SUBSCRIBE, {"key": key}, sub_id)))
+            await _send(ws, json.dumps(self._request_frame(ocp.M_CHAT_SEND, {
+                "sessionKey": key, "agentId": runtime_agent_id,
+                "message": message, "idempotencyKey": run_id}, send_id)))
+            last = ""
+            while True:
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    yield {"kind": "error", "message": "Hết thời gian chờ gateway trả lời",
+                           "timeout": True, "text": last}
+                    return
+                try:
+                    raw = await _recv(ws, timeout=left)
+                except asyncio.TimeoutError:
+                    continue
+                msg = json.loads(raw)
+                if str(msg.get("id")) in (sub_id, send_id):
+                    try:
+                        result = self._read_response(msg)
+                    except OpenClawProtocolError as exc:
+                        yield {"kind": "error", "message": str(exc)[:400]}
+                        return
+                    if str(msg.get("id")) == send_id:
+                        run_id = str(result.get("runId") or run_id)
+                    continue
+                for event in chat_stream_events(msg, run_id=run_id, session_key=key):
+                    if event["kind"] == "delta":
+                        if event["text"] == last:
+                            continue
+                        last = event["text"]
+                    yield event
+                    if event["kind"] in ("final", "error"):
+                        return
+
     # -- openclaw-specific surface ----------------------------------------
 
     async def list_agents(self) -> list[dict]:
@@ -676,6 +740,56 @@ def normalize_event(msg: dict) -> dict | None:
         event["errorMessage"] = payload.get("errorMessage")
         event["errorDetail"] = detail
     return event
+
+
+def _message_text(message) -> str:
+    if not isinstance(message, dict):
+        return ""
+    content = message.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(str(part.get("text") or "") for part in content
+                       if isinstance(part, dict) and part.get("type") in (None, "text"))
+    return str(message.get("text") or "")
+
+
+def chat_stream_events(msg: dict, *, run_id: str, session_key: str) -> list[dict]:
+    """Rút sự kiện cho người đọc từ một frame gateway. Hàm thuần, dễ test.
+
+    Bỏ qua frame của lượt khác (runId khác) hay phiên khác. ``NO_REPLY`` là
+    tín hiệu nội bộ của OpenClaw, không phải câu trả lời.
+    """
+    if msg.get("type") != "event":
+        return []
+    family = str(msg.get("event") or "")
+    payload = msg.get("payload") if isinstance(msg.get("payload"), dict) else {}
+    if payload.get("sessionKey") and payload.get("sessionKey") != session_key:
+        return []
+    if payload.get("runId") and run_id and payload.get("runId") != run_id:
+        return []
+    if family == "chat":
+        state = str(payload.get("state") or "")
+        if state == "delta":
+            text = _message_text(payload.get("message")) or str(payload.get("deltaText") or "")
+            return [{"kind": "delta", "text": text}] if text and text.strip() != "NO_REPLY" else []
+        if state in ocp.ERROR_STATES:
+            return [{"kind": "error", "message": str(payload.get("errorMessage") or "Model báo lỗi")[:400],
+                     "error_kind": payload.get("errorKind")}]
+        if state in ocp.TERMINAL_STATES:
+            text = _message_text(payload.get("message")).strip()
+            if text == "NO_REPLY":
+                text = ""
+            if state in ("aborted", "cancelled", "canceled"):
+                return [{"kind": "error", "message": "Lượt chạy đã bị huỷ", "text": text}]
+            return [{"kind": "final", "text": text, "stop_reason": payload.get("stopReason")}]
+        return []
+    if family == "agent" and payload.get("stream") == "item":
+        data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+        if data.get("kind") == "tool":
+            return [{"kind": "tool", "name": data.get("name"), "title": data.get("title"),
+                     "phase": data.get("phase")}]
+    return []
 
 
 def _ws_to_http(ws_url: str) -> str:

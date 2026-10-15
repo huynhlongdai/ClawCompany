@@ -153,10 +153,38 @@ def _handle(ctx: company_mcp.ToolContext, msg: dict) -> dict | None:
                 _deny_event(ctx, name, "ask_pending", approval_id=approval.id)
         else:
             ok, result = company_mcp.call(ctx, name, args)
-        return {"jsonrpc": "2.0", "id": id_, "result": {
-            "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False, default=str)}],
-            "structuredContent": result, "isError": not ok}}
+        return {"jsonrpc": "2.0", "id": id_, "result": tool_result(result, ok)}
     return _error(id_, -32601, f"Method not found: {method}")
+
+
+# Trần cho một kết quả tool đi vào ngữ cảnh model. Một kết quả to (ví dụ một
+# report 100k ký tự) làm MỌI lượt sau của phiên đó chậm và đắt, vì nó nằm lại
+# trong lịch sử. Giữ đầu + cuối (lỗi và tổng kết thường ở đó), nói rõ đã lược.
+MAX_TOOL_TEXT_CHARS = 24_000
+TOOL_TEXT_HEAD_CHARS = 18_000
+TOOL_TEXT_TAIL_CHARS = 4_000
+
+
+def cap_tool_text(text: str) -> tuple[str, bool]:
+    if len(text) <= MAX_TOOL_TEXT_CHARS:
+        return text, False
+    omitted = len(text) - TOOL_TEXT_HEAD_CHARS - TOOL_TEXT_TAIL_CHARS
+    return (text[:TOOL_TEXT_HEAD_CHARS]
+            + f"\n… [đã lược {omitted} ký tự ở giữa để giữ ngữ cảnh gọn; "
+              "thu hẹp truy vấn hoặc dùng offset/limit nếu tool hỗ trợ] …\n"
+            + text[-TOOL_TEXT_TAIL_CHARS:]), True
+
+
+def tool_result(result: dict, ok: bool) -> dict:
+    text, capped = cap_tool_text(json.dumps(result, ensure_ascii=False, default=str))
+    out = {"content": [{"type": "text", "text": text}], "isError": not ok}
+    # structuredContent là bản đầy đủ; khi đã lược thì không gửi kèm, nếu không
+    # client nào đưa cả hai vào model sẽ phá đúng trần vừa đặt.
+    if capped:
+        out["_meta"] = {"clawcompany/capped": True}
+    else:
+        out["structuredContent"] = result
+    return out
 
 
 @router.post("/mcp")

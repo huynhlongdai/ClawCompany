@@ -172,6 +172,22 @@ async def ask_nina(payload: AskIn, db: Session = Depends(get_db),
                                    timeout_seconds=payload.timeout_seconds)
 
 
+@router.post("/nina/ask/stream")
+async def ask_nina_stream(payload: AskIn,
+                          principal: Principal = Depends(writer("member"))):
+    """Hỏi Nina và nhận câu trả lời theo từng đoạn (SSE, đọc bằng fetch).
+
+    POST chứ không GET vì câu hỏi có thể dài và không nên nằm trong URL/log;
+    vì thế client đọc ``response.body`` thay vì ``EventSource``.
+    """
+    from fastapi.responses import StreamingResponse
+    from app.db.session import SessionLocal
+    generator = insights.ask_nina_stream(SessionLocal, active_org(principal), message=payload.message,
+                                         timeout_seconds=payload.timeout_seconds)
+    return StreamingResponse(generator, media_type="text/event-stream",
+                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
+
+
 # ------------------------------------------------------------------ hạn chót
 
 class DueDateIn(BaseModel):

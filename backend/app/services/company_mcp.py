@@ -424,18 +424,43 @@ def _knowledge_search(ctx: ToolContext, args: dict) -> dict:
     return {"hits": hits}
 
 
-@tool("company_knowledge_get", "knowledge", "Đọc nguyên văn một tài liệu tri thức.",
-      "company.knowledge:read", {"document_id": {"type": "integer"}}, ("document_id",))
+# Đọc tài liệu dài theo từng lát thay vì cắt cụt ở 20.000 ký tự. Bản cũ trả
+# 20k ký tự đầu (~5–7k token) cho MỌI lần đọc, và phần sau mốc đó thì agent
+# không bao giờ thấy. Học từ FastClaw: kết quả tool phải nhỏ để lượt sau của
+# model đọc prompt nhanh, nhưng phần còn lại phải đọc tiếp được.
+READ_SLICE_CHARS = 12_000
+
+
+def _slice(content: str, args: dict) -> dict:
+    offset = _int(args, "offset", required=False, default=0) or 0
+    if offset < 0:
+        raise ToolError("invalid_argument", "offset phải ≥ 0")
+    total = len(content)
+    part = content[offset:offset + READ_SLICE_CHARS]
+    end = offset + len(part)
+    out = {"content": part, "offset": offset, "total_chars": total,
+           "next_offset": end if end < total else None}
+    if end < total:
+        out["note"] = (f"Còn {total - end} ký tự. Gọi lại với offset={end} nếu cần đọc tiếp.")
+    return out
+
+
+@tool("company_knowledge_get", "knowledge",
+      "Đọc nguyên văn một tài liệu tri thức (mỗi lần tối đa 12.000 ký tự; dùng offset để đọc tiếp).",
+      "company.knowledge:read", {"document_id": {"type": "integer"}, "offset": {"type": "integer"}},
+      ("document_id",))
 def _knowledge_get(ctx: ToolContext, args: dict) -> dict:
     doc = ctx.db.get(KnowledgeDocument, _int(args, "document_id"))
     if not _doc_visible(ctx, doc):
         raise ToolError("not_found", "Không thấy tài liệu")
     return {"id": doc.id, "title": doc.title, "access_level": doc.access_level,
-            "content": (doc.content or "")[:20000]}
+            **_slice(doc.content or "", args)}
 
 
-@tool("company_sop_get", "knowledge", "Lấy SOP theo sop_id, hoặc tìm theo tên.",
-      "company.knowledge:read", {"sop_id": {"type": "integer"}, "query": {"type": "string"}})
+@tool("company_sop_get", "knowledge",
+      "Lấy SOP theo sop_id (dùng offset để đọc tiếp SOP dài), hoặc tìm theo tên.",
+      "company.knowledge:read", {"sop_id": {"type": "integer"}, "query": {"type": "string"},
+                                 "offset": {"type": "integer"}})
 def _sop_get(ctx: ToolContext, args: dict) -> dict:
     q = select(SOP).where(SOP.organization_id == ctx.org,
                           or_(SOP.department_id.is_(None),
@@ -445,7 +470,7 @@ def _sop_get(ctx: ToolContext, args: dict) -> dict:
         if sop is None:
             raise ToolError("not_found", "Không thấy SOP")
         return {"id": sop.id, "title": sop.title, "version": sop.version, "status": sop.status,
-                "content": (sop.content or "")[:20000]}
+                **_slice(sop.content or "", args)}
     text = _str(args, "query", required=False, limit=120)
     if text:
         q = q.where(SOP.title.ilike(f"%{text}%"))

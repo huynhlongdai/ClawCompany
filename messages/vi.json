@@ -187,7 +187,15 @@
   "phong_thi_nghiem_tat": "Phòng thí nghiệm: tắt",
   "cac_phan_cua": "Các phần của {p0}",
   "thong_tin_ben": "Thông tin bên",
-  "ngon_ngu": "Ngôn ngữ"
+  "ngon_ngu": "Ngôn ngữ",
+  "hoi_nina": "Hỏi Nina",
+  "hoi_nina_placeholder": "Hỏi Nina bất cứ điều gì về công ty…",
+  "gui": "Gửi",
+  "dang_nghi": "Nina đang nghĩ…",
+  "dang_dung_tool": "Đang dùng: {p0}",
+  "tra_loi_sau": "Chữ đầu sau {p0}s · xong sau {p1}s",
+  "loi_hoi_nina": "Nina chưa trả lời được: {p0}",
+  "dung": "Dừng"
  },
  "ui": {
   "dong_esc": "Đóng (Esc)",
