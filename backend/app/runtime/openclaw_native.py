@@ -467,8 +467,9 @@ class NativeOpenClawRuntime(AgentRuntime):
           {"kind": "tool", "name", "title", "phase"}
           {"kind": "final", "text"}
           {"kind": "error", "message"}
-        ``text`` của delta là toàn văn tích luỹ (lấy từ ``message.content``),
-        nên client chỉ cần thay, không phải nối — mất một frame cũng không lệch.
+        ``text`` của delta là toàn văn tích luỹ, nên client chỉ cần thay, không
+        phải nối. Gateway 2026.9.8 gửi ``chat.delta`` là MẢNH mới (đo trên VM
+        2026-10-15: "T", "ôi là Nina…", " thu"…), nên ở đây tự cộng dồn.
         ``runId`` của gateway chính là ``idempotencyKey`` ta gửi (đo trên
         gateway 2026.9.x), nên lọc sự kiện của lượt khác trên cùng phiên được.
         """
@@ -508,9 +509,11 @@ class NativeOpenClawRuntime(AgentRuntime):
                     continue
                 for event in chat_stream_events(msg, run_id=run_id, session_key=key):
                     if event["kind"] == "delta":
-                        if event["text"] == last:
+                        text = merge_delta(last, event["text"])
+                        if text == last:
                             continue
-                        last = event["text"]
+                        last = text
+                        event = {"kind": "delta", "text": last}
                     yield event
                     if event["kind"] in ("final", "error"):
                         return
@@ -754,8 +757,20 @@ def _message_text(message) -> str:
     return str(message.get("text") or "")
 
 
+def merge_delta(so_far: str, piece: str) -> str:
+    """Cộng dồn một delta. Nhận cả hai kiểu gateway có thể gửi: mảnh mới (nối
+    vào) hoặc toàn văn tới lúc đó (bắt đầu bằng phần đã có → thay)."""
+    if not piece:
+        return so_far
+    if so_far and piece.startswith(so_far):
+        return piece
+    return so_far + piece
+
+
 def chat_stream_events(msg: dict, *, run_id: str, session_key: str) -> list[dict]:
     """Rút sự kiện cho người đọc từ một frame gateway. Hàm thuần, dễ test.
+
+    ``delta`` ở đây là văn bản của RIÊNG frame đó; ``chat_stream`` cộng dồn.
 
     Bỏ qua frame của lượt khác (runId khác) hay phiên khác. ``NO_REPLY`` là
     tín hiệu nội bộ của OpenClaw, không phải câu trả lời.

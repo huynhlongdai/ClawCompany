@@ -42,6 +42,17 @@ def test_delta_carries_the_accumulated_text_not_a_fragment():
     assert out == [{"kind": "delta", "text": "Hello"}]
 
 
+def test_deltas_are_accumulated_whether_fragments_or_snapshots():
+    """Đo trên gateway thật 2026.9.8: chat.delta là mảnh ("T", "ôi là Nina…")."""
+    from app.runtime.openclaw_native import merge_delta
+    text = ""
+    for piece in ["T", "ôi là Nina", ", trợ lý."]:
+        text = merge_delta(text, piece)
+    assert text == "Tôi là Nina, trợ lý."
+    assert merge_delta("Tôi là", "Tôi là Nina") == "Tôi là Nina"   # kiểu toàn văn
+    assert merge_delta("abc", "") == "abc"
+
+
 def test_frames_of_another_run_or_session_are_ignored():
     other_run = frame("chat", {"state": "delta", "message": text_msg("x")})
     other_run["payload"]["runId"] = "someone-else"
@@ -167,7 +178,9 @@ async def test_chat_stream_sends_on_the_same_socket_and_stops_at_final(monkeypat
                 self.queue += [
                     {"type": "res", "id": msg["id"], "ok": True, "payload": {"runId": rid}},
                     {"type": "event", "event": "chat", "payload": {
-                        "sessionKey": KEY, "runId": rid, "state": "delta", "message": text_msg("Hi")}},
+                        "sessionKey": KEY, "runId": rid, "state": "delta", "message": text_msg("H")}},
+                    {"type": "event", "event": "chat", "payload": {
+                        "sessionKey": KEY, "runId": rid, "state": "delta", "message": text_msg("i")}},
                     {"type": "event", "event": "chat", "payload": {
                         "sessionKey": KEY, "runId": "other", "state": "final", "message": text_msg("x")}},
                     {"type": "event", "event": "chat", "payload": {
@@ -190,7 +203,7 @@ async def test_chat_stream_sends_on_the_same_socket_and_stops_at_final(monkeypat
     rt._headers = lambda: None
     events = [e async for e in rt.chat_stream("dev", "Chào", session_key=KEY)]
     assert [m["method"] for m in sent] == ["sessions.messages.subscribe", "chat.send"]
-    assert events == [{"kind": "delta", "text": "Hi"},
+    assert events == [{"kind": "delta", "text": "H"}, {"kind": "delta", "text": "Hi"},
                       {"kind": "final", "text": "Hi!", "stop_reason": None}]
 
 
