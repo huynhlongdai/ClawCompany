@@ -209,6 +209,7 @@ async def test_wire_gateway_one_patch_with_seat_isolated_mcp_models_and_memory(d
         "cc-nina__*", "cc-cskh__company_budget_check", "cc-cskh__company_plan_submit",
         "cc-cskh__company_task_assign", "exec", "process"]
     assert tree["agents"]["entries"]["cskh"]["tools"]["elevated"] == {"enabled": False}
+    assert tree["agents"]["entries"]["nina"]["tools"]["fs"] == {"workspaceOnly": True}
     assert "agents.entries.nina.tools.deny" in patches[0]["replacePaths"]
     # Key riêng từng ghế, đã băm trong DB, không trả ra ngoài.
     key = servers["cc-nina"]["headers"]["X-API-Key"]

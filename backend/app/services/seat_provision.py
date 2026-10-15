@@ -279,6 +279,11 @@ async def wire_gateway(db: Session, principal, org_id: int, runtime: Any, *, mcp
                                      ((entry.get("tools") or {}).get("deny")) or [])
             replace.append(path)
             values[("agents", "entries", rid, "tools", "elevated", "enabled")] = False
+            # Tool đọc/ghi file chỉ trong workspace của ghế: không đọc được
+            # openclaw.json (nơi có key MCP của mọi ghế) hay workspace ghế khác.
+            # Chuyển key sang .env không giúp gì — OpenClaw ghi rõ .env cũng là
+            # file agent đọc được; ranh giới thật là giới hạn đường dẫn này.
+            values[("agents", "entries", rid, "tools", "fs", "workspaceOnly")] = True
         if seat_models:
             from app.services import tool_permissions
             cfg = model_routing.seat_model_config(
