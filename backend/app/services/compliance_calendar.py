@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 from app.models import Company, Member, Project, Task
 from app.models.company_foundation import CompanyProfile, Position
 from app.models.company_ops import ComplianceDeadline, ComplianceRule
+from app.services import holidays
 
 DISCLAIMER = ("Lịch tham khảo do hệ thống tính từ căn cứ pháp lý ghi ở từng mục — không phải tư vấn pháp lý. "
               "Đối chiếu với kế toán hoặc cơ quan thuế trước khi nộp; ngày lễ chưa được tính.")
@@ -37,7 +38,9 @@ DUE_TYPES = ("next_month_day", "next_month_end", "next_quarter_first_month_end",
 COMPANY_TYPES = ["dntn", "tnhh_1tv", "tnhh_2tv", "co_phan", "hop_danh"]
 QLT = ("Điều 44 Luật Quản lý thuế 38/2019/QH14 (tới 30/6/2026); từ 1/7/2026: Luật Quản lý thuế 2025 và "
        "Điều 10 Nghị định 252/2026/NĐ-CP")
-WEEKEND_NOTE = "Hạn rơi vào thứ Bảy/Chủ nhật được dời sang thứ Hai (Điều 86 Thông tư 80/2021/TT-BTC); ngày lễ chưa được tính."
+WEEKEND_NOTE = ("Agent làm cả ngày nghỉ: việc tuân thủ nhắc và đặt hạn theo đúng ngày luật ghi (hạn theo lịch). Nếu ngày đó "
+                "rơi vào cuối tuần/lễ/Tết thì luật cho nộp tới ngày làm việc liền kề sau — hiển thị là \"hạn pháp lý\" "
+                "(khoản 14 Điều 3 NĐ 252/2026/NĐ-CP; trước 1/7/2026: Điều 86 TT 80/2021/TT-BTC).")
 
 DEFAULT_RULES = [
     dict(key="vat_monthly", name="Tờ khai thuế GTGT tháng", category="tax", entity_types=COMPANY_TYPES,
@@ -322,19 +325,38 @@ def generate(db: Session, org_id: int, company_id: int | None, *, today: date | 
         # chỉ hạn từ hôm nay trở đi: công ty mới bật lịch không bị báo "quá hạn" cho kỳ đã qua mà hệ thống
         # không biết đã nộp hay chưa (beat chạy hằng giờ nên hạn luôn được sinh trước 120 ngày)
         for label, statutory in periods(r, today - timedelta(days=3), today + timedelta(days=horizon_days)):
-            if shift_weekend(statutory) < today:
+            if statutory < today:      # M2d.3: hạn nội bộ = hạn theo lịch (không dời ngày nghỉ)
                 continue
             if (r.effective_to and statutory > r.effective_to) or (r.effective_from and statutory < r.effective_from):
                 continue
             if db.query(ComplianceDeadline).filter(ComplianceDeadline.rule_id == r.id, ComplianceDeadline.period_label == label).first():
                 continue
+            legal, _ = holidays.legal_due(db, org_id, statutory)
             db.add(ComplianceDeadline(organization_id=org_id, company_id=co.id, rule_id=r.id, period_label=label,
-                                      statutory_date=statutory, due_date=shift_weekend(statutory), assignee_member_id=who))
+                                      statutory_date=statutory, due_date=statutory, legal_due_date=legal,
+                                      assignee_member_id=who))
             try:
                 db.commit(); made += 1
             except IntegrityError:
                 db.rollback()
+    refresh_legal(db, org_id, co.id)
     return {"company_id": co.id, "created": made, "assignee": who_label}
+
+
+def refresh_legal(db: Session, org_id: int, company_id: int | None = None) -> int:
+    """Tính lại hạn pháp lý của các hạn chưa nộp (sau khi sửa lịch nghỉ). Hạn nội bộ không đổi."""
+    q = db.query(ComplianceDeadline).filter(ComplianceDeadline.organization_id == org_id,
+                                            ComplianceDeadline.status == "upcoming")
+    if company_id:
+        q = q.filter(ComplianceDeadline.company_id == company_id)
+    n = 0
+    for d in q.all():
+        legal, _ = holidays.legal_due(db, org_id, d.statutory_date)
+        if d.legal_due_date != legal:
+            d.legal_due_date = legal
+            n += 1
+    db.commit()
+    return n
 
 
 def _project(db: Session, company_id: int) -> Project:
@@ -361,9 +383,11 @@ def remind(db: Session, org_id: int, company_id: int | None, *, today: date | No
         days = (d.due_date - today).days
         when = f"còn {days} ngày" if days > 0 else ("hôm nay" if days == 0 else f"QUÁ HẠN {-days} ngày")
         title = f"{r.name} kỳ {d.period_label} — hạn {d.due_date:%d/%m/%Y} ({when})"
+        legal, why = holidays.legal_due(db, org_id, d.statutory_date)
         desc = "\n".join([f"**Nghĩa vụ:** {r.name} — kỳ {d.period_label}",
-                          f"**Hạn:** {d.due_date:%d/%m/%Y}" + (f" (theo luật {d.statutory_date:%d/%m/%Y}, dời vì cuối tuần)"
-                                                               if d.due_date != d.statutory_date else ""),
+                          f"**Hạn (làm theo ngày này):** {d.due_date:%d/%m/%Y}",
+                          *([f"**Hạn pháp lý:** {legal:%d/%m/%Y} — {d.due_date:%d/%m} rơi vào ngày nghỉ ({why}); luật cho "
+                             f"nộp tới ngày làm việc liền kề, nhưng đừng chờ: nộp theo hạn trên."] if legal != d.due_date else []),
                           f"**Căn cứ:** {r.legal_basis}", *( [f"**Lưu ý:** {r.note}"] if r.note else []),
                           "", f"_{DISCLAIMER}_", "", "Nộp xong thì chuyển việc sang review → xong (lịch tự đánh dấu đã nộp)."])
         if d.task_id is None and d.assignee_member_id:
@@ -402,10 +426,15 @@ def public_deadline(db: Session, d: ComplianceDeadline, today: date | None = Non
     today = today or (datetime.utcnow() + timedelta(hours=7)).date()
     r = db.get(ComplianceRule, d.rule_id)
     m = db.get(Member, d.assignee_member_id) if d.assignee_member_id else None
+    legal, why = (d.legal_due_date, "") if d.legal_due_date else (d.due_date, "")
+    if legal != d.due_date:
+        _, why = holidays.legal_due(db, d.organization_id, d.statutory_date)
     return {"id": d.id, "rule_id": d.rule_id, "name": r.name if r else "", "category": r.category if r else "",
             "period_label": d.period_label, "due_date": d.due_date.isoformat(), "statutory_date": d.statutory_date.isoformat(),
-            "shifted": d.due_date != d.statutory_date, "days_left": (d.due_date - today).days, "status": d.status,
-            "overdue": d.status == "upcoming" and d.due_date < today, "assignee": m.name if m else None,
+            "legal_due_date": legal.isoformat(), "legal_shift_reason": why,
+            "shifted": legal != d.due_date, "days_left": (d.due_date - today).days, "status": d.status,
+            "overdue": d.status == "upcoming" and d.due_date < today,
+            "legal_overdue": d.status == "upcoming" and legal < today, "assignee": m.name if m else None,
             "task_id": d.task_id, "reminded": d.reminded_at is not None, "legal_basis": r.legal_basis if r else "",
             "needs_review": bool(r and r.needs_review)}
 
@@ -423,7 +452,10 @@ def overview(db: Session, org_id: int, company_id: int | None, *, today: date | 
     s = settings_of(p)
     who, who_label = accountant(db, org_id, co, s)
     return {"company_id": co.id, "company_name": co.name, "today": today.isoformat(), "disclaimer": DISCLAIMER,
-            "weekend_note": WEEKEND_NOTE, "settings": s, "assignee": who_label,
+            "weekend_note": WEEKEND_NOTE, "legal_rule_url": holidays.LEGAL_RULE_URL, "settings": s, "assignee": who_label,
+            "holidays": {y: [holidays.public(h) for h in sorted(
+                [h for h in holidays.calendar_of(db, org_id, {y}).values()], key=lambda x: x.day)]
+                for y in (today.year, today.year + 1)},
             "rules": [{**public_rule(r), "applies": applies(r, s, today)} for r in rules],
             "deadlines": [public_deadline(db, d, today) for d in rows],
             "positions": [{"id": x.id, "title": x.title} for x in db.query(Position).filter(

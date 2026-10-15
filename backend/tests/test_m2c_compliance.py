@@ -53,8 +53,12 @@ def test_deadlines_follow_profile_and_mon_bai_is_abolished(E):
     got = E.c.get(f"/api/team/compliance?company_id={E.co.id}", headers=E.tok("member")).json()
     by = {(d["name"], d["period_label"]): d for d in got["deadlines"]}
     q3 = by[("Tờ khai thuế GTGT quý", "Q3/2026")]
-    assert q3["statutory_date"] == "2026-10-31" and q3["due_date"] == "2026-11-02" and q3["shifted"] is True
-    assert by[("Đóng BHXH, BHYT, BHTN tháng", "09/2026")]["due_date"] == "2026-11-02"
+    # Đổi assertion (M2d.3, yêu cầu của anh 16/10/2026 "agent mà nghỉ lễ gì"): KHÔNG phải lỗi code cũ mà đổi
+    # nghiệp vụ — hạn nội bộ (due_date) giữ đúng ngày theo lịch 31/10 để agent nộp sớm; ngày dời cuối tuần
+    # 2/11 chuyển sang trường phụ legal_due_date ("hạn pháp lý").
+    assert q3["statutory_date"] == "2026-10-31" and q3["due_date"] == "2026-10-31" and q3["shifted"] is True
+    assert q3["legal_due_date"] == "2026-11-02"
+    assert by[("Đóng BHXH, BHYT, BHTN tháng", "09/2026")]["legal_due_date"] == "2026-11-02"
     assert by[("Tờ khai khấu trừ thuế TNCN quý", "Q3/2026")]["assignee"] == "Chị Kế Toán"
     assert not any(d["name"].startswith("Lệ phí môn bài") for d in got["deadlines"])
     assert not any(d["name"] == "Tờ khai thuế GTGT tháng" for d in got["deadlines"])

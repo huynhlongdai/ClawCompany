@@ -482,6 +482,40 @@ export function RhythmTab({companyId, caps}: {companyId: number | null; caps: an
 
 // ===================================================================== Lịch tuân thủ (D7)
 
+const fdate = (iso: string) => new Date(iso + "T00:00:00").toLocaleDateString(intlLocale());
+
+// M2d.3: lịch nghỉ lễ theo năm — CHỈ để tính hạn pháp lý; agent làm mọi ngày.
+function Holidays({d, isAdmin, busy, run}: any) {
+  const years = Object.keys(d.holidays || {}).sort();
+  const [y, setY] = useState(years[0] || ""), [add, setAdd] = useState<any>(null);
+  const items: any[] = (d.holidays || {})[y] || [];
+  return <section className="ui-panel tm-card" data-testid="cmp-holidays">
+    <div className="tm-card-head"><div><b>{tr("ops.hol_title")}</b><span>{tr("ops.hol_desc")}</span></div>
+      <div className="ui-seg">{years.map(k => <button key={k} aria-pressed={k === y} onClick={() => setY(k)} data-testid={`hol-year-${k}`}>{k}</button>)}</div></div>
+    <small className="tmGuide">{d.weekend_note} {d.legal_rule_url && <a href={d.legal_rule_url} target="_blank" rel="noreferrer">{tr("ops.hol_source")}</a>}</small>
+    <table className="ui-table"><tbody>{items.map((h: any) => <tr key={h.id} data-testid={`hol-${h.day}`}>
+      <td style={{whiteSpace: "nowrap"}}><b>{fdate(h.day)}</b></td>
+      <td>{h.name}{h.kind === "makeup_workday" && <span className="ui-pill is-info">{tr("ops.hol_makeup")}</span>}
+        {h.status === "needs_confirmation" && <span className="ui-pill is-wait">{tr("ops.hol_unconfirmed")}</span>}
+        {h.note && <div><small>{h.note}</small></div>}</td>
+      <td>{h.source_url && <a href={h.source_url} target="_blank" rel="noreferrer"><small>{tr("ops.hol_source")}</small></a>}</td>
+      <td style={{textAlign: "right", whiteSpace: "nowrap"}}>{isAdmin && h.status === "needs_confirmation" && <button className="ui-btn is-ghost is-sm" disabled={busy}
+          onClick={() => run(() => apiOps.updateHoliday(h.id, {status: "official"}), (r: any) => tr("ops.hol_saved", {p0: r.legal_due_updated}))}>{tr("ops.hol_confirm")}</button>}
+        {isAdmin && <button className="ui-btn is-ghost is-sm" disabled={busy} aria-label={tr("ops.remove")}
+          onClick={() => run(() => apiOps.deleteHoliday(h.id), (r: any) => tr("ops.hol_saved", {p0: r.legal_due_updated}))}>✕</button>}</td>
+    </tr>)}</tbody></table>
+    {isAdmin && (add ? <div className="tmRow" data-testid="hol-add-form">
+      <input type="date" value={add.day} onChange={e => setAdd({...add, day: e.target.value})} aria-label={tr("ops.hol_day")}/>
+      <input value={add.name} placeholder={tr("ops.hol_name_ph")} onChange={e => setAdd({...add, name: e.target.value})}/>
+      <select value={add.kind} onChange={e => setAdd({...add, kind: e.target.value})} aria-label={tr("ops.hol_kind")}>
+        <option value="holiday">{tr("ops.hol_holiday")}</option><option value="makeup_workday">{tr("ops.hol_makeup")}</option></select>
+      <button className="ui-btn is-primary is-sm" disabled={busy || !add.day || !add.name}
+        onClick={async () => { const r = await run(() => apiOps.createHoliday(add), (x: any) => tr("ops.hol_saved", {p0: x.legal_due_updated})); if (r) setAdd(null); }}>{tr("ops.save")}</button>
+      <button className="ui-btn is-ghost is-sm" onClick={() => setAdd(null)}>{tr("ops.cancel")}</button></div>
+      : <button className="ui-btn is-ghost is-sm" onClick={() => setAdd({day: "", name: "", kind: "holiday", status: "official"})} data-testid="hol-add">{tr("ops.hol_add")}</button>)}
+  </section>;
+}
+
 export function ComplianceTab({companyId, caps}: {companyId: number | null; caps: any}) {
   const {data, error, reload, setError} = useLoad(() => apiOps.compliance(companyId), [companyId]);
   const [f, setF] = useState<any>(null), [busy, setBusy] = useState(false), [lic, setLic] = useState<any>(null);
@@ -537,7 +571,7 @@ export function ComplianceTab({companyId, caps}: {companyId: number | null; caps
         <div className="tm-card-head"><div><b>{tr("ops.cmp_upcoming")}</b><span>{tr("ops.cmp_upcoming_desc", {p0: upcoming.length})}</span></div></div>
         {!upcoming.length ? <EmptyState compact mood="ngu" title={tr("ops.cmp_empty")} testId="cmp-empty">{tr("ops.cmp_empty_hint")}</EmptyState>
           : <table className="ui-table" data-testid="cmp-deadlines"><tbody>{upcoming.map((x: any) => <tr key={x.id} data-testid={`cmp-d-${x.id}`}>
-            <td><b>{new Date(x.due_date + "T00:00:00").toLocaleDateString(intlLocale())}</b>{x.shifted && <div><small title={d.weekend_note}>{tr("ops.cmp_shifted", {p0: new Date(x.statutory_date + "T00:00:00").toLocaleDateString(intlLocale())})}</small></div>}</td>
+            <td><b>{fdate(x.due_date)}</b>{x.shifted && <div data-testid={`cmp-legal-${x.id}`}><small title={d.weekend_note}>{tr("ops.cmp_legal_due", {p0: fdate(x.legal_due_date), p1: x.legal_shift_reason})}</small></div>}</td>
             <td>{x.name} · <small>{x.period_label}</small>{x.needs_review && <span className="ui-pill is-wait" title={tr("ops.cmp_review_hint")}>{tr("ops.cmp_review")}</span>}
               <div><small>{x.assignee ? tr("ops.cmp_assigned", {p0: x.assignee}) : ""}{x.task_id ? <> · <Link href={`/app/tasks/${x.task_id}`}>{tr("ops.cmp_task")}</Link></> : ""}</small></div></td>
             <td><span className={"ui-pill " + (x.overdue ? "is-risk" : x.days_left <= 7 ? "is-wait" : "")}>{x.overdue ? tr("ops.cmp_overdue", {p0: -x.days_left}) : tr("ops.cmp_days", {p0: x.days_left})}</span></td>
@@ -546,6 +580,7 @@ export function ComplianceTab({companyId, caps}: {companyId: number | null; caps
         {done.length > 0 && <small className="tmGuide">{tr("ops.cmp_done_n", {p0: done.length})}</small>}
       </section>
     </div>
+    <Holidays d={d} isAdmin={isAdmin} busy={busy} run={run}/>
     <h3 className="ops-cat">{tr("ops.cmp_rules")} {can && <button className="ui-btn is-ghost is-sm" onClick={() => setLic({name: "", date: "", remind_days: 30, legal_basis: ""})} data-testid="cmp-add-license">{tr("ops.cmp_add_license")}</button>}</h3>
     {lic && <section className="ui-panel tm-card cf-edit" data-testid="cmp-license-form">
       <div className="ui-form cf-form"><FormRow>

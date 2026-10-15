@@ -1,6 +1,6 @@
 """M2c — vận hành công ty dưới tiền tố /api/team (cùng chỗ với M2b): bản đồ quy trình (D4).
 Spec: docs/m2c-company-operations.md."""
-from fastapi import APIRouter, Depends
+from fastapi import HTTPException, APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -339,6 +339,51 @@ def compliance_generate(payload: CompanyIn, principal: Principal = Depends(requi
     g = cc.generate(db, org, payload.company_id)
     m = cc.remind(db, org, payload.company_id)
     return {**g, "reminded": m["reminded"]}
+
+
+# M2d.3: ngày nghỉ lễ — chỉ để tính hạn pháp lý (agent không có ngày nghỉ)
+from app.services import holidays as hol  # noqa: E402
+
+
+class HolidayIn(BaseModel):
+    day: str | None = Field(default=None, max_length=10)
+    name: str | None = Field(default=None, max_length=200)
+    kind: str | None = Field(default=None, max_length=16)
+    status: str | None = Field(default=None, max_length=24)
+    source_url: str | None = Field(default=None, max_length=400)
+    note: str | None = Field(default=None, max_length=400)
+
+
+@router.get("/compliance/holidays")
+def holidays_list(year: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+    if year < 2000 or year > 2100:
+        raise HTTPException(422, "Năm không hợp lệ.")
+    return hol.list_year(db, active_org(principal), year)
+
+
+@router.post("/compliance/holidays")
+def holidays_create(payload: HolidayIn, principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
+    org = active_org(principal)
+    out = hol.create(db, org, payload.model_dump(exclude_unset=True))
+    out["legal_due_updated"] = cc.refresh_legal(db, org)
+    return out
+
+
+@router.patch("/compliance/holidays/{holiday_id}")
+def holidays_update(holiday_id: int, payload: HolidayIn, principal: Principal = Depends(require_role("admin")),
+                    db: Session = Depends(get_db)):
+    org = active_org(principal)
+    out = hol.update(db, org, holiday_id, payload.model_dump(exclude_unset=True))
+    out["legal_due_updated"] = cc.refresh_legal(db, org)
+    return out
+
+
+@router.delete("/compliance/holidays/{holiday_id}")
+def holidays_delete(holiday_id: int, principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
+    org = active_org(principal)
+    out = hol.delete(db, org, holiday_id)
+    out["legal_due_updated"] = cc.refresh_legal(db, org)
+    return out
 
 
 @router.post("/compliance/deadlines/{deadline_id}/done")

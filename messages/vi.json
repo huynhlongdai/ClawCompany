@@ -2751,6 +2751,19 @@
   "trend_running": "đang chạy",
   "snapshot": "Chụp số ngay",
   "snapshot_hint": "Lưu số KPI của kỳ hiện tại và tính lại tối đa 5 kỳ trước từ dữ liệu đang có (trừ chỉ số tại một thời điểm như phê duyệt đang chờ). Hệ thống cũng tự chụp mỗi giờ.",
-  "snapshot_done": "Đã lưu {p0} KPI cho kỳ này, tính lại {p1} kỳ cũ."
+  "snapshot_done": "Đã lưu {p0} KPI cho kỳ này, tính lại {p1} kỳ cũ.",
+  "cmp_legal_due": "hạn pháp lý {p0} (ngày nghỉ: {p1}) — vẫn làm theo hạn trên",
+  "hol_title": "Lịch nghỉ lễ (chỉ để tính hạn pháp lý)",
+  "hol_desc": "Agent làm mọi ngày — lịch này không ảnh hưởng giao việc, giao ban hay nhắc hạn; chỉ dùng để biết hạn pháp lý khi hạn rơi vào ngày nghỉ.",
+  "hol_source": "Nguồn",
+  "hol_makeup": "Làm bù",
+  "hol_holiday": "Nghỉ lễ",
+  "hol_unconfirmed": "Cần xác nhận",
+  "hol_confirm": "Xác nhận",
+  "hol_add": "+ Thêm ngày nghỉ",
+  "hol_day": "Ngày",
+  "hol_kind": "Loại",
+  "hol_name_ph": "Tên (vd. Giỗ Tổ Hùng Vương)",
+  "hol_saved": "Đã lưu lịch nghỉ — cập nhật hạn pháp lý của {p0} hạn."
  }
 }

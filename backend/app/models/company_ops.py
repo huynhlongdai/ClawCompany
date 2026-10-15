@@ -144,6 +144,24 @@ class KpiMeasurement(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 
+class PublicHoliday(Base):
+    """M2d.3 — ngày nghỉ lễ (và ngày làm bù) theo năm, dữ liệu sửa được cho từng tổ chức. CHỈ dùng để tính hạn
+    pháp lý (hạn rơi ngày nghỉ → ngày làm việc liền kề sau). Agent không có ngày nghỉ: lịch giao việc, giao ban,
+    nhắc hạn không đọc bảng này."""
+    __tablename__ = "public_holidays"
+    __table_args__ = (UniqueConstraint("organization_id", "day", name="uq_public_holidays_org_day"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    year: Mapped[int] = mapped_column(Integer, index=True)
+    day: Mapped[date] = mapped_column(Date)
+    name: Mapped[str] = mapped_column(String(200))
+    kind: Mapped[str] = mapped_column(String(16), default="holiday")          # holiday | makeup_workday
+    status: Mapped[str] = mapped_column(String(24), default="official")       # official | needs_confirmation
+    source_url: Mapped[str] = mapped_column(String(400), default="")
+    note: Mapped[str] = mapped_column(String(400), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class KpiSnapshot(Base):
     """M2d.2 — số KPI đã tính, lưu theo kỳ (một hàng / KPI × kỳ; trong kỳ thì cập nhật tại chỗ, hết kỳ thì
     đóng băng). ``trigger``: beat | manual | backfill (tính lại kỳ cũ từ dữ liệu hiện có)."""
@@ -242,8 +260,11 @@ class ComplianceDeadline(Base):
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     rule_id: Mapped[int] = mapped_column(ForeignKey("compliance_rules.id"), index=True)
     period_label: Mapped[str] = mapped_column(String(32))
-    statutory_date: Mapped[date] = mapped_column(Date)                         # hạn theo luật trước khi dời ngày nghỉ
+    statutory_date: Mapped[date] = mapped_column(Date)                         # hạn theo lịch (ngày luật ghi)
+    # M2d.3: due_date = hạn NỘI BỘ = đúng ngày theo lịch (agent làm cả ngày nghỉ → nộp sớm); nhắc + task theo ngày này.
     due_date: Mapped[date] = mapped_column(Date, index=True)
+    # hạn PHÁP LÝ: hạn theo lịch rơi vào cuối tuần/ngày lễ → ngày làm việc liền kề sau (chỉ để hiển thị/đối chiếu)
+    legal_due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="upcoming")      # upcoming|done|skipped
     assignee_member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     task_id: Mapped[int | None] = mapped_column(Integer, nullable=True)

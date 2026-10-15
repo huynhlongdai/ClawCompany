@@ -52,3 +52,32 @@ nút "Chụp số ngay" (lưu kỳ này + tính lại 5 kỳ trước).
 
 Giới hạn tự khai: số backfill là "tính lại hôm nay cho kỳ cũ" — việc bị xoá/sửa từ đó tới nay làm lệch; không có
 snapshot theo ngày (chỉ theo kỳ của KPI).
+
+## 3. Lịch tuân thủ: hạn theo lịch + hạn pháp lý, ngày lễ là dữ liệu (migration `0046_holiday_legal_due`)
+
+**Đổi nghiệp vụ theo anh (16/10/2026, "agent mà nghỉ lễ gì")**: agent làm mọi ngày — không có ngày nghỉ ở giao việc,
+giao ban, nhắc hạn. Ngày lễ CHỈ là dữ liệu để tính **hạn pháp lý**.
+
+- `compliance_deadlines.due_date` = **hạn nội bộ = đúng ngày luật ghi** (không dời). Nhắc trước N ngày, tiêu đề việc,
+  `tasks.due_at` (17:00 giờ VN) đều theo ngày này → agent nộp sớm. Áp dụng luôn cho việc dời cuối tuần của D7 (trước
+  đây `due_date` là ngày đã dời).
+- `legal_due_date` (mới) = ngày làm việc liền kề sau nếu hạn rơi vào thứ Bảy/CN/lễ/Tết — trường phụ "hạn pháp lý" kèm lý do.
+  Căn cứ: khoản 14 Điều 3 **Nghị định 252/2026/NĐ-CP** (hướng dẫn Luật Quản lý thuế 108/2025/QH15, từ 1/7/2026): "Trường
+  hợp ngày cuối cùng của thời hạn … trùng với ngày nghỉ theo quy định thì ngày cuối cùng của thời hạn được tính là ngày
+  làm việc liền kề sau ngày nghỉ đó"; trước 1/7/2026: Điều 86 Thông tư 80/2021/TT-BTC + khoản 5 Điều 148 BLDS 2015.
+- Migration chuyển dữ liệu D7: `legal_due_date` ← `due_date` cũ (đã dời), `due_date` ← `statutory_date`.
+
+**Lịch nghỉ** `public_holidays` (tổ chức × ngày, UNIQUE): tên, loại `holiday | makeup_workday` (thứ Bảy làm bù là ngày làm
+việc), trạng thái `official | needs_confirmation`, nguồn. Lần đầu đọc một năm → gieo mặc định (lịch khu vực hành chính —
+cơ quan thuế theo lịch này): 2026 theo TB 9441/TB-BNV (Tết 16–20/2; Quốc khánh 31/8 hoán đổi + 1–2/9, làm bù 22/8), CV
+3383/BNV-CVL (nghỉ bù Giỗ Tổ 27/4; 30/4, 1/5), CV 10065/VPCP-KGVX (Ngày Văn hóa Việt Nam 24/11/2026); 2027 theo TB
+11483/TB-BNV (Tết 4–10/2 gồm 2 ngày nghỉ bù; Quốc khánh 2–3/9). **Cần xác nhận**: Giỗ Tổ 2027 (16/4, tính âm lịch), nghỉ
+bù 1/5/2027 (3/5), Ngày Văn hóa 24/11/2027. Sửa lịch → tính lại hạn pháp lý các hạn chưa nộp (hạn nội bộ không đổi).
+
+API: `GET /team/compliance/holidays?year=` (member), `POST/PATCH/DELETE /team/compliance/holidays[/{id}]` (admin; trả
+`legal_due_updated`). `GET /team/compliance` thêm `legal_due_date`, `legal_shift_reason`, `legal_overdue`, `holidays`
+(năm nay + năm sau). UI tab Tuân thủ: ngày đậm = hạn theo lịch, dòng phụ "hạn pháp lý … — vẫn làm theo hạn trên"; thẻ
+"Lịch nghỉ lễ (chỉ để tính hạn pháp lý)" theo năm, nhãn Làm bù / Cần xác nhận, nút Xác nhận / thêm / xoá.
+
+Giới hạn tự khai: lịch nghỉ là của khu vực hành chính (doanh nghiệp có thể nghỉ Tết khác — không ảnh hưởng hạn thuế);
+năm ngoài 2026/2027 không có mặc định (nhập tay); BHXH dùng cùng quy tắc ngày nghỉ (luật BHXH không nói riêng — cần kiểm tra).
