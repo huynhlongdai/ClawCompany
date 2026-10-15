@@ -90,6 +90,12 @@ def read_all(principal: Principal = Depends(require_human()), db: Session = Depe
     return {"updated": inbox_hub.mark_all_read(db, active_org(principal), principal)}
 
 
+@router.get("/approvals/{approval_id}")
+def approval_detail(approval_id: int, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    """Chi tiết một yêu cầu duyệt: ai xin, xin làm gì (lệnh/nội dung/số tiền), việc liên quan, hạn."""
+    return inbox_hub.approval_detail(db, active_org(principal), principal, approval_id)
+
+
 @router.post("/approvals/{approval_id}/decide")
 async def decide(approval_id: int, payload: DecideIn, principal: Principal = Depends(require_human()),
                  db: Session = Depends(get_db)):

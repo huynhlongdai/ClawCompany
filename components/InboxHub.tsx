@@ -34,6 +34,14 @@ function ApprovalCard({c, onDone}: {c: Card; onDone: (msg: string, reload?: bool
   const [mode, setMode] = useState<"" | "reject">("");
   const [note, setNote] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState("");
   const [scope, setScope] = useState<"task" | "seat" | "department">("task");
+  const [open, setOpen] = useState(false), [det, setDet] = useState<any>(null), [detErr, setDetErr] = useState("");
+  async function toggle() {
+    const next = !open; setOpen(next);
+    if (next && !det) {
+      setDetErr("");
+      try { setDet(await apiInboxHub.approval(a.id)); } catch (e) { setDetErr(errorText(e, t("inbox.khong_tai_duoc_chi_tiet"))); }
+    }
+  }
 
   async function send(decision: "approve" | "reject") {
     if (decision === "reject" && !note.trim()) { setErr(t("inbox.chon_hoac_ghi_ly_do")); return; }
@@ -54,8 +62,11 @@ function ApprovalCard({c, onDone}: {c: Card; onDone: (msg: string, reload?: bool
       <span>{kindLabel(a.kind)}{a.requester ? t("inbox.xin_duyet", {p0: a.requester}) : ""}</span>
       <span className={"ibx-risk " + riskCls(a.risk)}>{riskLabel(a.risk)}</span>
     </header>
-    <h3 className="ibx-title">{a.action}</h3>
-    {a.summary && <p className="ibx-summary">{a.summary}</p>}
+    <h3 className="ibx-title"><button type="button" className="ibx-title-btn" onClick={toggle} aria-expanded={open}>{a.action}</button></h3>
+    {a.summary && !open && <p className="ibx-summary">{a.summary}</p>}
+    <button type="button" className="ibx-more" onClick={toggle} aria-expanded={open} data-testid={`ibx-detail-toggle-${a.id}`}>
+      <Icon name={open ? "chevron-down" : "chevron-right"} size={14}/>{open ? t("inbox.an_chi_tiet") : t("inbox.xem_chi_tiet")}</button>
+    {open && <ApprovalDetail det={det} err={detErr}/>}
     <div className="ibx-meta">
       {c.department?.name && <span><Icon name="users" size={13}/>{c.department.name}</span>}
       {a.task && <Link href={`/app/work?peek=${a.task.id}`}><Icon name="check" size={13}/>{t("inbox.viec")}{a.task.id}</Link>}
@@ -87,6 +98,38 @@ function ApprovalCard({c, onDone}: {c: Card; onDone: (msg: string, reload?: bool
       </>}
     </div>}
   </article>;
+}
+
+function fmtTime(iso?: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z");
+  return isNaN(d.getTime()) ? iso : d.toLocaleString();
+}
+
+function ApprovalDetail({det, err}: {det: any; err: string}) {
+  if (err) return <p className="ui-inline-error" role="alert">{err}</p>;
+  if (!det) return <SkeletonRows n={2} h={40}/>;
+  const td = det.task_detail;
+  return <div className="ibx-detail" data-testid={`ibx-detail-${det.id}`}>
+    <dl className="ibx-dl">
+      <dt>{t("inbox.loai_yeu_cau")}</dt><dd>{det.kind_vi}</dd>
+      {det.requester_detail && <><dt>{t("inbox.nguoi_xin")}</dt>
+        <dd>{det.requester_detail.name}{det.requester_detail.type === "agent" ? ` · ${t("inbox.agent")}` : ""}</dd></>}
+      {det.approver && <><dt>{t("inbox.nguoi_duyet")}</dt><dd>{det.approver}</dd></>}
+      {det.created_at && <><dt>{t("inbox.gui_luc")}</dt><dd>{fmtTime(det.created_at)}</dd></>}
+      {det.expires_at && <><dt>{t("inbox.han_duyet")}</dt><dd>{fmtTime(det.expires_at)}</dd></>}
+      {det.fields.map((f: any, i: number) => <div key={i} className="ibx-dl-row">
+        <dt>{f.label}</dt><dd>{f.mono ? <code className="ibx-code">{f.value}</code> : <span className="ibx-pre">{f.value}</span>}</dd></div>)}
+    </dl>
+    {det.text && <p className="ibx-pre">{det.text}</p>}
+    {!det.fields.length && !det.text && <p className="ibx-note">{t("inbox.khong_co_mo_ta_them")}</p>}
+    {td && <div className="ibx-task">
+      <b>{t("inbox.viec")}{td.id}: {td.title}</b>
+      <small>{[td.project, td.assignee, td.status].filter(Boolean).join(" · ")}</small>
+      {td.description && <p className="ibx-pre">{td.description}</p>}
+      <Link href={`/app/work?peek=${td.id}`}>{t("inbox.mo_viec")}{td.id}</Link>
+    </div>}
+  </div>;
 }
 
 function NoticeCard({c, onChange}: {c: Card; onChange: (msg?: string) => void}) {

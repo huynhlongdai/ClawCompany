@@ -479,7 +479,16 @@
   "dl_escalated": " (escalated to you)",
   "dl_h": "{p0:hr|hrs}",
   "dl_m": "{p0:min|min}",
-  "xin_short": "{p0} asks"
+  "xin_short": "{p0} asks",
+  "xem_chi_tiet": "View details",
+  "an_chi_tiet": "Collapse",
+  "khong_tai_duoc_chi_tiet": "Couldn't load details",
+  "loai_yeu_cau": "Type",
+  "nguoi_xin": "Requested by",
+  "gui_luc": "Sent",
+  "han_duyet": "Due",
+  "agent": "agent",
+  "khong_co_mo_ta_them": "This request has no further description."
  },
  "work": {
   "tam_dung": "paused",

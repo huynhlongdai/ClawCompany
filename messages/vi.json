@@ -479,7 +479,16 @@
   "dl_escalated": " (đã được chuyển lên anh)",
   "dl_h": "{p0} giờ",
   "dl_m": "{p0} phút",
-  "xin_short": "{p0} xin"
+  "xin_short": "{p0} xin",
+  "xem_chi_tiet": "Xem chi tiết",
+  "an_chi_tiet": "Thu gọn",
+  "khong_tai_duoc_chi_tiet": "Không tải được chi tiết",
+  "loai_yeu_cau": "Loại",
+  "nguoi_xin": "Người xin",
+  "gui_luc": "Gửi lúc",
+  "han_duyet": "Hạn duyệt",
+  "agent": "agent",
+  "khong_co_mo_ta_them": "Yêu cầu này không kèm mô tả nào thêm."
  },
  "work": {
   "tam_dung": "tạm dừng",

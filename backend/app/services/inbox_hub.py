@@ -411,3 +411,88 @@ def escalate(db: Session, organization_id: int) -> dict:
     if stuck:
         msg += f"; {stuck} yêu cầu quá hạn không có cấp trên để chuyển — người duyệt hiện tại vẫn phải quyết"
     return {"escalated": rows, "message": msg}
+
+
+# ------------------------------------------------------------------ chi tiết một yêu cầu duyệt
+# Thẻ trong danh sách chỉ có tiêu đề + một dòng tóm tắt. Trước khi bấm Duyệt người
+# duyệt cần thấy đủ: ai xin, xin làm gì (lệnh, thư mục, nội dung), việc liên quan,
+# hạn duyệt. Chi tiết đọc từ evidence/payload thật, không đoán thêm.
+
+FIELD_VI = {
+    "command": "Lệnh", "cwd": "Thư mục chạy", "host": "Nơi chạy", "security": "Chế độ an toàn",
+    "session_key": "Phiên agent", "sessionKey": "Phiên agent", "agentId": "Agent", "reason": "Lý do",
+    "summary": "Tóm tắt", "amount": "Số tiền", "amount_usd": "Số tiền (USD)", "spent": "Đã chi",
+    "limit": "Hạn mức", "level": "Nấc", "envelope": "Ngân sách", "stage": "Chặng", "title": "Tiêu đề",
+    "content": "Nội dung", "lesson": "Bài học", "to": "Gửi tới", "subject": "Chủ đề", "body": "Nội dung",
+    "url": "Đường dẫn", "tool": "Công cụ", "args": "Tham số", "risk": "Rủi ro", "task_id": "Việc",
+    "description": "Mô tả", "note": "Ghi chú", "plan": "Kế hoạch", "steps": "Các bước",
+}
+_SKIP = {"id", "event", "request", "systemRunBinding", "systemRunPlan", "nodeId", "ts", "createdAtMs",
+         "expiresAtMs", "revision"}
+
+
+def _fields(obj: Any, prefix: str = "", depth: int = 0) -> list[dict]:
+    out: list[dict] = []
+    if not isinstance(obj, dict) or depth > 2:
+        return out
+    for k, v in obj.items():
+        if v in (None, "", [], {}):
+            continue
+        if isinstance(v, dict):
+            out += _fields(v, prefix, depth + 1)
+            continue
+        if k in _SKIP:
+            continue
+        if isinstance(v, list):
+            v = "\n".join(str(x if not isinstance(x, dict) else json.dumps(x, ensure_ascii=False)) for x in v[:20])
+        text = str(v)
+        out.append({"key": k, "label": FIELD_VI.get(k, k), "value": text[:4000],
+                    "mono": k in ("command", "cwd", "args", "url", "session_key", "sessionKey")})
+    return out
+
+
+def _parse(raw: Any) -> tuple[list[dict], str]:
+    """(trường có nhãn, văn bản tự do)."""
+    if isinstance(raw, dict):
+        return _fields(raw), ""
+    raw = (raw or "").strip() if isinstance(raw, str) else ""
+    if raw.startswith("{"):
+        try:
+            obj = json.loads(raw)
+            if isinstance(obj, dict):
+                return _fields(obj), ""
+        except Exception:  # noqa: BLE001
+            pass
+    return [], raw[:4000]
+
+
+def approval_detail(db: Session, organization_id: int, principal: Principal, approval_id: int) -> dict:
+    from app.models import Department, Project
+    a = db.get(Approval, approval_id)
+    if a is None or a.organization_id != organization_id:
+        raise WorkError(404, "not_found", "Không tìm thấy yêu cầu duyệt này")
+    me = principal.member_id
+    if not (is_manager(principal) or can_decide(db, a, principal)
+            or (me is not None and me in (a.requester_member_id, a.approver_member_id))):
+        raise WorkError(404, "not_found", "Không tìm thấy yêu cầu duyệt này")
+    names = {m.id: m.name for m in db.query(Member).filter(Member.organization_id == organization_id).all()}
+    card = approval_card(db, a, principal, names)
+    ev_fields, ev_text = _parse(a.evidence)
+    pl_fields, _ = _parse(a.payload or {})
+    seen = {(f["key"], f["value"]) for f in ev_fields}
+    fields = ev_fields + [f for f in pl_fields if (f["key"], f["value"]) not in seen]
+    task = None
+    tid = inbox.task_of_approval(a)
+    t = db.get(Task, tid) if tid else None
+    if t is not None:
+        proj = db.get(Project, t.project_id) if t.project_id else None
+        dept = db.get(Department, t.assignee_department_id) if getattr(t, "assignee_department_id", None) else None
+        task = {"id": t.id, "title": t.title, "status": t.status, "description": (t.description or "")[:3000],
+                "assignee": names.get(t.assignee_member_id) if t.assignee_member_id else None,
+                "project": proj.name if proj else None, "department": dept.name if dept else None,
+                "due_at": t.due_at.isoformat() if t.due_at else None}
+    requester = db.get(Member, a.requester_member_id) if a.requester_member_id else None
+    return {**card, "kind_vi": _kind(a)[1], "policy_key": a.policy_key, "fields": fields, "text": ev_text,
+            "requester_detail": {"name": requester.name, "type": requester.member_type,
+                                 "title": getattr(requester, "title", "") or ""} if requester else None,
+            "task_detail": task, "resolution_note": a.resolution_note or ""}

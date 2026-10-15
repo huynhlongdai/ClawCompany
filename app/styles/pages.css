@@ -56,6 +56,19 @@
 .ibx-meta a:hover{color:var(--text);text-decoration:underline}
 .ibx-meta .is-late{color:var(--risk);font-weight:var(--fw-medium)}
 .ibx-note{font-size:var(--fs-12);color:var(--text-muted);background:var(--surface-2);padding:6px 10px;border-radius:var(--radius-sm)}
+.ibx-title-btn{all:unset;cursor:pointer}
+.ibx-title-btn:hover{text-decoration:underline}
+.ibx-more{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-12);color:var(--accent,var(--text));font-weight:var(--fw-medium);min-height:32px}
+.ibx-detail{display:flex;flex-direction:column;gap:10px;background:var(--surface-2);border-radius:var(--radius-sm);padding:10px 12px}
+.ibx-dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 12px;margin:0;font-size:var(--fs-13)}
+.ibx-dl dt{color:var(--text-muted)}
+.ibx-dl dd{margin:0;min-width:0}
+.ibx-dl-row{display:contents}
+.ibx-code{font-family:var(--font-mono,monospace);font-size:var(--fs-12);white-space:pre-wrap;word-break:break-all}
+.ibx-pre{white-space:pre-wrap;word-break:break-word;font-size:var(--fs-13)}
+.ibx-task{display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--border);padding-top:8px;font-size:var(--fs-13)}
+.ibx-task small{color:var(--text-muted)}
+@media (max-width:480px){.ibx-dl{grid-template-columns:1fr}.ibx-dl dt{margin-top:4px}}
 .ibx-scope{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .ibx-reject{display:grid;gap:8px}
 .ibx-actions{display:flex;gap:8px;margin-top:2px}
