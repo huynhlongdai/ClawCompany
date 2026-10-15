@@ -192,6 +192,17 @@ def _embed_remote(config: dict) -> dict | None:
     return {"baseUrl": base, "apiKey": key}
 
 
+def _same_remote(cur: dict, want: dict) -> bool:
+    """So sánh có tính tới việc config.get che ``id`` của SecretRef."""
+    if cur.get("baseUrl") != want.get("baseUrl"):
+        return False
+    a, b = cur.get("apiKey"), want.get("apiKey")
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.get("source") == b.get("source") and a.get("provider") == b.get("provider") \
+            and a.get("id") in (b.get("id"), "__OPENCLAW_REDACTED__")
+    return a == b
+
+
 def _merge_models(existing: list, wanted: list) -> list:
     by_id = {m.get("id"): m for m in existing if isinstance(m, dict)}
     for m in wanted:
@@ -237,7 +248,7 @@ async def wire_gateway(db: Session, principal, org_id: int, runtime: Any, *, mcp
         remote = _embed_remote(config)
         cur = ((config.get("memory") or {}).get("search")) or {}
         same = remote and cur.get("provider") == "openai" and cur.get("model") == EMBED_MODEL \
-            and all((cur.get("remote") or {}).get(k) == v for k, v in remote.items())
+            and _same_remote(cur.get("remote") or {}, remote)
         if same:
             # Không gửi lại: memory.search là đường cần khởi động lại gateway,
             # gửi giá trị y hệt vẫn bị tính là "chạm" → 409 vô cớ khi nối lại MCP.
