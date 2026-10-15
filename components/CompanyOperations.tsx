@@ -9,7 +9,7 @@ import {EmptyState, ErrorBanner} from "./ui/EmptyState";
 import {SkeletonRows} from "./ui/Skeleton";
 import {useToast} from "./ui/Toast";
 import {Field, FormRow} from "./ui/Field";
-import {t as tr, type Key} from "../lib/i18n";
+import {t as tr, type Key, intlLocale} from "../lib/i18n";
 import {actLabel} from "./CompanyFoundation";
 
 export function useLoad<T>(fn: () => Promise<T>, deps: any[]) {
@@ -362,7 +362,7 @@ export function RhythmTab({companyId, caps}: {companyId: number | null; caps: an
     {!d.reports.length ? <EmptyState mood="ngu" title={tr("ops.rh_empty")} testId="rh-empty">{tr("ops.rh_empty_hint")}</EmptyState>
       : <div className="ops-inst">{d.reports.map((r: any) => <details key={r.id} data-testid={`rh-${r.id}`}>
         <summary><b>{r.title}</b> <span className={"ui-pill " + (r.by_agent ? "is-info" : "")}>{r.by_agent ? tr("ops.rh_by_agent") : tr("ops.rh_by_system")}</span>
-          {" "}<small>→ {r.recipients.join(", ") || "—"} · {new Date(r.created_at + "Z").toLocaleString()}</small></summary>
+          {" "}<small>→ {r.recipients.join(", ") || "—"} · {new Date(r.created_at + "Z").toLocaleString(intlLocale())}</small></summary>
         <pre className="ibx-pre ops-report">{r.content}</pre>
         {r.author_note && <small className="tmGuide">{r.author_note}</small>}
         {r.by_agent && <details><summary><small>{tr("ops.rh_fallback")}</small></summary><pre className="ibx-pre ops-report">{r.fallback}</pre></details>}
@@ -427,7 +427,7 @@ export function ComplianceTab({companyId, caps}: {companyId: number | null; caps
         <div className="tm-card-head"><div><b>{tr("ops.cmp_upcoming")}</b><span>{tr("ops.cmp_upcoming_desc", {p0: upcoming.length})}</span></div></div>
         {!upcoming.length ? <EmptyState compact mood="ngu" title={tr("ops.cmp_empty")} testId="cmp-empty">{tr("ops.cmp_empty_hint")}</EmptyState>
           : <table className="ui-table" data-testid="cmp-deadlines"><tbody>{upcoming.map((x: any) => <tr key={x.id} data-testid={`cmp-d-${x.id}`}>
-            <td><b>{new Date(x.due_date + "T00:00:00").toLocaleDateString()}</b>{x.shifted && <div><small title={d.weekend_note}>{tr("ops.cmp_shifted", {p0: new Date(x.statutory_date + "T00:00:00").toLocaleDateString()})}</small></div>}</td>
+            <td><b>{new Date(x.due_date + "T00:00:00").toLocaleDateString(intlLocale())}</b>{x.shifted && <div><small title={d.weekend_note}>{tr("ops.cmp_shifted", {p0: new Date(x.statutory_date + "T00:00:00").toLocaleDateString(intlLocale())})}</small></div>}</td>
             <td>{x.name} · <small>{x.period_label}</small>{x.needs_review && <span className="ui-pill is-wait" title={tr("ops.cmp_review_hint")}>{tr("ops.cmp_review")}</span>}
               <div><small>{x.assignee ? tr("ops.cmp_assigned", {p0: x.assignee}) : ""}{x.task_id ? <> · <Link href={`/app/tasks/${x.task_id}`}>{tr("ops.cmp_task")}</Link></> : ""}</small></div></td>
             <td><span className={"ui-pill " + (x.overdue ? "is-risk" : x.days_left <= 7 ? "is-wait" : "")}>{x.overdue ? tr("ops.cmp_overdue", {p0: -x.days_left}) : tr("ops.cmp_days", {p0: x.days_left})}</span></td>
@@ -486,7 +486,7 @@ export function ReadinessTab({companyId, caps}: {companyId: number | null; caps:
     {!a ? <EmptyState mood="chao" title={tr("ops.rd_empty")} testId="rd-empty">{tr("ops.rd_empty_hint")}</EmptyState> : <>
       <div className="ui-grid is-2">
         <section className="ui-panel tm-card" data-testid="rd-score">
-          <div className="tm-card-head"><div><b>{tr("ops.rd_score")}</b><span>{tr(`ops.rd_trigger_${a.trigger}` as Key)} · {new Date(a.created_at + "Z").toLocaleString()}</span></div>
+          <div className="tm-card-head"><div><b>{tr("ops.rd_score")}</b><span>{tr(`ops.rd_trigger_${a.trigger}` as Key)} · {new Date(a.created_at + "Z").toLocaleString(intlLocale())}</span></div>
             <span className={"ui-pill " + lvlPill(a.level)}>{tr(`ops.rd_lv_${a.level}` as Key)}</span></div>
           <div className="ops-big"><b>{a.score}</b><span>/100</span>{a.previous_score != null && <small> ({a.score >= a.previous_score ? "+" : ""}{a.score - a.previous_score} {tr("ops.rd_vs_prev")})</small>}</div>
           <table className="ui-table"><tbody>{a.layers.map((l: any) => <tr key={l.key}>
