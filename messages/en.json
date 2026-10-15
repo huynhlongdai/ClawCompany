@@ -241,7 +241,9 @@
   "may_chu_gap_loi": "The server hit an error",
   "thu_lai_sau_it_giay": "Try again in a few seconds. If it keeps happening, send{p0} to your administrator.",
   "chua_thanh_cong": "{p0} did not succeed",
-  "thu_lai_neu_van_loi": "Try again. If it still fails, reload the page."
+  "thu_lai_neu_van_loi": "Try again. If it still fails, reload the page.",
+  "ben_ngoai_khong_tra_loi": "The other agent could not answer",
+  "ben_ngoai_khong_tra_loi_fix": "ClawCompany is fine — the reason is on the called agent's side (e.g. daily spend cap reached, model quota exhausted). Fix it there, then send again."
  },
  "labels": {
   "dang_hoat_dong": "Active",

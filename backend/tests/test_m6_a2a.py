@@ -81,3 +81,18 @@ def test_reply_text_reads_task_artifacts():
     assert a2a.reply_text({"kind": "task", "status": {"state": "completed"},
                            "artifacts": [{"parts": [{"kind": "text", "text": "Kết quả"}]}]}) == "Kết quả"
     assert a2a.reply_text({"kind": "task", "status": {"state": "input-required", "message": {"parts": [{"kind": "text", "text": "Cần mã đơn"}]}}}) == "Cần mã đơn"
+
+
+def test_remote_agent_error_is_424_and_recorded_on_the_external_agent(env, monkeypatch):
+    """M2d.4 (smoke VM): agent ngoài trả lỗi JSON-RPC (vd. -32003 hết trần chi) → 424 kèm lý do, không phải 502
+    "máy chủ lỗi"; số lần gọi và lỗi gần nhất vẫn được ghi để UI hiện."""
+    ext = ExternalAgent(organization_id=env.org.id, name="Shop bạn", card_url="https://x.example/.well-known/agent-card.json",
+                        endpoint_url="https://x.example/a2a", enabled=True)
+    env.db.add(ext); env.db.commit()
+    monkeypatch.setattr(a2a, "_http", lambda *a, **k: (200, {"jsonrpc": "2.0", "id": "1",
+                                                              "error": {"code": -32003, "message": "budget: trần chi ngày"}}))
+    r = env.c.post(f"/api/a2a/external/{ext.id}/send", json={"text": "ping"}, headers=env.tok("manager"))
+    assert r.status_code == 424 and "-32003" in r.json()["detail"]
+    env.db.expire_all()
+    got = env.db.get(ExternalAgent, ext.id)
+    assert got.calls == 1 and "trần chi" in got.last_error

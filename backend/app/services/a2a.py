@@ -193,7 +193,9 @@ def send(db: Session, org_id: int, ext_id: int, text: str, *, context_id: str | 
                payload={"external_agent": e.name, "chars_out": len(text), "chars_in": len(answer), "error": err,
                         "seconds": round(time.monotonic() - started, 1), "context_id": ctx_out, "task_run_id": task_run_id})
     if err and not answer:
-        raise HTTPException(502, f"{e.name} không trả lời được: {err}")
+        # 424 Failed Dependency (M2d.4): máy chủ ClawCompany vẫn ổn — agent bên kia từ chối/lỗi (vd. hết trần chi
+        # của seat, hết quota model). Trước đây 502 khiến UI báo "Máy chủ gặp lỗi, thử lại sau ít giây" — sai hướng.
+        raise HTTPException(424, f"{e.name} không trả lời được: {err}")
     return {"agent": e.name, "reply": answer[:8000], "context_id": ctx_out, "state": state, **({"warning": err} if err else {})}
 
 

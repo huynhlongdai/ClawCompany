@@ -40,6 +40,8 @@ export function explain(e: unknown, context = t("errors.thao_tac")): Explained {
     return {...base, title: t("errors.du_lieu_vua_thay_doi"), fix: t("errors.ai_do_hoac_agent_vua")};
   if (status === 422 || status === 400)
     return {...base, title: t("errors.du_lieu_chua_hop_le"), fix: t("errors.xem_lai_cac_o_vua"), retry: false};
+  if (status === 424)
+    return {...base, title: t("errors.ben_ngoai_khong_tra_loi"), fix: t("errors.ben_ngoai_khong_tra_loi_fix"), retry: false};
   if (status === 429)
     return {...base, title: t("errors.thao_tac_qua_nhanh"), fix: t("errors.doi_vai_giay_roi_thu")};
   if (status >= 500)

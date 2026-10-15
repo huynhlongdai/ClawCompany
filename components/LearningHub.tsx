@@ -398,7 +398,8 @@ function A2A({canEdit, o}: {canEdit: boolean; o: Any}) {
             <Button size="sm" onClick={() => { if (window.confirm(tr("learning.xac_nhan_xoa"))) act.run(`rm${e.id}`, async () => { await apiA2A.removeExternal(e.id); await q.reload(); }); }}>{tr("learning.xoa")}</Button>
           </div>
           <form className="ui-toolbar" onSubmit={ev => { ev.preventDefault(); act.run(`s${e.id}`, async () => {
-            const r = await apiA2A.send(e.id, test[e.id] || ""); setReply({...reply, [e.id]: r.reply}); await q.reload(); }); }}>
+            // gửi lỗi vẫn tải lại danh sách: số lần gọi + lỗi gần nhất của agent ngoài đã được ghi (smoke M2d.4)
+            try { const r = await apiA2A.send(e.id, test[e.id] || ""); setReply({...reply, [e.id]: r.reply}); } finally { await q.reload(); } }); }}>
             <input className="ui-input" placeholder={tr("learning.a2a_gui_thu_ph")} value={test[e.id] || ""} onChange={ev => setTest({...test, [e.id]: ev.target.value})}/>
             <Button size="sm" busy={act.busy === `s${e.id}`} type="submit" disabled={!e.enabled || !(test[e.id] || "").trim()}>{tr("learning.a2a_gui_thu")}</Button>
           </form>

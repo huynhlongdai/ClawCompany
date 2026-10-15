@@ -241,7 +241,9 @@
   "may_chu_gap_loi": "Máy chủ gặp lỗi",
   "thu_lai_sau_it_giay": "Thử lại sau ít giây. Nếu lặp lại, gửi{p0} cho người quản trị.",
   "chua_thanh_cong": "{p0} chưa thành công",
-  "thu_lai_neu_van_loi": "Thử lại. Nếu vẫn lỗi, tải lại trang."
+  "thu_lai_neu_van_loi": "Thử lại. Nếu vẫn lỗi, tải lại trang.",
+  "ben_ngoai_khong_tra_loi": "Agent bên kia không trả lời được",
+  "ben_ngoai_khong_tra_loi_fix": "ClawCompany vẫn chạy bình thường — lý do nằm ở phía agent được gọi (ví dụ hết trần chi trong ngày, hết quota model). Xử lý ở phía đó rồi gửi lại."
  },
  "labels": {
   "dang_hoat_dong": "Đang hoạt động",
