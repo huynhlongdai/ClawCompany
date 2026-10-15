@@ -25,6 +25,8 @@ services:
       - openclaw_home:/home/node/.openclaw
       # Key provider (SecretRef file, singleValue) — file thuộc uid 1000, quyền 600; tools/set_provider.sh ghi.
       - ./secrets:/home/node/.openclaw-secrets:ro
+      # Plugin ClawCompany Guard (chặn lộ tên model) — tools/install_guard.sh link + bật quyền hook.
+      - ./openclaw-plugins/clawcompany-guard:/opt/clawcompany-guard:ro
   api:
     environment: *oc-env
     volumes: [clawcompany_device:/var/lib/clawcompany]

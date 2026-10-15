@@ -1,0 +1,14 @@
+{
+  "id": "clawcompany-guard",
+  "name": "ClawCompany Guard",
+  "description": "Nhân sự AI không tiết lộ model / nhà cung cấp AI đang chạy.",
+  "activation": { "onStartup": true },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "extraTerms": { "type": "array", "items": { "type": "string" } },
+      "replacement": { "type": "string" }
+    }
+  }
+}
