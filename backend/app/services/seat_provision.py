@@ -96,6 +96,7 @@ async def provision_seat(db: Session, principal, org_id: int, runtime: Any, agen
         personality=spec.get("personality") or agent_hr.DEFAULT_PERSONALITY,
         emoji=spec.get("emoji") or "", job_description=spec.get("job_description") or "",
         manager_notes=spec.get("manager_notes") or "", monthly_budget=spec.get("monthly_budget"),
+        address_style=spec.get("address_style") or agent_hr.DEFAULT_ADDRESS_STYLE,
         **agent_hr._ctx(db, member))
     snaps = agent_hr.snapshots(db, agent.id)
     generated = dict(spec.get("generated") or {})

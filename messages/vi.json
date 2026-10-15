@@ -1320,7 +1320,9 @@
   "khoi_phuc": "Khôi phục",
   "da_khoi_phuc": "Đã khôi phục hồ sơ bản {p0} (thành bản {p1}).",
   "ket_qua_giu_vai": "Kết quả kiểm tra giữ vai",
-  "giu_vai_pct": "Giữ vai {p0}%"
+  "giu_vai_pct": "Giữ vai {p0}%",
+  "xung_ho": "Xưng hô",
+  "xung_ho_sinh_lai_soul": "Xưng hô (sinh lại SOUL.md)"
  },
  "seat": {
   "ho_so": "Hồ sơ",

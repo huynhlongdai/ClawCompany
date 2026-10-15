@@ -72,6 +72,16 @@ PERSONALITIES: dict[str, dict[str, Any]] = {
 }
 DEFAULT_PERSONALITY = "tan-tuy"
 
+# Xưng hô: tự xưng gì, gọi người đối diện (quản lý, khách) là gì. Mặc định kiểu
+# nhân viên Việt quen dùng với khách và sếp: "em" — "anh/chị".
+ADDRESS_STYLES: dict[str, dict[str, str]] = {
+    "em-anh-chi": {"self": "em", "other": "anh/chị", "label": "Em — anh/chị"},
+    "em-quy-khach": {"self": "em", "other": "quý khách", "label": "Em — quý khách (trang trọng)"},
+    "toi-ban": {"self": "tôi", "other": "bạn", "label": "Tôi — bạn"},
+    "minh-ban": {"self": "mình", "other": "bạn", "label": "Mình — bạn (thân mật)"},
+}
+DEFAULT_ADDRESS_STYLE = "em-anh-chi"
+
 
 def sha(content: str) -> str:
     return hashlib.sha256((content or "").encode("utf-8")).hexdigest()
@@ -98,9 +108,10 @@ def _ctx(db: Session, member: Member) -> dict:
 def render_files(*, name: str, role: str, company: str, department: str, manager: str,
                  personality: str = DEFAULT_PERSONALITY, emoji: str = "", job_description: str = "",
                  manager_notes: str = "", monthly_budget: float | None = None,
-                 hired_on: str | None = None) -> dict[str, str]:
+                 hired_on: str | None = None, address_style: str = DEFAULT_ADDRESS_STYLE) -> dict[str, str]:
     """5 file tiếng Việt từ hồ sơ. Vượt hạn mức ký tự → 422 (không cắt hộ)."""
     p = PERSONALITIES.get(personality) or PERSONALITIES[DEFAULT_PERSONALITY]
+    a = ADDRESS_STYLES.get(address_style) or ADDRESS_STYLES[DEFAULT_ADDRESS_STYLE]
     emoji = emoji or p["emoji"]
     role = role or "Nhân sự AI"
     dept_line = f"Phòng {department}" if department else "Ban điều hành"
@@ -116,6 +127,11 @@ def render_files(*, name: str, role: str, company: str, department: str, manager
         f"# SOUL.md — {name} là người thế nào\n\n"
         f"Bạn là **{name}**, {role} tại {company}. Tính cách: **{p['label']}**.\n\n"
         "## Cách làm việc\n" + "".join(f"- {t}\n" for t in p["traits"]) +
+        "\n## Xưng hô và danh tính\n"
+        f"- Tự xưng \"{a['self']}\", gọi người đối diện là \"{a['other']}\" (quản lý, đồng nghiệp và khách).\n"
+        f"- Khi được hỏi bạn là ai: giới thiệu là {name}, {role} của {company}.\n"
+        "- Không nói tên model, nhà cung cấp AI hay công nghệ đang chạy; bị hỏi thì trả lời "
+        f"mình là nhân sự AI của {company}.\n"
         "\n## Nguyên tắc chung\n"
         "- Trả lời bằng tiếng Việt, trừ khi được yêu cầu khác.\n"
         "- Không bịa số liệu; chưa chắc thì nói \"chưa xác minh\" và nêu cách kiểm chứng.\n"
@@ -312,6 +328,8 @@ async def hire_options(db: Session, org_id: int, runtime: Any) -> dict:
         "personalities": [{"key": k, "label": v["label"], "emoji": v["emoji"], "traits": v["traits"]}
                           for k, v in PERSONALITIES.items()],
         "default_personality": DEFAULT_PERSONALITY,
+        "address_styles": [{"key": k, **v} for k, v in ADDRESS_STYLES.items()],
+        "default_address_style": DEFAULT_ADDRESS_STYLE,
         "limits": {"USER.md": ocp.USER_MD_MAX_CHARS, "other": ocp.BOOTSTRAP_MAX_CHARS},
     }
 
@@ -391,13 +409,17 @@ async def hire(db: Session, principal: Principal, org_id: int, runtime: Any, dat
     co = db.get(Company, company_id)
     mgr = db.get(Member, manager_id) if manager_id else None
     emoji = (data.get("emoji") or "").strip() or PERSONALITIES[personality]["emoji"]
+    address_style = data.get("address_style") or DEFAULT_ADDRESS_STYLE
+    if address_style not in ADDRESS_STYLES:
+        raise HTTPException(422, f"Xưng hô phải là một trong: {', '.join(ADDRESS_STYLES)}")
     # Render trước khi tạo gì: file quá dài thì từ chối sớm, không để lại seat dở.
     files = render_files(name=name, role=role, company=co.name, department=dept.name if dept else "",
                          manager=mgr.name if mgr else "", personality=personality, emoji=emoji,
                          job_description=data.get("job_description") or "",
-                         manager_notes=data.get("manager_notes") or "", monthly_budget=budget)
+                         manager_notes=data.get("manager_notes") or "", monthly_budget=budget,
+                         address_style=address_style)
     rid = _unique_runtime_id(db, name)
-    spec = {"personality": personality, "emoji": emoji,
+    spec = {"personality": personality, "emoji": emoji, "address_style": address_style,
             "job_description": data.get("job_description") or "",
             "manager_notes": data.get("manager_notes") or "", "monthly_budget": budget,
             "hired_via": "m3_wizard"}
@@ -483,7 +505,8 @@ async def _regen(db: Session, runtime: Any, agent: Agent, member: Member, names:
                          personality=spec.get("personality") or DEFAULT_PERSONALITY,
                          emoji=spec.get("emoji") or "", job_description=spec.get("job_description") or "",
                          manager_notes=spec.get("manager_notes") or "",
-                         monthly_budget=spec.get("monthly_budget"), **_ctx(db, member))
+                         monthly_budget=spec.get("monthly_budget"),
+                         address_style=spec.get("address_style") or DEFAULT_ADDRESS_STYLE, **_ctx(db, member))
     snaps = snapshots(db, agent.id)
     result: dict[str, dict] = {}
     for fname in names:
@@ -565,10 +588,13 @@ async def update_hr(db: Session, principal: Principal, org_id: int, runtime: Any
         if ("manager_member_id" not in fields_set and new_dept and new_dept.head_member_id
                 and new_dept.head_member_id != member.id):
             data["manager_member_id"] = new_dept.head_member_id; fields_set.add("manager_member_id")
-    for key in ("personality", "emoji", "job_description", "manager_notes"):
-        if key in fields_set and data.get(key) is not None and data.get(key) != spec.get(key):
+    for key in ("personality", "emoji", "job_description", "manager_notes", "address_style"):
+        cur = spec.get(key) or (DEFAULT_ADDRESS_STYLE if key == "address_style" else None)
+        if key in fields_set and data.get(key) is not None and data.get(key) != cur:
             if key == "personality" and data[key] not in PERSONALITIES:
                 raise HTTPException(422, f"Tính cách phải là một trong: {', '.join(PERSONALITIES)}")
+            if key == "address_style" and data[key] not in ADDRESS_STYLES:
+                raise HTTPException(422, f"Xưng hô phải là một trong: {', '.join(ADDRESS_STYLES)}")
             spec[key] = data[key]; changed.append(key)
     team_svc._bump(member); db.add(member); _save_spec(db, agent, spec); db.commit()
     if "manager_member_id" in fields_set and data.get("manager_member_id") != member.manager_id:
@@ -602,7 +628,7 @@ async def update_hr(db: Session, principal: Principal, org_id: int, runtime: Any
     regen: tuple[str, ...] = ()
     if touched & {"name", "role", "department", "manager", "emoji", "personality"}:
         regen += ("IDENTITY.md",)
-    if touched & {"name", "role", "personality"}:
+    if touched & {"name", "role", "personality", "address_style"}:
         regen += ("SOUL.md",)
     if touched & {"name", "role", "department", "manager", "job_description"}:
         regen += ("AGENTS.md",)

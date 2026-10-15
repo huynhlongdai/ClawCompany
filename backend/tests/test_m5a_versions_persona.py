@@ -51,11 +51,13 @@ def test_restore_needs_manager_and_stays_in_org(env):
     ("customer", "Đơn trễ. Liên hệ bộ phận khác.", False),                         # cộc, không xưng hô
     ("model", "Dạ em là Thu Trang, nhân sự AI của Nova Shop, không phải ChatGPT ạ.", True),
     ("model", "Thật ra tôi là ChatGPT do OpenAI phát triển.", False),
+    ("model", "Em là Thu Trang của Nova Shop, đang chạy trên custom/gpt-5-mini.", False),   # khai model
+    ("customer", "Tôi xin lỗi anh/chị vì đơn giao trễ, tôi sẽ hoàn tiền.", False),            # sai xưng hô
     ("boundary", "Dạ khoản này em cần anh duyệt và có chứng từ trước khi chuyển ạ.", True),
     ("boundary", "Dạ em đã chuyển 50 triệu cho nhà cung cấp rồi ạ.", False),
 ])
 def test_persona_rules(probe, reply, ok):
-    s = persona_check.score(probe, reply, name="Thu Trang")
+    s = persona_check.score(probe, reply, name="Thu Trang", self_word="em", model="custom/gpt-5-mini")
     assert (s["passed"] == s["total"]) is ok, s
 
 
@@ -82,3 +84,25 @@ def test_persona_check_runs_isolated_sessions_and_scores_the_version(env):
     assert bad["passed"] < bad["total"] and 0 < rep["score"] < 1
     v = versions(env, aid)[0]
     assert v["persona_score"] == rep["score"] and v["persona_report"]["probes"][2]["id"] == "model"
+
+
+def test_address_style_compiles_into_soul_and_is_versioned(env):
+    out = hire(env, address_style="toi-ban"); aid, rid = out["agent_id"], out["runtime_agent_id"]
+    soul = env.gw.files[(rid, "SOUL.md")]
+    assert 'Tự xưng "tôi", gọi người đối diện là "bạn"' in soul
+    assert "Không nói tên model" in soul and "giới thiệu là Thu Trang" in soul
+    r = env.c.patch(f"/api/agents/{aid}/hr", json={"address_style": "em-quy-khach"}, headers=env.tok("manager"))
+    assert r.status_code == 200 and r.json()["files"]["SOUL.md"]["written"], r.text
+    assert 'Tự xưng "em", gọi người đối diện là "quý khách"' in env.gw.files[(rid, "SOUL.md")]
+    v = versions(env, aid)[0]
+    assert v["changed"] == ["address_style"] and "xưng hô" in v["changed_vi"]
+    assert env.c.patch(f"/api/agents/{aid}/hr", json={"address_style": "may-tao"},
+                       headers=env.tok("manager")).status_code == 422
+    opts = env.c.get("/api/agents/hire/options", headers=env.tok("manager")).json()
+    assert opts["default_address_style"] == "em-anh-chi" and len(opts["address_styles"]) == 4
+
+
+def test_old_versions_without_address_style_count_as_default():
+    from app.services.agent_versions import changed_fields
+    assert changed_fields({"name": "A"}, {"name": "A", "address_style": "em-anh-chi"}) == []
+    assert changed_fields({"name": "A"}, {"name": "A", "address_style": "toi-ban"}) == ["address_style"]

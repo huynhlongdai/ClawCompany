@@ -1320,7 +1320,9 @@
   "khoi_phuc": "Restore",
   "da_khoi_phuc": "Restored version {p0} (now version {p1}).",
   "ket_qua_giu_vai": "Persona check result",
-  "giu_vai_pct": "Persona {p0}%"
+  "giu_vai_pct": "Persona {p0}%",
+  "xung_ho": "Form of address",
+  "xung_ho_sinh_lai_soul": "Form of address (regenerates SOUL.md)"
  },
  "seat": {
   "ho_so": "Profile",

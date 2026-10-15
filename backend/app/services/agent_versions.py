@@ -20,19 +20,20 @@ from sqlalchemy.orm import Session
 from app.models import Agent, Member
 from app.models.agent_hr import AgentFileSnapshot, AgentProfileVersion
 
-PROFILE_FIELDS = ("name", "role", "department_id", "manager_member_id", "personality", "emoji",
+PROFILE_FIELDS = ("name", "role", "department_id", "manager_member_id", "personality", "address_style", "emoji",
                   "job_description", "manager_notes", "model")
 FIELD_VI = {"name": "tên", "role": "chức danh", "department_id": "phòng ban", "manager_member_id": "quản lý",
-            "personality": "tính cách", "emoji": "emoji", "job_description": "mô tả công việc",
+            "personality": "tính cách", "address_style": "xưng hô", "emoji": "emoji", "job_description": "mô tả công việc",
             "manager_notes": "ghi chú quản lý", "model": "model"}
 
 
 def current_profile(db: Session, agent: Agent, member: Member) -> dict:
-    from app.services.agent_hr import DEFAULT_PERSONALITY, hire_spec
+    from app.services.agent_hr import DEFAULT_ADDRESS_STYLE, DEFAULT_PERSONALITY, hire_spec
     spec = hire_spec(db, agent)
     return {"name": member.name, "role": member.role or "", "department_id": member.department_id,
             "manager_member_id": member.manager_id,
-            "personality": spec.get("personality") or DEFAULT_PERSONALITY, "emoji": spec.get("emoji") or "",
+            "personality": spec.get("personality") or DEFAULT_PERSONALITY,
+            "address_style": spec.get("address_style") or DEFAULT_ADDRESS_STYLE, "emoji": spec.get("emoji") or "",
             "job_description": spec.get("job_description") or "", "manager_notes": spec.get("manager_notes") or "",
             "model": agent.model or ""}
 
@@ -42,8 +43,14 @@ def _latest(db: Session, agent_id: int) -> AgentProfileVersion | None:
             .order_by(AgentProfileVersion.version.desc()).first())
 
 
+# Trường thêm sau: bản cũ không có khoá này nghĩa là đang dùng mặc định.
+FIELD_DEFAULTS = {"address_style": "em-anh-chi"}
+
+
 def changed_fields(old: dict, new: dict) -> list[str]:
-    return [k for k in PROFILE_FIELDS if (old or {}).get(k) != (new or {}).get(k)]
+    def g(d, k):
+        return (d or {}).get(k, FIELD_DEFAULTS.get(k))
+    return [k for k in PROFILE_FIELDS if g(old, k) != g(new, k)]
 
 
 def snapshot(db: Session, agent: Agent, member: Member, *, user_id: int | None = None,
@@ -100,7 +107,7 @@ async def restore(db: Session, principal: Any, org_id: int, runtime: Any, agent_
     fields = set(changed_fields(now, want))
     if not fields:
         return {"agent_id": agent.id, "restored": version, "changed": [], "note": "Hồ sơ đã giống bản này"}
-    data = {k: want.get(k) for k in fields}
+    data = {k: want.get(k, FIELD_DEFAULTS.get(k)) for k in fields}
     result = await agent_hr.update_hr(db, principal, org_id, runtime, agent.id, data, fields,
                                       version_note=f"Khôi phục từ bản {version}")
     return {**result, "restored": version}

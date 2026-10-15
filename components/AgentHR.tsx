@@ -63,7 +63,7 @@ function HireWizard({companyId, onClose, onDone}: {companyId: number | null; onC
   const [opt, setOpt] = useState<any>(null), [step, setStep] = useState(0), [busy, setBusy] = useState(false);
   const [error, setError] = useState(""), [result, setResult] = useState<any>(null);
   const [f, setF] = useState<any>({name: "", role: "", job_description: "", department_id: "", manager_member_id: "",
-    model: "", monthly_budget: "", personality: "tan-tuy", emoji: "", manager_notes: ""});
+    model: "", monthly_budget: "", personality: "tan-tuy", address_style: "em-anh-chi", emoji: "", manager_notes: ""});
   const set = (k: string, v: any) => setF((x: any) => ({...x, [k]: v}));
   useEffect(() => { apiAgentsHR.options().then(o => {
     setOpt(o); const d = (o.models || []).find((m: any) => m.default) || (o.models || [])[0];
@@ -121,6 +121,8 @@ function HireWizard({companyId, onClose, onDone}: {companyId: number | null; onC
           <button key={p.key} type="button" role="radio" aria-checked={f.personality === p.key}
             className={f.personality === p.key ? "is-on" : ""} onClick={() => set("personality", p.key)} data-testid={`hr-persona-${p.key}`}>
             <b>{p.emoji} {p.label}</b><small>{p.traits[0]}</small></button>)}</div>
+        {opt.address_styles?.length > 0 && <label>{tr("agentHr.xung_ho")}<select value={f.address_style} onChange={e => set("address_style", e.target.value)} data-testid="hr-address">
+          {opt.address_styles.map((a: any) => <option key={a.key} value={a.key}>{a.label}</option>)}</select></label>}
         <label>{tr("agentHr.dieu_nguoi_quan_ly_muon")} <small>{userLen}/3000</small>
           <textarea rows={3} value={f.manager_notes} onChange={e => set("manager_notes", e.target.value)} placeholder={tr("agentHr.bao_cao_ngan_gon_moi")} data-testid="hr-notes"/></label>
         <div className="hrSummary" data-testid="hr-summary"><b>{f.name || "—"}</b> · {f.role || tr("agentHr.nhan_su_ai")} · {dept?.name || tr("agentHr.ban_dieu_hanh")}
@@ -194,7 +196,7 @@ function HrForm({seat, opt, canEdit, busy, act}: any) {
   const set = (k: string, v: any) => setF((x: any) => ({...x, [k]: v}));
   const depts = (opt?.departments || []).filter((d: any) => d.company_id === seat.company_id);
   const managers = (opt?.managers || []).filter((m: any) => m.company_id === seat.company_id && m.id !== seat.member_id);
-  const [persona, setPersona] = useState("");
+  const [persona, setPersona] = useState(""), [address, setAddress] = useState("");
   function body() {
     const b: any = {};
     if (f.name !== seat.name) b.name = f.name;
@@ -203,6 +205,7 @@ function HrForm({seat, opt, canEdit, busy, act}: any) {
     if (String(f.manager_member_id) !== String(seat.manager_id ?? "")) b.manager_member_id = f.manager_member_id ? Number(f.manager_member_id) : null;
     if (f.model && f.model !== seat.model) b.model = f.model;
     if (persona) b.personality = persona;
+    if (address) b.address_style = address;
     return b;
   }
   const changes = Object.keys(body());
@@ -238,9 +241,12 @@ function HrForm({seat, opt, canEdit, busy, act}: any) {
         <label>{tr("agentHr.tinh_cach_sinh_lai_soul")}<select value={persona} disabled={!canEdit || !opt} onChange={e => setPersona(e.target.value)} data-testid="hr-edit-persona">
           <option value="">{tr("agentHr.giu_nguyen")}</option>
           {(opt?.personalities || []).map((p: any) => <option key={p.key} value={p.key}>{p.emoji} {p.label}</option>)}</select></label>
+        <label>{tr("agentHr.xung_ho_sinh_lai_soul")}<select value={address} disabled={!canEdit || !opt} onChange={e => setAddress(e.target.value)} data-testid="hr-edit-address">
+          <option value="">{tr("agentHr.giu_nguyen")}</option>
+          {(opt?.address_styles || []).map((a: any) => <option key={a.key} value={a.key}>{a.label}</option>)}</select></label>
       </div>
       {canEdit ? <button className="ui-btn is-primary" disabled={busy || !changes.length} data-testid="hr-save"
-        onClick={() => act(() => apiAgentsHR.update(seat.agent_id, body()), report).then(() => setPersona(""))}>{tr("agentHr.luu")}{changes.length ? ` (${changes.length})` : ""}</button>
+        onClick={() => act(() => apiAgentsHR.update(seat.agent_id, body()), report).then(() => { setPersona(""); setAddress(""); })}>{tr("agentHr.luu")}{changes.length ? ` (${changes.length})` : ""}</button>
         : <small className="tmGuide">{seat.lifecycle === "retired" ? tr("agentHr.nhan_su_da_nghi_ho") : tr("agentHr.can_vai_quan_ly_tro")}</small>}
     </div>
   </section>;

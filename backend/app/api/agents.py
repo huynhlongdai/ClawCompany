@@ -52,6 +52,7 @@ class HireIn(BaseModel):
     manager_member_id: int | None = None
     model: str = Field(default="", max_length=120)
     personality: str = Field(default=agent_hr.DEFAULT_PERSONALITY, max_length=40)
+    address_style: str = Field(default=agent_hr.DEFAULT_ADDRESS_STYLE, max_length=40)
     emoji: str = Field(default="", max_length=16)
     job_description: str = Field(default="", max_length=8000)
     manager_notes: str = Field(default="", max_length=3000)
@@ -66,6 +67,7 @@ class HrPatchIn(BaseModel):
     manager_member_id: int | None = None
     model: str | None = Field(default=None, max_length=120)
     personality: str | None = Field(default=None, max_length=40)
+    address_style: str | None = Field(default=None, max_length=40)
     emoji: str | None = Field(default=None, max_length=16)
     job_description: str | None = Field(default=None, max_length=8000)
     manager_notes: str | None = Field(default=None, max_length=3000)
