@@ -303,6 +303,12 @@ async def run_step(db: Session, org_id: int, runtime: Any, enrollment_id: int) -
         return {"enrollment": _enr_public(db, e, len(c.document_ids or [])), "message": f"{m.name} đã đạt khoá này"}
     ids = list(c.document_ids or [])
     now = datetime.utcnow()
+    seen = (len(e.log or []), e.status, e.module_index)   # chặn hai bước chạy chồng (bấm hai lần, beat + tay)
+
+    def still_mine() -> None:
+        db.refresh(e)
+        if (len(e.log or []), e.status, e.module_index) != seen:
+            raise HTTPException(409, "Một buổi học/thi khác của agent này vừa xong trước — kết quả lượt này bị bỏ, tải lại để xem")
     if e.status in ("learning", "stale") and e.module_index < len(ids):
         doc = db.get(KnowledgeDocument, ids[e.module_index])
         text = await _ask(runtime, ag.runtime_agent_id, STUDY_PROMPT.format(
@@ -310,6 +316,7 @@ async def run_step(db: Session, org_id: int, runtime: Any, enrollment_id: int) -
             goal=f" (mục tiêu: {c.goal[:300]})" if c.goal else "", doc_id=doc.id, title=doc.title,
             content=(doc.content or "")[:MODULE_CHARS]),
             f"agent:{ag.runtime_agent_id}:course-{c.id}-m{e.module_index + 1}-{int(time.time())}")
+        still_mine()
         data = _json(text) or {}
         notes = [str(x)[:300] for x in (data.get("notes") or [])][:5] if isinstance(data, dict) else []
         proposed = []
@@ -338,9 +345,8 @@ async def run_step(db: Session, org_id: int, runtime: Any, enrollment_id: int) -
                      for i, q in enumerate(c.quiz))
     text = await _ask(runtime, ag.runtime_agent_id, EXAM_PROMPT.format(name=m.name, course=c.title, questions=qs),
                       f"agent:{ag.runtime_agent_id}:course-{c.id}-exam-{int(time.time())}")
-    data = _json(text) or {}
-    answers = data.get("answers") if isinstance(data, dict) else None
-    answers = answers if isinstance(answers, list) else []
+    still_mine()
+    answers = parse_answers(text, len(c.quiz))
     result = grade(c.quiz, answers)
     e.attempts += 1
     e.score = result["score"]
@@ -348,17 +354,41 @@ async def run_step(db: Session, org_id: int, runtime: Any, enrollment_id: int) -
     if result["score"] >= c.pass_score:
         e.status, e.certified_at, e.note = "passed", now, ""
     else:
-        e.status = "failed"
+        e.status, e.certified_at = "failed", None
         e.note = f"Sai {len(result['wrong'])}/{len(c.quiz)} câu — cần học thêm rồi thi lại"
         from app.services import knowledge_hub
         for i in result["wrong"]:
             knowledge_hub.record_gap(db, org_id, m.id, c.quiz[i]["question"], source="exam")
     e.log = list(e.log or []) + [{"at": now.isoformat(), "kind": "exam", "score": result["score"],
-                                  "wrong": [i + 1 for i in result["wrong"]], "answers": answers[:len(c.quiz)]}]
+                                  "wrong": [i + 1 for i in result["wrong"]], "answers": answers[:len(c.quiz)],
+                                  **({"reply": text[:600]} if not answers else {})}]
     db.add(e); db.commit()
     verdict = "ĐẠT — đã cấp chứng chỉ" if e.status == "passed" else "chưa đạt"
     return {"enrollment": _enr_public(db, e, len(ids)), "grade": result,
             "message": f"{m.name} thi được {result['score']:.0f}/100 — {verdict}"}
+
+
+def parse_answers(text: str, n: int) -> list:
+    """JSON {"answers": [...]} là chuẩn; model hay trả kiểu "Câu 1: 2" / "1. B" / [1, 2] → vẫn đọc được."""
+    data = _json(text)
+    if isinstance(data, dict) and isinstance(data.get("answers"), list):
+        out = []
+        for a in data["answers"]:
+            if isinstance(a, str) and a.strip()[:1].upper() in "ABCD" and not a.strip()[:1].isdigit():
+                out.append("ABCD".index(a.strip()[0].upper()))
+            else:
+                out.append(a)
+        return out
+    m = re.search(r"\[\s*([0-3](?:\s*,\s*[0-3])+)\s*\]", text or "")
+    if m:
+        return [int(x) for x in re.findall(r"[0-3]", m.group(1))]
+    pairs = re.findall(r"(?:Câu\s*)?(\d{1,2})\s*[:.)\-–]\s*\(?([0-3A-Da-d])\b", text or "")
+    got: dict[int, int] = {}
+    for q, a in pairs:
+        qi = int(q) - 1
+        if 0 <= qi < n and qi not in got:
+            got[qi] = int(a) if a.isdigit() else "ABCD".index(a.upper())
+    return [got.get(i) for i in range(n)] if got else []
 
 
 def grade(quiz: list[dict], answers: list) -> dict:

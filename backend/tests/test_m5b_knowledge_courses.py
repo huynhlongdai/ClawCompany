@@ -180,3 +180,27 @@ def test_tick_runs_one_step_per_day_at_study_hour(L):
     assert asyncio.run(courses.tick(L.db, L.gw, now=datetime(2026, 10, 15, 15, 5)))["steps"] == 1   # 22h VN
     assert asyncio.run(courses.tick(L.db, L.gw, now=datetime(2026, 10, 15, 15, 40)))["steps"] == 0  # đã học hôm nay
     assert c["enrollments"] and len(calls) == 1
+
+
+def test_parse_answers_formats():
+    assert courses.parse_answers('{"answers": [1, 2, 0]}', 3) == [1, 2, 0]
+    assert courses.parse_answers('{"answers": ["B", "C", "A"]}', 3) == [1, 2, 0]
+    assert courses.parse_answers("Đáp án: [1, 2, 0]", 3) == [1, 2, 0]
+    assert courses.parse_answers("Câu 1: 1\nCâu 2: 2\nCâu 3: 0", 3) == [1, 2, 0]
+    assert courses.parse_answers("Em không biết", 3) == []
+
+
+def test_overlapping_steps_second_result_is_discarded(L):
+    d = add(L, title="Giờ làm việc", content="Tiệm mở cửa từ 8 giờ sáng đến 21 giờ tối, nghỉ ngày mùng 1 Tết.")
+    out = hire(L)
+    c = L.c.post("/api/learning/courses", json={"title": "Ca tối", "document_ids": [d["id"]], "agent_ids": [out["agent_id"]]},
+                 headers=L.tok("manager")).json()
+    e = L.db.query(CourseEnrollment).one()
+
+    async def chat_stream(agent_id, message, *, session_key=None, timeout_seconds=90):
+        # trong lúc agent đang trả lời, một bước khác đã ghi xong
+        e.log = list(e.log or []) + [{"kind": "study"}]; e.module_index = 1; e.status = "exam"; L.db.commit()
+        yield {"kind": "final", "text": '{"notes": [], "lessons": []}'}
+    L.gw.chat_stream = chat_stream
+    r = L.c.post(f"/api/learning/enrollments/{c['enrollments'][0]['id']}/step", headers=L.tok("manager"))
+    assert r.status_code == 409, r.text
