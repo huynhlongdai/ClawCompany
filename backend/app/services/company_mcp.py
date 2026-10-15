@@ -108,7 +108,9 @@ def _str(args: dict, key: str, *, required: bool = True, limit: int = 20000, def
 
 
 def _limit(args: dict, default: int = 20) -> int:
-    return max(1, min(_int(args, "limit", required=False, default=default) or default, MAX_LIST))
+    # OpenClaw quen gửi ``maxResults`` (theo tool memory_search của nó) → nhận như ``limit``.
+    raw = args.get("limit", args.get("maxResults"))
+    return max(1, min(_int({"limit": raw}, "limit", required=False, default=default) or default, MAX_LIST))
 
 
 def _company_project_ids(ctx: ToolContext) -> list[int]:
@@ -417,7 +419,7 @@ def _doc_visible(ctx: ToolContext, doc: KnowledgeDocument | None) -> bool:
       "Tìm trong kho tri thức công ty (tài liệu, quy định, sổ tay, khoá học) trong phạm vi của bạn. Mỗi kết quả có "
       "\"cite\" — khi trả lời dựa vào tài liệu, ghi kèm cite đó. found=false nghĩa là kho chưa có câu trả lời: "
       "nói rõ là chưa có tài liệu, đừng đoán.",
-      "company.knowledge:read", {"query": {"type": "string"}, "limit": {"type": "integer"}},
+      "company.knowledge:read", {"query": {"type": "string"}, "limit": {"type": "integer"}, "maxResults": {"type": "integer"}},
       ("query",))
 def _knowledge_search(ctx: ToolContext, args: dict) -> dict:
     from app.services import knowledge_hub
@@ -438,9 +440,10 @@ def _knowledge_gap_report(ctx: ToolContext, args: dict) -> dict:
 
 
 @tool("company_memory_search", "knowledge",
-      "Tra bộ nhớ chung của công ty (chính sách, thuật ngữ, quyết định, bài học) trong phạm vi của bạn: "
-      "toàn tổ chức, công ty, phòng ban, dự án bạn đang làm và mục ghi riêng cho bạn. Bỏ trống query để xem mục quan trọng nhất.",
-      "company.knowledge:read", {"query": {"type": "string"}, "limit": {"type": "integer"}})
+      "Tra các ghi nhớ ngắn của công ty (thuật ngữ, quyết định, bài học) trong phạm vi của bạn. Kèm luôn các đoạn khớp "
+      "nhất trong kho tài liệu (trường knowledge, có cite). Cần tra quy định/quy trình/chính sách chi tiết thì dùng "
+      "company_knowledge_search. Bỏ trống query để xem mục quan trọng nhất.",
+      "company.knowledge:read", {"query": {"type": "string"}, "limit": {"type": "integer"}, "maxResults": {"type": "integer"}})
 def _memory_search(ctx: ToolContext, args: dict) -> dict:
     from app.services import agent_memory
     q = _str(args, "query", required=False, limit=300).lower()
@@ -453,7 +456,12 @@ def _memory_search(ctx: ToolContext, args: dict) -> dict:
     for m in rows[:_limit(args, 10)]:
         it = agent_memory.item(ctx.db, m)
         out.append({k: it[k] for k in ("id", "kind_label", "scope_label", "scope_name", "content", "importance")})
-    return {"total_visible": len(rows), "items": out}
+    res = {"total_visible": len(rows), "items": out}
+    if q:   # một kho hợp nhất: agent tra nhầm công cụ vẫn thấy tài liệu liên quan
+        from app.services import knowledge_hub
+        kb = knowledge_hub.search(ctx.db, ctx.org, q, member=ctx.member, agent=ctx.agent, limit=3, log_gap=False)
+        res["knowledge"] = [{k: h[k] for k in ("cite", "score", "content")} for h in kb["hits"] if h["score"] >= knowledge_hub.GAP_THRESHOLD]
+    return res
 
 
 @tool("company_lesson_propose", "knowledge",
@@ -537,7 +545,7 @@ def _sop_get(ctx: ToolContext, args: dict) -> dict:
 
 
 @tool("company_decision_log", "knowledge", "Các quyết định đã ghi của công ty (mới nhất trước).",
-      "company.knowledge:read", {"query": {"type": "string"}, "limit": {"type": "integer"}})
+      "company.knowledge:read", {"query": {"type": "string"}, "limit": {"type": "integer"}, "maxResults": {"type": "integer"}})
 def _decision_log(ctx: ToolContext, args: dict) -> dict:
     q = select(Decision).where(Decision.organization_id == ctx.org)
     if ctx.member.company_id:

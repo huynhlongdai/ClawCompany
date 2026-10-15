@@ -204,3 +204,11 @@ def test_overlapping_steps_second_result_is_discarded(L):
     L.gw.chat_stream = chat_stream
     r = L.c.post(f"/api/learning/enrollments/{c['enrollments'][0]['id']}/step", headers=L.tok("manager"))
     assert r.status_code == 409, r.text
+
+
+def test_memory_search_also_returns_library_hits(L):
+    add(L, title="Chính sách đổi trả", content=POLICY)
+    out = hire(L); ag = L.db.get(Agent, out["agent_id"]); m = L.db.get(Member, ag.member_id)
+    ctx = company_mcp.ToolContext(db=L.db, member=m, agent=ag, scopes=["company.knowledge:read"])
+    r = company_mcp.TOOLS["company_memory_search"].handler(ctx, {"query": "hàng vỡ khi vận chuyển gửi ảnh"})
+    assert r["knowledge"] and "48 giờ" in r["knowledge"][0]["content"] and r["knowledge"][0]["cite"].startswith("[KB#")
