@@ -776,6 +776,10 @@ export const apiAgentsHR = {
     remove_from_gateway?: boolean; reason?: string}) =>
     request<any>(`/agents/${agentId}/lifecycle`, {method: "POST", body: JSON.stringify(body)}),
   tools: (agentId: number) => request<any>(`/agents/${agentId}/tools`),
+  versions: (agentId: number) => request<any>(`/agents/${agentId}/versions`),
+  restore: (agentId: number, version: number) =>
+    request<any>(`/agents/${agentId}/versions/${version}/restore`, {method: "POST"}),
+  personaCheck: (agentId: number) => request<any>(`/agents/${agentId}/persona-check`, {method: "POST"}),
 };
 
 // M4a — Công việc & lượt chạy (/api/work): danh sách, bảng, side-peek, review chéo, chạy ngay.

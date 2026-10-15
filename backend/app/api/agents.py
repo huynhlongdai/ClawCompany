@@ -200,6 +200,30 @@ async def hr_update(agent_id: int, payload: HrPatchIn, principal: Principal = De
                                     payload.model_dump(), set(payload.model_fields_set))
 
 
+@router.get("/{agent_id}/versions")
+def hr_versions(agent_id: int, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    """M5a: lịch sử phiên bản hồ sơ (ai đổi gì, khi nào) + điểm giữ vai của từng bản."""
+    from app.services import agent_versions
+    return agent_versions.list_versions(db, active_org(principal), agent_id)
+
+
+@router.post("/{agent_id}/versions/{version}/restore")
+async def hr_restore(agent_id: int, version: int, principal: Principal = Depends(require_role("manager")),
+                     db: Session = Depends(get_db)):
+    """Áp lại hồ sơ của một bản cũ (sinh lại file theo hồ sơ đó); tạo thành bản mới."""
+    from app.services import agent_versions
+    return await agent_versions.restore(db, principal, active_org(principal), get_runtime(), agent_id, version)
+
+
+@router.post("/{agent_id}/persona-check")
+async def hr_persona_check(agent_id: int, principal: Principal = Depends(require_role("manager")),
+                           db: Session = Depends(get_db)):
+    """M5a: 4 câu hỏi cố định (giới thiệu, xưng hô với khách, bị hỏi là AI nào, lệnh chuyển tiền)
+    trong phiên riêng, chấm bằng luật; lưu điểm vào phiên bản hồ sơ hiện tại."""
+    from app.services import persona_check
+    return await persona_check.run(db, active_org(principal), get_runtime(), agent_id)
+
+
 @router.get("/{agent_id}/drift")
 async def hr_drift(agent_id: int, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
     """So bản ClawCompany với gateway: tên, model, hash từng file."""

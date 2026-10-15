@@ -182,6 +182,7 @@ export function AgentHRPanel({memberId}: {memberId: number}) {
       <Lifecycle seat={seat} all={all} canEdit={!!me?.capabilities?.invite} busy={busy} act={act}/>
     </div>
     <Drift seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
+    <Versions seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Tools seat={seat} isAdmin={isAdmin} busy={busy} act={act} tick={tick}/>
   </div>;
 }
@@ -372,5 +373,59 @@ function Tools({seat, isAdmin, busy, act, tick}: any) {
         : <span className={x.level === "off" ? "is-warn" : ""}>{LEVEL_VI[x.level] || x.level}</span>}</td>
       <td className="hrSrc"><small>{src(x.source)}</small></td></tr>)}</tbody></table></div>}
     {t && !isAdmin && <small className="tmGuide">{tr("agentHr.doi_quyen_tool_can_vai")}</small>}
+  </section>;
+}
+
+
+// ------------------------------------------------------------------ M5a: phiên bản hồ sơ + kiểm tra giữ vai
+
+function ScorePill({score}: {score: number | null | undefined}) {
+  if (score === null || score === undefined) return null;
+  const pct = Math.round(score * 100);
+  const cls = pct >= 90 ? "is-ok" : pct >= 70 ? "is-wait" : "is-risk";
+  return <span className={`ui-pill ${cls}`} data-testid="hr-persona-score">{tr("agentHr.giu_vai_pct", {p0: pct})}</span>;
+}
+
+function Versions({seat, canEdit, busy, act, tick}: any) {
+  const [rows, setRows] = useState<any[] | null>(null), [err, setErr] = useState("");
+  const [report, setReport] = useState<any>(null), [checking, setChecking] = useState(false);
+  const agentId = seat.agent_id;
+  useEffect(() => {
+    apiAgentsHR.versions(agentId).then(r => setRows(r.versions || [])).catch(e => setErr(errorText(e)));
+  }, [agentId, tick, report]);
+  async function check() {
+    setChecking(true); setErr("");
+    try { setReport(await apiAgentsHR.personaCheck(agentId)); }
+    catch (e: any) { setErr(errorText(e)); } finally { setChecking(false); }
+  }
+  const canCheck = canEdit && seat.lifecycle === "active" && seat.on_gateway;
+  const shown = report || rows?.find(r => r.persona_report)?.persona_report;
+  return <section className="ui-panel ui-panel-body" data-testid="hr-versions">
+    <div className="lab-cardhead"><div><b>{tr("agentHr.phien_ban_ho_so")}</b><span>{tr("agentHr.phien_ban_mo_ta")}</span></div>
+      {canCheck && <button className="ui-btn is-sm" disabled={checking || busy} onClick={check} data-testid="hr-persona-run">
+        {checking ? tr("agentHr.dang_kiem_tra") : tr("agentHr.kiem_tra_giu_vai")}</button>}</div>
+    {err && <div className="ui-banner is-error">{err}</div>}
+    {rows === null ? <div className="ui-empty">{tr("agentHr.dang_tai_nhan_su")}</div> :
+      <table className="ui-table"><tbody>{rows.map(v => <tr key={v.version} data-testid="hr-version-row">
+        <td><b>{tr("agentHr.ban_so", {p0: v.version})}</b>{v.is_current && <span className="ui-pill is-ok" style={{marginLeft: 6}}>{tr("agentHr.dang_dung")}</span>}</td>
+        <td><small>{new Date(v.created_at + (v.created_at.endsWith("Z") ? "" : "Z")).toLocaleString()}</small></td>
+        <td><small>{v.note || (v.changed_vi?.length ? tr("agentHr.doi_truong", {p0: v.changed_vi.join(", ")}) : "")}</small></td>
+        <td><ScorePill score={v.persona_score}/></td>
+        <td style={{textAlign: "right"}}>{canEdit && !v.is_current && <button className="ui-btn is-sm" disabled={busy}
+          data-testid="hr-version-restore"
+          onClick={() => act(() => apiAgentsHR.restore(agentId, v.version),
+            (r: any) => tr("agentHr.da_khoi_phuc", {p0: v.version, p1: r.version ?? "–"}))}>{tr("agentHr.khoi_phuc")}</button>}</td>
+      </tr>)}</tbody></table>}
+    {shown && <div className="hrResult" data-testid="hr-persona-report" style={{marginTop: 12}}>
+      <div style={{display: "flex", gap: 8, alignItems: "center"}}><b>{tr("agentHr.ket_qua_giu_vai")}</b><ScorePill score={shown.score}/>
+        <small>{shown.passed}/{shown.total} · {shown.model}</small></div>
+      {(shown.probes || []).map((p: any) => <details key={p.id} style={{marginTop: 6}}>
+        <summary>{p.passed === p.total ? "✓" : "✗"} {p.label} <small>({p.passed}/{p.total})</small></summary>
+        <div style={{fontSize: 13, color: "var(--text-muted)", margin: "4px 0"}}>{p.prompt}</div>
+        <div style={{whiteSpace: "pre-wrap", fontSize: 13}}>{p.reply || p.error}</div>
+        <ul style={{fontSize: 12, margin: "4px 0 0 16px"}}>{p.checks.map((c: any, i: number) =>
+          <li key={i} style={{color: c.ok ? "inherit" : "var(--risk)"}}>{c.ok ? "✓" : "✗"} {c.rule}{c.detail ? ` — ${c.detail}` : ""}</li>)}</ul>
+      </details>)}
+    </div>}
   </section>;
 }

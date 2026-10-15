@@ -1309,7 +1309,18 @@
   "tao_hoan_thien_tren_gateway": "Create / complete on gateway",
   "da_hoan_thien_tren_gateway": "Completed on gateway, wrote {p0} files",
   "tro_chuyen": "Chat",
-  "tro_chuyen_voi": "Chat with {p0}"
+  "tro_chuyen_voi": "Chat with {p0}",
+  "phien_ban_ho_so": "Profile versions",
+  "phien_ban_mo_ta": "Each profile edit is a version; restoring regenerates the files from it.",
+  "kiem_tra_giu_vai": "Persona check",
+  "dang_kiem_tra": "Checking…",
+  "ban_so": "Version {p0}",
+  "dang_dung": "current",
+  "doi_truong": "Changed: {p0}",
+  "khoi_phuc": "Restore",
+  "da_khoi_phuc": "Restored version {p0} (now version {p1}).",
+  "ket_qua_giu_vai": "Persona check result",
+  "giu_vai_pct": "Persona {p0}%"
  },
  "seat": {
   "ho_so": "Profile",

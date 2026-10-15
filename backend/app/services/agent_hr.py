@@ -461,6 +461,9 @@ async def hire(db: Session, principal: Principal, org_id: int, runtime: Any, dat
               payload={"runtime_agent_id": rid, "files": [f["name"] for f in out["files"] if f.get("written")],
                        "personality": personality, "budget": budget})
     out["status"] = agent.lifecycle
+    from app.services import agent_versions
+    v = agent_versions.snapshot(db, agent, member, user_id=principal.user_id, note="Lúc tuyển")
+    out["version"] = v.version if v else None
     return out
 
 
@@ -528,7 +531,7 @@ async def _regen(db: Session, runtime: Any, agent: Agent, member: Member, names:
 
 
 async def update_hr(db: Session, principal: Principal, org_id: int, runtime: Any, agent_id: int,
-                    data: dict, fields_set: set[str]) -> dict:
+                    data: dict, fields_set: set[str], *, version_note: str = "") -> dict:
     force = tuple(data.get("regenerate_files") or ())
     bad = [f for f in force if f not in SEAT_FILES or f == "MEMORY.md"]
     if bad:
@@ -536,6 +539,11 @@ async def update_hr(db: Session, principal: Principal, org_id: int, runtime: Any
     agent, member = seat(db, org_id, agent_id)
     if agent.lifecycle == "retired":
         raise HTTPException(409, "Nhân sự đã nghỉ việc — không sửa hồ sơ được")
+    from app.services import agent_versions
+    if agent_versions.latest_version_number(db, agent.id) == 0:
+        # Seat có từ trước khi có phiên bản: chụp hồ sơ CŨ trước khi sửa, để
+        # khôi phục được về đúng trạng thái trước lần sửa đầu tiên.
+        agent_versions.snapshot(db, agent, member, note="Bản đầu (trước lần sửa đầu tiên)")
     actor = f"user:{principal.user_id}"
     changed: list[str] = []
     warnings: list[str] = []
@@ -604,10 +612,15 @@ async def update_hr(db: Session, principal: Principal, org_id: int, runtime: Any
     files = await _regen(db, runtime, agent, member, regen, principal.user_id, force=force) if regen else {}
     warnings += [r["message"] for r in files.values()
                  if r.get("reason") in ("edited_on_gateway", "customized", "write_failed")]
+    version = None
     if changed or force:
         log_event(db, org_id, "agent.hr.update", "agents", agent.id, actor_name=actor,
                   payload={"changed": changed, "files": {k: v.get("written") for k, v in files.items()}})
-    return {"agent_id": agent.id, "changed": changed, "gateway": gateway, "files": files, "warnings": warnings}
+        from app.services import agent_versions
+        row = agent_versions.snapshot(db, agent, member, user_id=principal.user_id, note=version_note)
+        version = row.version if row else None
+    return {"agent_id": agent.id, "changed": changed, "gateway": gateway, "files": files, "warnings": warnings,
+            "version": version}
 
 
 # --------------------------------------------------------------------- lệch & đồng bộ

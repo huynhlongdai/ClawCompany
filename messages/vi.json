@@ -1309,7 +1309,18 @@
   "tao_hoan_thien_tren_gateway": "Tạo / hoàn thiện trên gateway",
   "da_hoan_thien_tren_gateway": "Đã hoàn thiện trên gateway, ghi {p0} file tiếng Việt",
   "tro_chuyen": "Trò chuyện",
-  "tro_chuyen_voi": "Trò chuyện với {p0}"
+  "tro_chuyen_voi": "Trò chuyện với {p0}",
+  "phien_ban_ho_so": "Phiên bản hồ sơ",
+  "phien_ban_mo_ta": "Mỗi lần sửa hồ sơ là một bản; khôi phục sẽ sinh lại file theo bản đó.",
+  "kiem_tra_giu_vai": "Kiểm tra giữ vai",
+  "dang_kiem_tra": "Đang kiểm tra…",
+  "ban_so": "Bản {p0}",
+  "dang_dung": "đang dùng",
+  "doi_truong": "Đổi: {p0}",
+  "khoi_phuc": "Khôi phục",
+  "da_khoi_phuc": "Đã khôi phục hồ sơ bản {p0} (thành bản {p1}).",
+  "ket_qua_giu_vai": "Kết quả kiểm tra giữ vai",
+  "giu_vai_pct": "Giữ vai {p0}%"
  },
  "seat": {
   "ho_so": "Hồ sơ",
