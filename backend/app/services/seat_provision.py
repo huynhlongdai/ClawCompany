@@ -235,7 +235,14 @@ async def wire_gateway(db: Session, principal, org_id: int, runtime: Any, *, mcp
 
     if memory:
         remote = _embed_remote(config)
-        if remote:
+        cur = ((config.get("memory") or {}).get("search")) or {}
+        same = remote and cur.get("provider") == "openai" and cur.get("model") == EMBED_MODEL \
+            and all((cur.get("remote") or {}).get(k) == v for k, v in remote.items())
+        if same:
+            # Không gửi lại: memory.search là đường cần khởi động lại gateway,
+            # gửi giá trị y hệt vẫn bị tính là "chạm" → 409 vô cớ khi nối lại MCP.
+            summary["memory"] = "đã đúng, không đổi"
+        elif remote:
             values[("memory", "search", "provider")] = "openai"
             values[("memory", "search", "model")] = EMBED_MODEL
             values[("memory", "search", "remote")] = remote

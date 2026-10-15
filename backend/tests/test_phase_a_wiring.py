@@ -386,3 +386,15 @@ def sessionmaker_ctx(db):
     def _f():
         yield db
     return _f
+
+
+@pytest.mark.asyncio
+async def test_rewiring_does_not_touch_memory_search_when_already_right(db, org):
+    seat(db, org, "nina", "Nina", "Chief of Staff")
+    gw = FakeGateway(roster=("nina",))
+    await seat_provision.wire_gateway(db, PRINCIPAL, org[0].id, gw, allow_restart=True)
+    tree = json.loads(gw.sent(ocp.M_CONFIG_PATCH)[-1]["raw"])
+    gw.config["memory"] = tree["memory"]
+    out = await seat_provision.wire_gateway(db, PRINCIPAL, org[0].id, gw, allow_restart=False)
+    assert out["memory"] == "đã đúng, không đổi"
+    assert "memory" not in json.loads(gw.sent(ocp.M_CONFIG_PATCH)[-1]["raw"])
