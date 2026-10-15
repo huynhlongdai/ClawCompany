@@ -132,6 +132,9 @@ def transition(db: Session, task: Task, to: str, *, reason: str = "", via: str =
                        company_id=company_id or company, source=source,
                        aggregate_type="task", aggregate_id=str(task.id),
                        actor_member_id=actor_member_id)
+    if to in ("in_progress", "done", "cancelled"):
+        from app.services import process_map  # M2c D4: bước quy trình — chu trình + mở bước sau
+        process_map.on_task_status(db, task, to)
     if to in ("done", "cancelled"):
         wake_unblocked(db, task)
         if task.goal_id:

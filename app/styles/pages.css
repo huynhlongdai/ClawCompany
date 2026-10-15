@@ -607,3 +607,23 @@ a.org-node:hover{border-color:var(--text-muted);box-shadow:var(--shadow-2)}
 .cf-matrix tr.is-off td{opacity:.5}
 .cf-id{color:var(--text-muted);margin-right:6px}
 .ibx-rule{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);margin:2px 0 6px}
+
+/* M2c — vận hành công ty */
+.ops-group{margin-bottom:18px}
+.ops-cat{display:flex;align-items:center;gap:8px;font-size:15px;margin:14px 0 8px}
+.ops-steps{margin:6px 0 8px;padding-left:20px;display:grid;gap:4px;font-size:13px}
+.ops-steps li{line-height:1.45}
+.ops-steps .ui-pill{margin-left:6px;font-size:11px}
+.ops-meta{color:var(--text-muted)}
+.ops-sop{margin-left:6px;color:var(--text-muted);font-size:12px}
+.ops-kpi{margin:4px 0}
+.ops-issues{margin:4px 0 8px;padding-left:4px;list-style:none;font-size:12px;color:var(--wait)}
+.ops-inst{margin-top:8px;display:grid;gap:6px}
+.ops-inst summary{cursor:pointer;font-size:13px}
+.ops-inst .ui-table{margin-top:6px;font-size:13px}
+.ops-step-edit{display:grid;grid-template-columns:24px 2fr 1.4fr 70px 1.3fr 1.2fr auto auto auto;gap:6px;align-items:center;margin-bottom:8px}
+.ops-step-edit textarea{grid-column:2 / -1}
+.ops-step-edit input,.ops-step-edit select{width:100%;min-width:0}
+.ops-seq{font-weight:700;color:var(--accent,#D63A2F);text-align:center}
+.ops-min{text-align:right}
+@media (max-width:900px){.ops-step-edit{grid-template-columns:24px 1fr 1fr}.ops-step-edit textarea{grid-column:1 / -1}}

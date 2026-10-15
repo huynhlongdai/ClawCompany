@@ -57,6 +57,7 @@ from app.api.v36 import router as v36_router
 from app.api.routines import router as routines_router
 from app.api.strategy import router as strategy_router
 from app.api.team import router as team_router  # M2
+from app.api.company_ops import router as company_ops_router  # M2c
 from app.api.work import router as work_router, successor as work_successor  # M4a
 from app.api.inbox import router as inbox_router, costs_router, successor as inbox_successor  # M4b
 from app.core.middleware import RequestContextMiddleware
@@ -165,6 +166,7 @@ app.include_router(v36_router, prefix="/api")
 app.include_router(routines_router, prefix="/api")
 app.include_router(strategy_router, prefix="/api")
 app.include_router(team_router, prefix="/api")
+app.include_router(company_ops_router, prefix="/api")
 app.include_router(work_router, prefix="/api")
 app.include_router(inbox_router, prefix="/api")
 app.include_router(learning_router, prefix="/api")

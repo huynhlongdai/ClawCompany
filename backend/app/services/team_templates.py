@@ -149,6 +149,11 @@ async def create_from_template(db: Session, principal: Principal, org_id: int, k
     from app.services import company_foundation   # M2b: mỗi vai trong mẫu thành một chức danh có JD
     jd = {spec["role"]: spec["system_prompt"] for d in t["departments"] for spec in [d["head"], *d.get("staff", [])]}
     company_foundation.positions_from_members(db, org_id, company.id, jd_by_title=jd)
+    try:   # M2c D4: bộ quy trình mẫu (bước gắn chức danh vừa tạo); lỗi gieo không làm hỏng việc dựng công ty
+        from app.services import process_map
+        process_map.seed_templates(db, org_id, company.id, key)
+    except Exception as exc:  # noqa: BLE001
+        db.rollback(); print(f"[m2c] seed processes company #{company.id}: {exc}")
     issues = []
     for rid, ag in by_rid.items():
         if ag.lifecycle != "active":

@@ -776,6 +776,18 @@ export const apiCompany = {
   evaluate: (body: any) => request<any>(`/team/authority/evaluate`, {method: "POST", body: JSON.stringify(body)}),
 };
 
+// M2c: vận hành công ty — quy trình (D4), KPI (D5), giao ban (D6), tuân thủ (D7), sẵn sàng agent (D8).
+export const apiOps = {
+  processes: (companyId?: number | null) => request<any>(`/team/processes${cq(companyId)}`),
+  createProcess: (body: any) => request<any>(`/team/processes`, {method: "POST", body: JSON.stringify(body)}),
+  updateProcess: (id: number, body: any) => request<any>(`/team/processes/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  archiveProcess: (id: number) => request<any>(`/team/processes/${id}`, {method: "DELETE"}),
+  seedProcesses: (body: any) => request<any>(`/team/processes/seed`, {method: "POST", body: JSON.stringify(body)}),
+  startProcess: (id: number, body: any) => request<any>(`/team/processes/${id}/start`, {method: "POST", body: JSON.stringify(body)}),
+  instances: (id: number) => request<any>(`/team/processes/${id}/instances`),
+  cancelInstance: (id: number) => request<any>(`/team/process-instances/${id}/cancel`, {method: "POST"}),
+};
+
 // M3: Nhân sự AI — tuyển (wizard), sửa hồ sơ 2 chiều, lệch & đồng bộ lại, vòng đời, quyền tool theo seat.
 // agentId ở đây là id của bảng agents (seat), không phải member id.
 export const apiSharedMemory = {
