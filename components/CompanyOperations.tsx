@@ -369,3 +369,96 @@ export function RhythmTab({companyId, caps}: {companyId: number | null; caps: an
       </details>)}</div>}
   </section>;
 }
+
+// ===================================================================== Lịch tuân thủ (D7)
+
+export function ComplianceTab({companyId, caps}: {companyId: number | null; caps: any}) {
+  const {data, error, reload, setError} = useLoad(() => apiOps.compliance(companyId), [companyId]);
+  const [f, setF] = useState<any>(null), [busy, setBusy] = useState(false), [lic, setLic] = useState<any>(null);
+  const toast = useToast();
+  const isAdmin = !!caps?.manage_roles || !!caps?.create_company;
+  const can = !!caps?.invite || isAdmin;
+  useEffect(() => { if (data) setF({...(data as any).settings}); }, [data]);
+  if (error && !data) return <ErrorBanner error={error} onRetry={reload} testId="cmp-error"/>;
+  if (!data || !f) return <SkeletonRows n={5} h={40}/>;
+  const d: any = data;
+  const cid = companyId ?? d.company_id;
+  const set = (k: string, v: any) => setF({...f, [k]: v});
+  async function run(fn: () => Promise<any>, ok: string | ((r: any) => string)) {
+    setBusy(true); setError(null);
+    try { const r = await fn(); toast(typeof ok === "string" ? ok : ok(r)); await reload(); return r; }
+    catch (e) { setError(e); } finally { setBusy(false); }
+  }
+  const upcoming = d.deadlines.filter((x: any) => x.status !== "done");
+  const done = d.deadlines.filter((x: any) => x.status === "done");
+  const freq = (r: any) => tr(`ops.fq_${r.frequency}` as Key);
+  return <section className="ui-section" data-testid="compliance">
+    {error ? <ErrorBanner error={error} onClose={() => setError(null)}/> : null}
+    <div className="ui-banner" data-testid="cmp-disclaimer">⚖ {tr("ops.cmp_disclaimer")}</div>
+    <div className="ui-grid is-2">
+      <section className="ui-panel tm-card">
+        <div className="tm-card-head"><div><b>{tr("ops.cmp_settings")}</b>
+          <span>{tr("ops.cmp_entity")}: {f.entity_type ? tr(`company.et_${f.entity_type}` as Key) : tr("ops.cmp_no_entity")}
+            {" · "}<Link href={`/app/team?tab=profile${cid ? `&company=${cid}` : ""}`}>{tr("ops.cmp_edit_profile")}</Link></span></div></div>
+        <fieldset disabled={!isAdmin || busy} className="ui-form cf-form">
+          <FormRow>
+            <Field label={tr("ops.cmp_vat")}><select value={f.vat_period} onChange={e => set("vat_period", e.target.value)} data-testid="cmp-vat">
+              <option value="monthly">{tr("ops.fq_monthly")}</option><option value="quarterly">{tr("ops.fq_quarterly")}</option></select></Field>
+            <Field label={tr("ops.cmp_pit")}><select value={f.pit_period} onChange={e => set("pit_period", e.target.value)}>
+              <option value="monthly">{tr("ops.fq_monthly")}</option><option value="quarterly">{tr("ops.fq_quarterly")}</option></select></Field>
+          </FormRow>
+          <label className="tmInline"><input type="checkbox" checked={!!f.has_employees} onChange={e => set("has_employees", e.target.checked)} data-testid="cmp-emp"/>{tr("ops.cmp_employees")}</label>
+          <Field label={tr("ops.cmp_accountant")} hint={tr("ops.cmp_accountant_hint", {p0: d.assignee})}>
+            <select value={f.accounting_position_id ?? ""} onChange={e => set("accounting_position_id", e.target.value ? Number(e.target.value) : null)}>
+              <option value="">{tr("ops.cmp_auto")}</option>{d.positions.map((p: any) => <option key={p.id} value={p.id}>{p.title}</option>)}</select></Field>
+        </fieldset>
+        {!isAdmin && <small>{tr("ops.cmp_need_admin")}</small>}
+        <div className="tmRow">
+          {isAdmin && <button className="ui-btn is-primary" disabled={busy} data-testid="cmp-save"
+            onClick={() => run(() => apiOps.saveCompliance({company_id: cid, vat_period: f.vat_period, pit_period: f.pit_period,
+              has_employees: f.has_employees, accounting_position_id: f.accounting_position_id ?? null}), tr("ops.saved_short"))}>{tr("ops.save")}</button>}
+          {isAdmin && !d.rules.length && <button className="ui-btn is-ghost" disabled={busy} data-testid="cmp-seed"
+            onClick={() => run(() => apiOps.seedCompliance({company_id: cid}), (r: any) => tr("ops.cmp_seeded", {p0: r.created}))}>{tr("ops.cmp_seed")}</button>}
+          {can && d.rules.length > 0 && <button className="ui-btn is-ghost" disabled={busy} data-testid="cmp-generate"
+            onClick={() => run(() => apiOps.generateCompliance(cid), (r: any) => tr("ops.cmp_generated", {p0: r.created, p1: r.reminded}))}>{tr("ops.cmp_generate")}</button>}
+        </div>
+      </section>
+      <section className="ui-panel tm-card">
+        <div className="tm-card-head"><div><b>{tr("ops.cmp_upcoming")}</b><span>{tr("ops.cmp_upcoming_desc", {p0: upcoming.length})}</span></div></div>
+        {!upcoming.length ? <EmptyState compact mood="ngu" title={tr("ops.cmp_empty")} testId="cmp-empty">{tr("ops.cmp_empty_hint")}</EmptyState>
+          : <table className="ui-table" data-testid="cmp-deadlines"><tbody>{upcoming.map((x: any) => <tr key={x.id} data-testid={`cmp-d-${x.id}`}>
+            <td><b>{new Date(x.due_date + "T00:00:00").toLocaleDateString()}</b>{x.shifted && <div><small title={d.weekend_note}>{tr("ops.cmp_shifted", {p0: new Date(x.statutory_date + "T00:00:00").toLocaleDateString()})}</small></div>}</td>
+            <td>{x.name} · <small>{x.period_label}</small>{x.needs_review && <span className="ui-pill is-wait" title={tr("ops.cmp_review_hint")}>{tr("ops.cmp_review")}</span>}
+              <div><small>{x.assignee ? tr("ops.cmp_assigned", {p0: x.assignee}) : ""}{x.task_id ? <> · <Link href={`/app/tasks/${x.task_id}`}>{tr("ops.cmp_task")}</Link></> : ""}</small></div></td>
+            <td><span className={"ui-pill " + (x.overdue ? "is-risk" : x.days_left <= 7 ? "is-wait" : "")}>{x.overdue ? tr("ops.cmp_overdue", {p0: -x.days_left}) : tr("ops.cmp_days", {p0: x.days_left})}</span></td>
+            <td style={{textAlign: "right"}}>{can && <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => run(() => apiOps.complianceDone(x.id), tr("ops.cmp_marked"))}>{tr("ops.cmp_done")}</button>}</td>
+          </tr>)}</tbody></table>}
+        {done.length > 0 && <small className="tmGuide">{tr("ops.cmp_done_n", {p0: done.length})}</small>}
+      </section>
+    </div>
+    <h3 className="ops-cat">{tr("ops.cmp_rules")} {can && <button className="ui-btn is-ghost is-sm" onClick={() => setLic({name: "", date: "", remind_days: 30, legal_basis: ""})} data-testid="cmp-add-license">{tr("ops.cmp_add_license")}</button>}</h3>
+    {lic && <section className="ui-panel tm-card cf-edit" data-testid="cmp-license-form">
+      <div className="ui-form cf-form"><FormRow>
+        <Field label={tr("ops.cmp_lic_name")}><input value={lic.name} onChange={e => setLic({...lic, name: e.target.value})} placeholder={tr("ops.cmp_lic_ph")}/></Field>
+        <Field label={tr("ops.cmp_lic_date")}><input type="date" value={lic.date} onChange={e => setLic({...lic, date: e.target.value})}/></Field>
+        <Field label={tr("ops.cmp_remind")}><input inputMode="numeric" value={lic.remind_days} onChange={e => setLic({...lic, remind_days: Number(e.target.value) || 0})}/></Field>
+      </FormRow>
+      <Field label={tr("ops.cmp_basis")} hint={tr("ops.cmp_basis_hint")}><input value={lic.legal_basis} onChange={e => setLic({...lic, legal_basis: e.target.value})}/></Field>
+      <div className="tmRow"><button className="ui-btn is-primary" disabled={busy || !lic.name || !lic.date}
+        onClick={async () => { const r = await run(() => apiOps.createComplianceRule({company_id: cid, name: lic.name, category: "license", frequency: "once",
+          due_rule: {type: "fixed_date", date: lic.date}, remind_days: lic.remind_days, legal_basis: lic.legal_basis}), tr("ops.saved_short")); if (r) setLic(null); }}>{tr("ops.save")}</button>
+        <button className="ui-btn is-ghost" onClick={() => setLic(null)}>{tr("ops.cancel")}</button></div></div>
+    </section>}
+    {!d.rules.length ? <EmptyState mood="chao" title={tr("ops.cmp_no_rules")} testId="cmp-no-rules">{tr("ops.cmp_no_rules_hint")}</EmptyState>
+      : <div className="ui-panel"><table className="ui-table" data-testid="cmp-rules"><tbody>{d.rules.map((r: any) => <tr key={r.id} className={r.enabled ? "" : "is-off"}>
+        <td><b>{r.name}</b> {r.needs_review && <span className="ui-pill is-wait">{tr("ops.cmp_review")}</span>}
+          {!r.enabled && <span className="ui-pill">{tr("ops.cmp_off")}</span>}
+          <div><small>{r.legal_basis || tr("ops.cmp_no_basis")}</small></div>{r.note && <div><small>⚠ {r.note}</small></div>}</td>
+        <td><small>{freq(r)} · {tr("ops.cmp_remind_n", {p0: r.remind_days})}</small></td>
+        <td><span className={"ui-pill " + (r.applies ? "is-ok" : "")}>{r.applies ? tr("ops.cmp_applies") : tr("ops.cmp_not_applies")}</span></td>
+        <td style={{textAlign: "right", whiteSpace: "nowrap"}}>{isAdmin && <button className="ui-btn is-ghost is-sm" disabled={busy}
+          onClick={() => run(() => apiOps.updateComplianceRule(r.id, {enabled: !r.enabled}), tr("ops.saved_short"))}>{r.enabled ? tr("ops.cmp_turn_off") : tr("ops.cmp_turn_on")}</button>}
+          {isAdmin && r.source === "custom" && <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => run(() => apiOps.deleteComplianceRule(r.id), tr("ops.saved_short"))}>✕</button>}</td>
+      </tr>)}</tbody></table></div>}
+  </section>;
+}

@@ -48,6 +48,7 @@ export const SECTIONS: NavSection[] = lazy(() => ([
           {href: "/app/team?tab=processes", label: tr("nav.quy_trinh_cty")},
           {href: "/app/team?tab=kpi", label: tr("nav.kpi")},
           {href: "/app/team?tab=rhythm", label: tr("nav.giao_ban")},
+          {href: "/app/team?tab=compliance", label: tr("nav.tuan_thu")},
           {href: "/app/team?tab=training", label: tr("nav.dao_tao")}, {href: "/app/team?tab=build", label: tr("nav.dung_cong_ty")}]},
   {key: "routines", href: "/app/routines", label: tr("nav.viec_dinh_ky"), icon: "zap",
    desc: tr("nav.viec_lap_theo_lich_hoac"),

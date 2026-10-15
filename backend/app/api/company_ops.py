@@ -231,3 +231,90 @@ async def rhythm_run(payload: RhythmRunIn, principal: Principal = Depends(requir
 @router.get("/rhythm/reports/{report_id}")
 def rhythm_report(report_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
     return rh.get_report(db, active_org(principal), report_id)
+
+
+# ------------------------------------------------------------------ D7 lịch tuân thủ
+
+from app.services import compliance_calendar as cc  # noqa: E402
+
+
+class ComplianceSettingsIn(BaseModel):
+    company_id: int | None = None
+    vat_period: str | None = Field(default=None, max_length=16)
+    pit_period: str | None = Field(default=None, max_length=16)
+    has_employees: bool | None = None
+    accounting_position_id: int | None = None
+
+
+class ComplianceRuleIn(BaseModel):
+    company_id: int | None = None
+    name: str | None = Field(default=None, max_length=200)
+    category: str | None = Field(default=None, max_length=16)
+    frequency: str | None = Field(default=None, max_length=16)
+    due_rule: dict | None = None
+    legal_basis: str | None = Field(default=None, max_length=4000)
+    note: str | None = Field(default=None, max_length=4000)
+    remind_days: int | None = None
+    enabled: bool | None = None
+    needs_review: bool | None = None
+    entity_types: list[str] | None = None
+    condition: dict | None = None
+
+
+class SeedComplianceIn(BaseModel):
+    company_id: int | None = None
+    replace: bool = False
+
+
+@router.get("/compliance")
+def compliance(company_id: int | None = None, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+    return cc.overview(db, active_org(principal), company_id)
+
+
+@router.put("/compliance/settings")
+def compliance_settings(payload: ComplianceSettingsIn, principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
+    data = payload.model_dump(exclude_unset=True)
+    org = active_org(principal)
+    out = cc.save_settings(db, org, data.pop("company_id", None), data)
+    return out
+
+
+@router.post("/compliance/seed")
+def compliance_seed(payload: SeedComplianceIn, principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
+    from app.services.company_foundation import _company
+    org = active_org(principal)
+    co = _company(db, org, payload.company_id)
+    return cc.seed_defaults(db, org, co.id, replace=payload.replace)
+
+
+@router.post("/compliance/rules")
+def compliance_rule_create(payload: ComplianceRuleIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    data = payload.model_dump(exclude_unset=True)
+    return cc.create_rule(db, active_org(principal), data.pop("company_id", None), data)
+
+
+@router.patch("/compliance/rules/{rule_id}")
+def compliance_rule_update(rule_id: int, payload: ComplianceRuleIn, principal: Principal = Depends(require_role("admin")),
+                           db: Session = Depends(get_db)):
+    data = payload.model_dump(exclude_unset=True)
+    data.pop("company_id", None)
+    return cc.update_rule(db, active_org(principal), rule_id, data)
+
+
+@router.delete("/compliance/rules/{rule_id}")
+def compliance_rule_delete(rule_id: int, principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
+    return cc.delete_rule(db, active_org(principal), rule_id)
+
+
+@router.post("/compliance/generate")
+def compliance_generate(payload: CompanyIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    """Sinh hạn 120 ngày tới + gửi nhắc tới hạn ngay (không chờ beat)."""
+    org = active_org(principal)
+    g = cc.generate(db, org, payload.company_id)
+    m = cc.remind(db, org, payload.company_id)
+    return {**g, "reminded": m["reminded"]}
+
+
+@router.post("/compliance/deadlines/{deadline_id}/done")
+def compliance_done(deadline_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+    return cc.mark_done(db, active_org(principal), deadline_id)

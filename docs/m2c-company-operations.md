@@ -92,3 +92,37 @@ chủ doanh nghiệp. **Lịch**: Celery beat `rhythm.tick` 300 s, gửi trong 2
 
 API: `GET /team/rhythm`, `PUT /team/rhythm/config`, `POST /team/rhythm/run {kind, department_id? | all_departments}`,
 `GET /team/rhythm/reports/{id}`.
+
+## D7. Lịch tuân thủ Việt Nam — migration `0042_compliance_calendar`
+
+**Dữ liệu**: `company_profiles.compliance` (kỳ khai GTGT, kỳ khai khấu trừ TNCN, có người lao động, chức danh kế
+toán), `compliance_rules` (một nghĩa vụ là **dữ liệu sửa được** cho từng công ty: loại hình áp dụng, điều kiện, tần
+suất, cách tính hạn, **căn cứ pháp lý**, ghi chú, nhắc trước N ngày, bật/tắt, `needs_review`, hiệu lực), 
+`compliance_deadlines` (hạn theo kỳ: hạn theo luật, hạn sau khi dời cuối tuần, người nhận, việc, đã nhắc, đã nộp;
+UNIQUE luật × kỳ).
+
+**Luật mặc định** (đối chiếu web ngày 16/10/2026, nguồn trong báo cáo):
+
+| Nghĩa vụ | Hạn | Căn cứ |
+|---|---|---|
+| GTGT tháng / khấu trừ TNCN tháng | ngày 20 tháng sau | Điều 44 khoản 1a Luật QLT 38/2019 (tới 30/6/2026); từ 1/7/2026 Luật QLT 2025 + Điều 10 khoản 2 NĐ 252/2026/NĐ-CP |
+| GTGT quý / khấu trừ TNCN quý | ngày cuối tháng đầu quý sau | Điều 10 khoản 3 NĐ 252/2026 (trước đó Điều 44 khoản 1b) |
+| Quyết toán TNDN + BCTC; quyết toán TNCN (tổ chức trả thu nhập) | ngày cuối tháng thứ 3 sau năm | Điều 10 khoản 5a NĐ 252/2026 |
+| Đóng BHXH, BHYT, BHTN tháng | ngày cuối tháng tiếp theo | khoản 4 Điều 34 Luật BHXH 41/2024/QH15 (từ 1/7/2025) |
+| Hộ kinh doanh khai quý (01/CNKD) | ngày cuối tháng đầu quý sau | khoản 6 Điều 10 NQ 198/2025/QH15 (bỏ khoán từ 2026) — **cần kiểm tra** |
+| Lệ phí môn bài | **đã bãi bỏ từ 1/1/2026** — luật để TẮT, không sinh hạn | khoản 7 Điều 10 NQ 198/2025/QH15; NĐ 362/2025/NĐ-CP; CV 645/CT-CS |
+| Giấy phép / hạn riêng | ngày hết hạn người dùng nhập | người dùng ghi; trống → "cần kiểm tra" |
+
+Hạn rơi thứ Bảy/Chủ nhật → thứ Hai (Điều 86 TT 80/2021/TT-BTC; khoản 5 Điều 148 BLDS 2015); **ngày lễ chưa tính**.
+
+**Sinh + nhắc** (`compliance_calendar.generate/remind`, beat `compliance.tick` mỗi giờ): hạn 120 ngày tới (chỉ từ hôm
+nay — công ty mới bật không bị báo "quá hạn" cho kỳ cũ); tới ngưỡng nhắc → một việc trong dự án "Tuân thủ" giao người
+ngồi chức danh kế toán (chọn trong cài đặt; không có → chức danh có chữ "kế toán/thuế" → chủ doanh nghiệp), hạn 17:00,
++ Hộp việc (loại `compliance_due`) cho người đó và chủ doanh nghiệp; mỗi hạn nhắc một lần. Việc xong → hạn "đã nộp".
+Gieo luật mặc định khi dựng công ty từ mẫu, hoặc nút "Tạo lịch mặc định".
+
+**UI** không khẳng định chắc chắn pháp lý: dải cảnh báo "lịch tham khảo, không phải tư vấn pháp lý", mỗi luật hiện
+căn cứ, luật chưa chắc gắn nhãn "Cần kiểm tra".
+
+API: `GET /team/compliance`, `PUT /team/compliance/settings` (admin), `POST /team/compliance/seed`, `POST/PATCH/DELETE
+/team/compliance/rules[/{id}]`, `POST /team/compliance/generate`, `POST /team/compliance/deadlines/{id}/done`.

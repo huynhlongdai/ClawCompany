@@ -635,3 +635,4 @@ a.org-node:hover{border-color:var(--text-muted);box-shadow:var(--shadow-2)}
 .ops-lv{font-size:10px}
 .ops-kpi-table td{vertical-align:top}
 .ops-report{background:var(--surface-sunken,var(--bg));padding:10px;border-radius:8px;font-family:inherit;margin:6px 0}
+[data-testid=cmp-rules] tr.is-off td{opacity:.55}

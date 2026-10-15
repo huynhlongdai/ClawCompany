@@ -38,6 +38,8 @@ CORE_BEAT_SCHEDULE = {
     "sync-skill-proposals": {"task": "skills.sync_workshop", "schedule": 300.0},
     # M2c D6: giao ban sáng / báo cáo tuần theo giờ địa phương của từng công ty.
     "tick-operating-rhythm": {"task": "rhythm.tick", "schedule": 300.0},
+    # M2c D7: lịch tuân thủ — sinh hạn + nhắc trước N ngày (idempotent: mỗi hạn nhắc một lần).
+    "tick-compliance-calendar": {"task": "compliance.tick", "schedule": 3600.0},
 }
 
 

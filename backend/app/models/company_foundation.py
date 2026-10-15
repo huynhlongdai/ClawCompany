@@ -33,6 +33,8 @@ class CompanyProfile(Base):
     prohibitions: Mapped[list | None] = mapped_column(JSON, nullable=True)
     customer_promises: Mapped[list | None] = mapped_column(JSON, nullable=True)
     charter_version: Mapped[int] = mapped_column(Integer, default=0)
+    # M2c D7 (0042): lựa chọn kê khai cho lịch tuân thủ — kỳ GTGT/TNCN, có lao động, chức danh kế toán…
+    compliance: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     updated_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

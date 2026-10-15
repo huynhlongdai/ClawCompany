@@ -18,3 +18,15 @@ def rhythm_tick():
         return asyncio.run(operating_rhythm.tick(db, runtime=rt))
     finally:
         db.close()
+
+
+@celery_app.task(name="compliance.tick")
+def compliance_tick():
+    """D7: sinh hạn tuân thủ 120 ngày tới + nhắc trước N ngày vào Hộp việc, giao chức danh kế toán."""
+    from app.db.session import SessionLocal
+    from app.services import compliance_calendar
+    db = SessionLocal()
+    try:
+        return compliance_calendar.tick(db)
+    finally:
+        db.close()

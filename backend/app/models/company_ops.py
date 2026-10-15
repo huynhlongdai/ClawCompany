@@ -5,9 +5,9 @@ Quy trình KHÔNG có động cơ riêng: mỗi bước của một lần chạy
 (giao seat đang ngồi chức danh, chặn bằng ``task_dependencies``, duyệt bằng chặng
 ``execution_policy``), nên agent nhận việc, đánh thức, review, Hộp việc… đi đường cũ.
 Bảng ở đây chỉ ghi định nghĩa và thời gian chu trình."""
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -172,3 +172,49 @@ class RhythmReport(Base):
     author_note: Mapped[str] = mapped_column(String(400), default="")
     recipients: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+# ------------------------------------------------------------------ D7 lịch tuân thủ VN
+
+class ComplianceRule(Base):
+    """Một nghĩa vụ định kỳ (thuế, BHXH, báo cáo, giấy phép) lưu dưới dạng DỮ LIỆU sửa được: áp cho loại
+    hình nào, điều kiện (kỳ kê khai, có lao động), cách tính hạn, căn cứ pháp lý, nhắc trước bao nhiêu ngày."""
+    __tablename__ = "compliance_rules"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    key: Mapped[str] = mapped_column(String(64), default="")
+    name: Mapped[str] = mapped_column(String(200))
+    category: Mapped[str] = mapped_column(String(16), default="tax")          # tax|social|report|license
+    entity_types: Mapped[list | None] = mapped_column(JSON, nullable=True)    # rỗng = mọi loại hình
+    condition: Mapped[dict | None] = mapped_column(JSON, nullable=True)       # {"vat_period": "monthly", "has_employees": true}
+    frequency: Mapped[str] = mapped_column(String(16), default="monthly")     # monthly|quarterly|yearly|once
+    due_rule: Mapped[dict | None] = mapped_column(JSON, nullable=True)        # {"type": "next_month_day", "day": 20} …
+    legal_basis: Mapped[str] = mapped_column(Text, default="")
+    note: Mapped[str] = mapped_column(Text, default="")
+    remind_days: Mapped[int] = mapped_column(Integer, default=7)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    needs_review: Mapped[bool] = mapped_column(Boolean, default=False)
+    effective_from: Mapped[date | None] = mapped_column(Date, nullable=True)
+    effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
+    source: Mapped[str] = mapped_column(String(16), default="default")       # default | custom
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ComplianceDeadline(Base):
+    __tablename__ = "compliance_deadlines"
+    __table_args__ = (UniqueConstraint("rule_id", "period_label", name="uq_compliance_deadline_period"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    rule_id: Mapped[int] = mapped_column(ForeignKey("compliance_rules.id"), index=True)
+    period_label: Mapped[str] = mapped_column(String(32))
+    statutory_date: Mapped[date] = mapped_column(Date)                         # hạn theo luật trước khi dời ngày nghỉ
+    due_date: Mapped[date] = mapped_column(Date, index=True)
+    status: Mapped[str] = mapped_column(String(16), default="upcoming")      # upcoming|done|skipped
+    assignee_member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    task_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reminded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    done_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

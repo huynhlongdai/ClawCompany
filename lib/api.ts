@@ -794,6 +794,14 @@ export const apiOps = {
   rhythm: (companyId?: number | null) => request<any>(`/team/rhythm${cq(companyId)}`),
   saveRhythm: (body: any) => request<any>(`/team/rhythm/config`, {method: "PUT", body: JSON.stringify(body)}),
   runRhythm: (body: any) => request<any>(`/team/rhythm/run`, {method: "POST", body: JSON.stringify(body)}),
+  compliance: (companyId?: number | null) => request<any>(`/team/compliance${cq(companyId)}`),
+  saveCompliance: (body: any) => request<any>(`/team/compliance/settings`, {method: "PUT", body: JSON.stringify(body)}),
+  seedCompliance: (body: any) => request<any>(`/team/compliance/seed`, {method: "POST", body: JSON.stringify(body)}),
+  generateCompliance: (companyId?: number | null) => request<any>(`/team/compliance/generate`, {method: "POST", body: JSON.stringify({company_id: companyId ?? null})}),
+  createComplianceRule: (body: any) => request<any>(`/team/compliance/rules`, {method: "POST", body: JSON.stringify(body)}),
+  updateComplianceRule: (id: number, body: any) => request<any>(`/team/compliance/rules/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  deleteComplianceRule: (id: number) => request<any>(`/team/compliance/rules/${id}`, {method: "DELETE"}),
+  complianceDone: (id: number) => request<any>(`/team/compliance/deadlines/${id}/done`, {method: "POST"}),
   syncKpis: (companyId?: number | null) => request<any>(`/team/kpis/sync-positions`, {method: "POST", body: JSON.stringify({company_id: companyId ?? null})}),
 };
 
