@@ -488,7 +488,8 @@
   "gui_luc": "Gửi lúc",
   "han_duyet": "Hạn duyệt",
   "agent": "agent",
-  "khong_co_mo_ta_them": "Yêu cầu này không kèm mô tả nào thêm."
+  "khong_co_mo_ta_them": "Yêu cầu này không kèm mô tả nào thêm.",
+  "nguoi_duyet_nhan": "Người duyệt"
  },
  "work": {
   "tam_dung": "tạm dừng",

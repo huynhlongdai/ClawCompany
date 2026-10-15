@@ -115,7 +115,7 @@ function ApprovalDetail({det, err}: {det: any; err: string}) {
       <dt>{t("inbox.loai_yeu_cau")}</dt><dd>{det.kind_vi}</dd>
       {det.requester_detail && <><dt>{t("inbox.nguoi_xin")}</dt>
         <dd>{det.requester_detail.name}{det.requester_detail.type === "agent" ? ` · ${t("inbox.agent")}` : ""}</dd></>}
-      {det.approver && <><dt>{t("inbox.nguoi_duyet")}</dt><dd>{det.approver}</dd></>}
+      {det.approver && <><dt>{t("inbox.nguoi_duyet_nhan")}</dt><dd>{det.approver}</dd></>}
       {det.created_at && <><dt>{t("inbox.gui_luc")}</dt><dd>{fmtTime(det.created_at)}</dd></>}
       {det.expires_at && <><dt>{t("inbox.han_duyet")}</dt><dd>{fmtTime(det.expires_at)}</dd></>}
       {det.fields.map((f: any, i: number) => <div key={i} className="ibx-dl-row">

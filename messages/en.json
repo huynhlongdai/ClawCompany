@@ -488,7 +488,8 @@
   "gui_luc": "Sent",
   "han_duyet": "Due",
   "agent": "agent",
-  "khong_co_mo_ta_them": "This request has no further description."
+  "khong_co_mo_ta_them": "This request has no further description.",
+  "nguoi_duyet_nhan": "Approver"
  },
  "work": {
   "tam_dung": "paused",
