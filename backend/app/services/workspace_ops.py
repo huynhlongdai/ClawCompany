@@ -72,6 +72,8 @@ def create_company(db: Session, organization_id: int, *, name: str, industry: st
         raise HTTPException(409, f"A company named '{name}' already exists in this organization")
     company = Company(organization_id=organization_id, name=name, industry=industry or "", status=status)
     db.add(company); db.commit(); db.refresh(company)
+    from app.services.provisioning import seed_authority
+    seed_authority(db, company)
     _emit(db, organization_id, "company.created",
           {"company_id": company.id, "name": company.name, "industry": company.industry},
           company.id, "company", company.id, actor_member_id)

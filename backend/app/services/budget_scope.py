@@ -221,10 +221,27 @@ def soft_approver(db: Session, env: BudgetEnvelope, member: Member) -> int | Non
     return humans[0] if humans else None
 
 
+def _soft_authority(db: Session, env: BudgetEnvelope, member: Member):
+    """M2b: người duyệt chi tiếp theo ma trận phân quyền (loại việc budget_overrun); None → cách cũ."""
+    try:
+        from app.services import authority
+        spent = float(env.amount_spent or 0)
+        over = max(0.0, spent - float(env.amount_limit or 0) * (env.soft_stop_pct or 100) / 100.0)
+        d = authority.decide(db, member, "budget_overrun", amount_usd=over,
+                             company_id=member.company_id or env.company_id)
+        return d if d is not None and d.approver_member_id else None
+    except Exception as exc:  # noqa: BLE001
+        print(f"[authority] budget {exc}")
+        return None
+
+
 def _request_soft_approval(db: Session, env: BudgetEnvelope, member: Member, task: Task, key: str):
     from app.models import Approval
+    d = _soft_authority(db, env, member)
     a = Approval(organization_id=env.organization_id, company_id=member.company_id or env.company_id,
-                 requester_member_id=member.id, approver_member_id=soft_approver(db, env, member),
+                 requester_member_id=member.id,
+                 approver_member_id=d.approver_member_id if d else soft_approver(db, env, member),
+                 payload={"authority": d.card()} if d else None,
                  action=f"Chi tiếp ngân sách '{env.name}' cho việc #{task.id}: {task.title}"[:220],
                  risk="high", policy_key=key, status="pending",
                  evidence=json.dumps({"task_id": task.id, "budget_id": env.id, "pct": pct(env),

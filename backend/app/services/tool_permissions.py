@@ -114,12 +114,42 @@ def resolve(db: Session, member: Member, tool: str) -> tuple[str, str]:
     """(mức, nguồn). Nguồn: ``member`` | ``tier:<bậc>`` | ``default:<bậc>`` | ``unknown_tool``
     | ``action:<loại>/<nguồn>`` khi loại hành động chặt hơn hàng của tool."""
     level, source = _resolve_one(db, member, tool)
+    pos = _position_gate(db, member, tool)
+    if pos is not None:
+        return pos
     cls = action_of(tool)
+    if tool.startswith("action:") and level != "off":
+        cls_key = tool.split(":", 1)[1]
+        floor = _authority_floor(db, member, cls_key)
+        if floor and _STRICT[floor[0]] > _STRICT[level]:
+            return floor
     if cls and level != "off":
-        a_level, a_source = _resolve_one(db, member, f"action:{cls}")
+        a_level, a_source = resolve(db, member, f"action:{cls}")
         if _STRICT[a_level] > _STRICT[level]:
             return a_level, f"action:{cls}/{a_source}"
     return level, source
+
+
+def _authority_floor(db: Session, member: Member, action_class: str) -> tuple[str, str] | None:
+    """M2b: ma trận phân quyền chỉ SIẾT lưới (agent chưa đủ cấp tự làm → ít nhất "Hỏi trước")."""
+    try:
+        from app.services import authority
+        return authority.tool_floor(db, member, action_class)
+    except Exception as exc:  # noqa: BLE001 — ma trận lỗi không được mở toang lưới, cũng không chặn đọc
+        print(f"[authority] floor {exc}")
+        return None
+
+
+def _position_gate(db: Session, member: Member, tool: str) -> tuple[str, str] | None:
+    """M2b: chức danh có danh sách công cụ → tool công ty ngoài danh sách bị tắt cho người ngồi ghế đó."""
+    if not tool.startswith("company_") or not getattr(member, "position_id", None):
+        return None
+    from app.models.company_foundation import Position
+    p = db.get(Position, member.position_id)
+    allowed = (p.allowed_tools or []) if p is not None and p.status != "archived" else []
+    if allowed and tool not in allowed:
+        return "off", f"position:{p.id}"
+    return None
 
 
 def _resolve_one(db: Session, member: Member, tool: str) -> tuple[str, str]:
@@ -153,8 +183,18 @@ def ask_approval(db: Session, member: Member, tool: str, evidence: str) -> tuple
             return "granted", recent
         if recent.status == "pending":
             return "pending", recent
+    d = None
+    try:   # M2b: người duyệt theo ma trận phân quyền (loại hành động của tool)
+        from app.services import authority
+        cls = action_of(tool) or (tool.split(":", 1)[1] if tool.startswith("action:") else None)
+        at = authority.TOOL_CLASS_TO_ACTION.get(cls or "")
+        d = authority.decide(db, member, at) if at else None
+    except Exception as exc:  # noqa: BLE001
+        print(f"[authority] ask {exc}")
     approval = Approval(organization_id=member.organization_id, company_id=member.company_id,
                         requester_member_id=member.id, action=action, risk="medium",
+                        approver_member_id=d.approver_member_id if d else None,
+                        payload={"authority": d.card()} if d else None,
                         policy_key=action, evidence=evidence[:4000], status="pending")
     db.add(approval); db.commit(); db.refresh(approval)
     return "pending", approval

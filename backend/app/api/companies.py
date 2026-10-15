@@ -20,4 +20,6 @@ def create_company(payload: CompanyCreate, principal: Principal = Depends(requir
     enforce_org(payload.organization_id, principal)
     obj = Company(**payload.model_dump())
     db.add(obj); db.commit(); db.refresh(obj)
+    from app.services.provisioning import seed_authority
+    seed_authority(db, obj)
     return obj

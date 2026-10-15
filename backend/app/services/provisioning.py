@@ -118,6 +118,15 @@ async def provision_agent(
         return job
 
 
+def seed_authority(db: Session, company: Company, template: str | None = None) -> None:
+    """M2b: công ty mới có sẵn ma trận phân quyền mặc định. Lỗi gieo không được làm hỏng việc tạo công ty."""
+    try:
+        from app.services import authority
+        authority.seed_defaults(db, company.organization_id, company.id, template=template)
+    except Exception as exc:  # noqa: BLE001
+        db.rollback(); print(f"[authority] seed company #{company.id}: {exc}")
+
+
 async def provision_company(
     db: Session, *, organization_id: int, company_name: str, industry: str = "", template_id: int | None = None,
     manifest: dict | None = None, requested_by_user_id: int | None = None,
@@ -132,6 +141,7 @@ async def provision_company(
     try:
         company = Company(organization_id=organization_id, name=company_name, industry=industry or manifest.get("industry", ""), status="active")
         db.add(company); db.commit(); db.refresh(company); job.company_id = company.id; db.add(job); db.commit()
+        seed_authority(db, company)
         department_map: dict[str, int] = {}
         for dep_spec in manifest.get("departments", []):
             dep = Department(company_id=company.id, name=dep_spec.get("name", "Department"), access_level=dep_spec.get("access_level", "restricted"))

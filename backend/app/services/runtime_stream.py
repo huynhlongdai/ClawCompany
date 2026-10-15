@@ -381,7 +381,16 @@ def record_approval(db: Session, state: ConsumerState, event: dict, member: Memb
     risk = str(raw.get("risk") or ("high" if risk_kinds or (tool in ocp.HTTP_DENIED_TOOLS and not command)
                                    else "medium"))
     action = f"Chạy lệnh: {command}" if command else f"OpenClaw agent requests: {tool}"
+    auth = None
+    if member is not None:
+        try:   # M2b: người duyệt lệnh exec theo ma trận phân quyền
+            from app.services import authority
+            auth = authority.decide(db, member, "exec", risk=risk)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[authority] exec {exc}")
     approval = Approval(
+        approver_member_id=auth.approver_member_id if auth else None,
+        payload={"authority": auth.card()} if auth else None,
         organization_id=state.organization_id,
         company_id=member.company_id if member is not None else None,
         requester_member_id=member.id if member is not None else None,

@@ -111,6 +111,18 @@ def _ensure_approval(db: Session, goal: ExecutiveGoal, cycle: OperatingCycle, re
     return approval
 
 
+def _goal_authority(db: Session, goal: ExecutiveGoal, estimate_usd: float):
+    if not goal.company_id:
+        return None
+    try:
+        from app.services import authority
+        return authority.decide(db, None, "goal_execute", amount_usd=estimate_usd, risk=goal.risk,
+                                company_id=goal.company_id)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[authority] goal {exc}")
+        return None
+
+
 def create_cycle(db: Session, goal: ExecutiveGoal, *, estimated_cost_per_assignment: float = 0.25) -> OperatingCycle:
     if not goal.execution_plan_id:
         raise ValueError("Goal must be planned before execution")
@@ -138,8 +150,17 @@ def create_cycle(db: Session, goal: ExecutiveGoal, *, estimated_cost_per_assignm
         )
         db.add(assignment)
     db.commit()
+    auth = _goal_authority(db, goal, len(steps) * estimated_cost_per_assignment)
     if mode == "manual":
         _ensure_approval(db, goal, cycle, "Organization autonomy mode is manual")
+    elif auth is not None:   # M2b: ma trận phân quyền thay ngưỡng max_auto_risk khi có luật khớp
+        if auth.requires_approval or auth.approver_kind != "none":
+            a = _ensure_approval(db, goal, cycle, f"{auth.label}: {auth.reason}")
+            a.approver_member_id = auth.approver_member_id
+            a.payload = {**(a.payload or {}), "authority": auth.card()}
+            db.add(a); db.commit()
+        else:
+            cycle.status = "running"; goal.status = "running"; db.add_all([cycle, goal]); db.commit()
     elif not risk_allowed(goal.risk, policy.max_auto_risk):
         _ensure_approval(db, goal, cycle, f"Goal risk '{goal.risk}' exceeds auto-execution threshold '{policy.max_auto_risk}'")
     else:

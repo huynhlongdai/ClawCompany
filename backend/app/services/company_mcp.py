@@ -743,22 +743,44 @@ def _artifact_get(ctx: ToolContext, args: dict) -> dict:
 # ------------------------------------------------------------------ Kiểm soát
 
 @tool("company_approval_request", "control", "Xin phép trước khi làm một hành động rủi ro. "
-      "Trả allow / deny / approval_required (kèm approval_id).", "company.approvals:write",
-      {"action": {"type": "string"}, "evidence": {"type": "string"}}, ("action",), writes=True)
+      "action = loại việc theo ma trận phân quyền (spend, refund, external_message, contract, data_export, "
+      "data_delete, exec…); amount_usd = số tiền (USD) nếu có. "
+      "Trả allow / deny / approval_required (kèm approval_id và luật đã áp).", "company.approvals:write",
+      {"action": {"type": "string"}, "evidence": {"type": "string"}, "amount_usd": {"type": "number"},
+       "risk": {"type": "string"}}, ("action",), writes=True)
 def _approval_request(ctx: ToolContext, args: dict) -> dict:
     from app.services.policy import authorize
     d = authorize(ctx.db, ctx.org, _str(args, "action", limit=120), actor_member_id=ctx.member.id,
                   fallback_role="member", company_id=ctx.member.company_id,
-                  evidence=_str(args, "evidence", required=False, limit=4000))
+                  evidence=_str(args, "evidence", required=False, limit=4000),
+                  amount_usd=_amount(args), risk=_str(args, "risk", required=False, limit=16) or None)
     return {"decision": d.decision, "reason": d.reason, "policy_key": d.policy_key,
             "approval_id": d.approval_id}
 
 
+def _amount(args: dict) -> float | None:
+    v = args.get("amount_usd")
+    if v in (None, ""):
+        return None
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        raise ToolError("invalid_argument", "amount_usd phải là số (USD)")
+    if v < 0:
+        raise ToolError("invalid_argument", "amount_usd không được âm")
+    return v
+
+
 @tool("company_policy_check", "control", "Hỏi trước (không tạo yêu cầu duyệt) một hành động có "
       "cần duyệt hay bị cấm không.", "company.policy:read",
-      {"action": {"type": "string"}}, ("action",))
+      {"action": {"type": "string"}, "amount_usd": {"type": "number"}}, ("action",))
 def _policy_check(ctx: ToolContext, args: dict) -> dict:
     action = _str(args, "action", limit=120)
+    from app.services import authority
+    m = authority.decide(ctx.db, ctx.member, action, amount_usd=_amount(args))
+    if m is not None:   # M2b: ma trận phân quyền trả lời trước
+        return {"action": action, "policy": f"authority:r{m.rule_id}", "rule": m.label,
+                "requires_approval": m.requires_approval, "approver": m.approver_name, "reason": m.reason}
     policy = ctx.db.execute(select(PermissionPolicy).where(
         PermissionPolicy.organization_id == ctx.org, PermissionPolicy.action == action,
         PermissionPolicy.enabled == True)).scalars().first()  # noqa: E712

@@ -49,7 +49,8 @@ KIND_OF = (("task_stage:", "stage", "Chặng duyệt của việc"), ("strategy:
            ("budget_soft:", "budget", "Chi tiếp khi chạm nấc ngân sách"),
            ("openclaw:", "gateway", "Lệnh agent xin chạy (OpenClaw)"),
            ("lesson:", "lesson", "Bài học đề xuất ghi vào MEMORY.md"),
-           ("skill:", "skill", "Kỹ năng đề xuất cho thư viện công ty"))
+           ("skill:", "skill", "Kỹ năng đề xuất cho thư viện công ty"),
+           ("authority:", "authority", "Theo ma trận phân quyền"))
 
 
 # ------------------------------------------------------------------ quyền
@@ -150,6 +151,8 @@ def approval_card(db: Session, a: Approval, principal: Principal, names: dict[in
                        else deadline_vi(left, esc_to, bool(a.escalated_at)),
         "reject_needs_note": True,
         "grant_scopes": ["task", "seat", "department"] if kind == "budget" else [],
+        # M2b: luật nào của ma trận phân quyền sinh ra yêu cầu này (None = đường cũ, không qua ma trận)
+        "authority": (a.payload or {}).get("authority") if isinstance(a.payload, dict) else None,
         "created_at": a.created_at.isoformat() if a.created_at else None,
     }
 
