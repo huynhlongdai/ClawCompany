@@ -206,6 +206,8 @@ def snapshot_company(db: Session, company_id: int, *, now: datetime | None = Non
     thời điểm như phê duyệt đang chờ — không dựng lại được quá khứ)."""
     now = now or datetime.utcnow()
     rows = db.query(KpiDefinition).filter(KpiDefinition.company_id == company_id, KpiDefinition.status == "active").all()
+    co = db.get(Company, company_id)
+    born = getattr(co, "created_at", None)
     made = closed = back = 0
     for k in rows:
         # 1) kỳ trước đang có số "chạy" → tính lại tại cuối kỳ đó rồi đóng băng
@@ -221,6 +223,8 @@ def snapshot_company(db: Session, company_id: int, *, now: datetime | None = Non
             key, _, end = period_window(k.period, t)
             if k.metric in POINT_IN_TIME or (k.created_at and end <= k.created_at and k.metric == "manual"):
                 continue
+            if born and end <= born:
+                continue          # kỳ trước khi có công ty: "0 việc xong" là số giả, không ghi
             if db.query(KpiSnapshot).filter(KpiSnapshot.kpi_id == k.id, KpiSnapshot.period_key == key).first():
                 continue
             snapshot(db, k, now=t, trigger="backfill", final=True)

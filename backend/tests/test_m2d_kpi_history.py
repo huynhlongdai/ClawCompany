@@ -92,6 +92,7 @@ def test_backfill_recomputes_old_periods_but_skips_point_in_time_metrics_and_is_
     k = kpi(E, level="company", name="Việc xong", metric="tasks_done", target=2, period="week")
     pend = kpi(E, level="company", name="Chờ duyệt", metric="approvals_pending", target=0, direction="down", period="week")
     now = datetime.utcnow()
+    E.co.created_at = now - timedelta(days=400); E.db.commit()     # công ty đã có từ trước các kỳ cần tính lại
     for back in (1, 2, 2):
         t = _task(E, keeper.id); _finish(E, t.id); E.db.refresh(t)
         t.completed_at = kc.previous_now("week", now, back); E.db.commit()
@@ -107,3 +108,12 @@ def test_backfill_recomputes_old_periods_but_skips_point_in_time_metrics_and_is_
         [kc.period_window("week", now)[0]]
     # tổ chức khác không chụp được công ty này
     assert E.c.post("/api/team/kpis/snapshot", json={"company_id": E.co.id}, headers=E.tok("other")).status_code in (403, 404)
+
+
+def test_backfill_skips_periods_before_the_company_existed(E):
+    cskh, agent, kho, keeper, owner_pos = _setup(E)
+    k = kpi(E, level="company", name="Việc xong", metric="tasks_done", target=2, period="week")
+    E.co.created_at = datetime.utcnow(); E.db.commit()
+    r = E.c.post("/api/team/kpis/snapshot", json={"company_id": E.co.id, "backfill": 4}, headers=E.tok("manager")).json()
+    assert r["backfilled"] == 0
+    assert len(kc.history(E.db, E.db.get(kc.KpiDefinition, k["id"]))) == 1
