@@ -23,6 +23,13 @@ class StepIn(BaseModel):
     expected_minutes: int | None = None
     action_type: str = Field(default="", max_length=40)
     risk: str = Field(default="", max_length=16)
+    depends_on: list[int] | None = None      # v2: seq các bước đứng trước; vắng = nối tiếp bước trước
+    condition: dict | None = None             # v2: {field, op, value}
+    branch: str = Field(default="", max_length=60)
+
+
+class OutcomeIn(BaseModel):
+    outcome: str = Field(default="", max_length=200)
 
 
 class ProcessIn(BaseModel):
@@ -98,6 +105,12 @@ def process_instances(process_id: int, principal: Principal = Depends(require_ro
 @router.get("/process-instances/{instance_id}")
 def process_instance(instance_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
     return pm.get_instance(db, active_org(principal), instance_id)
+
+
+@router.post("/process-step-runs/{run_id}/outcome")
+def step_outcome(run_id: int, payload: OutcomeIn, principal: Principal = Depends(require_role("member")),
+                 db: Session = Depends(get_db)):
+    return pm.set_outcome(db, active_org(principal), run_id, payload.outcome)
 
 
 @router.post("/process-instances/{instance_id}/cancel")

@@ -95,12 +95,56 @@ def stats(db: Session, p: Process) -> dict:
     now = datetime.utcnow()
     late = sum(1 for r in runs if r.status == "active" and r.expected_minutes and r.activated_at
                and (now - r.activated_at).total_seconds() > r.expected_minutes * 60)
-    return {"instances": len(inst), "running": sum(1 for i in inst if i.status == "running"),
+    branches, paths = branch_stats(inst, runs)
+    return {"branches": branches, "paths": paths,"instances": len(inst), "running": sum(1 for i in inst if i.status == "running"),
             "done": len(done), "cancelled": sum(1 for i in inst if i.status == "cancelled"),
             "avg_cycle_minutes": _fmt_minutes(statistics.mean(done)) if done else None,
             "median_cycle_minutes": _fmt_minutes(statistics.median(done)) if done else None,
             "late_steps": late,
             "step_avg_minutes": {sid: _fmt_minutes(statistics.mean(v)) for sid, v in by_step.items()}}
+
+
+def branch_stats(inst: list[ProcessInstance], runs: list[ProcessStepRun]) -> tuple[list[dict], list[dict]]:
+    """Thời gian chu trình theo nhánh (v2).
+
+    * ``branches``: mỗi nhãn nhánh → số lần nhánh chạy trọn + thời gian TB của nhánh trong một lần chạy
+      (từ lúc bước đầu của nhánh tới lượt tới lúc bước cuối của nhánh xong; các bước song song tính một lần).
+    * ``paths``: mỗi lần chạy xong đi qua tập nhánh nào (bước bị bỏ qua không tính) → chu trình TB của
+      lần chạy theo đường đi đó, ví dụ "Duyệt" 42 phút vs "—" (không qua nhánh nào) 12 phút."""
+    by_inst: dict[int, list[ProcessStepRun]] = {}
+    for r in runs:
+        by_inst.setdefault(r.instance_id, []).append(r)
+    spans: dict[str, list[float]] = {}
+    path_cycles: dict[str, list[float]] = {}
+    for i in inst:
+        rs = by_inst.get(i.id, [])
+        labels: dict[str, list[ProcessStepRun]] = {}
+        for r in rs:
+            if r.branch and r.status == "done":
+                labels.setdefault(r.branch, []).append(r)
+        for label, group in labels.items():
+            # nhánh chỉ tính khi không còn bước nào của nó đang chờ/làm
+            if any(r.branch == label and r.status in ("waiting", "active") for r in rs):
+                continue
+            starts = [r.activated_at for r in group if r.activated_at]
+            ends = [r.finished_at for r in group if r.finished_at]
+            if starts and ends:
+                spans.setdefault(label, []).append((max(ends) - min(starts)).total_seconds())
+        if i.status == "done" and i.cycle_seconds is not None:
+            key = " + ".join(sorted(labels)) or "—"
+            path_cycles.setdefault(key, []).append(i.cycle_seconds)
+    branches = [{"branch": k, "runs": len(v), "avg_minutes": _fmt_minutes(statistics.mean(v))}
+                for k, v in sorted(spans.items())]
+    paths = [{"path": k, "instances": len(v), "avg_cycle_minutes": _fmt_minutes(statistics.mean(v))}
+             for k, v in sorted(path_cycles.items())]
+    return branches, paths
+
+
+def _deps(s) -> list[int]:
+    """Bước đứng trước của một bước/bước chạy. Hàng cũ chưa có đồ thị → tuyến tính (seq-1)."""
+    if s.depends_on is None:
+        return [s.seq - 1] if (s.seq or 1) > 1 else []
+    return [int(x) for x in s.depends_on]
 
 
 def public_step(db: Session, s: ProcessStep, avg: dict | None = None) -> dict:
@@ -109,13 +153,14 @@ def public_step(db: Session, s: ProcessStep, avg: dict | None = None) -> dict:
             "position_id": s.position_id, "position": _pos_title(db, s.position_id),
             "sop_id": s.sop_id, "sop": sop.title if sop else None, "expected_minutes": s.expected_minutes,
             "action_type": s.action_type or "", "risk": s.risk or "",
+            "depends_on": _deps(s), "condition": s.condition or None, "branch": s.branch or "",
             "avg_minutes": (avg or {}).get(s.id)}
 
 
 def public_process(db: Session, p: Process, *, with_stats: bool = True) -> dict:
     st = stats(db, p) if with_stats else None
     steps = steps_of(db, p.id)
-    expected = sum(s.expected_minutes or 0 for s in steps) or None
+    expected = critical_path_minutes(steps)
     return {"id": p.id, "company_id": p.company_id, "category": p.category,
             "category_vi": next((c[1] for c in CATEGORIES if c[0] == p.category), p.category),
             "name": p.name, "description": p.description or "", "owner_position_id": p.owner_position_id,
@@ -124,6 +169,20 @@ def public_process(db: Session, p: Process, *, with_stats: bool = True) -> dict:
             "steps": [public_step(db, s, (st or {}).get("step_avg_minutes")) for s in steps],
             "stats": {k: v for k, v in (st or {}).items() if k != "step_avg_minutes"} if st else None,
             "issues": issues(db, p, steps)}
+
+
+def critical_path_minutes(steps: list[ProcessStep]) -> int | None:
+    """Thời lượng kỳ vọng của cả quy trình = đường dài nhất qua đồ thị (bước song song không cộng dồn).
+    Quy trình tuyến tính → bằng tổng như trước."""
+    by_seq = {s.seq: s for s in steps}
+    memo: dict[int, int] = {}
+
+    def finish(seq: int) -> int:
+        if seq not in memo:
+            s = by_seq[seq]
+            memo[seq] = (s.expected_minutes or 0) + max((finish(d) for d in _deps(s) if d in by_seq), default=0)
+        return memo[seq]
+    return max((finish(s.seq) for s in steps), default=0) or None
 
 
 def issues(db: Session, p: Process, steps: list[ProcessStep] | None = None) -> list[str]:
@@ -191,6 +250,102 @@ def _apply(db: Session, co: Company, p: Process, data: dict, fields: set[str]) -
         p.owner_position_id = _check_position(db, co, data.get("owner_position_id"), "Chủ quy trình")
 
 
+CONDITION_OPS = ("==", "!=", ">", ">=", "<", "<=", "empty", "not_empty")
+
+
+def _clean_deps(i: int, s: dict) -> list[int]:
+    """``depends_on`` vắng → nối tiếp bước trước (giữ hành vi tuyến tính cũ). ``[]`` → chạy ngay khi bắt đầu."""
+    if "depends_on" not in s or s.get("depends_on") is None:
+        return [i - 1] if i > 1 else []
+    raw = s.get("depends_on")
+    if not isinstance(raw, list):
+        raise _err(422, f"Bước {i}: \"chạy sau bước\" phải là danh sách số thứ tự bước, ví dụ [1, 2].")
+    out = []
+    for x in raw:
+        if not isinstance(x, int) or isinstance(x, bool) or x < 1 or x >= i:
+            raise _err(422, f"Bước {i} chỉ chạy sau được các bước đứng trước nó (1 tới {i - 1}); \"{x}\" không hợp lệ. "
+                            f"Đổi thứ tự bước nếu cần.")
+        if x not in out:
+            out.append(x)
+    return sorted(out)
+
+
+def _clean_condition(i: int, c, deps: list[int]) -> dict | None:
+    """Điều kiện của bước: {field, op, value}. field = ``amount_usd`` | ``input.<khoá>`` | ``step<N>.outcome``
+    (N là một bước đứng trước). Không có → bước luôn chạy khi tới lượt."""
+    if not c:
+        return None
+    if not isinstance(c, dict):
+        raise _err(422, f"Bước {i}: điều kiện phải có dạng {{field, op, value}}.")
+    field = str(c.get("field") or "").strip()
+    op_ = str(c.get("op") or "").strip()
+    if not field and not op_:
+        return None
+    if op_ not in CONDITION_OPS:
+        raise _err(422, f"Bước {i}: phép so sánh \"{op_}\" không hợp lệ. Dùng một trong: {', '.join(CONDITION_OPS)}.")
+    import re
+    m = re.fullmatch(r"step(\d+)\.outcome", field)
+    if m:
+        n = int(m.group(1))
+        if n < 1 or n >= i:
+            raise _err(422, f"Bước {i}: điều kiện chỉ xét được kết quả của bước đứng trước (1 tới {i - 1}).")
+    elif field != "amount_usd" and not re.fullmatch(r"input\.[A-Za-z0-9_\-]{1,60}", field):
+        raise _err(422, f"Bước {i}: trường điều kiện \"{field}\" không hợp lệ. Dùng amount_usd, input.<tên trường> "
+                        f"hoặc step<N>.outcome.")
+    value = c.get("value")
+    if op_ in (">", ">=", "<", "<=") and not isinstance(value, (int, float)):
+        try:
+            value = float(str(value))
+        except ValueError:
+            raise _err(422, f"Bước {i}: phép {op_} cần một con số (ví dụ 50).") from None
+    if op_ in ("empty", "not_empty"):
+        value = None
+    return {"field": field, "op": op_, "value": value}
+
+
+def eval_condition(cond: dict | None, ctx: dict) -> bool:
+    """Điều kiện vắng → đúng. Trường không có giá trị → chỉ ``empty`` đúng."""
+    if not cond:
+        return True
+    field, op_, value = cond.get("field"), cond.get("op"), cond.get("value")
+    actual = ctx.get(field)
+    if op_ == "empty":
+        return actual in (None, "")
+    if op_ == "not_empty":
+        return actual not in (None, "")
+    if actual is None:
+        return False
+    if op_ in (">", ">=", "<", "<="):
+        try:
+            a, b = float(actual), float(value)
+        except (TypeError, ValueError):
+            return False
+        return {">": a > b, ">=": a >= b, "<": a < b, "<=": a <= b}[op_]
+    a, b = str(actual).strip().lower(), str(value if value is not None else "").strip().lower()
+    try:
+        eq = float(a) == float(b)
+    except ValueError:
+        eq = a == b
+    return eq if op_ == "==" else not eq
+
+
+def _context(inst: ProcessInstance, runs: list[ProcessStepRun]) -> dict:
+    ctx: dict = {"amount_usd": inst.amount_usd}
+    for k, v in (inst.input_json or {}).items():
+        ctx[f"input.{k}"] = v
+    for r in runs:
+        ctx[f"step{r.seq}.outcome"] = r.outcome or None
+    return ctx
+
+
+def describe_condition(cond: dict | None) -> str:
+    if not cond:
+        return ""
+    if cond["op"] in ("empty", "not_empty"):
+        return f"{cond['field']} {'trống' if cond['op'] == 'empty' else 'có giá trị'}"
+    return f"{cond['field']} {cond['op']} {cond['value']}"
+
+
 def save_steps(db: Session, org_id: int, p: Process, steps: list[dict]) -> None:
     from app.services import authority
     co = db.get(Company, p.company_id)
@@ -219,10 +374,13 @@ def save_steps(db: Session, org_id: int, p: Process, steps: list[dict]) -> None:
         risk = s.get("risk") or ""
         if risk and risk not in authority.RISKS:
             raise _err(422, f"Bước {i}: mức rủi ro phải là low, medium, high hoặc critical.")
+        deps = _clean_deps(i, s)
         clean.append(dict(seq=i, name=name[:200], instructions=(s.get("instructions") or "")[:4000],
                           position_id=_check_position(db, co, s.get("position_id"), f"Bước {i}"),
                           sop_id=sop_id or None, expected_minutes=em,
-                          action_type=authority.normalize_action(at) or "" if at else "", risk=risk))
+                          action_type=authority.normalize_action(at) or "" if at else "", risk=risk,
+                          depends_on=deps, condition=_clean_condition(i, s.get("condition"), deps),
+                          branch=(s.get("branch") or "").strip()[:60]))
     keep_ids = {s.get("id") for s in steps if s.get("id")}
     old = steps_of(db, p.id)
     by_id = {s.id: s for s in old}
@@ -313,9 +471,19 @@ def _brief(db: Session, p: Process, inst: ProcessInstance, s: ProcessStep, steps
         lines.append(f"**Chủ quy trình:** {_pos_title(db, p.owner_position_id)}")
     if s.expected_minutes:
         lines.append(f"**Thời lượng kỳ vọng:** {s.expected_minutes} phút")
-    nxt = next((x for x in steps if x.seq == s.seq + 1), None)
-    if nxt:
-        lines.append(f"**Bước sau:** {nxt.name} ({_pos_title(db, nxt.position_id) or 'chưa gắn chức danh'})")
+    if s.branch:
+        lines.append(f"**Nhánh:** {s.branch}")
+    if s.condition:
+        lines.append(f"**Chỉ chạy khi:** {describe_condition(s.condition)}")
+    before = [x for x in steps if x.seq in _deps(s)]
+    if len(before) > 1:
+        lines.append("**Gộp nhánh sau:** " + ", ".join(f"B{x.seq} {x.name}" for x in before))
+    parallel = [x for x in steps if x.seq != s.seq and _deps(x) == _deps(s) and _deps(s)]
+    if parallel:
+        lines.append("**Chạy song song với:** " + ", ".join(f"B{x.seq} {x.name}" for x in parallel))
+    for nxt in [x for x in steps if s.seq in _deps(x)]:
+        lines.append(f"**Bước sau:** {nxt.name} ({_pos_title(db, nxt.position_id) or 'chưa gắn chức danh'})"
+                     + (f" — nếu {describe_condition(nxt.condition)}" if nxt.condition else ""))
     if s.instructions:
         lines += ["", "## Việc cần làm", s.instructions]
     if s.sop_id:
@@ -353,7 +521,7 @@ def start(db: Session, org_id: int, pid: int, *, title: str = "", amount_usd: fl
     project = _project(db, p)
     inst.project_id = project.id
     db.add(inst); db.commit(); db.refresh(inst)
-    prev_task: Task | None = None
+    task_of: dict[int, Task] = {}
     out_runs = []
     for s in steps:
         assignee, note = pick_assignee(db, org_id, p.company_id, s.position_id)
@@ -362,7 +530,8 @@ def start(db: Session, org_id: int, pid: int, *, title: str = "", amount_usd: fl
                                actor_member_id=actor_member_id)
         run = ProcessStepRun(instance_id=inst.id, step_id=s.id, seq=s.seq, name=s.name, task_id=task.id,
                              position_id=s.position_id, assignee_member_id=assignee,
-                             expected_minutes=s.expected_minutes, note=note[:400], status="waiting")
+                             expected_minutes=s.expected_minutes, note=note[:400], status="waiting",
+                             depends_on=_deps(s), condition=s.condition or None, branch=s.branch or "")
         if s.action_type and assignee:
             d = authority.decide(db, db.get(Member, assignee), s.action_type, amount_usd=amount_usd,
                                  risk=s.risk or None, company_id=p.company_id)
@@ -372,19 +541,15 @@ def start(db: Session, org_id: int, pid: int, *, title: str = "", amount_usd: fl
                     run.approval_required, run.approver_member_id = True, d.approver_member_id
                     execution_policy.set_policy(db, task, {"stages": [{"type": "approval",
                                                                        "participants": [d.approver_member_id]}]})
-        if prev_task is not None:
-            db.add(TaskDependency(task_id=task.id, blocked_by_task_id=prev_task.id, created_by_member_id=actor_member_id))
+        # fan-out / fan-in = task_dependencies: một task bị chặn bởi MỌI bước đứng trước nó
+        for d in _deps(s):
+            if d in task_of:
+                db.add(TaskDependency(task_id=task.id, blocked_by_task_id=task_of[d].id,
+                                      created_by_member_id=actor_member_id))
         db.add(run); db.commit(); db.refresh(run)
         out_runs.append(run)
-        prev_task = task
-    first = out_runs[0]
-    first.status, first.activated_at = "active", now
-    db.commit()
-    t0 = db.get(Task, first.task_id)
-    lifecycle.transition(db, t0, "todo", reason=f"quy trình #{p.id} lần chạy #{inst.id}: bước 1 tới lượt",
-                         via="process", system=True, organization_id=org_id, company_id=p.company_id)
-    wakeup.enqueue_for_task(db, t0, "assigned", dedupe_key=f"process:i{inst.id}:s1",
-                            payload={"process_id": p.id, "instance_id": inst.id, "step": 1})
+        task_of[s.seq] = task
+    _settle(db, inst, now, wake_roots=True)
     emit_event(db, organization_id=org_id, company_id=p.company_id, event_type="process.started", source=SOURCE,
                aggregate_type="process_instance", aggregate_id=str(inst.id), actor_member_id=actor_member_id,
                payload={"process_id": p.id, "instance_id": inst.id, "tasks": [r.task_id for r in out_runs]})
@@ -427,27 +592,94 @@ def _advance(db: Session, run: ProcessStepRun, to: str) -> None:
             run.status, run.activated_at = "active", run.activated_at or now
         db.commit()
         return
-    if to == "done" and run.status != "done":
+    if to == "done" and run.status not in ("done", "skipped"):
         run.status, run.finished_at = "done", now
         run.cycle_seconds = (now - (run.activated_at or inst.started_at)).total_seconds()
         db.commit()
-        nxt = (db.query(ProcessStepRun).filter(ProcessStepRun.instance_id == inst.id, ProcessStepRun.status == "waiting")
-               .order_by(ProcessStepRun.seq).first())
-        if nxt is None:
-            _close_instance(db, inst, "done", now)
-            return
-        nxt.status, nxt.activated_at = "active", now
-        db.commit()
-        t = db.get(Task, nxt.task_id) if nxt.task_id else None
-        if t is not None and t.status == "backlog":
-            lifecycle.transition(db, t, "todo", reason=f"quy trình lần chạy #{inst.id}: bước {nxt.seq} tới lượt",
-                                 via="process", system=True, organization_id=inst.organization_id,
-                                 company_id=inst.company_id)
+        _settle(db, inst, now)
         return
-    if to == "cancelled" and run.status not in ("done", "cancelled"):
+    if to == "cancelled" and run.status not in ("done", "cancelled", "skipped"):
         run.status, run.finished_at = "cancelled", now
         db.commit()
         cancel(db, inst.organization_id, inst.id, reason=f"bước {run.seq} bị huỷ", _from_task=True)
+
+
+def _settle(db: Session, inst: ProcessInstance, now: datetime, *, wake_roots: bool = False) -> None:
+    """Mở mọi bước đã đủ điều kiện, bỏ qua nhánh không áp dụng, đóng lần chạy khi hết bước.
+
+    Một bước đang chờ được xét khi MỌI bước đứng trước đã xong hoặc bị bỏ qua:
+    * mọi bước trước đều bị bỏ qua → bước này cũng bị bỏ qua (cả nhánh chết);
+    * điều kiện sai → bỏ qua; đúng → tới lượt ("Cần làm"). Bước gộp nhánh (nhiều bước trước) chạy khi
+      ít nhất một nhánh trước nó đã xong.
+    Bước bị bỏ qua → task của nó chuyển "Huỷ" với lý do (task_dependencies coi huỷ là đã đóng, nên bước gộp
+    không bị kẹt). Lặp tới khi không đổi gì."""
+    from app.services import task_lifecycle as lifecycle
+    from app.services import wakeup
+    activated: list[ProcessStepRun] = []
+    while True:
+        runs = (db.query(ProcessStepRun).filter(ProcessStepRun.instance_id == inst.id)
+                .order_by(ProcessStepRun.seq).all())
+        by_seq = {r.seq: r for r in runs}
+        ctx = _context(inst, runs)
+        changed = False
+        for r in runs:
+            if r.status != "waiting":
+                continue
+            preds = [by_seq[d] for d in _deps(r) if d in by_seq]
+            if any(x.status in ("waiting", "active") for x in preds):
+                continue
+            if preds and all(x.status in ("skipped", "cancelled") for x in preds):
+                r.status, r.finished_at, r.skip_reason = "skipped", now, "Các bước trước đều bị bỏ qua."
+            elif not eval_condition(r.condition, ctx):
+                r.status, r.finished_at = "skipped", now
+                r.skip_reason = f"Điều kiện không thỏa: {describe_condition(r.condition)}"[:300]
+            else:
+                r.status, r.activated_at = "active", now
+                activated.append(r)
+            db.commit()
+            changed = True
+            if r.status == "skipped" and r.task_id:
+                t = db.get(Task, r.task_id)
+                if t is not None and t.status not in ("done", "cancelled"):
+                    lifecycle.transition(db, t, "cancelled", reason=f"quy trình lần chạy #{inst.id}: bước {r.seq} không "
+                                         f"áp dụng ({r.skip_reason})", via="process", system=True,
+                                         organization_id=inst.organization_id, company_id=inst.company_id)
+            break   # trạng thái đã đổi → đọc lại từ đầu
+        if not changed:
+            break
+    for r in activated:
+        t = db.get(Task, r.task_id) if r.task_id else None
+        if t is None:
+            continue
+        if t.status == "backlog":
+            lifecycle.transition(db, t, "todo", reason=f"quy trình lần chạy #{inst.id}: bước {r.seq} tới lượt",
+                                 via="process", system=True, organization_id=inst.organization_id,
+                                 company_id=inst.company_id)
+        # bước gốc (lúc bắt đầu) được đánh thức ở đây; bước sau được ``wake_unblocked`` đánh thức khi blocker đóng
+        if wake_roots and not _deps(r):
+            wakeup.enqueue_for_task(db, t, "assigned", dedupe_key=f"process:i{inst.id}:s{r.seq}",
+                                    payload={"process_id": inst.process_id, "instance_id": inst.id, "step": r.seq})
+    db.refresh(inst)
+    if inst.status == "running" and not db.query(ProcessStepRun).filter(
+            ProcessStepRun.instance_id == inst.id, ProcessStepRun.status.in_(("waiting", "active"))).count():
+        _close_instance(db, inst, "done", now)
+
+
+def set_outcome(db: Session, org_id: int, run_id: int, outcome: str) -> dict:
+    """Ghi kết quả của một bước (ví dụ "đồng ý", "hàng lỗi do vận chuyển") — điều kiện ``step<N>.outcome``
+    của các bước sau đọc giá trị này khi chúng tới lượt. Ghi được khi bước chưa đóng hoặc vừa xong mà bước
+    sau chưa được xét."""
+    run = db.get(ProcessStepRun, run_id)
+    inst = db.get(ProcessInstance, run.instance_id) if run else None
+    if run is None or inst is None or inst.organization_id != org_id:
+        raise _err(404, "Không thấy bước này của lần chạy.")
+    if inst.status != "running":
+        raise _err(409, f"Lần chạy đã {inst.status}; kết quả bước không đổi được nữa.")
+    if run.status in ("skipped", "cancelled"):
+        raise _err(409, "Bước này đã bị bỏ qua/huỷ nên không có kết quả.")
+    run.outcome = (outcome or "").strip()[:200]
+    db.commit()
+    return public_instance(db, inst)
 
 
 def cancel(db: Session, org_id: int, instance_id: int, *, reason: str = "huỷ tay", _from_task: bool = False) -> dict:
@@ -491,6 +723,8 @@ def public_instance(db: Session, inst: ProcessInstance) -> dict:
                        "assignee": names.get(r.assignee_member_id), "approval_required": r.approval_required,
                        "approver": names.get(r.approver_member_id), "authority_rule_id": r.authority_rule_id,
                        "expected_minutes": r.expected_minutes, "note": r.note,
+                       "depends_on": _deps(r), "condition": r.condition or None, "branch": r.branch or "",
+                       "outcome": r.outcome or "", "skip_reason": r.skip_reason or "",
                        "cycle_minutes": _fmt_minutes(r.cycle_seconds),
                        "late": bool(r.status == "active" and r.expected_minutes and r.activated_at
                                     and (now - r.activated_at).total_seconds() > r.expected_minutes * 60),
@@ -591,7 +825,8 @@ def seed_templates(db: Session, org_id: int, company_id: int, template: str, *, 
         for i, s in enumerate(spec["steps"], start=1):
             db.add(ProcessStep(process_id=p.id, seq=i, name=s["name"], instructions=s["instructions"],
                                position_id=_find_position(positions, s["who"]), sop_id=sop.id,
-                               expected_minutes=s["minutes"], action_type=s["action"], risk=s["risk"]))
+                               expected_minutes=s["minutes"], action_type=s["action"], risk=s["risk"],
+                               depends_on=[i - 1] if i > 1 else []))
         db.commit()
         made.append(p.id)
     return {"company_id": co.id, "template": template, "created": made, "skipped": skipped}

@@ -44,6 +44,12 @@ class ProcessStep(Base):
     # loại việc của ma trận phân quyền (refund, spend, external_message…); rỗng = không xét duyệt
     action_type: Mapped[str] = mapped_column(String(40), default="")
     risk: Mapped[str] = mapped_column(String(16), default="")
+    # v2 (0044): đồ thị bước. ``depends_on`` = danh sách seq bước đứng trước (rỗng = chạy ngay khi bắt đầu;
+    # nhiều bước cùng phụ thuộc một bước = song song; một bước phụ thuộc nhiều bước = gộp nhánh).
+    # ``condition`` = {field, op, value} xét lúc bước tới lượt; sai → bước bị bỏ qua (nhánh không áp dụng).
+    depends_on: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    condition: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    branch: Mapped[str] = mapped_column(String(60), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -76,12 +82,18 @@ class ProcessStepRun(Base):
     task_id: Mapped[int | None] = mapped_column(ForeignKey("tasks.id"), nullable=True, index=True)
     position_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     assignee_member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    status: Mapped[str] = mapped_column(String(16), default="waiting")   # waiting|active|done|cancelled
+    status: Mapped[str] = mapped_column(String(16), default="waiting")   # waiting|active|done|skipped|cancelled
     approval_required: Mapped[bool] = mapped_column(Boolean, default=False)
     approver_member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     authority_rule_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     expected_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     note: Mapped[str] = mapped_column(String(400), default="")
+    # v2 (0044): ảnh chụp đồ thị lúc bắt đầu chạy + kết quả bước (dùng cho điều kiện của bước sau)
+    depends_on: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    condition: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    branch: Mapped[str] = mapped_column(String(60), default="")
+    outcome: Mapped[str] = mapped_column(String(200), default="")
+    skip_reason: Mapped[str] = mapped_column(String(300), default="")
     activated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

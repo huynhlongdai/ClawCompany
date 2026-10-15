@@ -21,7 +21,19 @@ export function useLoad<T>(fn: () => Promise<T>, deps: any[]) {
 export const mins = (m: number | null | undefined) => m == null ? "—"
   : m < 60 ? tr("ops.min_n", {p0: Math.round(m * 10) / 10}) : tr("ops.hour_n", {p0: Math.round(m / 6) / 10});
 const ACTIONS = ["", "spend", "refund", "external_message", "contract", "data_export", "data_delete", "exec"];
-const STEP_STATUS: Record<string, string> = {waiting: "", active: "is-wait", done: "is-ok", cancelled: "is-risk"};
+const STEP_STATUS: Record<string, string> = {waiting: "", active: "is-wait", done: "is-ok", skipped: "is-outline", cancelled: "is-risk"};
+const COND_OPS = ["==", "!=", ">", ">=", "<", "<=", "empty", "not_empty"];
+// v2: điều kiện của bước → câu đọc được ("Số tiền ≥ 50")
+export function condText(c: any): string {
+  if (!c) return "";
+  const m = /^step(\d+)\.outcome$/.exec(c.field || "");
+  const f = c.field === "amount_usd" ? tr("ops.cf_amount") : m ? tr("ops.cf_outcome", {p0: m[1]})
+    : (c.field || "").startsWith("input.") ? tr("ops.cf_input", {p0: c.field.slice(6)}) : c.field;
+  if (c.op === "empty") return tr("ops.cond_empty", {p0: f});
+  if (c.op === "not_empty") return tr("ops.cond_not_empty", {p0: f});
+  return `${f} ${c.op.replace(">=", "≥").replace("<=", "≤").replace("!=", "≠")} ${c.field === "amount_usd" ? "$" : ""}${c.value}`;
+}
+const linearDeps = (s: any) => JSON.stringify(s.depends_on || []) === JSON.stringify(s.seq > 1 ? [s.seq - 1] : []);
 
 // ===================================================================== Quy trình (D4)
 
@@ -83,12 +95,19 @@ export function ProcessesTab({companyId, caps}: {companyId: number | null; caps:
               <b>{s.name}</b> <span className="ops-meta">{s.position || tr("ops.no_position")} · {mins(s.expected_minutes)}
                 {s.avg_minutes != null ? ` · ${tr("ops.avg")} ${mins(s.avg_minutes)}` : ""}</span>
               {s.action_type && <span className="ui-pill is-mid" title={tr("ops.action_hint")}>{actLabel(s.action_type)}</span>}
+              {s.branch && <span className="ui-pill is-info">{tr("ops.branch")}: {s.branch}</span>}
+              {!linearDeps(s) && <span className="ui-pill is-outline" data-testid={`proc-deps-${s.id}`}>{s.depends_on.length
+                ? tr("ops.after_steps", {p0: s.depends_on.map((x: number) => "B" + x).join(", ")}) : tr("ops.at_start")}</span>}
+              {s.condition && <span className="ui-pill is-wait" data-testid={`proc-cond-${s.id}`}>{tr("ops.only_if", {p0: condText(s.condition)})}</span>}
               {s.sop && <span className="ops-sop">📄 {s.sop}</span>}
             </li>)}</ol>
             {p.stats && <div className="org-stats ops-kpi" data-testid={`proc-stats-${p.id}`}>
               <span><b>{p.stats.instances}</b> {tr("ops.runs")}</span>
               <span><b>{mins(p.stats.avg_cycle_minutes)}</b> {tr("ops.avg_cycle")}</span>
               {p.stats.late_steps ? <span className="is-warn"><b>{p.stats.late_steps}</b> {tr("ops.late_steps")}</span> : null}</div>}
+            {p.stats && (p.stats.paths?.length > 1 || p.stats.branches?.length > 0) && <div className="org-stats ops-kpi" data-testid={`proc-branches-${p.id}`}>
+              {p.stats.paths.map((x: any) => <span key={"p" + x.path}>{x.path === "—" ? tr("ops.path_main") : tr("ops.path_via", {p0: x.path})}: <b>{mins(x.avg_cycle_minutes)}</b> ({x.instances})</span>)}
+              {p.stats.branches.map((x: any) => <span key={"b" + x.branch}>{tr("ops.branch_time", {p0: x.branch})}: <b>{mins(x.avg_minutes)}</b></span>)}</div>}
             {p.issues.length > 0 && <ul className="ops-issues">{p.issues.map((x: string, i: number) => <li key={i}>⚠ {x}</li>)}</ul>}
             <div className="tmRow">
               <button className="ui-btn is-primary is-sm" disabled={busy || !p.steps.length} onClick={() => setRunFor(p)} data-testid={`proc-run-${p.id}`}>{tr("ops.run")}</button>
@@ -97,6 +116,8 @@ export function ProcessesTab({companyId, caps}: {companyId: number | null; caps:
               {can && !p.stats?.running && <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => run(() => apiOps.archiveProcess(p.id), tr("ops.archived"))}>{tr("ops.archive")}</button>}
             </div>
             {open[p.id] && <Instances items={open[p.id]} can={can} busy={busy}
+              onOutcome={(id: number, v: string) => run(() => apiOps.stepOutcome(id, v), tr("ops.outcome_saved"))
+                .then(() => apiOps.instances(p.id)).then(x => setOpen(o => ({...o, [p.id]: x.items}))).catch(setError)}
               onCancel={(id: number) => run(() => apiOps.cancelInstance(id), tr("ops.cancelled"))
                 .then(() => apiOps.instances(p.id)).then(x => setOpen(o => ({...o, [p.id]: x.items}))).catch(setError)}/>}
           </section>)}</div>
@@ -104,14 +125,26 @@ export function ProcessesTab({companyId, caps}: {companyId: number | null; caps:
   </section>;
 }
 
-function Instances({items, can, busy, onCancel}: any) {
+function Outcome({s, busy, onOutcome}: any) {
+  const [v, setV] = useState(s.outcome || "");
+  return <div className="tmRow ops-outcome"><input value={v} placeholder={tr("ops.outcome_ph")} onChange={e => setV(e.target.value)}
+    aria-label={tr("ops.outcome")} data-testid={`outcome-${s.id}`}/>
+    <button className="ui-btn is-ghost is-sm" disabled={busy || v === (s.outcome || "")} onClick={() => onOutcome(s.id, v)}>{tr("ops.outcome_save")}</button></div>;
+}
+
+function Instances({items, can, busy, onCancel, onOutcome}: any) {
   if (!items.length) return <small className="tmGuide">{tr("ops.no_runs")}</small>;
   return <div className="ops-inst">{items.map((i: any) => <details key={i.id} open={i.status === "running"} data-testid={`inst-${i.id}`}>
     <summary><b>#{i.id} {i.title}</b> <span className={"ui-pill " + (i.status === "done" ? "is-ok" : i.status === "running" ? "is-wait" : "is-risk")}>{tr(`ops.st_${i.status}` as Key)}</span>
       {" "}{i.status === "done" ? tr("ops.cycle", {p0: mins(i.cycle_minutes)}) : tr("ops.elapsed", {p0: mins(i.elapsed_minutes)})}
       {i.amount_usd != null && ` · $${i.amount_usd}`}</summary>
     <table className="ui-table"><tbody>{i.steps.map((s: any) => <tr key={s.id}>
-      <td>{s.seq}. {s.task_id ? <Link href={`/app/tasks/${s.task_id}`}>{s.name}</Link> : s.name}{s.note && <div><small>{s.note}</small></div>}</td>
+      <td>{s.seq}. {s.task_id ? <Link href={`/app/tasks/${s.task_id}`}>{s.name}</Link> : s.name}
+        {s.branch && <span className="ui-pill is-info">{s.branch}</span>}{s.note && <div><small>{s.note}</small></div>}
+        {s.condition && <div><small>{tr("ops.only_if", {p0: condText(s.condition)})}</small></div>}
+        {s.skip_reason && <div><small className="is-warn">{s.skip_reason}</small></div>}
+        {s.outcome && s.status !== "active" && <div><small>{tr("ops.outcome")}: <b>{s.outcome}</b></small></div>}
+        {i.status === "running" && s.status === "active" && onOutcome && <Outcome s={s} busy={busy} onOutcome={onOutcome}/>}</td>
       <td>{s.assignee || "—"}{s.approval_required && <div><small>{tr("ops.approval_by", {p0: s.approver || "?", p1: s.authority_rule_id || "?"})}</small></div>}</td>
       <td><span className={"ui-pill " + (STEP_STATUS[s.status] || "")}>{tr(`ops.ss_${s.status}` as Key)}</span>{s.late && <span className="ui-pill is-risk">{tr("ops.late")}</span>}</td>
       <td style={{textAlign: "right"}}>{s.cycle_minutes != null ? mins(s.cycle_minutes) : s.expected_minutes ? `≤ ${mins(s.expected_minutes)}` : ""}</td>
@@ -142,7 +175,37 @@ function ProcessForm({d, edit, busy, onCancel, onSave}: any) {
   const [f, setF] = useState<any>(edit);
   const set = (k: string, v: any) => setF({...f, [k]: v});
   const setStep = (i: number, k: string, v: any) => set("steps", f.steps.map((s: any, j: number) => j === i ? {...s, [k]: v} : s));
-  const move = (i: number, dir: number) => { const s = [...f.steps]; const j = i + dir; if (j < 0 || j >= s.length) return; [s[i], s[j]] = [s[j], s[i]]; set("steps", s); };
+  // depends_on trỏ theo số thứ tự bước → đổi chỗ / xoá bước thì đánh số lại, bỏ tham chiếu không còn hợp lệ
+  const deps = (s: any, i: number) => s.depends_on ?? (i > 0 ? [i] : []);
+  const renumber = (steps: any[], map: (n: number) => number | null) => steps.map((s: any, i: number) => {
+    const d = deps(s, i).map(map).filter((n: number | null) => n != null && n >= 1 && n <= i) as number[];
+    const c = s.condition; const m = c ? /^step(\d+)\.outcome$/.exec(c.field || "") : null;
+    const nc = m ? (map(Number(m[1])) && (map(Number(m[1])) as number) <= i ? {...c, field: `step${map(Number(m[1]))}.outcome`} : null) : c;
+    return {...s, depends_on: Array.from(new Set(d)).sort((a, b) => a - b), condition: nc};
+  });
+  const move = (i: number, dir: number) => {
+    const j = i + dir; if (j < 0 || j >= f.steps.length) return;
+    const s = f.steps.map((x: any, k: number) => ({...x, depends_on: deps(x, k)})); [s[i], s[j]] = [s[j], s[i]];
+    set("steps", renumber(s, n => n === i + 1 ? j + 1 : n === j + 1 ? i + 1 : n));
+  };
+  const remove = (i: number) => {
+    const s = f.steps.map((x: any, k: number) => ({...x, depends_on: deps(x, k)})).filter((_: any, k: number) => k !== i);
+    set("steps", renumber(s, n => n === i + 1 ? null : n > i + 1 ? n - 1 : n));
+  };
+  const compact = () => {  // bỏ bước trống tên mà không làm lệch tham chiếu "chạy sau bước"
+    let s = f.steps.map((x: any, k: number) => ({...x, depends_on: deps(x, k)}));
+    for (let i = s.length - 1; i >= 0; i--) if (!(s[i].name || "").trim()) {
+      s = renumber(s.filter((_: any, k: number) => k !== i), n => n === i + 1 ? null : n > i + 1 ? n - 1 : n);
+    }
+    return s;
+  };
+  const toggleDep = (i: number, n: number) => {
+    const d = deps(f.steps[i], i); setStep(i, "depends_on", d.includes(n) ? d.filter((x: number) => x !== n) : [...d, n].sort((a, b) => a - b));
+  };
+  const setCond = (i: number, k: string, v: any) => {
+    const c = {field: "", op: ">=", value: "", ...(f.steps[i].condition || {}), [k]: v};
+    setStep(i, "condition", c.field ? c : null);
+  };
   const num = (v: any) => v === "" || v == null ? null : Number(v);
   return <section className="ui-panel tm-card cf-edit" data-testid="proc-form">
     <div className="tm-card-head"><div><b>{f.id ? tr("ops.edit_process") : tr("ops.new_process")}</b><span>{tr("ops.form_note")}</span></div></div>
@@ -168,16 +231,42 @@ function ProcessForm({d, edit, busy, onCancel, onSave}: any) {
             <option value="">SOP…</option>{d.sops.map((x: any) => <option key={x.id} value={x.id}>{x.title}</option>)}</select>
           <button className="ui-btn is-ghost is-sm" onClick={() => move(i, -1)} aria-label="↑">↑</button>
           <button className="ui-btn is-ghost is-sm" onClick={() => move(i, 1)} aria-label="↓">↓</button>
-          <button className="ui-btn is-ghost is-sm" onClick={() => set("steps", f.steps.filter((_: any, j: number) => j !== i))} aria-label={tr("ops.remove")}>✕</button>
+          <button className="ui-btn is-ghost is-sm" onClick={() => remove(i)} aria-label={tr("ops.remove")}>✕</button>
           <textarea rows={1} placeholder={tr("ops.instructions")} value={s.instructions || ""} onChange={e => setStep(i, "instructions", e.target.value)}/>
+          <div className="ops-flow" data-testid={`pf-flow-${i}`}>
+            <span className="ops-flow-label">{tr("ops.runs_after")}</span>
+            {i === 0 ? <small>{tr("ops.at_start")}</small> : <>{Array.from({length: i}, (_, k) => k + 1).map(n =>
+              <button key={n} type="button" className="ui-chip" aria-pressed={deps(s, i).includes(n)} onClick={() => toggleDep(i, n)}
+                data-testid={`pf-dep-${i}-${n}`}>B{n}</button>)}
+              {!deps(s, i).length && <small>{tr("ops.at_start")}</small>}</>}
+            <input className="ops-branch" placeholder={tr("ops.branch_ph")} value={s.branch || ""} onChange={e => setStep(i, "branch", e.target.value)}
+              aria-label={tr("ops.branch")} data-testid={`pf-branch-${i}`}/>
+            <select value={s.condition?.field?.startsWith("input.") ? "input." : s.condition?.field || ""} aria-label={tr("ops.condition")}
+              data-testid={`pf-cond-field-${i}`}
+              onChange={e => setCond(i, "field", e.target.value === "input." ? "input.ghi_chu" : e.target.value)}>
+              <option value="">{tr("ops.cond_none")}</option>
+              <option value="amount_usd">{tr("ops.cf_amount")}</option>
+              <option value="input.">{tr("ops.cf_input_any")}</option>
+              {Array.from({length: i}, (_, k) => k + 1).map(n => <option key={n} value={`step${n}.outcome`}>{tr("ops.cf_outcome", {p0: n})}</option>)}
+            </select>
+            {s.condition?.field?.startsWith("input.") && <input className="ops-branch" value={s.condition.field.slice(6)} aria-label={tr("ops.cf_input_key")}
+              onChange={e => setCond(i, "field", "input." + e.target.value.replace(/[^A-Za-z0-9_-]/g, ""))}/>}
+            {s.condition && <><select value={s.condition.op} onChange={e => setCond(i, "op", e.target.value)} aria-label={tr("ops.cond_op")} data-testid={`pf-cond-op-${i}`}>
+              {COND_OPS.map(o => <option key={o} value={o}>{tr(`ops.op_${o}` as Key)}</option>)}</select>
+              {!["empty", "not_empty"].includes(s.condition.op) && <input className="ops-min" value={s.condition.value ?? ""} aria-label={tr("ops.cond_value")}
+                data-testid={`pf-cond-val-${i}`} onChange={e => setCond(i, "value", e.target.value)}/>}</>}
+          </div>
         </div>)}
+        <small className="tmGuide">{tr("ops.flow_hint")}</small>
         <button className="ui-btn is-ghost is-sm" onClick={() => set("steps", [...f.steps, {name: ""}])} data-testid="pf-add-step">{tr("ops.add_step")}</button>
       </div>
       <div className="tmRow"><button className="ui-btn is-primary" disabled={busy} data-testid="pf-save" onClick={() => onSave({
         name: f.name, category: f.category, description: f.description || "", owner_position_id: f.owner_position_id ?? null,
-        steps: f.steps.filter((s: any) => (s.name || "").trim()).map((s: any) => ({id: s.id, name: s.name, position_id: s.position_id ?? null,
+        steps: compact().map((s: any) => ({id: s.id, name: s.name, position_id: s.position_id ?? null,
           sop_id: s.sop_id ?? null, expected_minutes: s.expected_minutes ?? null, action_type: s.action_type || "", risk: s.risk || "",
-          instructions: s.instructions || ""}))})}>{tr("ops.save")}</button>
+          instructions: s.instructions || "", depends_on: s.depends_on, branch: s.branch || "",
+          condition: s.condition && s.condition.field ? {...s.condition,
+            value: [">", ">=", "<", "<="].includes(s.condition.op) ? Number(s.condition.value) : s.condition.value} : null}))})}>{tr("ops.save")}</button>
         <button className="ui-btn is-ghost" onClick={onCancel}>{tr("ops.cancel")}</button></div>
     </div>
   </section>;
