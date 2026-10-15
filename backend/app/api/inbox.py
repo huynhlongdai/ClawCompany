@@ -90,6 +90,12 @@ def read_all(principal: Principal = Depends(require_human()), db: Session = Depe
     return {"updated": inbox_hub.mark_all_read(db, active_org(principal), principal)}
 
 
+@router.get("/items/{item_id}")
+def item_detail(item_id: int, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    """Chi tiết một mục hộp việc; mở ra thì tính là đã đọc."""
+    return inbox_hub.item_detail(db, active_org(principal), principal, item_id)
+
+
 @router.get("/approvals/{approval_id}")
 def approval_detail(approval_id: int, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
     """Chi tiết một yêu cầu duyệt: ai xin, xin làm gì (lệnh/nội dung/số tiền), việc liên quan, hạn."""

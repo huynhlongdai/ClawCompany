@@ -836,6 +836,7 @@ export const apiInboxHub = {
     grant_scope?: "task" | "seat" | "department"}) =>
     request<any>(`/inbox/approvals/${id}/decide`, {method: "POST", body: JSON.stringify(body)}),
   approval: (id: number) => request<any>(`/inbox/approvals/${id}`),
+  item: (id: number) => request<any>(`/inbox/items/${id}`),
   escalate: () => request<any>(`/inbox/escalate`, {method: "POST"}),
 };
 export const apiCosts = {

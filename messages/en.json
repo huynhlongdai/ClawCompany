@@ -489,7 +489,15 @@
   "han_duyet": "Due",
   "agent": "agent",
   "khong_co_mo_ta_them": "This request has no further description.",
-  "nguoi_duyet_nhan": "Approver"
+  "nguoi_duyet_nhan": "Approver",
+  "mo_ta_viec": "Task description",
+  "san_pham_nop": "Agent deliverables",
+  "mo_tep": "Open file",
+  "khong_co_noi_dung_xem": "No preview",
+  "luot_chay_gan_nhat": "Latest run",
+  "nhat_ky_viec": "Work log",
+  "ngan_sach": "Budget",
+  "da_chi": "Spent"
  },
  "work": {
   "tam_dung": "paused",

@@ -489,7 +489,15 @@
   "han_duyet": "Hạn duyệt",
   "agent": "agent",
   "khong_co_mo_ta_them": "Yêu cầu này không kèm mô tả nào thêm.",
-  "nguoi_duyet_nhan": "Người duyệt"
+  "nguoi_duyet_nhan": "Người duyệt",
+  "mo_ta_viec": "Mô tả việc",
+  "san_pham_nop": "Sản phẩm agent nộp",
+  "mo_tep": "Mở tệp",
+  "khong_co_noi_dung_xem": "Không có nội dung xem trước",
+  "luot_chay_gan_nhat": "Lượt chạy gần nhất",
+  "nhat_ky_viec": "Nhật ký làm việc",
+  "ngan_sach": "Ngân sách",
+  "da_chi": "Đã chi"
  },
  "work": {
   "tam_dung": "tạm dừng",

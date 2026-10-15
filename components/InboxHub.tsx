@@ -127,6 +127,46 @@ function fmtTime(iso?: string | null) {
   return isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
+function TaskContext({td}: {td: any}) {
+  return <section className="ibx-task" data-testid={`ibx-task-${td.id}`}>
+    <h4>{t("inbox.viec")}{td.id}: {td.title}</h4>
+    <small>{[td.status_vi, td.project, td.assignee, td.department].filter(Boolean).join(" · ")}</small>
+    {td.description && <><b className="ibx-sub">{t("inbox.mo_ta_viec")}</b><p className="ibx-pre">{td.description}</p></>}
+    {td.deliverables?.length > 0 && <><b className="ibx-sub">{t("inbox.san_pham_nop")}</b>
+      {td.deliverables.map((d: any) => <div key={d.id} className="ibx-deliv">
+        <div className="ibx-deliv-head"><Icon name="book" size={13}/>{d.name}<small>v{d.version}{d.author ? ` · ${d.author}` : ""} · {fmtTime(d.created_at)}</small></div>
+        {d.content ? <pre className="ibx-deliv-body">{d.content}{d.truncated ? "\n…" : ""}</pre>
+          : d.uri ? <a href={d.uri} target="_blank" rel="noreferrer">{t("inbox.mo_tep")}</a> : <small>{t("inbox.khong_co_noi_dung_xem")}</small>}
+      </div>)}</>}
+    {td.last_run && <><b className="ibx-sub">{t("inbox.luot_chay_gan_nhat")}</b>
+      <small>{td.last_run.status} · ${td.last_run.cost_usd} · {fmtTime(td.last_run.ended_at || td.last_run.started_at)}</small>
+      {td.last_run.error && <pre className="ibx-deliv-body is-error">{td.last_run.error}</pre>}</>}
+    {td.journal?.length > 0 && <><b className="ibx-sub">{t("inbox.nhat_ky_viec")}</b>
+      <ol className="ibx-journal">{td.journal.map((j: any, i: number) => <li key={i}>
+        <small>{fmtTime(j.at)} · {j.kind_vi}{j.actor ? ` · ${j.actor}` : ""}</small>
+        <div>{j.summary}</div>{j.detail && j.detail !== j.summary && <p className="ibx-pre">{j.detail}</p>}</li>)}</ol></>}
+    <Link href={`/app/work?peek=${td.id}`}>{t("inbox.mo_viec")}{td.id}</Link>
+  </section>;
+}
+
+function ItemDetail({det, err}: {det: any; err: string}) {
+  if (err) return <p className="ui-inline-error" role="alert">{err}</p>;
+  if (!det) return <SkeletonRows n={3} h={40}/>;
+  const b = det.budget;
+  return <div className="ibx-detail" data-testid={`ibx-item-detail-${det.id}`}>
+    <dl className="ibx-dl">
+      <dt>{t("inbox.loai_yeu_cau")}</dt><dd>{(det.kinds_vi || []).join(" · ")}{det.count > 1 ? ` (×${det.count})` : ""}</dd>
+      <dt>{t("inbox.gui_luc")}</dt><dd>{fmtTime(det.updated_at || det.created_at)}</dd>
+      {b && <><dt>{t("inbox.ngan_sach")}</dt><dd>{b.name}</dd>
+        <dt>{t("inbox.da_chi")}</dt><dd>{b.spent} / {b.limit} {b.currency}{b.pct != null ? ` (${b.pct}%)` : ""}</dd></>}
+    </dl>
+    {det.body && <p className="ibx-pre">{det.body}</p>}
+    {det.approval_detail && <ApprovalDetail det={det.approval_detail} err=""/>}
+    {!det.approval_detail && det.task_detail && <TaskContext td={det.task_detail}/>}
+    {b && <Link href="/app/costs?tab=budgets">{t("inbox.xem_ngan_sach")}</Link>}
+  </div>;
+}
+
 function ApprovalDetail({det, err}: {det: any; err: string}) {
   if (err) return <p className="ui-inline-error" role="alert">{err}</p>;
   if (!det) return <SkeletonRows n={2} h={40}/>;
@@ -144,17 +184,21 @@ function ApprovalDetail({det, err}: {det: any; err: string}) {
     </dl>
     {det.text && <p className="ibx-pre">{det.text}</p>}
     {!det.fields.length && !det.text && <p className="ibx-note">{t("inbox.khong_co_mo_ta_them")}</p>}
-    {td && <div className="ibx-task">
-      <b>{t("inbox.viec")}{td.id}: {td.title}</b>
-      <small>{[td.project, td.assignee, td.status].filter(Boolean).join(" · ")}</small>
-      {td.description && <p className="ibx-pre">{td.description}</p>}
-      <Link href={`/app/work?peek=${td.id}`}>{t("inbox.mo_viec")}{td.id}</Link>
-    </div>}
+    {td && <TaskContext td={td}/>}
   </div>;
 }
 
 function NoticeCard({c, onChange}: {c: Card; onChange: (msg?: string) => void}) {
   const [busy, setBusy] = useState(false), [err, setErr] = useState("");
+  const [open, setOpen] = useState(false), [det, setDet] = useState<any>(null), [detErr, setDetErr] = useState("");
+  async function openFull() {
+    if (!c.id) return;
+    setOpen(true);
+    if (!det) {
+      try { setDet(await apiInboxHub.item(c.id)); } catch (e) { setDetErr(errorText(e, t("inbox.khong_tai_duoc_chi_tiet"))); }
+    }
+  }
+  const close = () => { setOpen(false); if (det && c.status === "unread") onChange(); };
   async function mark(status: "read" | "done") {
     if (!c.id) return;
     setBusy(true); setErr("");
@@ -162,12 +206,31 @@ function NoticeCard({c, onChange}: {c: Card; onChange: (msg?: string) => void}) 
     catch (e) { setErr(errorText(e, t("inbox.khong_cap_nhat_duoc_thu"))); }
     finally { setBusy(false); }
   }
-  return <article className={"ibx-card" + (c.status === "unread" ? " is-unread" : "")} data-testid={`ibx-item-${c.id}`}>
+  const actions = c.id && <div className="ibx-actions">
+      {c.status === "unread" && !det && <button className="ibx-btn is-ghost" disabled={busy} onClick={() => mark("read")}>{t("inbox.da_doc")}</button>}
+      <button className="ibx-btn is-ghost" disabled={busy} onClick={() => mark("done")}>{t("inbox.xong")}</button>
+    </div>;
+  const onCardClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button,a,textarea,input,select")) return;
+    openFull();
+  };
+  return <>
+  {open && <Sheet label={c.title} onClose={close} testId={`ibx-item-sheet-${c.id}`}
+    head={<span className="ibx-sheet-kind">{(c.kinds_vi || []).join(" · ")}</span>}>
+    <div className="ibx-full">
+      <h2 className="ibx-full-title">{c.title}</h2>
+      <ItemDetail det={det} err={detErr}/>
+      {err && <p className="ui-inline-error" role="alert">{err}</p>}
+      {actions}
+    </div>
+  </Sheet>}
+  <article className={"ibx-card" + (c.id ? " is-clickable" : "") + (c.status === "unread" ? " is-unread" : "")} data-testid={`ibx-item-${c.id}`}
+    onClick={onCardClick}>
     <header className="ibx-top">
       <span>{(c.kinds_vi || []).join(" · ")}{c.count > 1 ? ` · ×${c.count}` : ""}</span>
       {c.priority === "urgent" || c.priority === "high" ? <span className="ibx-risk is-hot">{t("inbox.uu_tien_cao")}</span> : null}
     </header>
-    <h3 className="ibx-title">{c.title}</h3>
+    <h3 className="ibx-title">{c.id ? <button type="button" className="ibx-title-btn" onClick={openFull}>{c.title}</button> : c.title}</h3>
     {c.lines?.[0] && <p className="ibx-summary">{c.lines[0]}</p>}
     <div className="ibx-meta">
       {c.seat?.name && <span><Icon name="sparkle" size={13}/>{c.seat.name}</span>}
@@ -176,11 +239,9 @@ function NoticeCard({c, onChange}: {c: Card; onChange: (msg?: string) => void}) 
       {c.related_type === "budget_envelope" && <Link href="/app/costs?tab=budgets"><Icon name="coins" size={13}/>{t("inbox.xem_ngan_sach")}</Link>}
     </div>
     {err && <p className="ui-inline-error" role="alert">{err}</p>}
-    {c.id && <div className="ibx-actions">
-      {c.status === "unread" && <button className="ibx-btn is-ghost" disabled={busy} onClick={() => mark("read")}>{t("inbox.da_doc")}</button>}
-      <button className="ibx-btn is-ghost" disabled={busy} onClick={() => mark("done")}>{t("inbox.xong")}</button>
-    </div>}
-  </article>;
+    {actions}
+  </article>
+  </>;
 }
 
 /* Tên nhóm theo ngôn ngữ (backend trả nhãn tiếng Việt cố định; khoá nhóm là id ổn định). */

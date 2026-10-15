@@ -481,18 +481,85 @@ def approval_detail(db: Session, organization_id: int, principal: Principal, app
     pl_fields, _ = _parse(a.payload or {})
     seen = {(f["key"], f["value"]) for f in ev_fields}
     fields = ev_fields + [f for f in pl_fields if (f["key"], f["value"]) not in seen]
-    task = None
     tid = inbox.task_of_approval(a)
-    t = db.get(Task, tid) if tid else None
-    if t is not None:
-        proj = db.get(Project, t.project_id) if t.project_id else None
-        dept = db.get(Department, t.assignee_department_id) if getattr(t, "assignee_department_id", None) else None
-        task = {"id": t.id, "title": t.title, "status": t.status, "description": (t.description or "")[:3000],
-                "assignee": names.get(t.assignee_member_id) if t.assignee_member_id else None,
-                "project": proj.name if proj else None, "department": dept.name if dept else None,
-                "due_at": t.due_at.isoformat() if t.due_at else None}
+    task = task_context(db, db.get(Task, tid) if tid else None, names)
     requester = db.get(Member, a.requester_member_id) if a.requester_member_id else None
     return {**card, "kind_vi": _kind(a)[1], "policy_key": a.policy_key, "fields": fields, "text": ev_text,
             "requester_detail": {"name": requester.name, "type": requester.member_type,
                                  "title": getattr(requester, "title", "") or ""} if requester else None,
             "task_detail": task, "resolution_note": a.resolution_note or ""}
+
+
+TASK_STATUS_VI = {"todo": "Cần làm", "in_progress": "Đang làm", "review": "Chờ duyệt", "done": "Xong",
+                  "blocked": "Bị chặn", "cancelled": "Đã huỷ", "failed": "Lỗi"}
+JOURNAL_VI = {"note": "Ghi chú", "plan": "Kế hoạch", "progress": "Tiến độ", "result": "Kết quả",
+              "decision": "Quyết định", "handoff": "Bàn giao", "review": "Duyệt", "error": "Lỗi",
+              "blocker": "Vướng mắc", "question": "Câu hỏi"}
+
+
+def task_context(db: Session, t: Task | None, names: dict[int, str]) -> dict | None:
+    """Mọi thứ người duyệt cần để hiểu một việc: mô tả, sản phẩm agent nộp (nội dung thật),
+    nhật ký làm việc gần nhất và lượt chạy gần nhất (kèm lỗi đầy đủ)."""
+    if t is None:
+        return None
+    from app.models import Department, Project
+    from app.models.v10 import Artifact
+    from app.models.v37 import TaskJournalEntry
+    from app.models.work_graph import TaskRun
+    proj = db.get(Project, t.project_id) if t.project_id else None
+    dept_id = getattr(t, "assignee_department_id", None)
+    dept = db.get(Department, dept_id) if dept_id else None
+    arts = (db.query(Artifact).filter(Artifact.task_id == t.id, Artifact.status != "deleted")
+            .order_by(Artifact.id.desc()).limit(5).all())
+    journal = (db.query(TaskJournalEntry).filter(TaskJournalEntry.task_id == t.id)
+               .order_by(TaskJournalEntry.seq.desc()).limit(8).all())
+    run = db.query(TaskRun).filter(TaskRun.task_id == t.id).order_by(TaskRun.id.desc()).first()
+    return {
+        "id": t.id, "title": t.title, "status": t.status, "status_vi": TASK_STATUS_VI.get(t.status, t.status),
+        "description": (t.description or "")[:6000],
+        "assignee": names.get(t.assignee_member_id) if t.assignee_member_id else None,
+        "project": proj.name if proj else None, "department": dept.name if dept else None,
+        "due_at": t.due_at.isoformat() if t.due_at else None,
+        "deliverables": [{"id": x.id, "name": x.name, "type": x.artifact_type, "version": x.version,
+                          "mime": x.mime_type, "content": (x.content_text or "")[:8000],
+                          "truncated": len(x.content_text or "") > 8000, "uri": x.uri if x.uri.startswith("http") else "",
+                          "author": names.get(x.created_by_member_id) if x.created_by_member_id else None,
+                          "created_at": x.created_at.isoformat() if x.created_at else None} for x in arts],
+        "journal": [{"kind": j.kind, "kind_vi": JOURNAL_VI.get(j.kind, j.kind), "summary": j.summary,
+                     "detail": (j.detail or "")[:2000], "outcome": j.outcome,
+                     "actor": names.get(j.actor_member_id) if j.actor_member_id else None,
+                     "at": j.created_at.isoformat() if j.created_at else None} for j in journal],
+        "last_run": {"status": run.status, "error": (run.error_reason or "")[:3000],
+                     "cost_usd": round(run.cost_usd or 0, 4),
+                     "started_at": run.started_at.isoformat() if run.started_at else None,
+                     "ended_at": run.ended_at.isoformat() if run.ended_at else None} if run else None,
+    }
+
+
+def item_detail(db: Session, organization_id: int, principal: Principal, item_id: int) -> dict:
+    """Chi tiết một mục hộp việc (cần xem, ngân sách, thông báo, bài học): toàn bộ nội dung,
+    việc liên quan kèm sản phẩm/nhật ký, ngân sách liên quan, yêu cầu duyệt liên quan."""
+    from app.models import BudgetEnvelope
+    item = db.get(InboxItem, item_id)
+    if (item is None or item.organization_id != organization_id or principal.member_id is None
+            or item.recipient_member_id != principal.member_id):
+        raise WorkError(404, "not_found", "Không tìm thấy mục này trong hộp việc của anh")
+    names = {m.id: m.name for m in db.query(Member).filter(Member.organization_id == organization_id).all()}
+    out = {**inbox.public(item), "body": item.body or "",
+           "task_detail": task_context(db, db.get(Task, item.task_id) if item.task_id else None, names),
+           "budget": None, "approval_detail": None}
+    if item.related_type == "budget_envelope" and str(item.related_id).isdigit():
+        b = db.get(BudgetEnvelope, int(item.related_id))
+        if b is not None and b.organization_id == organization_id:
+            pct = round(100 * (b.amount_spent or 0) / b.amount_limit, 1) if b.amount_limit else None
+            out["budget"] = {"id": b.id, "name": b.name, "currency": b.currency, "limit": b.amount_limit,
+                             "spent": round(b.amount_spent or 0, 4), "reserved": round(b.amount_reserved or 0, 4),
+                             "pct": pct, "period": b.period, "state": b.threshold_state, "scope": b.scope_type}
+    if item.related_type == "approval" and str(item.related_id).isdigit():
+        try:
+            out["approval_detail"] = approval_detail(db, organization_id, principal, int(item.related_id))
+        except WorkError:
+            pass
+    if item.status == "unread":
+        item.status = "read"; db.add(item); db.commit(); out["status"] = "read"
+    return out
