@@ -62,7 +62,7 @@ giao ban, nhắc hạn. Ngày lễ CHỈ là dữ liệu để tính **hạn ph�
   `tasks.due_at` (17:00 giờ VN) đều theo ngày này → agent nộp sớm. Áp dụng luôn cho việc dời cuối tuần của D7 (trước
   đây `due_date` là ngày đã dời).
 - `legal_due_date` (mới) = ngày làm việc liền kề sau nếu hạn rơi vào thứ Bảy/CN/lễ/Tết — trường phụ "hạn pháp lý" kèm lý do.
-  Căn cứ: khoản 14 Điều 3 **Nghị định 252/2026/NĐ-CP** (hướng dẫn Luật Quản lý thuế 108/2025/QH15, từ 1/7/2026): "Trường
+  Căn cứ: Điều 3 (giải thích từ ngữ) **Nghị định 252/2026/NĐ-CP** (hướng dẫn Luật Quản lý thuế 108/2025/QH15, từ 1/7/2026): "Trường
   hợp ngày cuối cùng của thời hạn … trùng với ngày nghỉ theo quy định thì ngày cuối cùng của thời hạn được tính là ngày
   làm việc liền kề sau ngày nghỉ đó"; trước 1/7/2026: Điều 86 Thông tư 80/2021/TT-BTC + khoản 5 Điều 148 BLDS 2015.
 - Migration chuyển dữ liệu D7: `legal_due_date` ← `due_date` cũ (đã dời), `due_date` ← `statutory_date`.

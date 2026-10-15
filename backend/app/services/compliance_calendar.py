@@ -40,7 +40,7 @@ QLT = ("Điều 44 Luật Quản lý thuế 38/2019/QH14 (tới 30/6/2026); từ
        "Điều 10 Nghị định 252/2026/NĐ-CP")
 WEEKEND_NOTE = ("Agent làm cả ngày nghỉ: việc tuân thủ nhắc và đặt hạn theo đúng ngày luật ghi (hạn theo lịch). Nếu ngày đó "
                 "rơi vào cuối tuần/lễ/Tết thì luật cho nộp tới ngày làm việc liền kề sau — hiển thị là \"hạn pháp lý\" "
-                "(khoản 14 Điều 3 NĐ 252/2026/NĐ-CP; trước 1/7/2026: Điều 86 TT 80/2021/TT-BTC).")
+                "(Điều 3 NĐ 252/2026/NĐ-CP; trước 1/7/2026: Điều 86 TT 80/2021/TT-BTC).")
 
 DEFAULT_RULES = [
     dict(key="vat_monthly", name="Tờ khai thuế GTGT tháng", category="tax", entity_types=COMPANY_TYPES,

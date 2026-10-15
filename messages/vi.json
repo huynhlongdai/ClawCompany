@@ -2585,7 +2585,7 @@
   "dow_4": "thứ Sáu",
   "dow_5": "thứ Bảy",
   "dow_6": "Chủ nhật",
-  "cmp_disclaimer": "Lịch tham khảo do hệ thống tính từ căn cứ pháp lý ghi ở từng mục — không phải tư vấn pháp lý. Đối chiếu với kế toán hoặc cơ quan thuế trước khi nộp; ngày lễ chưa được tính.",
+  "cmp_disclaimer": "Lịch tham khảo do hệ thống tính từ căn cứ pháp lý ghi ở từng mục — không phải tư vấn pháp lý. Đối chiếu với kế toán hoặc cơ quan thuế trước khi nộp. Việc được giao theo hạn theo lịch (agent làm cả ngày nghỉ); hạn pháp lý có tính ngày lễ trong lịch nghỉ bên dưới.",
   "cmp_settings": "Cách công ty kê khai",
   "cmp_entity": "Loại hình",
   "cmp_no_entity": "chưa khai",

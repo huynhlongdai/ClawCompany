@@ -1,5 +1,5 @@
 """M2d.3 — ngày lễ chỉ để tính hạn pháp lý: agent làm mọi ngày nên việc tuân thủ nhắc + đặt hạn theo ngày luật
-ghi (không dời cuối tuần/lễ); hạn pháp lý (ngày làm việc liền kề sau, khoản 14 Điều 3 NĐ 252/2026) là trường
+ghi (không dời cuối tuần/lễ); hạn pháp lý (ngày làm việc liền kề sau, Điều 3 NĐ 252/2026) là trường
 phụ; lịch nghỉ là dữ liệu sửa được theo năm, gieo 2026/2027, ngày chưa công bố gắn "cần xác nhận"."""
 from datetime import date, datetime
 

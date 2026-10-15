@@ -2,7 +2,7 @@
 
 Agent làm việc mọi ngày: giao việc, giao ban, nhắc hạn và hạn nội bộ của việc tuân thủ KHÔNG đọc module này.
 Luật chỉ cho phép: hạn nộp hồ sơ khai thuế / nộp thuế rơi vào ngày nghỉ (cuối tuần, lễ, Tết) thì ngày cuối của
-thời hạn là ngày làm việc liền kề sau ngày nghỉ đó — khoản 14 Điều 3 Nghị định 252/2026/NĐ-CP (hướng dẫn Luật
+thời hạn là ngày làm việc liền kề sau ngày nghỉ đó — Điều 3 (giải thích từ ngữ — ngày hết thời hạn) Nghị định 252/2026/NĐ-CP (hướng dẫn Luật
 Quản lý thuế 108/2025/QH15, từ 1/7/2026); trước đó Điều 86 Thông tư 80/2021/TT-BTC + khoản 5 Điều 148 BLDS 2015.
 Lịch tuân thủ hiển thị ngày đó là "hạn pháp lý", phụ.
 
@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.models.company_ops import PublicHoliday
 
-LEGAL_RULE = ("Hạn rơi vào ngày nghỉ (thứ Bảy, Chủ nhật, lễ, Tết) → hạn pháp lý là ngày làm việc liền kề sau: khoản 14 "
+LEGAL_RULE = ("Hạn rơi vào ngày nghỉ (thứ Bảy, Chủ nhật, lễ, Tết) → hạn pháp lý là ngày làm việc liền kề sau: "
               "Điều 3 Nghị định 252/2026/NĐ-CP (trước 1/7/2026: Điều 86 Thông tư 80/2021/TT-BTC, khoản 5 Điều 148 BLDS "
               "2015). Agent vẫn làm theo hạn theo lịch — hạn pháp lý chỉ để đối chiếu.")
 LEGAL_RULE_URL = "https://luatvietnam.vn/thue/nghi-dinh-252-2026-nd-cp-huong-dan-thi-hanh-luat-quan-ly-thue-chi-tiet-va-hieu-qua-439382-d1.html"

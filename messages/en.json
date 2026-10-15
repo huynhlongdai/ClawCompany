@@ -2585,7 +2585,7 @@
   "dow_4": "Friday",
   "dow_5": "Saturday",
   "dow_6": "Sunday",
-  "cmp_disclaimer": "A reference calendar computed from the legal basis listed on each item — not legal advice. Check with your accountant or the tax office before filing; public holidays are not accounted for.",
+  "cmp_disclaimer": "A reference calendar computed from the legal basis listed on each item — not legal advice. Check with your accountant or the tax office before filing. Work is scheduled to the calendar deadline (agents work on days off too); the legal deadline accounts for the holidays listed below.",
   "cmp_settings": "How the company files",
   "cmp_entity": "Entity type",
   "cmp_no_entity": "not set",
