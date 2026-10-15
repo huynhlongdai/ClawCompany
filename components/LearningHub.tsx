@@ -9,7 +9,7 @@ import {ErrorBanner} from "./ui/EmptyState";
 import {Field} from "./ui/Field";
 import {Any, LabBody, Panel, Pill, Table, useAction, useLoad} from "./lab/kit";
 
-type Sub = "library" | "gaps" | "courses" | "skills";
+type Sub = "library" | "gaps" | "courses" | "skills" | "evals";
 
 function tokenRole(): string {
   try {
@@ -27,12 +27,13 @@ export function LearningHub() {
   const opt = useLoad(async () => await apiSharedMemory.options(), null as Any);
   return <div className="lab" data-testid="learning-hub">
     <div className="ui-seg" role="tablist" style={{marginBottom: 12}}>
-      {(["library", "courses", "skills", "gaps"] as Sub[]).map(s => <button key={s} role="tab" aria-selected={sub === s} aria-pressed={sub === s}
+      {(["library", "courses", "skills", "evals", "gaps"] as Sub[]).map(s => <button key={s} role="tab" aria-selected={sub === s} aria-pressed={sub === s}
         onClick={() => setSub(s)} data-testid={`learning-tab-${s}`}>{tr(`learning.tab_${s}` as any)}</button>)}
     </div>
     {sub === "library" && <Library canEdit={canEdit} o={opt.data}/>}
     {sub === "courses" && <Courses canEdit={canEdit} o={opt.data}/>}
     {sub === "skills" && <Skills canEdit={canEdit} o={opt.data}/>}
+    {sub === "evals" && <Evals canEdit={canEdit}/>}
     {sub === "gaps" && <Gaps canEdit={canEdit}/>}
   </div>;
 }
@@ -312,4 +313,41 @@ function SkillDetail({id, canEdit, o, onClose}: {id: number; canEdit: boolean; o
       <div className="ui-toolbar"><Button onClick={onClose}>{tr("learning.dong")}</Button></div>
     </div>}
   </Panel>;
+}
+
+
+/* M6 việc 11: bộ đánh giá theo vai — mỗi ca chạy k lần, agent phải đúng cả k lần. */
+function Evals({canEdit}: {canEdit: boolean}) {
+  const q = useLoad(async () => (await apiLearning.suites()).items as Any[], []);
+  const act = useAction();
+  const [f, setF] = useState<Any>({id: null, title: "", role_keyword: "", k: 3, cases: ""});
+  const save = () => act.run("save", async () => {
+    const body = {title: f.title, role_keyword: f.role_keyword, k: Number(f.k), cases: parseCases(f.cases)};
+    if (f.id) await apiLearning.suiteUpdate(f.id, body); else await apiLearning.suiteCreate(body);
+    setF({id: null, title: "", role_keyword: "", k: 3, cases: ""}); await q.reload();
+  }, tr("learning.ev_da_luu"));
+  return <LabBody q={q}>
+    {act.error ? <ErrorBanner error={act.error} context={tr("learning.tab_evals")} onClose={() => act.setError(null)}/> : null}
+    <Panel title={tr("learning.ev_bo")} desc={tr("learning.ev_bo_desc")}>
+      <Table rows={q.data} empty={tr("learning.ev_trong")} testId="suite-list" cols={[
+        {label: tr("learning.ev_ten"), render: s => <b>{s.title}</b>},
+        {label: tr("learning.ev_vai"), render: s => s.role_keyword || tr("learning.ev_moi_vai")},
+        {label: tr("learning.ev_so_ca"), render: s => `${s.cases.length} × ${s.k}`},
+        ...(canEdit ? [{label: "", render: (s: Any) => <Button size="sm" onClick={() => setF({id: s.id, title: s.title, role_keyword: s.role_keyword, k: s.k, cases: casesText(s.cases)})}>{tr("learning.ev_sua")}</Button>}] : []),
+      ]}/>
+      <small className="tmGuide">{tr("learning.ev_chay_o_dau")}</small>
+    </Panel>
+    {canEdit && <Panel title={f.id ? tr("learning.ev_sua_bo") : tr("learning.ev_tao")} desc={tr("learning.ev_tao_desc")}>
+      <div className="ui-form" data-testid="suite-form">
+        <div className="ui-form-row">
+          <Field label={tr("learning.ev_ten")}><input className="ui-input" value={f.title} onChange={e => setF({...f, title: e.target.value})}/></Field>
+          <Field label={tr("learning.ev_vai")} hint={tr("learning.ev_vai_hint")}><input className="ui-input" value={f.role_keyword} onChange={e => setF({...f, role_keyword: e.target.value})}/></Field>
+          <Field label={tr("learning.ev_k")} hint={tr("learning.ev_k_hint")}><input className="ui-input" type="number" min={1} max={5} value={f.k} onChange={e => setF({...f, k: e.target.value})}/></Field>
+        </div>
+        <Field label={tr("learning.sk_ca_kiem")} hint={tr("learning.sk_ca_kiem_hint")}><textarea className="ui-textarea" rows={5} value={f.cases} onChange={e => setF({...f, cases: e.target.value})}/></Field>
+        <div className="ui-toolbar"><Button variant="primary" busy={act.busy === "save"} disabled={f.title.trim().length < 3 || !f.cases.trim()} onClick={save}>{tr("learning.ev_luu")}</Button>
+          {f.id && <Button onClick={() => setF({id: null, title: "", role_keyword: "", k: 3, cases: ""})}>{tr("learning.dong")}</Button>}</div>
+      </div>
+    </Panel>}
+  </LabBody>;
 }

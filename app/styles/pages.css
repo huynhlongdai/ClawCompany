@@ -590,3 +590,4 @@ a.org-node:hover{border-color:var(--text-muted);box-shadow:var(--shadow-2)}
 .ibx-journal{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:var(--fs-13)}
 .ibx-journal small{color:var(--text-muted)}
 .ibx-lesson-edit{display:flex;flex-direction:column;gap:4px}.ibx-lesson-edit textarea{width:100%;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;font:inherit}
+.ui-grid.is-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}@media (max-width:720px){.ui-grid.is-4{grid-template-columns:repeat(2,minmax(0,1fr))}}

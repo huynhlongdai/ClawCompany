@@ -660,7 +660,7 @@ export const apiTask = {
   /* D2.1 — hàng đợi đánh thức của việc này: lý do, trạng thái, vì sao bị bỏ qua. */
   wakeups: (taskId: number) => request<any>(`/tasks/wakeups?task_id=${taskId}`),
   policy: (taskId: number) => request<any>(`/tasks/${taskId}/execution-policy`),
-  setPolicy: (taskId: number, stages: {type: string; participants: number[]}[]) =>
+  setPolicy: (taskId: number, stages: {type: string; participants: number[]; mode?: string}[]) =>
     request<any>(`/tasks/${taskId}/execution-policy`, {method: "PUT", body: JSON.stringify({stages})}),
   review: (taskId: number, decision: "approve" | "revise", note: string) =>
     request<any>(`/tasks/${taskId}/review`, {method: "POST", body: JSON.stringify({decision, note})}),
@@ -799,6 +799,14 @@ export const apiLearning = {
   retake: (enrollmentId: number, from_start = false) =>
     request<any>(`/learning/enrollments/${enrollmentId}/retake`, {method: "POST", body: JSON.stringify({from_start})}),
   agent: (agentId: number) => request<any>(`/learning/agents/${agentId}`),
+  suites: () => request<any>(`/learning/eval-suites`),
+  suiteCreate: (body: any) => request<any>(`/learning/eval-suites`, {method: "POST", body: JSON.stringify(body)}),
+  suiteUpdate: (id: number, body: any) => request<any>(`/learning/eval-suites/${id}`, {method: "PUT", body: JSON.stringify(body)}),
+  career: (agentId: number, days = 30) => request<any>(`/learning/career/${agentId}?days=${days}`),
+  careerEval: (agentId: number, suite_id: number) => request<any>(`/learning/career/${agentId}/eval`, {method: "POST", body: JSON.stringify({suite_id})}),
+  careerLevel: (agentId: number, level: string, reason: string) =>
+    request<any>(`/learning/career/${agentId}/level`, {method: "POST", body: JSON.stringify({level, reason})}),
+  evalRun: (id: number) => request<any>(`/learning/eval-runs/${id}`),
   skills: () => request<any>(`/learning/skills`),
   skill: (id: number) => request<any>(`/learning/skills/${id}`),
   skillGovernance: () => request<any>(`/learning/skills/governance`),

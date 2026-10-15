@@ -104,3 +104,29 @@ class CompanySkillInstall(Base):
     status: Mapped[str] = mapped_column(String(16), default="installed")   # installed | failed
     error: Mapped[str] = mapped_column(Text, default="")
     installed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class EvalSuite(Base):
+    """M6 việc 11 — bộ bài đánh giá theo vai (chạy k lần mỗi ca: 'k lần đều đúng')."""
+    __tablename__ = "eval_suites"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    title: Mapped[str] = mapped_column(String(220))
+    role_keyword: Mapped[str] = mapped_column(String(120), default="")      # áp cho seat có chức danh chứa chữ này
+    department_id: Mapped[int | None] = mapped_column(ForeignKey("departments.id"), nullable=True)
+    cases: Mapped[list] = mapped_column(JSON, default=list)
+    k: Mapped[int] = mapped_column(Integer, default=3)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class EvalRun(Base):
+    __tablename__ = "eval_runs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    suite_id: Mapped[int] = mapped_column(ForeignKey("eval_suites.id"), index=True)
+    agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id"), index=True)
+    profile_version: Mapped[int | None] = mapped_column(Integer, nullable=True)   # AgentVersion lúc chạy
+    k: Mapped[int] = mapped_column(Integer, default=3)
+    pass_at_1: Mapped[float] = mapped_column(Float, default=0.0)
+    pass_k: Mapped[float] = mapped_column(Float, default=0.0)
+    results: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

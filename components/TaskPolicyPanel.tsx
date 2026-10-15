@@ -4,7 +4,7 @@ import {apiTask, errorText} from "../lib/api";
 import {t, lazy} from "../lib/i18n";
 import {ErrorBanner} from "./ui/EmptyState";
 
-type Stage = {type: string; participants: number[]};
+type Stage = {type: string; participants: number[]; mode?: string};
 type Member = {id?: number; name?: string; member_type?: string; [k: string]: any};
 
 const STATE_VI: Record<string, string> = lazy(() => ({
@@ -96,6 +96,11 @@ export function TaskPolicyPanel({taskId, members, onChange, refreshKey = 0}:
           <option value="">{t("taskPolicy.chon_nguoi")}</option>
           {members.map(m => <option key={m.id} value={m.id}>{m.name}{m.member_type === "agent" ? " (agent)" : ""}</option>)}
         </select>
+        {s.type === "review" && <label style={{fontSize: 12.5, display: "flex", gap: 4, alignItems: "center"}}
+          title={t("taskPolicy.ngu_canh_sach_giai_thich")}>
+          <input type="checkbox" data-testid="policy-clean" checked={s.mode === "clean"}
+            onChange={e => setDraft(draft.map((x, j) => j === i ? {...x, mode: e.target.checked ? "clean" : undefined} : x))}/>
+          {t("taskPolicy.ngu_canh_sach")}</label>}
         <button onClick={() => setDraft(draft.filter((_, j) => j !== i))}>{t("taskPolicy.bo")}</button>
       </div>)}
       <div style={{display: "flex", gap: 8}}>

@@ -31,6 +31,7 @@ from app.core.config import settings
 from app.models import Approval, Member, Task, TaskRun
 
 STAGE_TYPES = ("review", "approval")
+REVIEW_MODES = ("room", "clean")
 DECISIONS = ("approve", "revise")
 REPORT_KINDS = ("note", "result", "decision", "blocker")
 _DECISION_RE = re.compile(r"QUYẾT ĐỊNH:\s*(DUYỆT|SỬA)", re.IGNORECASE)
@@ -60,7 +61,15 @@ def normalize(policy: dict | None) -> dict | None:
         parts = st.get("participants") or []
         if not isinstance(parts, list) or not parts or not all(isinstance(p, int) for p in parts):
             raise PolicyError(422, "invalid_policy", f"chặng {i + 1}: cần ít nhất một participant (member id)")
-        out.append({"type": st["type"], "participants": list(dict.fromkeys(parts))})
+        row = {"type": st["type"], "participants": list(dict.fromkeys(parts))}
+        mode = st.get("mode") or "room"
+        if mode not in REVIEW_MODES:
+            raise PolicyError(422, "invalid_policy", f"chặng {i + 1}: mode phải là room hoặc clean")
+        if mode == "clean":
+            # M6 việc 12: reviewer ngữ cảnh sạch — agent duyệt chỉ thấy đề bài + sản phẩm nộp,
+            # không đọc trao đổi của người làm (tránh bị thuyết phục theo).
+            row["mode"] = "clean"
+        out.append(row)
     return {"stages": out}
 
 
@@ -287,9 +296,68 @@ def flag_missing_report(db: Session, task: Task, run: TaskRun | None) -> None:
 # ------------------------------------------------------------- agent review
 
 
+CLEAN_REVIEW_PROMPT = """Bạn là người duyệt độc lập cho việc #{id}. Bạn KHÔNG thấy trao đổi của người làm — chỉ đề bài
+và sản phẩm nộp dưới đây. Đối chiếu từng tiêu chí nghiệm thu; không suy diễn thêm điều không có trong sản phẩm.
+Kết thúc bằng đúng một dòng: "QUYẾT ĐỊNH: DUYỆT" hoặc "QUYẾT ĐỊNH: SỬA", rồi liệt kê ngắn những gì cần sửa (nếu có).
+
+# Đề bài: {title}
+{description}
+
+# Tiêu chí nghiệm thu
+{criteria}
+
+# Sản phẩm nộp
+{deliverables}
+
+# Báo cáo kết quả của người làm (chỉ phần kết quả)
+{results}"""
+
+
+async def run_clean_review(db: Session, task: Task, reviewer: Member, runtime, *, timeout: int = 180) -> dict:
+    """Reviewer ngữ cảnh sạch: một phiên mới chỉ có đề bài + sản phẩm; đọc ``QUYẾT ĐỊNH:``."""
+    import time as _time
+    from app.models import Agent, TaskJournalEntry
+    from app.models.v10 import Artifact
+    st = task.execution_state or {}
+    ag = db.query(Agent).filter(Agent.member_id == reviewer.id).first()
+    if ag is None or not getattr(runtime, "chat_stream", None):
+        raise PolicyError(409, "no_runtime", "Reviewer không phải agent trên gateway")
+    arts = (db.query(Artifact).filter(Artifact.task_id == task.id, Artifact.status != "deleted")
+            .order_by(Artifact.id.desc()).limit(5).all())
+    deliver = "\n\n".join(f"## {a.name} (v{a.version})\n{(a.content_text or '')[:8000]}" for a in arts) or "(không có sản phẩm nộp)"
+    results = (db.query(TaskJournalEntry).filter(TaskJournalEntry.task_id == task.id, TaskJournalEntry.kind == "result")
+               .order_by(TaskJournalEntry.seq.desc()).limit(3).all())
+    res_text = "\n".join(f"- {j.summary}" + (f": {(j.detail or '')[:1500]}" if j.detail else "") for j in reversed(results)) or "(không có)"
+    prompt = CLEAN_REVIEW_PROMPT.format(id=task.id, title=task.title, description=(task.description or "")[:6000],
+                                        criteria=task.acceptance_criteria or "(chưa ghi — dựa vào đề bài)",
+                                        deliverables=deliver, results=res_text)
+    key = f"agent:{ag.runtime_agent_id}:clean-review-t{task.id}-r{st.get('round')}-s{st.get('stage_index')}-{int(_time.time())}"
+    text = ""
+    async for ev in runtime.chat_stream(ag.runtime_agent_id, prompt, session_key=key, timeout_seconds=timeout):
+        if ev["kind"] == "delta":
+            text = ev["text"]
+        elif ev["kind"] == "final":
+            text = ev.get("text") or text
+            break
+        elif ev["kind"] != "tool":
+            break
+    decision = parse_decision(text)
+    if decision is None:
+        st2 = dict(task.execution_state or {})
+        st2["review_inconclusive"] = key
+        _save(db, task, st2)
+        _emit(db, task, "task.review.inconclusive", {"mode": "clean", "session_key": key})
+        return {"decision": None, "mode": "clean", "session_key": key}
+    res = decide(db, task, member_id=reviewer.id, decision=decision, note=text[:2000], via="clean_review")
+    return {"decision": decision, "mode": "clean", "session_key": key, "state": res.get("status")}
+
+
 async def run_agent_review(db: Session, task: Task, reviewer: Member, runtime) -> dict:
-    """Phòng 2 người, reviewer làm chủ toạ, tối đa 4 lượt; đọc ``QUYẾT ĐỊNH:``."""
+    """Phòng 2 người, reviewer làm chủ toạ, tối đa 4 lượt; đọc ``QUYẾT ĐỊNH:``.
+    Chặng ``mode: clean`` → reviewer ngữ cảnh sạch (một phiên, không có người làm)."""
     from app.services import collaboration_rooms as rooms, room_conductor
+    if (current_stage(task) or {}).get("mode") == "clean":
+        return await run_clean_review(db, task, reviewer, runtime)
     st = task.execution_state or {}
     org = _org(db, task)
     key = f"review-t{task.id}-r{st.get('round')}-s{st.get('stage_index')}"

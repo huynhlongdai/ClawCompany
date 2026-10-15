@@ -489,6 +489,78 @@ def _lesson_propose(ctx: ToolContext, args: dict) -> dict:
     return {**r, "message": "Đã gửi bài học vào Hộp việc của người quản lý để duyệt"}
 
 
+def _run_async(coro):
+    """Tool MCP là hàm đồng bộ chạy trong vòng lặp của request: chạy coroutine ở một luồng riêng
+    (mỗi lời gọi gateway tự mở WebSocket của nó nên không dính vòng lặp chính)."""
+    import asyncio
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+        return ex.submit(asyncio.run, coro).result(timeout=200)
+
+
+ADVISOR_PROMPT = """Bạn đang ở vai CỐ VẤN CẤP CAO (chạy model mạnh hơn bình thường) cho chính đồng nghiệp {name}.
+Câu hỏi: {question}
+
+Bối cảnh: {context}
+
+Trả lời ngắn gọn bằng tiếng Việt: khuyến nghị cụ thể, lý do chính, rủi ro cần tránh. Không thực hiện hành động nào."""
+
+
+@tool("company_ask_advisor", "collab",
+      "Hỏi cố vấn (cùng vai của bạn nhưng chạy model mạnh nhất) khi gặp quyết định khó, mơ hồ hoặc rủi ro: "
+      "chính sách, khiếu nại nặng, số tiền lớn. Tốn chi phí hơn — chỉ dùng khi thật cần. Cố vấn chỉ khuyên, không làm thay.",
+      "company.messages:write", {"question": {"type": "string"}, "context": {"type": "string"}}, ("question",))
+def _ask_advisor(ctx: ToolContext, args: dict) -> dict:
+    import time as _time
+    from app.runtime.factory import get_runtime
+    from app.services import model_routing, seat_limits
+    if ctx.agent is None or not (ctx.agent.runtime_agent_id or "").strip():
+        raise ToolError("not_agent", "Chỉ seat AI trên gateway mới hỏi cố vấn được")
+    blocked = seat_limits.check(ctx.db, ctx.member)
+    if blocked:
+        raise ToolError("budget", blocked)
+    rt = get_runtime()
+    if not getattr(rt, "chat_stream", None) or not callable(getattr(rt, "rpc", None)):
+        raise ToolError("no_runtime", "Gateway không hỗ trợ")
+    rid = ctx.agent.runtime_agent_id
+    tier = model_routing.TIERS["T4"]
+    key = f"agent:{rid}:advisor-{int(_time.time() * 1000)}"
+    prompt = ADVISOR_PROMPT.format(name=ctx.member.name, question=_str(args, "question", limit=2000),
+                                   context=_str(args, "context", required=False, limit=6000) or "(không có)")
+
+    async def go() -> tuple[str, str]:
+        err = ""
+        try:
+            await rt.rpc("sessions.create", {"key": key, "agentId": rid, "label": "advisor"})
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            await rt.rpc("sessions.patch", {"key": key, "model": tier.ref, "thinkingLevel": "medium"})
+        except Exception as exc:  # noqa: BLE001
+            err = f"không đổi được model cố vấn: {exc}"[:200]
+        text = ""
+        async for ev in rt.chat_stream(rid, prompt, session_key=key, timeout_seconds=150):
+            if ev["kind"] == "delta":
+                text = ev["text"]
+            elif ev["kind"] == "final":
+                return ev.get("text") or text, err
+            elif ev["kind"] != "tool":
+                return text, err or str(ev.get("message") or "lỗi")
+        return text, err
+
+    try:
+        answer, err = _run_async(go())
+    except Exception as exc:  # noqa: BLE001
+        raise ToolError("gateway_error", f"Cố vấn không trả lời được: {exc}"[:300]) from exc
+    emit_event(ctx.db, organization_id=ctx.org, event_type="agent.advisor.consulted", source=SOURCE,
+               company_id=ctx.member.company_id, aggregate_type="member", aggregate_id=str(ctx.member.id),
+               actor_member_id=ctx.member.id, payload={"tier": "T4", "model": tier.ref, "session_key": key,
+                                                       "task_run_id": ctx.run.id if ctx.run else None, "warning": err})
+    if not answer:
+        raise ToolError("no_answer", err or "Cố vấn không trả lời")
+    return {"advice": answer[:6000], "model": tier.ref, **({"warning": err} if err else {})}
+
+
 # Đọc tài liệu dài theo từng lát thay vì cắt cụt ở 20.000 ký tự. Bản cũ trả
 # 20k ký tự đầu (~5–7k token) cho MỌI lần đọc, và phần sau mốc đó thì agent
 # không bao giờ thấy. Học từ FastClaw: kết quả tool phải nhỏ để lượt sau của

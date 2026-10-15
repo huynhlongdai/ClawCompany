@@ -867,7 +867,9 @@
   "luu": "Lưu",
   "huy": "Huỷ",
   "sua_chang": "Sửa chặng",
-  "them_chang_duyet": "Thêm chặng duyệt"
+  "them_chang_duyet": "Thêm chặng duyệt",
+  "ngu_canh_sach": "Duyệt độc lập",
+  "ngu_canh_sach_giai_thich": "Agent duyệt chỉ thấy đề bài và sản phẩm nộp, không đọc trao đổi của người làm"
  },
  "goals": {
   "moi_tao": "Mới tạo",
@@ -1375,7 +1377,29 @@
   "bai_hoc_da_ghi": "Đã ghi vào ký ức",
   "bai_hoc_duyet_chua_ghi": "Đã duyệt, chưa ghi được",
   "bai_hoc_cho_duyet": "Chờ duyệt",
-  "bai_hoc_tu_choi": "Bị từ chối"
+  "bai_hoc_tu_choi": "Bị từ chối",
+  "su_nghiep": "Sự nghiệp",
+  "su_nghiep_mo_ta": "Số liệu thật {p0} ngày gần nhất",
+  "viec_xong": "Việc xong",
+  "qua_review_lan_dau": "Qua review lần đầu",
+  "vong_sua": "Vòng sửa",
+  "luot_loi": "Lượt chạy lỗi",
+  "chi_phi_moi_viec": "Chi phí / việc xong",
+  "bi_chan_quyen": "Bị chặn quyền",
+  "lo_hong_kien_thuc": "Lỗ hổng kiến thức",
+  "danh_gia_k_lan": "Đúng cả k lần",
+  "goi_y_thang": "Gợi ý: thăng lên {p0}.",
+  "goi_y_ha": "Gợi ý: hạ xuống {p0}.",
+  "goi_y_giu": "Gợi ý: giữ cấp hiện tại.",
+  "chuyen_sang": "Chuyển sang {p0}",
+  "chon_bo_danh_gia": "— Bộ đánh giá —",
+  "chua_co_bo_danh_gia": "Chưa có bộ đánh giá cho vai này",
+  "chay_danh_gia": "Chạy đánh giá",
+  "dang_chay": "Đang chạy…",
+  "lan_danh_gia": "Các lần đánh giá",
+  "ly_do_doi_cap": "Lý do đổi cấp (lưu vào lịch sử phiên bản):",
+  "da_doi_cap": "Đã đổi cấp tự chủ",
+  "ket_qua_danh_gia": "Đúng cả {p1} lần: {p0} số ca · từng lần: {p2}"
  },
  "seat": {
   "ho_so": "Hồ sơ",
@@ -2155,6 +2179,24 @@
   "sk_loi": "Lỗi",
   "sk_cai_cho": "Cài bản hiện hành cho",
   "sk_cai": "Cài v{p0}",
-  "sk_da_cai_xong": "Đã cài"
+  "sk_da_cai_xong": "Đã cài",
+  "tab_evals": "Đánh giá",
+  "ev_bo": "Bộ đánh giá theo vai",
+  "ev_bo_desc": "Agent gặp khách phải đúng cả k lần, không phải đúng một lần (75%/lần → 3/3 lần chỉ ~42%).",
+  "ev_trong": "Chưa có bộ đánh giá nào.",
+  "ev_ten": "Tên bộ",
+  "ev_vai": "Áp cho chức danh chứa",
+  "ev_moi_vai": "Mọi vai",
+  "ev_so_ca": "Ca × lần",
+  "ev_sua": "Sửa",
+  "ev_chay_o_dau": "Chạy đánh giá ở hồ sơ từng agent (thẻ Sự nghiệp); kết quả gắn với phiên bản hồ sơ lúc chạy.",
+  "ev_sua_bo": "Sửa bộ đánh giá",
+  "ev_tao": "Tạo bộ đánh giá",
+  "ev_tao_desc": "Lấy ca từ lỗi thật: câu khách hỏi bị trả lời sai, góp ý của người duyệt, lỗ hổng kiến thức.",
+  "ev_vai_hint": "ví dụ: chăm sóc (để trống = mọi vai)",
+  "ev_k": "Số lần mỗi ca (k)",
+  "ev_k_hint": "1–5; agent gặp khách nên để 3",
+  "ev_luu": "Lưu bộ đánh giá",
+  "ev_da_luu": "Đã lưu bộ đánh giá"
  }
 }

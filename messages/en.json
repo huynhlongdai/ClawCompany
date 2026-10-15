@@ -867,7 +867,9 @@
   "luu": "Save",
   "huy": "Cancel",
   "sua_chang": "Edit stages",
-  "them_chang_duyet": "Add approval stage"
+  "them_chang_duyet": "Add approval stage",
+  "ngu_canh_sach": "Independent review",
+  "ngu_canh_sach_giai_thich": "The reviewing agent sees only the brief and deliverables, not the doer's conversation"
  },
  "goals": {
   "moi_tao": "New",
@@ -1375,7 +1377,29 @@
   "bai_hoc_da_ghi": "Saved to memory",
   "bai_hoc_duyet_chua_ghi": "Approved, not saved",
   "bai_hoc_cho_duyet": "Awaiting approval",
-  "bai_hoc_tu_choi": "Rejected"
+  "bai_hoc_tu_choi": "Rejected",
+  "su_nghiep": "Career",
+  "su_nghiep_mo_ta": "Real data, last {p0} days",
+  "viec_xong": "Tasks done",
+  "qua_review_lan_dau": "First-pass review",
+  "vong_sua": "Revisions",
+  "luot_loi": "Failed runs",
+  "chi_phi_moi_viec": "Cost per done task",
+  "bi_chan_quyen": "Policy denials",
+  "lo_hong_kien_thuc": "Knowledge gaps",
+  "danh_gia_k_lan": "Pass^k",
+  "goi_y_thang": "Suggestion: promote to {p0}.",
+  "goi_y_ha": "Suggestion: demote to {p0}.",
+  "goi_y_giu": "Suggestion: keep the current level.",
+  "chuyen_sang": "Move to {p0}",
+  "chon_bo_danh_gia": "— Eval suite —",
+  "chua_co_bo_danh_gia": "No eval suite for this role",
+  "chay_danh_gia": "Run eval",
+  "dang_chay": "Running…",
+  "lan_danh_gia": "Eval runs",
+  "ly_do_doi_cap": "Reason for the change (saved in version history):",
+  "da_doi_cap": "Autonomy level changed",
+  "ket_qua_danh_gia": "All {p1} tries correct: {p0} of cases · per try: {p2}"
  },
  "seat": {
   "ho_so": "Profile",
@@ -2155,6 +2179,24 @@
   "sk_loi": "Failed",
   "sk_cai_cho": "Install the current version on",
   "sk_cai": "Install v{p0}",
-  "sk_da_cai_xong": "Installed"
+  "sk_da_cai_xong": "Installed",
+  "tab_evals": "Evals",
+  "ev_bo": "Role eval suites",
+  "ev_bo_desc": "Customer-facing agents must be right on all k tries, not once (75% per try → 3/3 only ~42%).",
+  "ev_trong": "No eval suites yet.",
+  "ev_ten": "Suite name",
+  "ev_vai": "Applies to titles containing",
+  "ev_moi_vai": "All roles",
+  "ev_so_ca": "Cases × tries",
+  "ev_sua": "Edit",
+  "ev_chay_o_dau": "Run evals from each agent's profile (Career card); results are tied to the profile version at run time.",
+  "ev_sua_bo": "Edit suite",
+  "ev_tao": "Create suite",
+  "ev_tao_desc": "Build cases from real failures: wrong answers, reviewer feedback, knowledge gaps.",
+  "ev_vai_hint": "e.g. support (blank = all roles)",
+  "ev_k": "Tries per case (k)",
+  "ev_k_hint": "1–5; use 3 for customer-facing agents",
+  "ev_luu": "Save suite",
+  "ev_da_luu": "Suite saved"
  }
 }

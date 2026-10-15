@@ -282,3 +282,74 @@ async def skill_rollback(skill_id: int, payload: RollbackIn, principal: Principa
                          db: Session = Depends(get_db)):
     """Quay về một phiên bản đã duyệt trước đó và cài lại cho mọi agent đang có kỹ năng này."""
     return await skill_studio.rollback(db, active_org(principal), get_runtime(), skill_id, version_id=payload.version_id)
+
+
+# ------------------------------------------------------------------ M6 việc 11: đánh giá theo vai, scorecard, cấp tự chủ
+
+from app.services import career  # noqa: E402
+
+
+class SuiteIn(BaseModel):
+    title: str | None = Field(default=None, max_length=220)
+    role_keyword: str | None = Field(default=None, max_length=120)
+    department_id: int | None = None
+    cases: list[dict] | None = None
+    k: int | None = None
+
+
+@router.get("/eval-suites")
+def eval_suites(principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    return {"items": career.suites_for(db, active_org(principal))}
+
+
+@router.post("/eval-suites")
+def eval_suite_create(payload: SuiteIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    return career.save_suite(db, active_org(principal), payload.model_dump(exclude_unset=True))
+
+
+@router.put("/eval-suites/{suite_id}")
+def eval_suite_update(suite_id: int, payload: SuiteIn, principal: Principal = Depends(require_role("manager")),
+                      db: Session = Depends(get_db)):
+    return career.save_suite(db, active_org(principal), payload.model_dump(exclude_unset=True), suite_id)
+
+
+@router.get("/career/{agent_id}")
+def career_overview(agent_id: int, days: int = 30, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    """Scorecard thật N ngày + gợi ý thăng/hạ + bộ đánh giá áp cho vai này + các lượt chạy gần đây."""
+    return career.overview(db, active_org(principal), agent_id, days=max(1, min(days, 365)))
+
+
+class RunSuiteIn(BaseModel):
+    suite_id: int
+
+
+@router.post("/career/{agent_id}/eval")
+async def career_eval(agent_id: int, payload: RunSuiteIn, principal: Principal = Depends(require_role("manager")),
+                      db: Session = Depends(get_db)):
+    """Chạy bộ đánh giá: mỗi ca k lần trong phiên riêng; pass^k = tỉ lệ ca đúng cả k lần."""
+    return await career.run_suite(db, active_org(principal), get_runtime(), agent_id, payload.suite_id)
+
+
+@router.get("/eval-runs/{run_id}")
+def eval_run(run_id: int, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    from fastapi import HTTPException
+    from app.models.learning import EvalRun
+    from app.services import agent_hr
+    r = db.get(EvalRun, run_id)
+    if r is None:
+        raise HTTPException(404, "Không thấy lượt đánh giá")
+    agent_hr.seat(db, active_org(principal), r.agent_id)
+    return career.run_public(db, r)
+
+
+class LevelIn(BaseModel):
+    level: str
+    reason: str = Field(default="", max_length=280)
+
+
+@router.post("/career/{agent_id}/level")
+async def career_level(agent_id: int, payload: LevelIn, principal: Principal = Depends(require_role("manager")),
+                       db: Session = Depends(get_db)):
+    """Thử việc / Chính thức / Tin cậy — đổi quyền theo hành động, lưu thành một phiên bản hồ sơ (khôi phục được)."""
+    return await career.set_level(db, principal, active_org(principal), get_runtime(), agent_id,
+                                  level=payload.level, reason=payload.reason)

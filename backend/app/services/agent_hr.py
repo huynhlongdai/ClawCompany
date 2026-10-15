@@ -618,6 +618,14 @@ async def update_hr(db: Session, principal: Principal, org_id: int, runtime: Any
             if (mp.get("fallback") or None) != ((spec.get("model_policy") or {}).get("fallback") or None):
                 warnings.append("Model dự phòng áp dụng trên gateway khi cấp lại ghế (Cấp lại cấu hình).")
             spec["model_policy"] = mp; changed.append("model_policy")
+    if "career_level" in fields_set:
+        from app.services import career
+        lvl = data.get("career_level") or "standard"
+        if lvl not in career.LEVELS:
+            raise HTTPException(422, f"Cấp tự chủ phải là một trong: {', '.join(career.LEVELS)}")
+        if lvl != (spec.get("career_level") or "standard"):
+            spec["career_level"] = lvl; changed.append("career_level")
+            career.apply_level(db, member, lvl, actor_member_id=principal.member_id)
     team_svc._bump(member); db.add(member); _save_spec(db, agent, spec); db.commit()
     if "manager_member_id" in fields_set and data.get("manager_member_id") != member.manager_id:
         team_svc.set_manager(db, org_id, member, data.get("manager_member_id"), actor=actor)

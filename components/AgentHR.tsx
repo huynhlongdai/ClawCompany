@@ -4,7 +4,7 @@
 // vòng đời (tạm dừng / tiếp tục / cho nghỉ), lệch & "Đồng bộ lại", quyền tool theo seat.
 import {useEffect, useMemo, useState} from "react";
 import Link from "next/link";
-import {apiAgentsHR, apiMcp, apiTeam, errorText} from "../lib/api";
+import {apiAgentsHR, apiLearning, apiMcp, apiTeam, errorText} from "../lib/api";
 import {t as tr, lazy} from "../lib/i18n";
 import {AskNina} from "./shell/AskNina";
 
@@ -186,6 +186,7 @@ export function AgentHRPanel({memberId}: {memberId: number}) {
     <Drift seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Versions seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Memory seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
+    <Career seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Lessons seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Limits seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Tools seat={seat} isAdmin={isAdmin} busy={busy} act={act} tick={tick}/>
@@ -424,6 +425,53 @@ function Memory({seat, canEdit, busy, act, tick}: any) {
         onClick={() => run({op: "add", text: draft}, tr("agentHr.da_them_ky_uc"))} data-testid="hr-mem-add">{tr("agentHr.them_ky_uc")}</button></div>
     </div>}
     <small className="tmGuide">{tr("agentHr.ky_uc_giai_thich")}</small>
+  </section>;
+}
+
+
+// ------------------------------------------------------------------ M6 việc 11: sự nghiệp (scorecard, đánh giá, cấp tự chủ)
+
+const pct = (v: any) => v === null || v === undefined ? "—" : `${Math.round(Number(v) * 100)}%`;
+const LEVEL_PILL: Record<string, string> = {probation: "is-wait", standard: "", trusted: "is-ok"};
+
+function Career({seat, canEdit, busy, act, tick}: any) {
+  const [d, setD] = useState<any>(null), [err, setErr] = useState(""), [n, setN] = useState(0), [suite, setSuite] = useState("");
+  useEffect(() => { apiLearning.career(seat.agent_id).then(setD).catch(e => setErr(errorText(e))); }, [seat.agent_id, tick, n]);
+  if (err) return <section className="ui-panel ui-panel-body"><div className="ui-banner is-error">{err}</div></section>;
+  if (!d) return null;
+  const c = d.scorecard, r = d.recommendation;
+  const level = (lvl: string) => {
+    const reason = window.prompt(tr("agentHr.ly_do_doi_cap")); if (!reason) return;
+    act(async () => { const x = await apiLearning.careerLevel(seat.agent_id, lvl, reason); setN(v => v + 1); return x; }, () => tr("agentHr.da_doi_cap"));
+  };
+  const runEval = () => act(async () => { const x = await apiLearning.careerEval(seat.agent_id, Number(suite)); setN(v => v + 1); return x; },
+    (x: any) => tr("agentHr.ket_qua_danh_gia", {p0: pct(x.pass_k), p1: x.k, p2: pct(x.pass_at_1)}));
+  const stat = (label: string, v: any) => <div className="ui-row" style={{display: "block"}}><small>{label}</small><br/><b>{v}</b></div>;
+  return <section className="ui-panel ui-panel-body" data-testid="hr-career">
+    <div className="lab-cardhead"><div><b>{tr("agentHr.su_nghiep")}</b><span>{tr("agentHr.su_nghiep_mo_ta", {p0: c.days})}</span></div>
+      <span className={`ui-pill ${LEVEL_PILL[c.level] || ""}`}>{c.level_vi}</span></div>
+    <div className="ui-grid is-4" style={{gap: 8}}>
+      {stat(tr("agentHr.viec_xong"), c.tasks_done)}
+      {stat(tr("agentHr.qua_review_lan_dau"), pct(c.first_pass_rate))}
+      {stat(tr("agentHr.vong_sua"), c.revisions)}
+      {stat(tr("agentHr.luot_loi"), `${c.failed_runs}/${c.runs}`)}
+      {stat(tr("agentHr.chi_phi_moi_viec"), c.cost_per_done_usd === null ? "—" : `$${c.cost_per_done_usd}`)}
+      {stat(tr("agentHr.bi_chan_quyen"), c.policy_denials)}
+      {stat(tr("agentHr.lo_hong_kien_thuc"), c.knowledge_gaps)}
+      {stat(tr("agentHr.danh_gia_k_lan"), c.eval ? `${pct(c.eval.pass_k)} (k=${c.eval.k})` : "—")}
+    </div>
+    <p style={{margin: "10px 0 4px"}}><b>{r.action === "promote" ? tr("agentHr.goi_y_thang", {p0: d.levels.find((l: any) => l.key === r.to)?.label})
+      : r.action === "demote" ? tr("agentHr.goi_y_ha", {p0: d.levels.find((l: any) => l.key === r.to)?.label}) : tr("agentHr.goi_y_giu")}</b>
+      {" "}<small>{r.reasons.join(" · ")}</small></p>
+    {canEdit && <div className="tmRow" style={{flexWrap: "wrap"}}>
+      {d.levels.filter((l: any) => l.key !== c.level).map((l: any) => <button key={l.key} className={`ui-btn ${r.to === l.key && r.action !== "keep" ? "is-primary" : ""}`}
+        disabled={busy} onClick={() => level(l.key)} title={Object.entries(l.actions).map(([a, v]) => `${a}: ${v}`).join(", ")}>{tr("agentHr.chuyen_sang", {p0: l.label})}</button>)}
+      <select className="ui-select" style={{width: "auto"}} value={suite} onChange={e => setSuite(e.target.value)}>
+        <option value="">{d.suites.length ? tr("agentHr.chon_bo_danh_gia") : tr("agentHr.chua_co_bo_danh_gia")}</option>
+        {d.suites.map((s: any) => <option key={s.id} value={s.id}>{s.title} ({s.cases.length}×{s.k})</option>)}</select>
+      <button className="ui-btn" disabled={busy || !suite} onClick={runEval} data-testid="hr-career-eval">{busy ? tr("agentHr.dang_chay") : tr("agentHr.chay_danh_gia")}</button>
+    </div>}
+    {d.runs.length > 0 && <small className="tmGuide">{tr("agentHr.lan_danh_gia")}: {d.runs.slice(0, 5).map((x: any) => `${x.suite} ${pct(x.pass_k)} (v${x.profile_version ?? "?"})`).join(" · ")}</small>}
   </section>;
 }
 
