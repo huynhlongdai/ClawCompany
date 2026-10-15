@@ -1305,7 +1305,9 @@
   "xong": "Done",
   "ghi_hau_to": " · writes",
   "cho_nghi_viec_ten": "Retire {p0}?",
-  "tam_dung_nut": "Pause"
+  "tam_dung_nut": "Pause",
+  "tao_hoan_thien_tren_gateway": "Create / complete on gateway",
+  "da_hoan_thien_tren_gateway": "Completed on gateway, wrote {p0} files"
  },
  "seat": {
   "ho_so": "Profile",
@@ -1387,7 +1389,12 @@
   "goi_y": "Suggested:",
   "luu_se_tao_gia_tri": "Saving creates a value for this seat only; agents.defaults is unchanged.",
   "luu_thay_doi": "Save {p0:change|changes}",
-  "cac_tab_ho_so": "OpenClaw configuration sections"
+  "cac_tab_ho_so": "OpenClaw configuration sections",
+  "model_phu": "Utility model (small tasks)",
+  "model_phu_goi_y": "provider/model format; pick a cheap one, e.g. custom/gpt-5-nano",
+  "model_heartbeat": "Heartbeat model",
+  "heartbeat_gon": "Light heartbeat context",
+  "heartbeat_gon_goi_y": "Recommended: heartbeat loads only what it needs, much cheaper"
  },
  "routines": {
   "dang_cho": "waiting",

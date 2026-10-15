@@ -86,6 +86,66 @@ class LifecycleIn(BaseModel):
     reason: str = Field(default="", max_length=500)
 
 
+class WireIn(BaseModel):
+    models: bool = True
+    memory: bool = True
+    mcp: bool = True
+    seat_models: bool = True
+    allow_restart: bool = False
+    dry_run: bool = False
+
+
+@router.get("/model-tiers")
+def model_tiers(principal: Principal = Depends(require_human())):
+    """Bảng tầng model đang dùng để định tuyến (giá ước tính, USD/1M token)."""
+    from app.core.config import settings
+    from app.services import model_routing
+    return {"enabled": settings.model_routing_enabled, "tiers": model_routing.tiers_public(),
+            "fallback": f"{model_routing.PROVIDER}/{model_routing.FALLBACK_MODEL}",
+            "max_escalation": model_routing.MAX_ESCALATION}
+
+
+class RoutePreviewIn(BaseModel):
+    title: str = Field(min_length=1, max_length=220)
+    description: str = ""
+    priority: str = "medium"
+    role: str = ""
+    rework_count: int = Field(default=0, ge=0, le=20)
+
+
+@router.post("/model-tiers/preview")
+def model_tier_preview(payload: RoutePreviewIn, principal: Principal = Depends(require_human())):
+    """Thử luật định tuyến cho một việc giả định — không gọi model nào."""
+    from app.services import model_routing
+    return model_routing.decide(**payload.model_dump()).as_dict()
+
+
+@router.post("/gateway/wire")
+async def wire_gateway(payload: WireIn, principal: Principal = Depends(require_role("admin")),
+                       db: Session = Depends(get_db)):
+    """Giai đoạn A: MCP công ty cho từng ghế, tầng model, embedding cho memory — một config.patch."""
+    from app.services import seat_provision
+    return await seat_provision.wire_gateway(db, principal, active_org(principal), get_runtime(),
+                                             **payload.model_dump())
+
+
+@router.post("/provision-all")
+async def provision_all(payload: WireIn, principal: Principal = Depends(require_role("admin")),
+                        db: Session = Depends(get_db)):
+    """Tạo/hoàn thiện mọi ghế trên gateway (5 file tiếng Việt) rồi nối dây cả tổ chức."""
+    from app.services import seat_provision
+    return await seat_provision.provision_all(db, principal, active_org(principal), get_runtime(),
+                                              **payload.model_dump())
+
+
+@router.post("/{agent_id}/provision")
+async def provision_seat(agent_id: int, principal: Principal = Depends(require_role("manager")),
+                         db: Session = Depends(get_db)):
+    """B3 + B7: tạo agent trên gateway cho ghế có sẵn và ghi 5 file tiếng Việt."""
+    from app.services import seat_provision
+    return await seat_provision.provision_seat(db, principal, active_org(principal), get_runtime(), agent_id)
+
+
 @router.get("/roster")
 async def hr_roster(company_id: int | None = None, principal: Principal = Depends(require_human()),
                     db: Session = Depends(get_db)):

@@ -346,6 +346,16 @@ class NativeOpenClawRuntime(AgentRuntime):
             )
         except OpenClawProtocolError:
             pass
+        # Định tuyến model theo việc: ghi đè model của RIÊNG phiên này trước khi
+        # gửi (``sessions.patch {key, model}`` — đo trên 2026.9.8: trả
+        # modelOverride + resolved). Lỗi ở đây không chặn lượt gửi; agent chạy
+        # bằng model mặc định của ghế, và ta trả lý do về để ghi lại.
+        route_error = ""
+        if meta.get("model"):
+            try:
+                await self._rpc(ocp.M_SESSIONS_PATCH, {"key": key, "model": str(meta["model"])})
+            except Exception as exc:  # noqa: BLE001
+                route_error = str(exc)[:300]
         # v35.1: ChatSendParamsSchema là closedObject,
         # required = ["sessionKey", "message", "idempotencyKey"], và KHÔNG có
         # thuộc tính "metadata". Bản cũ gửi metadata và thiếu idempotencyKey,
@@ -388,7 +398,7 @@ class NativeOpenClawRuntime(AgentRuntime):
             run_id=run_id or key,
             session_key=str(result.get("sessionKey") or key),
             status=str(result.get("state") or result.get("status") or "running"),
-            raw=result,
+            raw={**result, **({"route_error": route_error} if route_error else {})},
         )
 
     async def cancel_run(self, run_id: str) -> dict:

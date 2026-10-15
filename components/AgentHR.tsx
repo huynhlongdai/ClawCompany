@@ -303,6 +303,13 @@ function Drift({seat, canEdit, busy, act, tick}: any) {
     <div className="lab-cardhead"><div><b>{tr("agentHr.dong_bo_voi_gateway")}</b>
       <span>{!d ? tr("agentHr.dang_kiem") : d.in_sync ? tr("agentHr.khop_ban_clawcompany_va_gateway") : tr("agentHr.lech_muc", {p0: d.drift_count})}</span></div>
       <div className="tmRow"><button className="ui-btn is-ghost is-sm" onClick={load} disabled={busy}>{tr("agentHr.kiem_tra_lai")}</button>
+        {canEdit && d && (!d.roster_match || (d.files || []).some((f: any) => f.status === "untracked" && f.counts_as_drift)) &&
+          <button className="ui-btn is-primary is-sm" disabled={busy} data-testid="hr-provision"
+            onClick={() => act(() => apiAgentsHR.provision(seat.agent_id), (r: any) => {
+              load();
+              const n = (r.steps?.find((x: any) => x.step === "files")?.written || []).length;
+              return <span>{tr("agentHr.da_hoan_thien_tren_gateway", {p0: n})}{r.warnings?.length ? " · " + r.warnings.join("; ") : ""}</span>;
+            })}>{tr("agentHr.tao_hoan_thien_tren_gateway")}</button>}
         {canEdit && d && !d.in_sync && d.roster_match && <>
           <button className="ui-btn is-primary is-sm" disabled={busy} onClick={() => sync("push")} data-testid="hr-push-all">{tr("agentHr.dong_bo_lai_day_len")}</button>
           <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => sync("pull")} data-testid="hr-pull-all">{tr("agentHr.nhan_ban_gateway")}</button></>}</div></div>

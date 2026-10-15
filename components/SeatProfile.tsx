@@ -52,9 +52,8 @@ const CONFIG_FIELDS: Record<string, {key: string; label: string; hint?: string;
     {key: "thinkingDefault", label: tr("seat.muc_suy_nghi"),
      options: ["off", "minimal", "low", "medium", "high", "xhigh", "adaptive", "max"],
      advice: tr("seat.seat_quan_ly_high_seat")},
-    {key: "timeoutSeconds", label: tr("seat.thoi_gian_toi_da_moi")},
-    {key: "compaction.notifyUser", label: tr("seat.bao_khi_nen_ngu_canh"),
-     options: ["true", "false"], advice: tr("seat.nen_bat_nguoi_dung_biet")},
+    {key: "utilityModel", label: tr("seat.model_phu"), hint: tr("seat.model_phu_goi_y")},
+    {key: "heartbeat.model", label: tr("seat.model_heartbeat"), hint: tr("seat.model_phu_goi_y")},
   ],
   permission: [
     {key: "sandbox.mode", label: tr("seat.che_do_sandbox"), options: ["off", "non-main", "all"],
@@ -71,7 +70,8 @@ const CONFIG_FIELDS: Record<string, {key: string; label: string; hint?: string;
      advice: tr("seat.tat_cho_seat_thua_hanh")},
     {key: "heartbeat.activeHours.start", label: tr("seat.gio_bat_dau_hh_mm")},
     {key: "heartbeat.activeHours.end", label: tr("seat.gio_ket_thuc_hh_mm")},
-    {key: "maxConcurrent", label: tr("seat.so_luot_chay_song_song")},
+    {key: "heartbeat.lightContext", label: tr("seat.heartbeat_gon"), options: ["true", "false"],
+     advice: tr("seat.heartbeat_gon_goi_y")},
   ],
 }));
 

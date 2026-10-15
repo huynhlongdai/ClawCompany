@@ -1305,7 +1305,9 @@
   "xong": "Xong",
   "ghi_hau_to": " · ghi",
   "cho_nghi_viec_ten": "Cho {p0} nghỉ việc?",
-  "tam_dung_nut": "Tạm dừng"
+  "tam_dung_nut": "Tạm dừng",
+  "tao_hoan_thien_tren_gateway": "Tạo / hoàn thiện trên gateway",
+  "da_hoan_thien_tren_gateway": "Đã hoàn thiện trên gateway, ghi {p0} file tiếng Việt"
  },
  "seat": {
   "ho_so": "Hồ sơ",
@@ -1387,7 +1389,12 @@
   "goi_y": "Gợi ý:",
   "luu_se_tao_gia_tri": "Lưu sẽ tạo giá trị riêng cho seat này, không đổi agents.defaults.",
   "luu_thay_doi": "Lưu {p0} thay đổi",
-  "cac_tab_ho_so": "Các phần cấu hình OpenClaw"
+  "cac_tab_ho_so": "Các phần cấu hình OpenClaw",
+  "model_phu": "Model phụ (việc vặt)",
+  "model_phu_goi_y": "Dạng provider/model, nên chọn model rẻ, ví dụ custom/gpt-5-nano",
+  "model_heartbeat": "Model cho heartbeat",
+  "heartbeat_gon": "Heartbeat ngữ cảnh gọn",
+  "heartbeat_gon_goi_y": "Nên bật: heartbeat chỉ nạp phần cần thiết, rẻ hơn nhiều"
  },
  "routines": {
   "dang_cho": "đang chờ",

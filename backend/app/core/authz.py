@@ -20,6 +20,34 @@ class Principal:
     member_id: int | None = None
 
 
+# bcrypt cố ý chậm (~0,1–0,3 s). Mỗi lượt gọi tool MCP của agent đều mang key,
+# nên một agent gọi 10 tool trả 1–3 giây chỉ để xác thực. Nhớ trong tiến trình
+# rằng "băm SHA-256 của key này đã khớp key #id" trong 5 phút; vẫn đọc hàng
+# APIKey mỗi lần nên key bị thu hồi (is_active=False) mất hiệu lực ngay.
+_KEY_CACHE: dict[str, tuple[int, float]] = {}
+_KEY_CACHE_TTL = 300.0
+
+
+def _key_digest(raw: str) -> str:
+    import hashlib
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _verified_key_id(raw: str) -> int | None:
+    import time
+    hit = _KEY_CACHE.get(_key_digest(raw))
+    if hit and hit[1] > time.monotonic():
+        return hit[0]
+    return None
+
+
+def _remember_key(raw: str, key_id: int) -> None:
+    import time
+    if len(_KEY_CACHE) > 2048:
+        _KEY_CACHE.clear()
+    _KEY_CACHE[_key_digest(raw)] = (key_id, time.monotonic() + _KEY_CACHE_TTL)
+
+
 def get_principal(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
@@ -28,8 +56,10 @@ def get_principal(
     if x_api_key:
         prefix = x_api_key[:12]
         candidates = db.query(APIKey).filter(APIKey.key_prefix == prefix, APIKey.is_active == True).all()  # noqa: E712
+        cached = _verified_key_id(x_api_key)
         for item in candidates:
-            if pwd_context.verify(x_api_key, item.key_hash):
+            if item.id == cached or pwd_context.verify(x_api_key, item.key_hash):
+                _remember_key(x_api_key, item.id)
                 item.last_used_at = datetime.utcnow(); db.add(item); db.commit()
                 import json
                 try: scopes = json.loads(item.scopes or "[]")

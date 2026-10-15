@@ -457,7 +457,12 @@ async def _pick_nina_seat(db: Session, organization_id: int, runtime):
         }
 
     # Trong số ghế gateway biết, ưu tiên ghế database cũng cho là active.
-    usable.sort(key=lambda pair: 0 if pair[0].lifecycle == "active" else 1)
+    # B2: ưu tiên đúng Nina (Chief of Staff) chứ không lấy ghế đầu tiên.
+    def rank(pair):
+        agent, name = pair
+        is_nina = agent.runtime_agent_id == "nina" or (name or "").strip().lower() == "nina"
+        return (0 if is_nina else 1, 0 if agent.lifecycle == "active" else 1)
+    usable.sort(key=rank)
     return usable[0], None
 
 
@@ -497,44 +502,33 @@ async def ask_nina(db: Session, organization_id: int, *, message: str,
     agent, agent_name = seat
     session_key = ocp.main_session_key(agent.runtime_agent_id)
 
+    # B2: bản cũ gửi rồi poll ``chat.history`` (limit=50): phiên >50 tin thì
+    # mốc ``before`` không bao giờ tăng → luôn timeout; còn lỗi model (401)
+    # được ghi thành tin assistant nên bị báo ``answered: true``. Nay đọc
+    # thẳng luồng sự kiện của đúng lượt này, giống endpoint stream.
     started = _time.monotonic()
-    before = 0
+    reply, error = "", ""
     try:
-        history = await runtime.history(session_key, limit=50)
-        before = len(history.get("messages") or [])
-    except Exception:
-        before = 0
-
-    try:
-        await runtime.run_agent(agent.runtime_agent_id, message, metadata={}, session_key=session_key)
+        async for event in runtime.chat_stream(agent.runtime_agent_id, message,
+                                               session_key=session_key,
+                                               timeout_seconds=max(5, min(timeout_seconds, 120))):
+            if event["kind"] == "delta":
+                reply = event["text"]
+            elif event["kind"] == "final":
+                reply = event.get("text") or reply
+                break
+            elif event["kind"] == "error":
+                error = event.get("message") or "lỗi"
+                break
     except Exception as exc:  # noqa: BLE001 - lỗi gateway phải nói ra, không nuốt
         return {"answered": False, "reason": f"gateway từ chối: {exc}"[:400],
                 "agent": agent_name, "session_key": session_key}
-
-    # Chờ có thêm tin nhắn assistant. Bước ngắn để trả lời nhanh khi model nhanh.
-    deadline = _time.monotonic() + max(5, min(timeout_seconds, 120))
-    reply = ""
-    while _time.monotonic() < deadline:
-        await _asyncio.sleep(2)
-        try:
-            history = await runtime.history(session_key, limit=50)
-        except Exception:
-            continue
-        messages = history.get("messages") or []
-        fresh = messages[before:]
-        for item in reversed(fresh):
-            if (item.get("role") or "") != "assistant":
-                continue
-            content = item.get("content") or item.get("text") or ""
-            if isinstance(content, list):
-                content = " ".join(str(part.get("text", part)) for part in content)
-            text = str(content).strip()
-            # NO_REPLY là tín hiệu nội bộ của OpenClaw, không phải câu trả lời.
-            if text and text != "NO_REPLY":
-                reply = text
-                break
-        if reply:
-            break
+    if error:
+        return {"answered": False, "reason": error[:400], "partial": reply,
+                "agent": agent_name, "runtime_agent_id": agent.runtime_agent_id,
+                "session_key": session_key,
+                "elapsed_seconds": round(_time.monotonic() - started, 1),
+                "timed_out": "Hết thời gian" in error}
 
     return {
         "answered": bool(reply),

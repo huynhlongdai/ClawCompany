@@ -234,6 +234,19 @@ def record_file_write(db: Session, org_id: int, agent_id: int, name: str, conten
         put_snapshot(db, agent.id, name, content, user_id=user_id, hash_=hash_ or sha(content))
 
 
+_MODEL_REF = __import__("re").compile(r"^[A-Za-z0-9][\w.-]*/[\w.:@/-]+$")
+
+
+def is_runtime_model_ref(model: str | None) -> bool:
+    """B1: chỉ ``provider/model`` mới là model thật trên gateway.
+
+    Seed và vài màn cũ ghi nhãn hiển thị ("GPT-4.1", "Gemini 1.5") vào
+    ``agents.model``. Đẩy nhãn đó qua ``agents.update`` làm agent trên gateway
+    trỏ vào một model không tồn tại → mọi lượt sau lỗi.
+    """
+    return bool(model) and bool(_MODEL_REF.match(model.strip()))
+
+
 async def _agents_update(db: Session, runtime: Any, agent: Agent, upd: dict, user_id: int | None) -> dict:
     """``agents.update`` + nhận phần IDENTITY.md do chính gateway viết lại.
 
@@ -242,6 +255,9 @@ async def _agents_update(db: Session, runtime: Any, agent: Agent, upd: dict, use
     ClawCompany, chính thao tác đổi tên của ta bị báo là "sửa tay trên gateway".
     Chỉ nhận khi trước lúc gọi, file trên gateway còn khớp bản ClawCompany.
     """
+    if "model" in upd and not is_runtime_model_ref(upd["model"]):
+        raise ValueError(f"'{upd['model']}' là nhãn hiển thị, không phải model của gateway "
+                         "(cần dạng provider/model, ví dụ custom/gpt-5-mini)")
     absorb = bool({"name", "emoji", "avatar"} & set(upd))
     snap = snapshots(db, agent.id).get("IDENTITY.md") if absorb else None
     before = None
@@ -650,7 +666,11 @@ async def drift(db: Session, org_id: int, runtime: Any, agent_id: int) -> dict:
             status = "in_sync"
         else:
             status = "edited_on_gateway"
-        counts = status in ("missing_on_gateway", "edited_on_gateway") and name not in AGENT_OWNED_FILES
+        # B7: "untracked" = gateway có file nhưng ClawCompany chưa từng ghi —
+        # thường là mẫu tiếng Anh OpenClaw seed sẵn nằm cạnh IDENTITY tiếng Việt.
+        # Trước đây không tính là lệch nên UI báo "đã đồng bộ" sai.
+        counts = (status in ("missing_on_gateway", "edited_on_gateway", "untracked")
+                  and name not in AGENT_OWNED_FILES)
         rec = {"name": name, "status": status, "counts_as_drift": counts, "agent_owned": name in AGENT_OWNED_FILES,
                "gateway_hash": cur["hash"], "clawcompany_hash": snap.hash if snap else "",
                "clawcompany_updated_at": (snap.updated_at.isoformat() + "Z") if snap and snap.updated_at else None,

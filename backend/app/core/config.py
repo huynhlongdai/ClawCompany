@@ -73,6 +73,11 @@ class Settings(BaseSettings):
     wakeup_drain_seconds: float = 0
     wakeup_window_seconds: float = 10  # gộp các lý do của cùng seat trong cửa sổ này
     wakeup_run_estimate_usd: float = 0.05  # số giữ chỗ để hỏi budget.can_reserve
+    # Định tuyến model theo tầng (services/model_routing.py). Tắt → mọi việc chạy
+    # bằng model mặc định của ghế, quyết định vẫn được tính và ghi để so sánh.
+    model_routing_enabled: bool = True
+    # URL gateway dùng để gọi MCP công ty (mạng docker nội bộ).
+    clawcompany_mcp_url: str = "http://api:8000/api/mcp"
     wakeup_follow: bool = True  # gắn follower ngay sau khi dispatch (cần cho thẻ duyệt và chi phí)
     # D2.2: run kết thúc không có comment → missing_report. Task có policy luôn bắt
     # buộc; bật cờ này để bắt buộc cho mọi task.

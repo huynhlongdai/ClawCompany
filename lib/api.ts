@@ -766,6 +766,12 @@ export const apiAgentsHR = {
   drift: (agentId: number) => request<any>(`/agents/${agentId}/drift`),
   resync: (agentId: number, body: {direction: "push" | "pull"; files?: string[]; fields?: string[]}) =>
     request<any>(`/agents/${agentId}/resync`, {method: "POST", body: JSON.stringify(body)}),
+  provision: (agentId: number) => request<any>(`/agents/${agentId}/provision`, {method: "POST"}),
+  provisionAll: (body: {dry_run?: boolean; allow_restart?: boolean} = {}) =>
+    request<any>(`/agents/provision-all`, {method: "POST", body: JSON.stringify(body)}),
+  wireGateway: (body: {dry_run?: boolean; allow_restart?: boolean} = {}) =>
+    request<any>(`/agents/gateway/wire`, {method: "POST", body: JSON.stringify(body)}),
+  modelTiers: () => request<any>(`/agents/model-tiers`),
   lifecycle: (agentId: number, body: {action: "pause" | "resume" | "retire"; reassign_to_member_id?: number | null;
     remove_from_gateway?: boolean; reason?: string}) =>
     request<any>(`/agents/${agentId}/lifecycle`, {method: "POST", body: JSON.stringify(body)}),

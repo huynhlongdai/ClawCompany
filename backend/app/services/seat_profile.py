@@ -60,18 +60,21 @@ CONFIG_TABS: dict[str, tuple[str, ...]] = {
     # Tab 1 — Hồ sơ: tên hiển thị, chủ đề, emoji, avatar.
     "profile": ("name", "identity.name", "identity.theme", "identity.emoji",
                 "identity.avatar"),
-    # Tab 4 — Năng lực: nghĩ sâu tới đâu, model nào, nén ngữ cảnh thế nào.
-    "capability": ("model", "utilityModel", "thinkingDefault", "fastModeDefault",
-                   "timeoutSeconds", "compaction.enabled", "compaction.notifyUser",
-                   "modelPolicy.allow"),
+    # Tab 4 — Năng lực: nghĩ sâu tới đâu, model nào.
+    # B4: ``timeoutSeconds`` và ``compaction.*`` KHÔNG phải khoá hợp lệ dưới
+    # ``agents.entries.<id>`` ở schema 2026.9.8 (additionalProperties:false; chỉ
+    # có ở ``agents.defaults``) → config.patch bị từ chối. Đã bỏ; thêm các khoá
+    # per-agent hợp lệ cho định tuyến model theo tầng.
+    "capability": ("model", "utilityModel", "thinkingDefault", "reasoningDefault",
+                   "fastModeDefault", "modelPolicy.allow", "heartbeat.model"),
     # Tab 5 — Quyền: tool và sandbox. Đây là tab nguy hiểm nhất.
     "permission": ("tools.profile", "tools.allow", "tools.deny",
                    "tools.elevated.enabled", "sandbox.mode", "sandbox.scope",
                    "sandbox.workspaceAccess", "sandbox.docker.network", "skills"),
-    # Tab 6 — Hạn mức: tiền và khối lượng việc.
+    # Tab 6 — Hạn mức: nhịp heartbeat. ``maxConcurrent`` và ``subagents.max*``
+    # chỉ có ở ``agents.defaults`` (toàn gateway), không đặt riêng một ghế được.
     "budget": ("heartbeat.every", "heartbeat.prompt", "heartbeat.activeHours.start",
-               "heartbeat.activeHours.end", "maxConcurrent",
-               "subagents.maxConcurrent", "subagents.maxChildrenPerAgent"),
+               "heartbeat.activeHours.end", "heartbeat.lightContext"),
 }
 
 # Mảng: ghi lại là thay, nên phải khai replacePaths. Giữ ở đây để tầng API
