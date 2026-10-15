@@ -97,7 +97,8 @@ def within(local: float, gw: float | None, pct: float = 5.0) -> bool:
 
 def gateway_cards(tid: int) -> list[dict]:
     _, r = api("GET", "/inbox/items?status=open")
-    return [c for c in r.get("items", []) if (c.get("approval") or {}).get("kind") == "gateway"
+    items = [x for g in (r.get("groups") or []) for x in (g.get("items") or [])]   # /inbox/items trả theo nhóm
+    return [c for c in items if (c.get("approval") or {}).get("kind") == "gateway"
             and ((c.get("task") or {}).get("id") == tid or c.get("task_id") == tid)]
 
 
