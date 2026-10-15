@@ -631,6 +631,10 @@ a.org-node:hover{border-color:var(--text-muted);box-shadow:var(--shadow-2)}
 .ops-flow select,.ops-flow input{width:auto;min-height:30px;height:30px;font-size:var(--fs-12)}
 .ops-flow .ops-branch{width:140px}
 .ops-flow-label{font-weight:var(--fw-medium);color:var(--text)}
+.ops-spark{display:block;stroke:var(--text-muted);fill:var(--text-muted)}
+.ops-spark.is-ok{stroke:var(--ok);fill:var(--ok)}.ops-spark.is-wait{stroke:var(--wait);fill:var(--wait)}.ops-spark.is-risk{stroke:var(--risk);fill:var(--risk)}
+.ops-spark polyline{fill:none}
+.ops-spark-empty{color:var(--text-muted)}
 .ops-outcome{margin-top:4px}.ops-outcome input{min-height:30px;height:30px;font-size:var(--fs-12)}
 @media (max-width:900px){.ops-step-edit{grid-template-columns:24px 1fr 1fr}.ops-step-edit textarea{grid-column:1 / -1}.ops-flow{grid-column:1 / -1}}
 .ops-bar{display:inline-block;width:80px;height:8px;border-radius:4px;background:var(--surface-sunken,#eee);vertical-align:middle;overflow:hidden}

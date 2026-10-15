@@ -282,6 +282,23 @@ function Bar({p}: {p: number | null | undefined}) {
   return <span className="ops-bar" title={`${p}%`}><i style={{width: `${Math.min(100, p)}%`}} className={p >= 90 ? "is-ok" : p >= 60 ? "is-wait" : "is-risk"}/></span>;
 }
 
+// M2d.2: đường xu hướng theo kỳ (số đã lưu ở kpi_snapshots). Màu theo sức khoẻ kỳ cuối, chấm = kỳ hiện tại.
+export function Sparkline({hist, unit, testId}: {hist: any[]; unit: string; testId?: string}) {
+  const pts = (hist || []).filter((h: any) => h.value != null);
+  if (pts.length < 2) return <small className="ops-spark-empty" data-testid={testId}>{pts.length ? tr("ops.trend_one") : tr("ops.trend_none")}</small>;
+  const W = 96, H = 26, vals = pts.map((h: any) => h.value as number);
+  const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+  const xy = pts.map((h: any, i: number) => [2 + i * (W - 4) / (pts.length - 1), H - 3 - ((h.value - lo) / span) * (H - 6)]);
+  const last = pts[pts.length - 1];
+  const tone = last.health === "on_track" ? "is-ok" : last.health === "at_risk" ? "is-wait" : last.health === "off_track" ? "is-risk" : "";
+  const title = pts.map((h: any) => `${h.period_key}: ${fmt(h.value, unit)}${h.final ? "" : " (" + tr("ops.trend_running") + ")"}`).join("\n");
+  return <svg className={"ops-spark " + tone} width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={tr("ops.trend")} data-testid={testId}>
+    <title>{title}</title>
+    <polyline fill="none" strokeWidth="1.6" points={xy.map(p => p.join(",")).join(" ")}/>
+    <circle cx={xy[xy.length - 1][0]} cy={xy[xy.length - 1][1]} r="2.4"/>
+  </svg>;
+}
+
 export function KpiTab({companyId, caps}: {companyId: number | null; caps: any}) {
   const {data, error, reload, setError} = useLoad(() => apiOps.kpis(companyId), [companyId]);
   const [edit, setEdit] = useState<any>(null), [busy, setBusy] = useState(false), [rec, setRec] = useState<any>(null);
@@ -309,6 +326,9 @@ export function KpiTab({companyId, caps}: {companyId: number | null; caps: any})
       <span className="ui-grow"/>
       {can && <button className="ui-btn is-ghost is-sm" disabled={busy} data-testid="kpi-sync"
         onClick={() => run(() => apiOps.syncKpis(companyId ?? d.company_id), (r: any) => tr("ops.kpi_synced", {p0: r.created, p1: r.updated}))}>{tr("ops.kpi_sync")}</button>}
+      {can && <button className="ui-btn is-ghost is-sm" disabled={busy} data-testid="kpi-snapshot" title={tr("ops.snapshot_hint")}
+        onClick={() => run(() => apiOps.snapshotKpis({company_id: companyId ?? d.company_id, backfill: 5}),
+          (r: any) => tr("ops.snapshot_done", {p0: r.snapshots, p1: r.backfilled}))}>{tr("ops.snapshot")}</button>}
       {can && <button className="ui-btn is-primary is-sm" data-testid="kpi-new" onClick={() => setEdit({level: "company", name: "", metric: "manual", period: "month", weight: 1})}>{tr("ops.new_kpi")}</button>}
     </div>
     {edit && <KpiForm d={d} edit={edit} busy={busy} onCancel={() => setEdit(null)} onSave={async (body: any) => {
@@ -326,7 +346,7 @@ export function KpiTab({companyId, caps}: {companyId: number | null; caps: any})
     {!rows.length ? <EmptyState mood="chao" title={tr("ops.kpi_empty")} testId="kpi-empty">{tr("ops.kpi_empty_hint")}</EmptyState>
       : <div className="ui-panel"><table className="ui-table ops-kpi-table"><thead><tr>
         <th>KPI</th><th>{tr("ops.k_owner")}</th><th>{tr("ops.k_source")}</th><th style={{textAlign: "right"}}>{tr("ops.k_target")}</th>
-        <th style={{textAlign: "right"}}>{tr("ops.k_actual")}</th><th>{tr("ops.k_progress")}</th><th/></tr></thead>
+        <th style={{textAlign: "right"}}>{tr("ops.k_actual")}</th><th>{tr("ops.k_progress")}</th><th>{tr("ops.trend")}</th><th/></tr></thead>
         <tbody>{rows.map(r => <tr key={r.id} data-testid={`kpi-${r.id}`}>
           <td style={{paddingLeft: 8 + r.depth * 18}}><span className="ui-pill is-info ops-lv">{tr(`ops.lv_${r.level}` as Key)}</span> <b>{r.name}</b>
             {r.goal && <div><small>🎯 {r.goal.title} ({r.goal.progress}%)</small></div>}</td>
@@ -336,6 +356,7 @@ export function KpiTab({companyId, caps}: {companyId: number | null; caps: any})
           <td style={{textAlign: "right"}}><b>{fmt(r.value, r.unit)}</b></td>
           <td><Bar p={r.progress}/> <span className={"ui-pill " + HEALTH[r.health]}>{r.progress == null ? tr("ops.h_no_data") : r.progress + "%"}</span>
             {r.rollup != null && <div><small>{tr("ops.rollup", {p0: r.rollup})}</small></div>}</td>
+          <td><Sparkline hist={r.history} unit={r.unit} testId={`kpi-trend-${r.id}`}/></td>
           <td style={{textAlign: "right", whiteSpace: "nowrap"}}>
             <button className="ui-btn is-ghost is-sm" onClick={() => setRec({...r, v: ""})} data-testid={`kpi-rec-${r.id}`}>{tr("ops.record")}</button>
             {can && <button className="ui-btn is-ghost is-sm" onClick={() => setEdit({...r})}>{tr("ops.edit")}</button>}

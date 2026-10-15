@@ -144,6 +144,26 @@ class KpiMeasurement(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 
+class KpiSnapshot(Base):
+    """M2d.2 — số KPI đã tính, lưu theo kỳ (một hàng / KPI × kỳ; trong kỳ thì cập nhật tại chỗ, hết kỳ thì
+    đóng băng). ``trigger``: beat | manual | backfill (tính lại kỳ cũ từ dữ liệu hiện có)."""
+    __tablename__ = "kpi_snapshots"
+    __table_args__ = (UniqueConstraint("kpi_id", "period_key", name="uq_kpi_snapshots_kpi_period"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kpi_id: Mapped[int] = mapped_column(ForeignKey("kpi_definitions.id"), index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    period: Mapped[str] = mapped_column(String(16), default="month")
+    period_key: Mapped[str] = mapped_column(String(16), index=True)
+    value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    value_source: Mapped[str] = mapped_column(String(16), default="")       # auto | manual | ""
+    target: Mapped[float | None] = mapped_column(Float, nullable=True)
+    progress: Mapped[float | None] = mapped_column(Float, nullable=True)
+    health: Mapped[str] = mapped_column(String(16), default="no_data")
+    trigger: Mapped[str] = mapped_column(String(16), default="beat")
+    final: Mapped[bool] = mapped_column(Boolean, default=False)              # kỳ đã qua → không ghi đè nữa
+    computed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 # ------------------------------------------------------------------ D6 nhịp vận hành
 
 class RhythmConfig(Base):

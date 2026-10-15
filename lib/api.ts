@@ -788,6 +788,7 @@ export const apiOps = {
   cancelInstance: (id: number) => request<any>(`/team/process-instances/${id}/cancel`, {method: "POST"}),
   stepOutcome: (runId: number, outcome: string) => request<any>(`/team/process-step-runs/${runId}/outcome`, {method: "POST", body: JSON.stringify({outcome})}),
   kpis: (companyId?: number | null) => request<any>(`/team/kpis${cq(companyId)}`),
+  snapshotKpis: (body: any) => request<any>(`/team/kpis/snapshot`, {method: "POST", body: JSON.stringify(body)}),
   createKpi: (body: any) => request<any>(`/team/kpis`, {method: "POST", body: JSON.stringify(body)}),
   updateKpi: (id: number, body: any) => request<any>(`/team/kpis/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
   deleteKpi: (id: number) => request<any>(`/team/kpis/${id}`, {method: "DELETE"}),

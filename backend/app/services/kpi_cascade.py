@@ -14,6 +14,10 @@ Số thực tế:
 Tiến độ = thực tế / mục tiêu (hướng ``down``: mục tiêu / thực tế), chặn 0–150 %. Cuộn lên: tầng cha
 lấy trung bình có trọng số tiến độ của tầng con (``rollup``) bên cạnh số của chính nó.
 Scorecard agent (M6 ``career.scorecard``) nhận ``kpis`` của seat qua ``seat_kpis``.
+
+M2d.2: "việc xong trong kỳ" dùng ``tasks.completed_at`` (lúc chuyển "done"; hàng cũ chưa có → ``updated_at``).
+Số đã tính được lưu theo kỳ ở ``kpi_snapshots`` (beat ``kpi.snapshot`` mỗi giờ + nút "Chụp số ngay") — hết kỳ
+thì hàng của kỳ đó đóng băng (``final``); ``history`` trả các kỳ gần nhất cho đường xu hướng.
 """
 from __future__ import annotations
 
@@ -21,11 +25,12 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Approval, Company, Department, Member, Project, Task
 from app.models.company_foundation import Position
-from app.models.company_ops import (KpiDefinition, KpiMeasurement, Process, ProcessInstance,
+from app.models.company_ops import (KpiDefinition, KpiMeasurement, KpiSnapshot, Process, ProcessInstance,
                                     ProcessStepRun)
 
 TZ = ZoneInfo("Asia/Ho_Chi_Minh")
@@ -93,14 +98,23 @@ def _tasks(db: Session, company_id: int, members: list[int] | None):
     return q
 
 
+def _done_at():
+    """Mốc "xong" của một việc: completed_at (M2d.2), hàng cũ chưa có → updated_at."""
+    return func.coalesce(Task.completed_at, Task.updated_at)
+
+
+# chỉ số "tại một thời điểm" (không có cửa sổ kỳ) → không tính lại được cho kỳ đã qua
+POINT_IN_TIME = ("approvals_pending",)
+
+
 def compute(db: Session, k: KpiDefinition, now: datetime | None = None) -> float | None:
     from app.models.work_graph import TaskRun
     key, start, end = period_window(k.period, now)
     members = scope_members(db, k)
     m = k.metric
     if m == "tasks_done":
-        return float(_tasks(db, k.company_id, members).filter(Task.status == "done", Task.updated_at >= start,
-                                                              Task.updated_at < end).count())
+        return float(_tasks(db, k.company_id, members).filter(Task.status == "done", _done_at() >= start,
+                                                              _done_at() < end).count())
     if m in ("cycle_time_minutes", "on_time_rate", "process_runs_done"):
         if members is None and m != "on_time_rate":
             q = db.query(ProcessInstance).filter(ProcessInstance.company_id == k.company_id, ProcessInstance.status == "done",
@@ -129,14 +143,14 @@ def compute(db: Session, k: KpiDefinition, now: datetime | None = None) -> float
         return round(sum(vals) / len(vals) / 60, 1) if vals else None
     if m == "cost_per_task_usd":
         tasks = _tasks(db, k.company_id, members)
-        done = tasks.filter(Task.status == "done", Task.updated_at >= start, Task.updated_at < end).count()
+        done = tasks.filter(Task.status == "done", _done_at() >= start, _done_at() < end).count()
         ids = [t.id for t in tasks.with_entities(Task.id).all()]
         q = db.query(TaskRun).filter(TaskRun.created_at >= start, TaskRun.created_at < end, TaskRun.task_id.in_(ids or [-1]))
         cost = sum(r.cost_usd or 0 for r in q.all())
         return round(cost / done, 4) if done else None
     if m == "first_pass_rate":
         reviewed = first = 0
-        for t in _tasks(db, k.company_id, members).filter(Task.updated_at >= start, Task.updated_at < end).all():
+        for t in _tasks(db, k.company_id, members).filter(Task.status == "done", _done_at() >= start, _done_at() < end).all():
             hist = [h for h in ((t.execution_state or {}).get("history") or []) if h.get("decision")]
             if hist:
                 reviewed += 1
@@ -153,6 +167,88 @@ def compute(db: Session, k: KpiDefinition, now: datetime | None = None) -> float
         vals = [(r.updated_at - r.created_at).total_seconds() / 3600 for r in rows if r.updated_at and r.created_at]
         return round(sum(vals) / len(vals), 2) if vals else None
     return None
+
+
+# ------------------------------------------------------------------ lịch sử theo kỳ (M2d.2)
+
+def previous_now(period: str, now: datetime, back: int) -> datetime:
+    """Một thời điểm nằm trong kỳ cách kỳ hiện tại ``back`` kỳ (dùng để tính lại kỳ cũ)."""
+    t = now
+    for _ in range(back):
+        _, start, _ = period_window(period, t)
+        t = start - timedelta(seconds=1)
+    return t
+
+
+def snapshot(db: Session, k: KpiDefinition, *, now: datetime | None = None, trigger: str = "beat",
+             final: bool = False) -> KpiSnapshot | None:
+    """Ghi số của KPI cho kỳ chứa ``now`` (upsert theo KPI × kỳ). Kỳ đã đóng băng thì giữ nguyên."""
+    now = now or datetime.utcnow()
+    key, _, _ = period_window(k.period, now)
+    row = db.query(KpiSnapshot).filter(KpiSnapshot.kpi_id == k.id, KpiSnapshot.period_key == key).first()
+    if row is not None and row.final:
+        return row
+    ev = evaluate(db, k, now)
+    if row is None:
+        row = KpiSnapshot(kpi_id=k.id, company_id=k.company_id, period=k.period, period_key=key)
+        db.add(row)
+    row.value, row.value_source = ev["value"], ev["value_source"] or ""
+    row.target, row.progress, row.health = k.target, ev["progress"], ev["health"]
+    row.trigger, row.final, row.computed_at = trigger, final, datetime.utcnow()
+    db.commit()
+    return row
+
+
+def snapshot_company(db: Session, company_id: int, *, now: datetime | None = None, trigger: str = "beat",
+                     backfill: int = 0) -> dict:
+    """Chụp số mọi KPI đang hoạt động của công ty cho kỳ hiện tại; kỳ trước chưa đóng băng → tính lại tại
+    cuối kỳ đó và đóng băng. ``backfill`` = số kỳ cũ cần tính lại từ dữ liệu hiện có (bỏ qua chỉ số tại một
+    thời điểm như phê duyệt đang chờ — không dựng lại được quá khứ)."""
+    now = now or datetime.utcnow()
+    rows = db.query(KpiDefinition).filter(KpiDefinition.company_id == company_id, KpiDefinition.status == "active").all()
+    made = closed = back = 0
+    for k in rows:
+        # 1) kỳ trước đang có số "chạy" → tính lại tại cuối kỳ đó rồi đóng băng
+        t1 = previous_now(k.period, now, 1)
+        key1, _, _ = period_window(k.period, t1)
+        have1 = db.query(KpiSnapshot).filter(KpiSnapshot.kpi_id == k.id, KpiSnapshot.period_key == key1).first()
+        if have1 is not None and not have1.final:
+            snapshot(db, k, now=t1, trigger="close", final=True)
+            closed += 1
+        # 2) kỳ cũ chưa có số → tính lại từ dữ liệu hiện có (chỉ khi được yêu cầu)
+        for bk in range(backfill, 0, -1):
+            t = previous_now(k.period, now, bk)
+            key, _, end = period_window(k.period, t)
+            if k.metric in POINT_IN_TIME or (k.created_at and end <= k.created_at and k.metric == "manual"):
+                continue
+            if db.query(KpiSnapshot).filter(KpiSnapshot.kpi_id == k.id, KpiSnapshot.period_key == key).first():
+                continue
+            snapshot(db, k, now=t, trigger="backfill", final=True)
+            back += 1
+        snapshot(db, k, now=now, trigger=trigger)
+        made += 1
+    return {"company_id": company_id, "snapshots": made, "closed": closed, "backfilled": back}
+
+
+def tick(db: Session) -> dict:
+    """Beat ``kpi.snapshot`` (mỗi giờ): mọi công ty có KPI."""
+    ids = [r[0] for r in db.query(KpiDefinition.company_id).filter(KpiDefinition.status == "active").distinct().all()]
+    out = []
+    for cid in ids:
+        try:
+            out.append(snapshot_company(db, cid))
+        except Exception as exc:  # noqa: BLE001 — một công ty lỗi không chặn công ty khác
+            db.rollback()
+            out.append({"company_id": cid, "error": str(exc)[:200]})
+    return {"companies": len(ids), "results": out}
+
+
+def history(db: Session, k: KpiDefinition, limit: int = 8) -> list[dict]:
+    rows = (db.query(KpiSnapshot).filter(KpiSnapshot.kpi_id == k.id, KpiSnapshot.period == k.period)
+            .order_by(KpiSnapshot.period_key.desc())
+            .limit(limit).all())
+    return [{"period_key": r.period_key, "value": r.value, "progress": r.progress, "health": r.health,
+             "final": r.final, "trigger": r.trigger, "source": r.value_source} for r in reversed(rows)]
 
 
 def manual_value(db: Session, k: KpiDefinition, period_key: str) -> KpiMeasurement | None:
@@ -248,7 +344,7 @@ def list_kpis(db: Session, org_id: int, company_id: int | None, *, now: datetime
     co = _company(db, org_id, company_id)
     rows = (db.query(KpiDefinition).filter(KpiDefinition.company_id == co.id, KpiDefinition.status == "active")
             .order_by(KpiDefinition.id).all())
-    items = [evaluate(db, k, now) for k in rows]
+    items = [{**evaluate(db, k, now), "history": history(db, k)} for k in rows]
     tree = _tree(items)
     scored = [i["progress"] for i in items if i["progress"] is not None]
     company_rows = [n for n in tree if n["level"] == "company"]

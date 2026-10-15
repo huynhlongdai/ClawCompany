@@ -30,3 +30,15 @@ def compliance_tick():
         return compliance_calendar.tick(db)
     finally:
         db.close()
+
+
+@celery_app.task(name="kpi.snapshot")
+def kpi_snapshot():
+    """M2d.2: lưu số KPI của kỳ hiện tại (upsert) + đóng băng kỳ vừa qua, cho mọi công ty có KPI."""
+    from app.db.session import SessionLocal
+    from app.services import kpi_cascade
+    db = SessionLocal()
+    try:
+        return kpi_cascade.tick(db)
+    finally:
+        db.close()

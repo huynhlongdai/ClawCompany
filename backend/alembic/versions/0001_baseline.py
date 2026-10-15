@@ -90,7 +90,8 @@ COLUMNS_OWNED_BY_LATER_MIGRATIONS = {
               "acceptance_criteria",
               "checkout_run_id",                     # 0019_task_runs
               "execution_policy", "execution_state",  # 0022_execution_policy
-              "assignee_department_id"],             # 0024_department_routing
+              "assignee_department_id",              # 0024_department_routing
+              "completed_at"],                       # 0045_kpi_history
     "departments": ["row_revision", "status",       # 0013, 0014
                     "guide"],                       # 0024
     "inbox_items": ["task_id", "group_key", "kinds", "count", "body"],   # 0025_inbox_escalation

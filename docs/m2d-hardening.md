@@ -32,3 +32,23 @@ gian theo đường đi/nhánh. Lần chạy hiện bước "Bỏ qua" + lý do,
 
 Giới hạn tự khai: kết quả bước do người ghi qua UI/API (agent chưa có tool MCP để ghi `outcome`; bước sau xét
 lúc tới lượt nên phải ghi trước khi chuyển Xong); điều kiện một vế (chưa AND/OR); chu trình vẫn tính giờ đồng hồ.
+
+## 2. Lịch sử KPI (migration `0045_kpi_history`)
+
+**Mốc "xong"**: `tasks.completed_at` — listener ORM trên `Task.status` ghi lúc chuyển sang `done` (mọi đường đổi trạng
+thái qua ORM, kể cả không qua `task_lifecycle`), mở lại thì xoá. Backfill: lần cuối có sự kiện `task.done` trong
+`company_events.occurred_at`; không có → `updated_at`. KPI `tasks_done`, `cost_per_task_usd`, `first_pass_rate` và giao
+ban D6 đếm theo `coalesce(completed_at, updated_at)` (sửa việc đã xong không còn dời nó sang kỳ khác).
+
+**Snapshot**: `kpi_snapshots` (một hàng / KPI × kỳ, UNIQUE): giá trị, nguồn (auto/manual), mục tiêu, tiến độ, sức khoẻ,
+`trigger` (beat | manual | close | backfill), `final`. `kpi_cascade.snapshot_company`: (1) kỳ trước đang có số "chạy" →
+tính lại tại cuối kỳ đó, đóng băng (`close`); (2) tuỳ chọn `backfill` ≤ 12 kỳ cũ chưa có số → tính lại từ dữ liệu hiện
+có, bỏ qua chỉ số tại một thời điểm (`approvals_pending` — không dựng lại được quá khứ) và KPI nhập tay của kỳ trước khi
+KPI tồn tại; (3) upsert kỳ hiện tại. Beat `kpi.snapshot` mỗi giờ; `POST /team/kpis/snapshot {company_id, backfill}`
+(manager). `GET /team/kpis` trả `history` (≤ 8 kỳ gần nhất cùng loại kỳ) mỗi KPI.
+
+**UI**: cột "Xu hướng" — sparkline SVG theo kỳ, màu theo sức khoẻ kỳ cuối, tooltip từng kỳ (đánh dấu kỳ đang chạy);
+nút "Chụp số ngay" (lưu kỳ này + tính lại 5 kỳ trước).
+
+Giới hạn tự khai: số backfill là "tính lại hôm nay cho kỳ cũ" — việc bị xoá/sửa từ đó tới nay làm lệch; không có
+snapshot theo ngày (chỉ theo kỳ của KPI).

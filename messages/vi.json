@@ -2744,6 +2744,13 @@
   "op_<=": "tới (≤)",
   "op_empty": "trống",
   "op_not_empty": "có giá trị",
-  "flow_hint": "Chọn nhiều bước ở \"Chạy sau\" để gộp nhánh; nhiều bước cùng chạy sau một bước thì chạy song song. Điều kiện sai → bước bị bỏ qua và các bước chỉ phụ thuộc nó cũng bỏ qua."
+  "flow_hint": "Chọn nhiều bước ở \"Chạy sau\" để gộp nhánh; nhiều bước cùng chạy sau một bước thì chạy song song. Điều kiện sai → bước bị bỏ qua và các bước chỉ phụ thuộc nó cũng bỏ qua.",
+  "trend": "Xu hướng",
+  "trend_none": "chưa có lịch sử",
+  "trend_one": "1 kỳ — cần ≥ 2 kỳ",
+  "trend_running": "đang chạy",
+  "snapshot": "Chụp số ngay",
+  "snapshot_hint": "Lưu số KPI của kỳ hiện tại và tính lại tối đa 5 kỳ trước từ dữ liệu đang có (trừ chỉ số tại một thời điểm như phê duyệt đang chờ). Hệ thống cũng tự chụp mỗi giờ.",
+  "snapshot_done": "Đã lưu {p0} KPI cho kỳ này, tính lại {p1} kỳ cũ."
  }
 }

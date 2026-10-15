@@ -123,6 +123,11 @@ def cancel_instance(instance_id: int, principal: Principal = Depends(require_rol
 from app.services import kpi_cascade as kc  # noqa: E402
 
 
+class KpiSnapIn(BaseModel):
+    company_id: int | None = None
+    backfill: int = Field(default=0, ge=0, le=12)
+
+
 class KpiIn(BaseModel):
     company_id: int | None = None
     level: str | None = Field(default=None, max_length=16)
@@ -182,6 +187,14 @@ def record_kpi(kpi_id: int, payload: MeasureIn, principal: Principal = Depends(r
 @router.post("/kpis/sync-positions")
 def sync_position_kpis(payload: CompanyIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
     return kc.sync_positions(db, active_org(principal), payload.company_id)
+
+
+@router.post("/kpis/snapshot")
+def snapshot_kpis(payload: KpiSnapIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    """M2d.2: chụp số KPI ngay (kỳ hiện tại) + tuỳ chọn tính lại ``backfill`` kỳ cũ từ dữ liệu hiện có."""
+    from app.services.company_foundation import _company
+    co = _company(db, active_org(principal), payload.company_id)
+    return kc.snapshot_company(db, co.id, trigger="manual", backfill=payload.backfill)
 
 
 # ------------------------------------------------------------------ D6 nhịp vận hành

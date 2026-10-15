@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Agent, Approval, Company, Department, Member, Project, Task
@@ -114,7 +115,8 @@ def collect(db: Session, company_id: int, department_id: int | None, kind: str, 
     base = db.query(Task).join(Project, Project.id == Task.project_id).filter(Project.company_id == company_id)
     if department_id:
         base = base.filter((Task.assignee_member_id.in_(members or [-1])) | (Task.assignee_department_id == department_id))
-    done = base.filter(Task.status == "done", Task.updated_at >= since).order_by(Task.updated_at.desc()).all()
+    done_at = func.coalesce(Task.completed_at, Task.updated_at)   # M2d.2: mốc xong thật, không phải lần sửa cuối
+    done = base.filter(Task.status == "done", done_at >= since).order_by(done_at.desc()).all()
     doing = base.filter(Task.status.in_(("in_progress", "review"))).all()
     blocked = base.filter(Task.status == "blocked").all()
     overdue = base.filter(Task.status.in_(OPEN), Task.due_at.isnot(None), Task.due_at < now).all()

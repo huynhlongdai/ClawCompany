@@ -113,6 +113,10 @@ class Task(Base, TimestampMixin, RevisionMixin):
     # D3.1 (0024_department_routing): việc giao cho phòng ban; trưởng phòng
     # được đánh thức (lý do ``routed``) để chọn người. Chỉ services/routing.py ghi.
     assignee_department_id: Mapped[int | None] = mapped_column(ForeignKey("departments.id"), nullable=True, index=True)
+    # M2d.2 (0045_kpi_history): lúc việc chuyển sang "done" — mốc "xong trong kỳ" của KPI/giao ban
+    # (trước đó dùng updated_at, lệch khi việc đã xong bị sửa lại). Ghi bởi listener bên dưới cho MỌI
+    # đường đổi trạng thái qua ORM; rời "done" (mở lại) thì xoá.
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 
 class KnowledgeDocument(Base, TimestampMixin):
     __tablename__ = "knowledge_documents"
@@ -155,3 +159,14 @@ class Approval(Base, TimestampMixin):
     # D3.3: kế hoạch chiến lược (action='strategy') — nội dung có cấu trúc + số lần sửa.
     payload: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
     revision: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+
+
+from sqlalchemy import event as _sa_event  # noqa: E402
+
+
+@_sa_event.listens_for(Task.status, "set")
+def _task_completed_at(target, value, oldvalue, initiator):  # noqa: ARG001
+    if value == "done" and oldvalue != "done":
+        target.completed_at = datetime.utcnow()
+    elif value != "done" and oldvalue == "done":
+        target.completed_at = None

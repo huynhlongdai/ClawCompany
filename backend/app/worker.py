@@ -40,6 +40,8 @@ CORE_BEAT_SCHEDULE = {
     "tick-operating-rhythm": {"task": "rhythm.tick", "schedule": 300.0},
     # M2c D7: lịch tuân thủ — sinh hạn + nhắc trước N ngày (idempotent: mỗi hạn nhắc một lần).
     "tick-compliance-calendar": {"task": "compliance.tick", "schedule": 3600.0},
+    # M2d.2: lịch sử KPI — chụp số kỳ hiện tại + đóng băng kỳ vừa qua.
+    "snapshot-kpis": {"task": "kpi.snapshot", "schedule": 3600.0},
 }
 
 

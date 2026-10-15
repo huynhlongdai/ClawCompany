@@ -2744,6 +2744,13 @@
   "op_<=": "at most (≤)",
   "op_empty": "is empty",
   "op_not_empty": "is set",
-  "flow_hint": "Pick several steps under \"Runs after\" to join branches; steps that run after the same step run in parallel. A false condition skips the step and any step depending only on it."
+  "flow_hint": "Pick several steps under \"Runs after\" to join branches; steps that run after the same step run in parallel. A false condition skips the step and any step depending only on it.",
+  "trend": "Trend",
+  "trend_none": "no history yet",
+  "trend_one": "1 period — needs ≥ 2",
+  "trend_running": "in progress",
+  "snapshot": "Snapshot now",
+  "snapshot_hint": "Save this period's KPI values and recompute up to 5 past periods from existing data (except point-in-time metrics such as pending approvals). It also runs hourly.",
+  "snapshot_done": "Saved {p0} KPIs for this period, recomputed {p1} past periods."
  }
 }
