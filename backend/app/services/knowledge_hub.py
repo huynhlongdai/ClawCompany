@@ -167,7 +167,8 @@ def reindex(db: Session, doc: KnowledgeDocument) -> int:
 
 def _check_scope(db: Session, org_id: int, data: dict) -> dict:
     out = {"company_id": data.get("company_id"), "department_id": data.get("department_id"),
-           "project_id": data.get("project_id"), "agent_id": data.get("agent_id")}
+           "project_id": data.get("project_id"), "agent_id": data.get("agent_id"),
+           "role_keyword": (data.get("role_keyword") or "").strip()[:120]}
     if out["department_id"]:
         d = db.get(Department, out["department_id"])
         if d is None:
@@ -184,7 +185,7 @@ def _check_scope(db: Session, org_id: int, data: dict) -> dict:
 
 
 def ingest(db: Session, org_id: int, *, title: str, content: str, source_type: str = "text",
-           source_url: str = "", scope: dict | None = None) -> dict:
+           source_url: str = "", scope: dict | None = None, is_core: bool = False) -> dict:
     content = (content or "").strip()
     if len(content) < 20:
         raise HTTPException(422, "Tài liệu trống hoặc quá ngắn (cần ít nhất 20 ký tự có chữ)")
@@ -197,10 +198,12 @@ def ingest(db: Session, org_id: int, *, title: str, content: str, source_type: s
         q = q.filter(getattr(KnowledgeDocument, k) == v) if v is not None else q.filter(getattr(KnowledgeDocument, k).is_(None))
     old = q.first()
     if old is not None:
+        if is_core and not old.is_core:
+            old.is_core = True; db.add(old); db.commit()
         return {**public(db, old), "duplicate": True}
     doc = KnowledgeDocument(organization_id=org_id, title=(title or "Tài liệu").strip()[:220], content=content,
                             source_type=source_type, source_url=source_url[:1000], content_hash=h,
-                            synced_at=datetime.utcnow(), access_level="restricted", **sc)
+                            synced_at=datetime.utcnow(), access_level="restricted", is_core=bool(is_core), **sc)
     db.add(doc); db.commit(); db.refresh(doc)
     reindex(db, doc)
     return {**public(db, doc), "duplicate": False}
@@ -257,6 +260,8 @@ def delete(db: Session, org_id: int, doc_id: int) -> dict:
 
 
 def scope_label(db: Session, doc: KnowledgeDocument) -> str:
+    if doc.role_keyword and not doc.agent_id:
+        return f"Nghề: {doc.role_keyword}"
     if doc.agent_id:
         ag = db.get(Agent, doc.agent_id); m = db.get(Member, ag.member_id) if ag else None
         return f"Riêng {m.name}" if m else "Riêng một agent"
@@ -274,7 +279,8 @@ def public(db: Session, doc: KnowledgeDocument) -> dict:
     return {"id": doc.id, "title": doc.title, "source_type": doc.source_type, "source_url": doc.source_url or "",
             "chars": len(doc.content or ""), "chunks": n, "scope": scope_label(db, doc),
             "company_id": doc.company_id, "department_id": doc.department_id, "project_id": doc.project_id,
-            "agent_id": doc.agent_id, "synced_at": doc.synced_at.isoformat() if doc.synced_at else None,
+            "agent_id": doc.agent_id, "is_core": bool(doc.is_core), "role_keyword": doc.role_keyword or "",
+            "layer": layer_of(doc), "synced_at": doc.synced_at.isoformat() if doc.synced_at else None,
             "created_at": doc.created_at.isoformat() if getattr(doc, "created_at", None) else None}
 
 
@@ -306,7 +312,7 @@ def search(db: Session, org_id: int, query: str, *, member: Member | None = None
     import json as _json
     query = (query or "").strip()
     qt = set(_tokens(query))
-    docs = {d.id: d for d in visible_docs_query(db, org_id, member, agent).all()}
+    docs = {d.id: d for d in visible_docs_query(db, org_id, member, agent).all() if role_ok(d, member)}
     if not qt or not docs:
         hits = []
     else:
@@ -383,3 +389,108 @@ def resolve_gap(db: Session, org_id: int, gap_id: int, *, document_id: int | Non
     g.resolved_at = datetime.utcnow()
     db.add(g); db.commit()
     return {"id": g.id, "status": g.status}
+
+
+# ------------------------------------------------------------------ kiến thức cốt lõi 3 lớp → AGENTS.md
+# Đo trên VM (eval CSKH 15/10/2026): agent KHÔNG tự gọi company_knowledge_search khi khách hỏi chính sách,
+# kể cả khi AGENTS.md dặn — chỉ tra khi được nhắc "dựa theo tài liệu". Nên phần cốt lõi phải nằm sẵn trong
+# ngữ cảnh (bài học FastClaw: kho nhỏ thì nhúng thẳng). Ba lớp: riêng agent / nghề (chức danh) / công ty.
+
+CORE_BUDGET = 12_000
+LAYER_BUDGET = {"personal": 3_000, "profession": 4_500, "company": 4_500}
+LAYER_VI = {"personal": "Riêng bạn", "profession": "Nghề nghiệp", "company": "Công ty"}
+
+
+def layer_of(doc: KnowledgeDocument) -> str:
+    if doc.agent_id:
+        return "personal"
+    if doc.role_keyword:
+        return "profession"
+    return "company"
+
+
+def role_ok(doc: KnowledgeDocument, member: Member | None) -> bool:
+    kw = (doc.role_keyword or "").strip().lower()
+    return not kw or member is None or kw in (member.role or "").lower()
+
+
+def core_docs(db: Session, org_id: int, *, company_id: int | None, department_id: int | None, role: str,
+              agent_id: int | None) -> list[KnowledgeDocument]:
+    q = (db.query(KnowledgeDocument).filter(KnowledgeDocument.organization_id == org_id, KnowledgeDocument.is_core.is_(True),
+                                            KnowledgeDocument.project_id.is_(None))
+         .filter(or_(KnowledgeDocument.company_id.is_(None), KnowledgeDocument.company_id == company_id))
+         .filter(or_(KnowledgeDocument.department_id.is_(None), KnowledgeDocument.department_id == department_id))
+         .filter(or_(KnowledgeDocument.agent_id.is_(None), KnowledgeDocument.agent_id == (agent_id or -1))))
+    r = (role or "").lower()
+    return [d for d in q.order_by(KnowledgeDocument.id).all() if not d.role_keyword or d.role_keyword.lower() in r]
+
+
+def core_section(db: Session, org_id: int, *, company_id: int | None, department_id: int | None, role: str,
+                 agent_id: int | None) -> str:
+    docs = core_docs(db, org_id, company_id=company_id, department_id=department_id, role=role, agent_id=agent_id)
+    if not docs:
+        return ""
+    parts = ["## Kiến thức cốt lõi (luôn áp dụng khi trả lời; chi tiết khác: company_knowledge_search)"]
+    for layer in ("personal", "profession", "company"):
+        mine = [d for d in docs if layer_of(d) == layer]
+        if not mine:
+            continue
+        left = LAYER_BUDGET[layer]
+        head = LAYER_VI[layer] + (f" — {role}" if layer == "profession" and role else "")
+        parts.append(f"### {head}")
+        for d in mine:
+            body = re.sub(r"\n{3,}", "\n\n", (d.content or "").strip())
+            if left <= 200:
+                parts.append(f"- {d.title}: đọc bằng company_knowledge_get document_id={d.id}")
+                continue
+            take = body[:left - 120]
+            more = len(body) > len(take)
+            parts.append(f"#### {d.title}\n{take}" + (f"\n(… còn tiếp: company_knowledge_get document_id={d.id})" if more else ""))
+            left -= len(take) + len(d.title) + 20
+    text = "\n\n".join(parts)
+    return text[:CORE_BUDGET]
+
+
+def core_for_member(db: Session, member: Member, agent: Agent | None) -> str:
+    return core_section(db, member.organization_id, company_id=member.company_id, department_id=member.department_id,
+                        role=member.role or "", agent_id=agent.id if agent else None)
+
+
+def update_doc(db: Session, org_id: int, doc_id: int, data: dict) -> tuple[dict, bool]:
+    """Sửa tiêu đề / cờ cốt lõi / lớp nghề. Trả (tài liệu, có ảnh hưởng tới phần cốt lõi không)."""
+    doc = get(db, org_id, doc_id)
+    before = (doc.is_core, doc.role_keyword or "", doc.title)
+    if data.get("title"):
+        doc.title = data["title"].strip()[:220]
+    if data.get("is_core") is not None:
+        doc.is_core = bool(data["is_core"])
+    if data.get("role_keyword") is not None:
+        doc.role_keyword = data["role_keyword"].strip()[:120]
+    db.add(doc); db.commit()
+    after = (doc.is_core, doc.role_keyword or "", doc.title)
+    return public(db, doc), (before != after and (before[0] or after[0]))
+
+
+def core_preview(db: Session, org_id: int, agent_id: int) -> dict:
+    from app.services import agent_hr
+    ag, m = agent_hr.seat(db, org_id, agent_id)
+    text = core_for_member(db, m, ag)
+    docs = core_docs(db, org_id, company_id=m.company_id, department_id=m.department_id, role=m.role or "", agent_id=ag.id)
+    return {"agent_id": ag.id, "chars": len(text), "budget": CORE_BUDGET, "text": text,
+            "documents": [{"id": d.id, "title": d.title, "layer": layer_of(d), "layer_vi": LAYER_VI[layer_of(d)]} for d in docs]}
+
+
+async def sync_core(db: Session, principal, org_id: int, runtime) -> dict:
+    """Sinh lại AGENTS.md cho mọi seat đang làm (kèm phần cốt lõi mới)."""
+    from app.services import agent_hr
+    seats = (db.query(Agent, Member).join(Member, Member.id == Agent.member_id)
+             .filter(Member.organization_id == org_id, Agent.lifecycle.notin_(("retired", "runtime_missing"))).all())
+    rows = []
+    for ag, m in seats:
+        try:
+            out = await agent_hr.update_hr(db, principal, org_id, runtime, ag.id, {"regenerate_files": ["AGENTS.md"]}, set())
+            w = ((out.get("files") or {}).get("AGENTS.md") or {})
+            rows.append({"agent_id": ag.id, "name": m.name, "written": bool(w.get("written")), "note": w.get("reason") or ""})
+        except Exception as exc:  # noqa: BLE001
+            rows.append({"agent_id": ag.id, "name": m.name, "written": False, "note": str(getattr(exc, "detail", exc))[:200]})
+    return {"seats": rows, "written": sum(r["written"] for r in rows)}

@@ -2197,6 +2197,17 @@
   "ev_k": "Tries per case (k)",
   "ev_k_hint": "1–5; use 3 for customer-facing agents",
   "ev_luu": "Save suite",
-  "ev_da_luu": "Suite saved"
+  "ev_da_luu": "Suite saved",
+  "pv_nghe": "Profession (by job title)",
+  "chuc_danh_chua": "Job title contains",
+  "chuc_danh_hint": "Every agent whose title contains this",
+  "chuc_danh_ph": "e.g. customer support",
+  "cot_loi": "Core knowledge",
+  "cot_loi_hint": "Always in the agent's profile (no lookup needed). Use for policies, hours, prices, scripts — keep it short; about 12,000 characters per agent across 3 layers: personal, profession, company.",
+  "cot_loi_ngan": "Core",
+  "dat_cot_loi": "Make core",
+  "bo_cot_loi": "Unset core",
+  "da_dat_cot_loi": "Marked core — updating agent profiles",
+  "da_bo_cot_loi": "Unset core — updating agent profiles"
  }
 }

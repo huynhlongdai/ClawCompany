@@ -2197,6 +2197,17 @@
   "ev_k": "Số lần mỗi ca (k)",
   "ev_k_hint": "1–5; agent gặp khách nên để 3",
   "ev_luu": "Lưu bộ đánh giá",
-  "ev_da_luu": "Đã lưu bộ đánh giá"
+  "ev_da_luu": "Đã lưu bộ đánh giá",
+  "pv_nghe": "Nghề nghiệp (theo chức danh)",
+  "chuc_danh_chua": "Chức danh chứa",
+  "chuc_danh_hint": "Mọi agent có chức danh chứa chữ này",
+  "chuc_danh_ph": "ví dụ: chăm sóc khách",
+  "cot_loi": "Kiến thức cốt lõi",
+  "cot_loi_hint": "Luôn nằm sẵn trong hồ sơ agent (không cần tra). Dùng cho chính sách, giờ làm, giá, kịch bản — ngắn gọn; mỗi agent tối đa ~12.000 ký tự cho 3 lớp: riêng, nghề, công ty.",
+  "cot_loi_ngan": "Cốt lõi",
+  "dat_cot_loi": "Đặt cốt lõi",
+  "bo_cot_loi": "Bỏ cốt lõi",
+  "da_dat_cot_loi": "Đã đặt cốt lõi — đang cập nhật hồ sơ agent",
+  "da_bo_cot_loi": "Đã bỏ cốt lõi — đang cập nhật hồ sơ agent"
  }
 }

@@ -129,6 +129,9 @@ class KnowledgeDocument(Base, TimestampMixin):
     content_hash: Mapped[str] = mapped_column(String(64), default="", server_default="", index=True)
     synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     agent_id: Mapped[int | None] = mapped_column(ForeignKey("agents.id"), nullable=True, index=True)
+    # Kiến thức cốt lõi (luôn nằm trong AGENTS.md của seat) + lớp nghề nghiệp (chức danh chứa chữ này).
+    is_core: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    role_keyword: Mapped[str] = mapped_column(String(120), default="", server_default="")
 
 class Approval(Base, TimestampMixin):
     __tablename__ = "approvals"

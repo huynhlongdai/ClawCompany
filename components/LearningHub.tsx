@@ -39,30 +39,34 @@ export function LearningHub() {
 }
 
 function ScopePicker({o, v, set}: {o: Any; v: Any; set: (x: Any) => void}) {
-  const kinds = [["org", tr("learning.pv_to_chuc")], ["department", tr("learning.pv_phong")], ["project", tr("learning.pv_du_an")], ["agent", tr("learning.pv_agent")]];
+  const kinds = [["org", tr("learning.pv_to_chuc")], ["role", tr("learning.pv_nghe")], ["department", tr("learning.pv_phong")], ["project", tr("learning.pv_du_an")], ["agent", tr("learning.pv_agent")]];
   const list = !o ? [] : v.kind === "department" ? o.departments : v.kind === "project" ? o.projects : v.kind === "agent" ? o.agents : [];
   return <div className="ui-form-row">
     <Field label={tr("learning.pham_vi")}><select className="ui-select" value={v.kind} onChange={e => set({kind: e.target.value, id: ""})}>
       {kinds.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
-    {v.kind !== "org" && <Field label={tr("learning.thuoc")}><select className="ui-select" value={v.id} onChange={e => set({...v, id: e.target.value})}>
+    {v.kind === "role" && <Field label={tr("learning.chuc_danh_chua")} hint={tr("learning.chuc_danh_hint")}><input className="ui-input"
+      value={v.id} onChange={e => set({...v, id: e.target.value})} placeholder={tr("learning.chuc_danh_ph")}/></Field>}
+    {v.kind !== "org" && v.kind !== "role" && <Field label={tr("learning.thuoc")}><select className="ui-select" value={v.id} onChange={e => set({...v, id: e.target.value})}>
       <option value="">{tr("learning.chon")}</option>{list.map((x: Any) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></Field>}
   </div>;
 }
 
-const scopeBody = (v: Any) => v.kind === "org" || !v.id ? {} : {[`${v.kind}_id`]: Number(v.id)};
+const scopeBody = (v: Any) => v.kind === "org" || !v.id ? {} : v.kind === "role" ? {role_keyword: String(v.id).trim()}
+  : {[`${v.kind}_id`]: Number(v.id)};
 
 function Library({canEdit, o}: {canEdit: boolean; o: Any}) {
   const q = useLoad(async () => (await apiLearning.docs()).items as Any[], []);
   const act = useAction();
   const [mode, setMode] = useState<"text" | "url" | "file">("text");
-  const [f, setF] = useState<Any>({title: "", content: "", url: ""});
+  const [f, setF] = useState<Any>({title: "", content: "", url: "", core: false});
   const [file, setFile] = useState<File | null>(null);
   const [scope, setScope] = useState<Any>({kind: "org", id: ""});
   const [s, setS] = useState(""), [res, setRes] = useState<Any>(null);
   const add = () => act.run("add", async () => {
-    const r = mode === "file" && file ? await apiLearning.upload(file, {title: f.title, ...scopeBody(scope)})
-      : await apiLearning.addDoc(mode === "url" ? {url: f.url, title: f.title, ...scopeBody(scope)} : {title: f.title, content: f.content, ...scopeBody(scope)});
-    setF({title: "", content: "", url: ""}); setFile(null); await q.reload();
+    const extra = {...scopeBody(scope), is_core: f.core};
+    const r = mode === "file" && file ? await apiLearning.upload(file, {title: f.title, ...extra})
+      : await apiLearning.addDoc(mode === "url" ? {url: f.url, title: f.title, ...extra} : {title: f.title, content: f.content, ...extra});
+    setF({title: "", content: "", url: "", core: false}); setFile(null); await q.reload();
     return r;
   }, tr("learning.da_nap"));
   const ready = mode === "text" ? f.content.trim().length >= 20 && f.title.trim() : mode === "url" ? /^https?:\/\//.test(f.url) : !!file;
@@ -81,6 +85,9 @@ function Library({canEdit, o}: {canEdit: boolean; o: Any}) {
         {mode === "file" && <Field label={tr("learning.tep")} hint={tr("learning.tep_hint")}><input type="file"
           accept=".pdf,.docx,.md,.markdown,.txt,.csv,.html,.htm" onChange={e => setFile(e.target.files?.[0] || null)}/></Field>}
         <ScopePicker o={o} v={scope} set={setScope}/>
+        <label style={{display: "flex", gap: 6, alignItems: "flex-start"}}><input type="checkbox" checked={f.core}
+          onChange={e => setF({...f, core: e.target.checked})} data-testid="kb-core"/>
+          <span><b>{tr("learning.cot_loi")}</b><br/><small>{tr("learning.cot_loi_hint")}</small></span></label>
         <div className="ui-toolbar"><Button variant="primary" busy={act.busy === "add"} disabled={!ready} onClick={add}>{tr("learning.nap")}</Button></div>
       </div>
     </Panel>}
@@ -98,10 +105,13 @@ function Library({canEdit, o}: {canEdit: boolean; o: Any}) {
     <Panel title={tr("learning.kho")} desc={tr("learning.so_tai_lieu", {p0: q.data.length})}>
       <Table rows={q.data} empty={tr("learning.kho_trong")} testId="kb-list" cols={[
         {label: tr("learning.tai_lieu"), render: d => <><b>{d.title}</b><br/><small>#{d.id} · {d.chunks} {tr("learning.doan")} · {Math.round(d.chars / 1000)}k {tr("learning.ky_tu")}</small></>},
-        {label: tr("learning.pham_vi"), render: d => <Pill s="info" label={d.scope}/>},
+        {label: tr("learning.pham_vi"), render: d => <><Pill s="info" label={d.scope}/>{d.is_core ? <> <Pill s="ok" label={tr("learning.cot_loi_ngan")}/></> : null}</>},
         {label: tr("learning.nguon"), render: d => d.source_url ? <a href={d.source_url} target="_blank" rel="noreferrer">{tr(`learning.src_${d.source_type}` as any)}</a> : tr(`learning.src_${d.source_type}` as any), hideSm: true},
         {label: tr("learning.dong_bo"), render: d => <small>{fmt(d.synced_at)}</small>, hideSm: true},
         ...(canEdit ? [{label: "", render: (d: Any) => <div className="ui-toolbar">
+          <Button size="sm" busy={act.busy === `core${d.id}`} onClick={() => act.run(`core${d.id}`, async () => {
+            await apiLearning.patchDoc(d.id, {is_core: !d.is_core}); await q.reload(); }, d.is_core ? tr("learning.da_bo_cot_loi") : tr("learning.da_dat_cot_loi"))}>
+            {d.is_core ? tr("learning.bo_cot_loi") : tr("learning.dat_cot_loi")}</Button>
           {d.source_url && <Button size="sm" busy={act.busy === `rs${d.id}`} onClick={() => act.run(`rs${d.id}`, async () => {
             const r = await apiLearning.resync(d.id); await q.reload(); return r; }, tr("learning.da_dong_bo"))}>{tr("learning.dong_bo_lai")}</Button>}
           <Button size="sm" onClick={() => { if (window.confirm(tr("learning.xac_nhan_xoa"))) act.run(`rm${d.id}`, async () => { await apiLearning.removeDoc(d.id); await q.reload(); }, tr("learning.da_xoa")); }}>{tr("learning.xoa")}</Button>

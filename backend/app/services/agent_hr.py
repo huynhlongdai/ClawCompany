@@ -109,7 +109,7 @@ def render_files(*, name: str, role: str, company: str, department: str, manager
                  personality: str = DEFAULT_PERSONALITY, emoji: str = "", job_description: str = "",
                  manager_notes: str = "", monthly_budget: float | None = None,
                  hired_on: str | None = None, address_style: str = DEFAULT_ADDRESS_STYLE,
-                 daily_cap_usd: float | None = None) -> dict[str, str]:
+                 daily_cap_usd: float | None = None, core_knowledge: str = "") -> dict[str, str]:
     """5 file tiếng Việt từ hồ sơ. Vượt hạn mức ký tự → 422 (không cắt hộ)."""
     p = PERSONALITIES.get(personality) or PERSONALITIES[DEFAULT_PERSONALITY]
     a = ADDRESS_STYLES.get(address_style) or ADDRESS_STYLES[DEFAULT_ADDRESS_STYLE]
@@ -163,7 +163,8 @@ def render_files(*, name: str, role: str, company: str, department: str, manager
         "- Mã trích dẫn [KB#…] chỉ dùng trong báo cáo nội bộ, không gửi cho khách.\n"
         "- Quyết định khó hoặc rủi ro (khiếu nại nặng, số tiền lớn): hỏi company_ask_advisor trước khi trả lời.\n"
         "- Rút ra được bài học đáng nhớ: đề xuất bằng company_lesson_propose (người quản lý duyệt mới ghi nhớ).\n\n"
-        f"## Ngân sách\n{budget_line}\n")
+        f"## Ngân sách\n{budget_line}\n"
+        + (f"\n{core_knowledge.strip()}\n" if core_knowledge.strip() else ""))
     notes = (manager_notes or "").strip() or ("- Báo cáo ngắn gọn, có số liệu và nguồn.\n"
                                               "- Hỏi lại khi yêu cầu chưa rõ.")
     user = f"# USER.md — Người quản lý muốn gì\n\nNgười quản lý: {boss}\n\n{notes}\n"
@@ -432,7 +433,8 @@ async def hire(db: Session, principal: Principal, org_id: int, runtime: Any, dat
                          manager=mgr.name if mgr else "", personality=personality, emoji=emoji,
                          job_description=data.get("job_description") or "",
                          manager_notes=data.get("manager_notes") or "", monthly_budget=budget,
-                         address_style=address_style, daily_cap_usd=daily_cap)
+                         address_style=address_style, daily_cap_usd=daily_cap,
+                         core_knowledge=_core_at_hire(db, org_id, co.id, dept.id if dept else None, role))
     rid = _unique_runtime_id(db, name)
     spec = {"personality": personality, "emoji": emoji, "address_style": address_style,
             "daily_cap_usd": daily_cap, "model_policy": model_policy,
@@ -507,6 +509,25 @@ async def hire(db: Session, principal: Principal, org_id: int, runtime: Any, dat
 
 # --------------------------------------------------------------------- sửa hồ sơ (2 chiều)
 
+def _core_for(db: Session, member: Member, agent: Agent) -> str:
+    from app.services import knowledge_hub
+    try:
+        return knowledge_hub.core_for_member(db, member, agent)
+    except Exception as exc:  # noqa: BLE001 — thiếu phần cốt lõi không được chặn sinh file
+        print(f"[core] {exc}")
+        return ""
+
+
+def _core_at_hire(db: Session, org_id: int, company_id: int | None, department_id: int | None, role: str) -> str:
+    from app.services import knowledge_hub
+    try:
+        return knowledge_hub.core_section(db, org_id, company_id=company_id, department_id=department_id,
+                                          role=role or "", agent_id=None)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[core] {exc}")
+        return ""
+
+
 async def _regen(db: Session, runtime: Any, agent: Agent, member: Member, names: tuple[str, ...],
                  user_id: int | None, force: tuple[str, ...] = ()) -> dict[str, dict]:
     """Sinh lại file từ hồ sơ. Hai chốt, theo thứ tự:
@@ -523,7 +544,8 @@ async def _regen(db: Session, runtime: Any, agent: Agent, member: Member, names:
                          manager_notes=spec.get("manager_notes") or "",
                          monthly_budget=spec.get("monthly_budget"),
                          address_style=spec.get("address_style") or DEFAULT_ADDRESS_STYLE,
-                         daily_cap_usd=spec.get("daily_cap_usd"), **_ctx(db, member))
+                         daily_cap_usd=spec.get("daily_cap_usd"), core_knowledge=_core_for(db, member, agent),
+                         **_ctx(db, member))
     snaps = snapshots(db, agent.id)
     result: dict[str, dict] = {}
     for fname in names:

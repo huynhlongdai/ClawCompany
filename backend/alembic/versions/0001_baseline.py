@@ -97,7 +97,8 @@ COLUMNS_OWNED_BY_LATER_MIGRATIONS = {
                   "payload", "revision"],                                 # 0027_strategy_plans
     "user_organization_access": ["status"],                                 # 0028_team_invitations
     "users": ["locale"],                                                    # 0031_user_locale
-    "knowledge_documents": ["source_url", "content_hash", "synced_at", "agent_id"],   # 0033_learning
+    "knowledge_documents": ["source_url", "content_hash", "synced_at", "agent_id",   # 0033_learning
+                            "is_core", "role_keyword"],                            # 0036_core_knowledge
 }
 
 # 0014 tự tạo index unique này; model cũng khai nó, nên create_all sẽ tạo

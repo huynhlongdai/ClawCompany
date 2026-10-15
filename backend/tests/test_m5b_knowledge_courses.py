@@ -212,3 +212,35 @@ def test_memory_search_also_returns_library_hits(L):
     ctx = company_mcp.ToolContext(db=L.db, member=m, agent=ag, scopes=["company.knowledge:read"])
     r = company_mcp.TOOLS["company_memory_search"].handler(ctx, {"query": "hàng vỡ khi vận chuyển gửi ảnh"})
     assert r["knowledge"] and "48 giờ" in r["knowledge"][0]["content"] and r["knowledge"][0]["cite"].startswith("[KB#")
+
+
+def test_core_knowledge_three_layers_compiled_into_agents_md(L):
+    a = hire(L)                                   # chức danh: "Nhân viên chăm sóc khách"
+    b = hire(L, name="Minh Khoa", role="Nhân viên kho")
+    ag_a = L.db.get(Agent, a["agent_id"])
+    add(L, title="Chính sách đổi trả", content=POLICY, is_core=True)
+    add(L, title="Kịch bản CSKH", content="Luôn chào khách bằng tên và hỏi mã đơn trước khi xử lý.", is_core=True,
+        role_keyword="chăm sóc")
+    add(L, title="Ghi chú riêng Trang", content="Khách VIP Lan thích men lam, tặng kèm thiệp viết tay.", is_core=True,
+        agent_id=ag_a.id)
+    add(L, title="Tài liệu tra cứu", content="Bảng mã màu men chi tiết dùng khi khách hỏi sâu về kỹ thuật nung.")
+    pa = L.c.get(f"/api/learning/core/{a['agent_id']}", headers=L.tok("member")).json()
+    pb = L.c.get(f"/api/learning/core/{b['agent_id']}", headers=L.tok("member")).json()
+    assert [d["layer"] for d in pa["documents"]] == ["company", "profession", "personal"]
+    assert "### Riêng bạn" in pa["text"] and "### Nghề nghiệp" in pa["text"] and "7 ngày" in pa["text"]
+    assert "Bảng mã màu" not in pa["text"]                                    # không cốt lõi → chỉ tra cứu
+    assert [d["layer"] for d in pb["documents"]] == ["company"] and "Kịch bản" not in pb["text"]
+    r = L.c.post("/api/learning/core/sync", headers=L.tok("manager"))
+    assert r.status_code == 200 and r.json()["written"] >= 2, r.text
+    agents_md = L.gw.files[(a["runtime_agent_id"], "AGENTS.md")]
+    assert "## Kiến thức cốt lõi" in agents_md and "Khách VIP Lan" in agents_md and "hỏi mã đơn" in agents_md
+    assert "Khách VIP Lan" not in L.gw.files[(b["runtime_agent_id"], "AGENTS.md")]
+    # lớp nghề cũng lọc tra cứu: seat kho không thấy kịch bản CSKH
+    mb = L.db.get(Member, L.db.get(Agent, b["agent_id"]).member_id)
+    assert not knowledge_hub.search(L.db, L.org.id, "kịch bản chào khách mã đơn", member=mb,
+                                    agent=L.db.get(Agent, b["agent_id"]), log_gap=False)["found"]
+    # tắt cốt lõi → bỏ khỏi AGENTS.md sau lần sync
+    doc_id = next(d["id"] for d in pa["documents"] if d["layer"] == "personal")
+    r = L.c.patch(f"/api/learning/docs/{doc_id}", json={"is_core": False}, headers=L.tok("manager"))
+    assert r.json()["core_sync"] is True
+    assert "Khách VIP Lan" not in L.c.get(f"/api/learning/core/{a['agent_id']}", headers=L.tok("member")).json()["text"]

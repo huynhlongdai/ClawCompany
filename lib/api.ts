@@ -783,6 +783,10 @@ export const apiLearning = {
   },
   resync: (id: number) => request<any>(`/learning/docs/${id}/resync`, {method: "POST"}),
   removeDoc: (id: number) => request<any>(`/learning/docs/${id}`, {method: "DELETE"}),
+  patchDoc: (id: number, body: {title?: string; is_core?: boolean; role_keyword?: string}) =>
+    request<any>(`/learning/docs/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  corePreview: (agentId: number) => request<any>(`/learning/core/${agentId}`),
+  coreSync: () => request<any>(`/learning/core/sync`, {method: "POST"}),
   search: (q: string) => request<any>(`/learning/search?q=${encodeURIComponent(q)}`),
   gaps: (status = "open") => request<any>(`/learning/gaps?status=${status}`),
   resolveGap: (id: number, body: {document_id?: number | null; dismiss?: boolean}) =>

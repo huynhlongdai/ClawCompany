@@ -1,5 +1,5 @@
 """M5b việc 9 — kho tri thức hợp nhất, lỗ hổng kiến thức, khoá học của agent."""
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -17,12 +17,28 @@ class Scope(BaseModel):
     department_id: int | None = None
     project_id: int | None = None
     agent_id: int | None = None
+    role_keyword: str = Field(default="", max_length=120)   # lớp nghề nghiệp: chức danh chứa chữ này
+
+
+def _schedule_core_sync(background: BackgroundTasks, principal: Principal, org_id: int) -> None:
+    """Tài liệu cốt lõi đổi → sinh lại AGENTS.md của mọi seat sau khi trả lời (phiên DB riêng)."""
+    async def run():
+        from app.db.session import SessionLocal
+        db = SessionLocal()
+        try:
+            await knowledge_hub.sync_core(db, principal, org_id, get_runtime())
+        except Exception as exc:  # noqa: BLE001
+            print(f"[core] sync failed: {exc}")
+        finally:
+            db.close()
+    background.add_task(run)
 
 
 class DocIn(Scope):
     title: str = Field(default="", max_length=220)
     content: str = Field(default="", max_length=400_000)
     url: str = Field(default="", max_length=1000)
+    is_core: bool = False
 
 
 @router.get("/docs")
@@ -31,19 +47,27 @@ def docs(principal: Principal = Depends(require_human()), db: Session = Depends(
 
 
 @router.post("/docs")
-def add_doc(payload: DocIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
-    """Nạp văn bản dán trực tiếp, hoặc một URL (tải về, bỏ menu/script, giữ tiêu đề)."""
+def add_doc(payload: DocIn, background: BackgroundTasks, principal: Principal = Depends(require_role("manager")),
+            db: Session = Depends(get_db)):
+    """Nạp văn bản dán trực tiếp, hoặc một URL (tải về, bỏ menu/script, giữ tiêu đề).
+    ``is_core`` → nằm luôn trong AGENTS.md của các seat thuộc phạm vi (riêng agent / nghề / công ty)."""
     org = active_org(principal)
-    scope = payload.model_dump(include={"company_id", "department_id", "project_id", "agent_id"})
+    scope = payload.model_dump(include={"company_id", "department_id", "project_id", "agent_id", "role_keyword"})
     if payload.url:
         title, text = knowledge_hub.fetch_url(payload.url)
-        return knowledge_hub.ingest(db, org, title=payload.title or title or payload.url, content=text,
-                                    source_type="url", source_url=payload.url, scope=scope)
-    return knowledge_hub.ingest(db, org, title=payload.title, content=payload.content, source_type="text", scope=scope)
+        out = knowledge_hub.ingest(db, org, title=payload.title or title or payload.url, content=text,
+                                   source_type="url", source_url=payload.url, scope=scope, is_core=payload.is_core)
+    else:
+        out = knowledge_hub.ingest(db, org, title=payload.title, content=payload.content, source_type="text",
+                                   scope=scope, is_core=payload.is_core)
+    if out.get("is_core"):
+        _schedule_core_sync(background, principal, org)
+    return out
 
 
 @router.post("/docs/upload")
-async def upload_doc(file: UploadFile = File(...), title: str = Form(default=""),
+async def upload_doc(background: BackgroundTasks, file: UploadFile = File(...), title: str = Form(default=""),
+                     is_core: bool = Form(default=False), role_keyword: str = Form(default=""),
                      company_id: int | None = Form(default=None), department_id: int | None = Form(default=None),
                      project_id: int | None = Form(default=None), agent_id: int | None = Form(default=None),
                      principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
@@ -53,21 +77,61 @@ async def upload_doc(file: UploadFile = File(...), title: str = Form(default="")
     if len(data) > 20_000_000:
         raise HTTPException(422, "Tệp tối đa 20 MB")
     text = knowledge_hub.extract_text(file.filename or "", data)
-    return knowledge_hub.ingest(db, active_org(principal), title=title or (file.filename or "Tài liệu").rsplit(".", 1)[0],
-                                content=text, source_type="upload",
-                                scope={"company_id": company_id, "department_id": department_id,
-                                       "project_id": project_id, "agent_id": agent_id})
+    out = knowledge_hub.ingest(db, active_org(principal), title=title or (file.filename or "Tài liệu").rsplit(".", 1)[0],
+                               content=text, source_type="upload", is_core=is_core,
+                               scope={"company_id": company_id, "department_id": department_id,
+                                      "project_id": project_id, "agent_id": agent_id, "role_keyword": role_keyword})
+    if out.get("is_core"):
+        _schedule_core_sync(background, principal, active_org(principal))
+    return out
 
 
 @router.post("/docs/{doc_id}/resync")
-def resync_doc(doc_id: int, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def resync_doc(doc_id: int, background: BackgroundTasks, principal: Principal = Depends(require_role("manager")),
+               db: Session = Depends(get_db)):
     """Tải lại URL nguồn; nội dung đổi → chỉ mục lại + học viên các khoá dùng tài liệu này chuyển sang 'Cần ôn'."""
-    return knowledge_hub.resync(db, active_org(principal), doc_id)
+    out = knowledge_hub.resync(db, active_org(principal), doc_id)
+    if out.get("changed") and out.get("is_core"):
+        _schedule_core_sync(background, principal, active_org(principal))
+    return out
+
+
+class DocPatchIn(BaseModel):
+    title: str | None = Field(default=None, max_length=220)
+    is_core: bool | None = None
+    role_keyword: str | None = Field(default=None, max_length=120)
+
+
+@router.patch("/docs/{doc_id}")
+def patch_doc(doc_id: int, payload: DocPatchIn, background: BackgroundTasks,
+              principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    """Bật/tắt 'cốt lõi', đổi lớp nghề nghiệp. Ảnh hưởng phần cốt lõi → sinh lại AGENTS.md mọi seat."""
+    out, touched = knowledge_hub.update_doc(db, active_org(principal), doc_id, payload.model_dump(exclude_unset=True))
+    if touched:
+        _schedule_core_sync(background, principal, active_org(principal))
+    return {**out, "core_sync": bool(touched)}
 
 
 @router.delete("/docs/{doc_id}")
-def delete_doc(doc_id: int, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
-    return knowledge_hub.delete(db, active_org(principal), doc_id)
+def delete_doc(doc_id: int, background: BackgroundTasks, principal: Principal = Depends(require_role("manager")),
+               db: Session = Depends(get_db)):
+    core = knowledge_hub.get(db, active_org(principal), doc_id).is_core
+    out = knowledge_hub.delete(db, active_org(principal), doc_id)
+    if core:
+        _schedule_core_sync(background, principal, active_org(principal))
+    return out
+
+
+@router.get("/core/{agent_id}")
+def core_preview(agent_id: int, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    """Phần 'Kiến thức cốt lõi' sẽ nằm trong AGENTS.md của agent này (3 lớp, có hạn mức ký tự)."""
+    return knowledge_hub.core_preview(db, active_org(principal), agent_id)
+
+
+@router.post("/core/sync")
+async def core_sync(principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    """Sinh lại AGENTS.md cho mọi seat ngay (bình thường tự chạy sau khi tài liệu cốt lõi đổi)."""
+    return await knowledge_hub.sync_core(db, principal, active_org(principal), get_runtime())
 
 
 @router.get("/search")
