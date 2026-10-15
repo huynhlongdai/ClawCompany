@@ -497,7 +497,8 @@
   "luot_chay_gan_nhat": "Lượt chạy gần nhất",
   "nhat_ky_viec": "Nhật ký làm việc",
   "ngan_sach": "Ngân sách",
-  "da_chi": "Đã chi"
+  "da_chi": "Đã chi",
+  "cau_chu_se_ghi": "Câu chữ sẽ ghi vào ký ức (sửa được trước khi duyệt)"
  },
  "work": {
   "tam_dung": "tạm dừng",
@@ -1364,7 +1365,17 @@
   "them_ky_uc_placeholder": "Điều agent cần nhớ lâu dài, ví dụ: Khách Lan dị ứng men chì",
   "them_ky_uc": "Thêm ký ức",
   "da_them_ky_uc": "Đã thêm ký ức.",
-  "ky_uc_giai_thich": "Agent đọc MEMORY.md ở mỗi phiên. Nếu agent vừa tự ghi thêm, lưu sẽ báo xung đột để không đè mất; tải lại rồi làm tiếp. Nhật ký ngày (memory/…) chưa xem được qua gateway."
+  "ky_uc_giai_thich": "Agent đọc MEMORY.md ở mỗi phiên. Nếu agent vừa tự ghi thêm, lưu sẽ báo xung đột để không đè mất; tải lại rồi làm tiếp. Nhật ký ngày (memory/…) chưa xem được qua gateway.",
+  "bai_hoc": "Bài học",
+  "bai_hoc_mo_ta": "Đề xuất từ góp ý, agent tự rút hoặc tự đề xuất — chỉ ghi vào ký ức khi được duyệt",
+  "rut_bai_hoc": "Rút bài học",
+  "dang_rut": "Đang rút…",
+  "mo_hop_viec": "Mở Hộp việc",
+  "chua_co_bai_hoc": "Chưa có bài học nào. Bấm Rút bài học để agent đọc nhật ký việc gần đây và đề xuất.",
+  "bai_hoc_da_ghi": "Đã ghi vào ký ức",
+  "bai_hoc_duyet_chua_ghi": "Đã duyệt, chưa ghi được",
+  "bai_hoc_cho_duyet": "Chờ duyệt",
+  "bai_hoc_tu_choi": "Bị từ chối"
  },
  "seat": {
   "ho_so": "Hồ sơ",

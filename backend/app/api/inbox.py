@@ -61,6 +61,7 @@ class DecideIn(BaseModel):
     note: str = Field(default="", max_length=2000)
     expected_revision: int | None = None
     grant_scope: str | None = None   # chi tiếp ngân sách: task | seat | department
+    edited_text: str = Field(default="", max_length=600)   # bài học: người duyệt sửa câu chữ trước khi ghi
 
 
 @router.get("/items")
@@ -108,7 +109,7 @@ async def decide(approval_id: int, payload: DecideIn, principal: Principal = Dep
     """Duyệt một chạm. Từ chối phải có lý do. 409 khi đã có người quyết / nội dung vừa đổi."""
     return await inbox_hub.decide(db, active_org(principal), principal, approval_id, decision=payload.decision,
                                   note=payload.note, expected_revision=payload.expected_revision,
-                                  grant_scope=payload.grant_scope)
+                                  grant_scope=payload.grant_scope, edited_text=payload.edited_text)
 
 
 @router.post("/escalate")

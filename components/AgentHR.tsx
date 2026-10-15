@@ -186,6 +186,7 @@ export function AgentHRPanel({memberId}: {memberId: number}) {
     <Drift seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Versions seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Memory seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
+    <Lessons seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Limits seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Tools seat={seat} isAdmin={isAdmin} busy={busy} act={act} tick={tick}/>
   </div>;
@@ -423,6 +424,35 @@ function Memory({seat, canEdit, busy, act, tick}: any) {
         onClick={() => run({op: "add", text: draft}, tr("agentHr.da_them_ky_uc"))} data-testid="hr-mem-add">{tr("agentHr.them_ky_uc")}</button></div>
     </div>}
     <small className="tmGuide">{tr("agentHr.ky_uc_giai_thich")}</small>
+  </section>;
+}
+
+
+// ------------------------------------------------------------------ M5b việc 8: bài học có kiểm soát
+
+const LESSON_PILL: Record<string, string> = {pending: "is-wait", approved: "is-ok", rejected: "is-risk"};
+
+function Lessons({seat, canEdit, busy, act, tick}: any) {
+  const [items, setItems] = useState<any[] | null>(null), [err, setErr] = useState(""), [n, setN] = useState(0);
+  useEffect(() => { apiAgentsHR.lessons(seat.agent_id).then((r: any) => setItems(r.items)).catch(e => setErr(errorText(e))); },
+    [seat.agent_id, tick, n]);
+  const extract = () => act(async () => { const r = await apiAgentsHR.lessonsExtract(seat.agent_id); setN(x => x + 1); return r; },
+    (r: any) => r.message);
+  const status = (x: any) => x.status === "approved" ? (x.applied ? tr("agentHr.bai_hoc_da_ghi") : tr("agentHr.bai_hoc_duyet_chua_ghi"))
+    : x.status === "pending" ? tr("agentHr.bai_hoc_cho_duyet") : tr("agentHr.bai_hoc_tu_choi");
+  return <section className="ui-panel ui-panel-body" data-testid="hr-lessons">
+    <div className="lab-cardhead"><div><b>{tr("agentHr.bai_hoc")}</b><span>{tr("agentHr.bai_hoc_mo_ta")}</span></div>
+      <div className="tmRow">
+        {canEdit && seat.lifecycle !== "retired" && <button className="ui-btn is-primary" disabled={busy} onClick={extract}
+          data-testid="hr-lessons-extract">{busy ? tr("agentHr.dang_rut") : tr("agentHr.rut_bai_hoc")}</button>}
+        <Link className="ui-btn" href="/app/inbox?group=lessons">{tr("agentHr.mo_hop_viec")}</Link></div></div>
+    {err && <div className="ui-banner is-error">{err}</div>}
+    {items && !items.length && <small className="tmGuide">{tr("agentHr.chua_co_bai_hoc")}</small>}
+    {items && items.length > 0 && <div className="ui-list">{items.map(x => <div className="ui-row" key={x.approval_id}>
+      <span>{x.lesson}</span>
+      <small>{x.source_vi}{x.task_id ? ` · #${x.task_id}` : ""}{x.status === "rejected" && x.note ? ` · ${x.note}` : ""}{x.apply_error ? ` · ${x.apply_error}` : ""}</small>
+      <span className={`ui-pill ${LESSON_PILL[x.status] || ""}`}>{status(x)}</span>
+    </div>)}</div>}
   </section>;
 }
 

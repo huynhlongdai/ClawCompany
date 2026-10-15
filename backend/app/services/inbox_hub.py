@@ -291,7 +291,7 @@ def mark_all_read(db: Session, organization_id: int, principal: Principal) -> in
 
 async def decide(db: Session, organization_id: int, principal: Principal, approval_id: int, *,
                  decision: str, note: str = "", expected_revision: int | None = None,
-                 grant_scope: str | None = None) -> dict:
+                 grant_scope: str | None = None, edited_text: str = "") -> dict:
     a = db.get(Approval, approval_id)
     if a is None or a.organization_id != organization_id:
         raise WorkError(404, "not_found", "Không tìm thấy yêu cầu duyệt này")
@@ -347,8 +347,15 @@ async def decide(db: Session, organization_id: int, principal: Principal, approv
     _audit(db, a, "approval.decided", actor_member_id=me, actor_name="human", result=status,
            payload={"decision": status, "policy_key": a.policy_key, "via": "inbox", "revision": rev})
     extra = after_decision(db, a, me)
+    msg = _done_vi(a)
+    if (a.policy_key or "").startswith("lesson:") and status == "approved":
+        from app.services import lessons
+        from app.runtime.factory import get_runtime
+        res = await lessons.apply(db, a, principal, get_runtime(), edited_text=edited_text)
+        extra = {**extra, **res}
+        msg += " — đã ghi vào MEMORY.md của agent" if res.get("applied") else f" — nhưng CHƯA ghi được vào MEMORY.md ({res.get('apply_error')})"
     db.refresh(a)
-    return {"approval_id": a.id, "status": a.status, "message": _done_vi(a), **extra}
+    return {"approval_id": a.id, "status": a.status, "message": msg, **extra}
 
 
 def _still_open(db: Session, a: Approval, expected_revision: int | None) -> None:
@@ -393,7 +400,7 @@ def after_decision(db: Session, a: Approval, actor_member_id: int | None) -> dic
             raise WorkError(409, "plan_error", exc.message) from exc
         return {"effect": "plan"}
     if key.startswith("lesson:"):
-        # M5 sẽ ghi bài học đã duyệt vào MEMORY.md của agent; M4b chỉ giữ chỗ cho luồng duyệt.
+        # Ghi MEMORY.md là việc async (gateway) → decide() làm sau khi trả về đây.
         return {"effect": "lesson", "applied": False}
     if key.startswith("budget_soft:"):
         from app.services import budget_scope
@@ -426,9 +433,11 @@ FIELD_VI = {
     "content": "Nội dung", "lesson": "Bài học", "to": "Gửi tới", "subject": "Chủ đề", "body": "Nội dung",
     "url": "Đường dẫn", "tool": "Công cụ", "args": "Tham số", "risk": "Rủi ro", "task_id": "Việc",
     "description": "Mô tả", "note": "Ghi chú", "plan": "Kế hoạch", "steps": "Các bước",
+    "source_vi": "Nguồn", "agent_name": "Agent", "task_title": "Việc liên quan", "applied_text": "Đã ghi vào MEMORY.md",
+    "apply_error": "Lỗi khi ghi",
 }
 _SKIP = {"id", "event", "request", "systemRunBinding", "systemRunPlan", "nodeId", "ts", "createdAtMs",
-         "expiresAtMs", "revision"}
+         "expiresAtMs", "revision", "source", "agent_id", "applied", "applied_at", "memory_hash"}
 
 
 def _fields(obj: Any, prefix: str = "", depth: int = 0) -> list[dict]:

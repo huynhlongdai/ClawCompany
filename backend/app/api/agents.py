@@ -231,6 +231,22 @@ async def hr_persona_check(agent_id: int, principal: Principal = Depends(require
     return await persona_check.run(db, active_org(principal), get_runtime(), agent_id)
 
 
+@router.get("/{agent_id}/lessons")
+def hr_lessons(agent_id: int, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    """M5b: các bài học đã đề xuất cho seat (chờ duyệt / đã ghi / bị từ chối)."""
+    from app.services import agent_hr, lessons
+    agent_hr.seat(db, active_org(principal), agent_id)
+    return {"items": lessons.list_for(db, active_org(principal), agent_id)}
+
+
+@router.post("/{agent_id}/lessons/extract")
+async def hr_lessons_extract(agent_id: int, principal: Principal = Depends(require_role("manager")),
+                             db: Session = Depends(get_db)):
+    """M5b: agent đọc nhật ký các việc gần đây (phiên riêng) và đề xuất tối đa 3 bài học → Hộp việc duyệt."""
+    from app.services import lessons
+    return await lessons.extract(db, active_org(principal), get_runtime(), agent_id)
+
+
 @router.get("/{agent_id}/drift")
 async def hr_drift(agent_id: int, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
     """So bản ClawCompany với gateway: tên, model, hash từng file."""

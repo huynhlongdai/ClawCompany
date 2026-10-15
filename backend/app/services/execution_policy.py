@@ -216,6 +216,11 @@ def decide(db: Session, task: Task, *, member_id: int | None, decision: str, not
                         outcome="success" if decision == "approve" else "partial")
     if decision == "revise":
         st.update(status="changes_requested", reviewer_member_id=None)
+        try:   # M5b: góp ý của reviewer → đề xuất bài học cho agent làm việc này (chờ duyệt)
+            from app.services import lessons
+            lessons.from_review(db, task, doer_member_id=_doer(task, st), reviewer_member_id=member_id, note=note)
+        except Exception as exc:  # noqa: BLE001 — bài học không được chặn luồng duyệt
+            print(f"[M5b] lesson from review failed: {exc}")
         _save(db, task, st)
         lifecycle.transition(db, task, "in_progress", system=True, via=f"execution_policy:{via}",
                              reason="changes_requested", actor_member_id=member_id)

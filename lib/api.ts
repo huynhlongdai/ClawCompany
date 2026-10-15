@@ -792,6 +792,8 @@ export const apiAgentsHR = {
   tools: (agentId: number) => request<any>(`/agents/${agentId}/tools`),
   limits: (agentId: number) => request<any>(`/agents/${agentId}/limits`),
   memory: (agentId: number) => request<any>(`/agents/${agentId}/memory`),
+  lessons: (agentId: number) => request<any>(`/agents/${agentId}/lessons`),
+  lessonsExtract: (agentId: number) => request<any>(`/agents/${agentId}/lessons/extract`, {method: "POST"}),
   memoryChange: (agentId: number, body: any) =>
     request<any>(`/agents/${agentId}/memory`, {method: "POST", body: JSON.stringify(body)}),
   versions: (agentId: number) => request<any>(`/agents/${agentId}/versions`),
@@ -833,7 +835,7 @@ export const apiInboxHub = {
     request<any>(`/inbox/items/${id}/status`, {method: "POST", body: JSON.stringify({status})}),
   readAll: () => request<any>(`/inbox/items/read-all`, {method: "POST"}),
   decide: (id: number, body: {decision: "approve" | "reject"; note?: string; expected_revision?: number;
-    grant_scope?: "task" | "seat" | "department"}) =>
+    grant_scope?: "task" | "seat" | "department"; edited_text?: string}) =>
     request<any>(`/inbox/approvals/${id}/decide`, {method: "POST", body: JSON.stringify(body)}),
   approval: (id: number) => request<any>(`/inbox/approvals/${id}`),
   item: (id: number) => request<any>(`/inbox/items/${id}`),

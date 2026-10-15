@@ -497,7 +497,8 @@
   "luot_chay_gan_nhat": "Latest run",
   "nhat_ky_viec": "Work log",
   "ngan_sach": "Budget",
-  "da_chi": "Spent"
+  "da_chi": "Spent",
+  "cau_chu_se_ghi": "Wording to save to memory (editable before approving)"
  },
  "work": {
   "tam_dung": "paused",
@@ -1364,7 +1365,17 @@
   "them_ky_uc_placeholder": "Something the agent should remember long term",
   "them_ky_uc": "Add memory",
   "da_them_ky_uc": "Memory added.",
-  "ky_uc_giai_thich": "The agent reads MEMORY.md every session. If the agent just wrote to it, saving reports a conflict instead of overwriting; reload and retry. Daily notes (memory/…) aren't readable through the gateway yet."
+  "ky_uc_giai_thich": "The agent reads MEMORY.md every session. If the agent just wrote to it, saving reports a conflict instead of overwriting; reload and retry. Daily notes (memory/…) aren't readable through the gateway yet.",
+  "bai_hoc": "Lessons",
+  "bai_hoc_mo_ta": "From reviewer feedback, agent reflection or self-proposals — saved to memory only after approval",
+  "rut_bai_hoc": "Extract lessons",
+  "dang_rut": "Extracting…",
+  "mo_hop_viec": "Open Inbox",
+  "chua_co_bai_hoc": "No lessons yet. Click Extract lessons to have the agent review recent work and propose some.",
+  "bai_hoc_da_ghi": "Saved to memory",
+  "bai_hoc_duyet_chua_ghi": "Approved, not saved",
+  "bai_hoc_cho_duyet": "Awaiting approval",
+  "bai_hoc_tu_choi": "Rejected"
  },
  "seat": {
   "ho_so": "Profile",

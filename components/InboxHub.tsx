@@ -35,12 +35,16 @@ function ApprovalCard({c, onDone}: {c: Card; onDone: (msg: string, reload?: bool
   const [mode, setMode] = useState<"" | "reject">("");
   const [note, setNote] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState("");
   const [scope, setScope] = useState<"task" | "seat" | "department">("task");
+  const [lesson, setLesson] = useState<string | null>(null);   // bài học: câu chữ người duyệt sửa trước khi ghi
   const [open, setOpen] = useState(false), [det, setDet] = useState<any>(null), [detErr, setDetErr] = useState("");
   async function openFull() {
     setOpen(true);
     if (!det) {
       setDetErr("");
-      try { setDet(await apiInboxHub.approval(a.id)); } catch (e) { setDetErr(errorText(e, t("inbox.khong_tai_duoc_chi_tiet"))); }
+      try {
+        const d = await apiInboxHub.approval(a.id); setDet(d);
+        if (a.kind === "lesson") setLesson((d.fields || []).find((f: any) => f.key === "lesson")?.value ?? null);
+      } catch (e) { setDetErr(errorText(e, t("inbox.khong_tai_duoc_chi_tiet"))); }
     }
   }
 
@@ -49,7 +53,8 @@ function ApprovalCard({c, onDone}: {c: Card; onDone: (msg: string, reload?: bool
     setBusy(true); setErr("");
     try {
       const out = await apiInboxHub.decide(a.id, {decision, note: note.trim(), expected_revision: a.revision,
-        ...(a.kind === "budget" && decision === "approve" ? {grant_scope: scope} : {})});
+        ...(a.kind === "budget" && decision === "approve" ? {grant_scope: scope} : {}),
+        ...(a.kind === "lesson" && decision === "approve" && lesson?.trim() ? {edited_text: lesson.trim()} : {})});
       onDone(out?.message || (decision === "approve" ? t("inbox.da_duyet") : t("inbox.da_tu_choi")));
     } catch (e: any) {
       const code = e?.code || "";
@@ -67,6 +72,11 @@ function ApprovalCard({c, onDone}: {c: Card; onDone: (msg: string, reload?: bool
           <button key={s} type="button" role="radio" aria-checked={scope === s} aria-pressed={scope === s}
             onClick={() => setScope(s as any)}>{SCOPE_VI[s] || s}</button>)}</div>
       </div>}
+    {a.can_decide && a.kind === "lesson" && open && lesson !== null && mode !== "reject" && <label className="ibx-lesson-edit">
+      <small>{t("inbox.cau_chu_se_ghi")}</small>
+      <textarea value={lesson} onChange={e => setLesson(e.target.value)} rows={3} maxLength={600}
+        aria-label={t("inbox.cau_chu_se_ghi")} data-testid={`ibx-lesson-text-${a.id}`}/>
+    </label>}
     {a.can_decide && mode === "reject" && <div className="ibx-reject">
       <div className="ui-chips">{REASONS.map(r => <button key={r} type="button" className="ui-chip"
         aria-pressed={note === r} onClick={() => setNote(r)}>{r}</button>)}</div>

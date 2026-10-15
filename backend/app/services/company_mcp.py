@@ -443,6 +443,31 @@ def _memory_search(ctx: ToolContext, args: dict) -> dict:
     return {"total_visible": len(rows), "items": out}
 
 
+@tool("company_lesson_propose", "knowledge",
+      "Đề xuất một bài học cho chính bạn (rút từ việc vừa làm: lỗi, góp ý, cách làm tốt hơn). Bài học KHÔNG ghi thẳng "
+      "vào ký ức: người quản lý duyệt trong Hộp việc rồi mới ghi vào MEMORY.md. Viết một câu cụ thể: khi nào áp dụng, làm gì.",
+      "company.approvals:write",
+      {"lesson": {"type": "string"}, "reason": {"type": "string"}, "task_id": {"type": "integer"}},
+      ("lesson",), writes=True)
+def _lesson_propose(ctx: ToolContext, args: dict) -> dict:
+    from app.services import lessons
+    if ctx.agent is None:
+        raise ToolError("not_agent", "Chỉ seat AI mới đề xuất bài học cho chính mình")
+    tid = _int(args, "task_id", required=False, default=None)
+    if tid is not None:
+        t = ctx.db.get(Task, tid)
+        if t is None or t.assignee_member_id != ctx.member.id:
+            raise ToolError("not_found", "task_id phải là việc của bạn")
+    try:
+        r = lessons.propose(ctx.db, agent=ctx.agent, member=ctx.member, text=_str(args, "lesson", limit=700),
+                            source="self", task_id=tid, reason=_str(args, "reason", required=False, limit=1500))
+    except lessons.LessonError as exc:
+        raise ToolError("invalid_argument", exc.message) from exc
+    if r["duplicate"]:
+        return {**r, "message": f"Bài học này đã được đề xuất trước đó (trạng thái: {r['status']}) — không gửi lại"}
+    return {**r, "message": "Đã gửi bài học vào Hộp việc của người quản lý để duyệt"}
+
+
 # Đọc tài liệu dài theo từng lát thay vì cắt cụt ở 20.000 ký tự. Bản cũ trả
 # 20k ký tự đầu (~5–7k token) cho MỌI lần đọc, và phần sau mốc đó thì agent
 # không bao giờ thấy. Học từ FastClaw: kết quả tool phải nhỏ để lượt sau của
