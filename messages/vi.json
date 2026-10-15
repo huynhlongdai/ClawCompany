@@ -1322,7 +1322,18 @@
   "ket_qua_giu_vai": "Kết quả kiểm tra giữ vai",
   "giu_vai_pct": "Giữ vai {p0}%",
   "xung_ho": "Xưng hô",
-  "xung_ho_sinh_lai_soul": "Xưng hô (sinh lại SOUL.md)"
+  "xung_ho_sinh_lai_soul": "Xưng hô (sinh lại SOUL.md)",
+  "hanh_dong_nhan": "Hành động: {p0}",
+  "chi_phi_va_model": "Chi phí và model",
+  "tinh_bang_usd_ngay_theo": "Tính bằng USD, ngày theo múi giờ {p0}. Chạm trần thì việc mới tạm dừng.",
+  "tran_chi_ngay_usd": "Trần chi mỗi ngày (USD)",
+  "han_muc_thang_usd": "Hạn mức tháng (USD)",
+  "loai_viec": "Loại việc",
+  "tang_model": "Tầng model",
+  "theo_router": "Theo router",
+  "model_du_phong": "Model dự phòng (khi model chính lỗi)",
+  "san_an_toan_van_ap": "Sàn an toàn vẫn áp: việc gửi ra ngoài tối thiểu T3, khách đọc thì không dùng T1. Thinking chỉ áp cho model có suy luận.",
+  "da_luu_chi_phi_model": "Đã lưu chi phí và model."
  },
  "seat": {
   "ho_so": "Hồ sơ",
@@ -1760,7 +1771,8 @@
   "tu_choi": "từ chối · {p0}",
   "loi": "lỗi · {p0}",
   "ghe": "ghế #{p0}",
-  "luot_chay": " · lượt chạy #{p0}"
+  "luot_chay": " · lượt chạy #{p0}",
+  "loai_hanh_dong": "Loại hành động (áp cho mọi tool cùng loại)"
  },
  "secrets": {
   "han_che": "Hạn chế",

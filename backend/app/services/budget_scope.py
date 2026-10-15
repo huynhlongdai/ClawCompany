@@ -126,6 +126,10 @@ def gate(db: Session, member: Member, task, amount: float | None = None) -> tupl
     """Trả (lý do chặn | "", phong bì áp dụng, số giữ)."""
     amount = estimate(db, member.id) if amount is None else amount
     envs = applicable(db, member, task)
+    from app.services import seat_limits   # trần chi USD riêng của ghế (Phase B việc 6)
+    capped = seat_limits.check(db, member)
+    if capped:
+        return capped, envs, amount
     for env in envs:
         if (env.threshold_state or "ok") == "exhausted":
             return f"budget: {env.name}: đã hết hạn mức ({pct(env):.0f}%)", envs, amount

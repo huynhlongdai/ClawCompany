@@ -108,7 +108,8 @@ def _ctx(db: Session, member: Member) -> dict:
 def render_files(*, name: str, role: str, company: str, department: str, manager: str,
                  personality: str = DEFAULT_PERSONALITY, emoji: str = "", job_description: str = "",
                  manager_notes: str = "", monthly_budget: float | None = None,
-                 hired_on: str | None = None, address_style: str = DEFAULT_ADDRESS_STYLE) -> dict[str, str]:
+                 hired_on: str | None = None, address_style: str = DEFAULT_ADDRESS_STYLE,
+                 daily_cap_usd: float | None = None) -> dict[str, str]:
     """5 file tiếng Việt từ hồ sơ. Vượt hạn mức ký tự → 422 (không cắt hộ)."""
     p = PERSONALITIES.get(personality) or PERSONALITIES[DEFAULT_PERSONALITY]
     a = ADDRESS_STYLES.get(address_style) or ADDRESS_STYLES[DEFAULT_ADDRESS_STYLE]
@@ -145,6 +146,8 @@ def render_files(*, name: str, role: str, company: str, department: str, manager
                         "- Chủ động đề xuất cải tiến trong phạm vi phòng ban.")
     budget_line = (f"Hạn mức chi phí: {monthly_budget:g} USD/tháng. Gần chạm hạn mức thì báo người quản lý."
                    if monthly_budget else "Chưa đặt hạn mức riêng; theo ngân sách phòng/công ty.")
+    if daily_cap_usd:
+        budget_line += f"\nTrần chi mỗi ngày: {daily_cap_usd:g} USD; chạm trần thì việc mới tạm dừng tới hôm sau."
     agents = (
         f"# AGENTS.md — Công việc của {name}\n\n"
         f"## Vai trò\n{role} · {dept_line} · {company}\nBáo cáo cho: {boss}\n\n"
@@ -330,6 +333,7 @@ async def hire_options(db: Session, org_id: int, runtime: Any) -> dict:
                           for k, v in PERSONALITIES.items()],
         "default_personality": DEFAULT_PERSONALITY,
         "address_styles": [{"key": k, **v} for k, v in ADDRESS_STYLES.items()],
+        "model_policy_options": __import__("app.services.seat_limits", fromlist=["options"]).options(),
         "default_address_style": DEFAULT_ADDRESS_STYLE,
         "limits": {"USER.md": ocp.USER_MD_MAX_CHARS, "other": ocp.BOOTSTRAP_MAX_CHARS},
     }
@@ -414,13 +418,17 @@ async def hire(db: Session, principal: Principal, org_id: int, runtime: Any, dat
     if address_style not in ADDRESS_STYLES:
         raise HTTPException(422, f"Xưng hô phải là một trong: {', '.join(ADDRESS_STYLES)}")
     # Render trước khi tạo gì: file quá dài thì từ chối sớm, không để lại seat dở.
+    from app.services import seat_limits
+    daily_cap = seat_limits.clean_money(data.get("daily_cap_usd"), "Trần chi ngày")
+    model_policy = seat_limits.clean_model_policy(data.get("model_policy"))
     files = render_files(name=name, role=role, company=co.name, department=dept.name if dept else "",
                          manager=mgr.name if mgr else "", personality=personality, emoji=emoji,
                          job_description=data.get("job_description") or "",
                          manager_notes=data.get("manager_notes") or "", monthly_budget=budget,
-                         address_style=address_style)
+                         address_style=address_style, daily_cap_usd=daily_cap)
     rid = _unique_runtime_id(db, name)
     spec = {"personality": personality, "emoji": emoji, "address_style": address_style,
+            "daily_cap_usd": daily_cap, "model_policy": model_policy,
             "job_description": data.get("job_description") or "",
             "manager_notes": data.get("manager_notes") or "", "monthly_budget": budget,
             "hired_via": "m3_wizard"}
@@ -507,7 +515,8 @@ async def _regen(db: Session, runtime: Any, agent: Agent, member: Member, names:
                          emoji=spec.get("emoji") or "", job_description=spec.get("job_description") or "",
                          manager_notes=spec.get("manager_notes") or "",
                          monthly_budget=spec.get("monthly_budget"),
-                         address_style=spec.get("address_style") or DEFAULT_ADDRESS_STYLE, **_ctx(db, member))
+                         address_style=spec.get("address_style") or DEFAULT_ADDRESS_STYLE,
+                         daily_cap_usd=spec.get("daily_cap_usd"), **_ctx(db, member))
     snaps = snapshots(db, agent.id)
     result: dict[str, dict] = {}
     for fname in names:
@@ -597,6 +606,18 @@ async def update_hr(db: Session, principal: Principal, org_id: int, runtime: Any
             if key == "address_style" and data[key] not in ADDRESS_STYLES:
                 raise HTTPException(422, f"Xưng hô phải là một trong: {', '.join(ADDRESS_STYLES)}")
             spec[key] = data[key]; changed.append(key)
+    from app.services import seat_limits
+    for key, label in (("monthly_budget", "Hạn mức tháng"), ("daily_cap_usd", "Trần chi ngày")):
+        if key in fields_set:
+            val = seat_limits.clean_money(data.get(key), label)
+            if val != spec.get(key):
+                spec[key] = val; changed.append(key)
+    if "model_policy" in fields_set:
+        mp = seat_limits.clean_model_policy(data.get("model_policy"))
+        if mp != (spec.get("model_policy") or {}):
+            if (mp.get("fallback") or None) != ((spec.get("model_policy") or {}).get("fallback") or None):
+                warnings.append("Model dự phòng áp dụng trên gateway khi cấp lại ghế (Cấp lại cấu hình).")
+            spec["model_policy"] = mp; changed.append("model_policy")
     team_svc._bump(member); db.add(member); _save_spec(db, agent, spec); db.commit()
     if "manager_member_id" in fields_set and data.get("manager_member_id") != member.manager_id:
         team_svc.set_manager(db, org_id, member, data.get("manager_member_id"), actor=actor)
@@ -635,6 +656,8 @@ async def update_hr(db: Session, principal: Principal, org_id: int, runtime: Any
         regen += ("AGENTS.md",)
     if touched & {"manager", "manager_notes"}:
         regen += ("USER.md",)
+    if touched & {"monthly_budget", "daily_cap_usd"} and "AGENTS.md" not in regen:
+        regen += ("AGENTS.md",)
     regen += tuple(f for f in force if f not in regen)
     files = await _regen(db, runtime, agent, member, regen, principal.user_id, force=force) if regen else {}
     warnings += [r["message"] for r in files.values()
@@ -971,7 +994,8 @@ def seat_tools(db: Session, org_id: int, agent_id: int) -> dict:
     for name, t in TOOLS.items():
         level, source = perms.resolve(db, member, name)
         items.append({"name": name, "group": t.group, "writes": t.writes, "description": t.description,
-                      "level": level, "source": source})
+                      "level": level, "source": source, "action": perms.action_of(name),
+                      "label": getattr(t, "label", None)})
     return {"agent_id": agent.id, "member_id": member.id, "tier": tier,
             "tier_label": "Trưởng/điều hành" if tier == "lead" else "Thừa hành",
             "levels": list(perms.TOOL_LEVELS), "tools": items}

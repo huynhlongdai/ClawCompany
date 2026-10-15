@@ -97,6 +97,7 @@ async def provision_seat(db: Session, principal, org_id: int, runtime: Any, agen
         emoji=spec.get("emoji") or "", job_description=spec.get("job_description") or "",
         manager_notes=spec.get("manager_notes") or "", monthly_budget=spec.get("monthly_budget"),
         address_style=spec.get("address_style") or agent_hr.DEFAULT_ADDRESS_STYLE,
+        daily_cap_usd=spec.get("daily_cap_usd"),
         **agent_hr._ctx(db, member))
     snaps = agent_hr.snapshots(db, agent.id)
     generated = dict(spec.get("generated") or {})
@@ -299,7 +300,8 @@ async def wire_gateway(db: Session, principal, org_id: int, runtime: Any, *, mcp
         if seat_models:
             from app.services import tool_permissions
             cfg = model_routing.seat_model_config(
-                member.role or "", lead=tool_permissions.seat_tier(db, member) == "lead")
+                member.role or "", lead=tool_permissions.seat_tier(db, member) == "lead",
+                fallback=((agent_hr.hire_spec(db, agent).get("model_policy") or {}).get("fallback")))
             values[("agents", "entries", rid, "model")] = cfg["model"]
             values[("agents", "entries", rid, "utilityModel")] = cfg["utilityModel"]
             values[("agents", "entries", rid, "heartbeat", "model")] = cfg["heartbeat"]["model"]

@@ -67,7 +67,7 @@ Embedding đề xuất: `text-embedding-3-small` trên CometAPI ($0.016/1 triệ
 
 - `KnowledgeConnector(type[upload|gdrive|notion|url|sharepoint|confluence|github|youtube], credential_ref, scope, sync_cron, acl_mode)`
 - `KnowledgeDoc(connector_id, external_id, title, version_hash, scope, updated_at)` · `KnowledgeChunk(doc_id, text, embedding, position)`
-- `Course(title, goal, modules[], audience{roles,departments,agents}, schedule_cron, model_tier, budget_vnd, pass_score)`
+- `Course(title, goal, modules[], audience{roles,departments,agents}, schedule_cron, model_tier, budget_usd, pass_score)`
 - `Enrollment(agent_id, course_id, progress, status[learning|passed|failed|stale], score, certified_at)`
 - `Quiz / QuizAttempt` · `LessonProposal(agent_id, source_ref, content, status)` → Hộp việc · `KnowledgeGap(agent_id, question, task_id, resolved_by_doc)`
 

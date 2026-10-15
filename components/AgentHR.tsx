@@ -185,6 +185,7 @@ export function AgentHRPanel({memberId}: {memberId: number}) {
     </div>
     <Drift seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Versions seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
+    <Limits seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Tools seat={seat} isAdmin={isAdmin} busy={busy} act={act} tick={tick}/>
   </div>;
 }
@@ -369,7 +370,7 @@ function Tools({seat, isAdmin, busy, act, tick}: any) {
       <Link className="ui-btn" href="/app/agent-tools">{tr("agentHr.ma_tran_theo_bac")}</Link></div>
     {err && <div className="ui-banner is-error">{err}</div>}
     {t && <div className="hrScroll"><table className="ui-table"><tbody>{t.tools.map((x: any) => <tr key={x.name}>
-      <td><b>{x.name}</b><br/><small>{x.description}</small></td>
+      <td><b>{x.group === "action" ? tr("agentHr.hanh_dong_nhan", {p0: x.label || x.name}) : x.name}</b><br/><small>{x.description}</small></td>
       <td><small>{x.group}{x.writes ? tr("agentHr.ghi_hau_to") : ""}</small></td>
       <td>{isAdmin && seat.lifecycle !== "retired" ? <select value={x.source === "member" ? x.level : "inherit"} disabled={busy} data-testid={`hr-tool-${x.name}`}
           onChange={e => act(() => apiMcp.setPermission({tool: x.name, level: e.target.value, member_id: seat.member_id}),
@@ -379,6 +380,60 @@ function Tools({seat, isAdmin, busy, act, tick}: any) {
         : <span className={x.level === "off" ? "is-warn" : ""}>{LEVEL_VI[x.level] || x.level}</span>}</td>
       <td className="hrSrc"><small>{src(x.source)}</small></td></tr>)}</tbody></table></div>}
     {t && !isAdmin && <small className="tmGuide">{tr("agentHr.doi_quyen_tool_can_vai")}</small>}
+  </section>;
+}
+
+
+// ------------------------------------------------------------------ Phase B việc 6: trần chi USD + model theo loại việc
+
+const usd = (v: any) => v === null || v === undefined || v === "" ? "—" : `$${Number(v).toFixed(2)}`;
+
+function Limits({seat, canEdit, busy, act, tick}: any) {
+  const [d, setD] = useState<any>(null), [err, setErr] = useState("");
+  const [f, setF] = useState<any>({monthly: "", daily: "", tiers: {}, thinking: {}, fallback: ""});
+  useEffect(() => {
+    apiAgentsHR.limits(seat.agent_id).then((x: any) => {
+      setD(x);
+      setF({monthly: x.monthly_budget ?? "", daily: x.daily_cap_usd ?? "", tiers: x.model_policy?.tiers || {},
+            thinking: x.model_policy?.thinking || {}, fallback: x.model_policy?.fallback || ""});
+    }).catch(e => setErr(errorText(e)));
+  }, [seat.agent_id, tick]);
+  if (err) return <section className="ui-panel ui-panel-body"><div className="ui-banner is-error">{err}</div></section>;
+  if (!d) return null;
+  const o = d.options;
+  const setK = (group: string, k: string, v: string) => setF((x: any) => ({...x, [group]: {...x[group], [k]: v}}));
+  const save = () => act(() => apiAgentsHR.update(seat.agent_id, {
+    monthly_budget: f.monthly === "" ? null : Number(f.monthly), daily_cap_usd: f.daily === "" ? null : Number(f.daily),
+    model_policy: {tiers: f.tiers, thinking: f.thinking, fallback: f.fallback}}), () => tr("agentHr.da_luu_chi_phi_model"));
+  const bar = (spent: number, cap: any) => cap ? <span className={`ui-pill ${spent >= cap ? "is-risk" : spent >= cap * 0.8 ? "is-wait" : "is-ok"}`}>
+    {usd(spent)} / {usd(cap)}</span> : <span className="ui-pill">{usd(spent)}</span>;
+  return <section className="ui-panel ui-panel-body" data-testid="hr-limits">
+    <div className="lab-cardhead"><div><b>{tr("agentHr.chi_phi_va_model")}</b>
+      <span>{tr("agentHr.tinh_bang_usd_ngay_theo", {p0: d.day_tz})}</span></div></div>
+    {d.blocked && <div className="ui-banner is-error" data-testid="hr-limits-blocked">{d.blocked.replace(/^budget: /, "")}</div>}
+    <div className="ui-form">
+      <div className="ui-form-row">
+        <label>{tr("agentHr.tran_chi_ngay_usd")} {bar(d.spent_today_usd, d.daily_cap_usd)}
+          <input type="number" min={0} step="0.5" value={f.daily} disabled={!canEdit} onChange={e => setF({...f, daily: e.target.value})} data-testid="hr-daily-cap"/></label>
+        <label>{tr("agentHr.han_muc_thang_usd")} {bar(d.spent_month_usd, d.monthly_budget)}
+          <input type="number" min={0} step="1" value={f.monthly} disabled={!canEdit} onChange={e => setF({...f, monthly: e.target.value})} data-testid="hr-monthly-cap"/></label>
+      </div>
+      <table className="ui-table"><thead><tr><th>{tr("agentHr.loai_viec")}</th><th>{tr("agentHr.tang_model")}</th><th>Thinking</th></tr></thead>
+        <tbody>{o.kinds.map((k: any) => <tr key={k.key}>
+          <td>{k.label}</td>
+          <td><select value={f.tiers[k.key] || ""} disabled={!canEdit} onChange={e => setK("tiers", k.key, e.target.value)} data-testid={`hr-tier-${k.key}`}>
+            <option value="">{tr("agentHr.theo_router")}</option>
+            {o.tiers.map((t: any) => <option key={t.key} value={t.key}>{t.key} · {t.model}</option>)}</select></td>
+          <td><select value={f.thinking[k.key] || ""} disabled={!canEdit} onChange={e => setK("thinking", k.key, e.target.value)} data-testid={`hr-think-${k.key}`}>
+            <option value="">{tr("agentHr.mac_dinh_2")}</option>
+            {o.thinking_levels.map((l: string) => <option key={l} value={l}>{l}</option>)}</select></td>
+        </tr>)}</tbody></table>
+      <label>{tr("agentHr.model_du_phong")}<select value={f.fallback} disabled={!canEdit} onChange={e => setF({...f, fallback: e.target.value})} data-testid="hr-fallback">
+        <option value="">{tr("agentHr.mac_dinh_2")}</option>
+        {o.fallbacks.map((m: string) => <option key={m} value={m}>{m}</option>)}</select></label>
+      <small className="tmGuide">{tr("agentHr.san_an_toan_van_ap")}</small>
+      {canEdit && <div className="tmRow"><button className="ui-btn is-primary" disabled={busy} onClick={save} data-testid="hr-limits-save">{tr("agentHr.luu")}</button></div>}
+    </div>
   </section>;
 }
 

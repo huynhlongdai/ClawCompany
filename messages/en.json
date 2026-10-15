@@ -1322,7 +1322,18 @@
   "ket_qua_giu_vai": "Persona check result",
   "giu_vai_pct": "Persona {p0}%",
   "xung_ho": "Form of address",
-  "xung_ho_sinh_lai_soul": "Form of address (regenerates SOUL.md)"
+  "xung_ho_sinh_lai_soul": "Form of address (regenerates SOUL.md)",
+  "hanh_dong_nhan": "Action: {p0}",
+  "chi_phi_va_model": "Spend and models",
+  "tinh_bang_usd_ngay_theo": "In USD, days in {p0}. At the cap, new work pauses.",
+  "tran_chi_ngay_usd": "Daily cap (USD)",
+  "han_muc_thang_usd": "Monthly budget (USD)",
+  "loai_viec": "Task type",
+  "tang_model": "Model tier",
+  "theo_router": "Router default",
+  "model_du_phong": "Fallback model (when primary fails)",
+  "san_an_toan_van_ap": "Safety floors still apply: outbound work is at least T3, customer-facing never T1. Thinking applies only to reasoning models.",
+  "da_luu_chi_phi_model": "Spend and models saved."
  },
  "seat": {
   "ho_so": "Profile",
@@ -1760,7 +1771,8 @@
   "tu_choi": "denied · {p0}",
   "loi": "error · {p0}",
   "ghe": "seat #{p0}",
-  "luot_chay": " · run #{p0}"
+  "luot_chay": " · run #{p0}",
+  "loai_hanh_dong": "Action class (applies to every tool of that kind)"
  },
  "secrets": {
   "han_che": "Restricted",

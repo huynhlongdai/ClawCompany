@@ -44,17 +44,57 @@ GATEWAY_TOOLS = {
 _GATEWAY_DEFAULTS = {"lead": {SHELL: "ask"}, "executor": {SHELL: "off"}}
 
 
+# ------------------------------------------------------------- lưới quyền theo hành động
+#
+# Mỗi tool thuộc một loại hành động. Mức thật của một tool = mức CHẶT hơn giữa
+# hàng của tool và hàng của loại hành động. Nhờ vậy "Trả tiền: Tắt" cho thừa
+# hành chặn luôn mọi tool trả tiền kết nối sau này, không phải nhớ từng tool.
+# Lưu chung bảng tool_permissions, tên ``action:<loại>``.
+
+class _ActionClass:
+    def __init__(self, key: str, label: str, description: str):
+        self.name, self.group, self.writes = f"action:{key}", "action", key != "read"
+        self.key, self.label, self.description = key, label, description
+
+
+ACTION_CLASSES = {a.name: a for a in (
+    _ActionClass("read", "Đọc", "Xem dữ liệu công ty: việc, tài liệu, sơ đồ, số liệu."),
+    _ActionClass("draft", "Ghi nội bộ", "Tạo/sửa trong công ty: bình luận, đổi trạng thái, soạn tài liệu, nhắn đồng nghiệp."),
+    _ActionClass("send", "Gửi ra ngoài", "Gửi email, tin nhắn cho khách hoặc đối tác bên ngoài công ty."),
+    _ActionClass("pay", "Trả tiền", "Thanh toán, chuyển tiền, mua hàng, hoàn tiền."),
+    _ActionClass("delete", "Xoá", "Xoá dữ liệu không khôi phục được."),
+)}
+# Tool chưa liệt kê: không ghi → read, có ghi → draft (nội bộ).
+_TOOL_ACTION: dict[str, str] = {}
+_ACTION_DEFAULTS = {
+    "lead": {"read": "allowed", "draft": "allowed", "send": "ask", "pay": "ask", "delete": "ask"},
+    "executor": {"read": "allowed", "draft": "allowed", "send": "ask", "pay": "off", "delete": "off"},
+}
+_STRICT = {"allowed": 0, "ask": 1, "off": 2}
+
+
+def action_of(tool: str) -> str | None:
+    """Loại hành động của một tool công ty (None với tool gateway/loại hành động)."""
+    from app.services.company_mcp import TOOLS
+    t = TOOLS.get(tool)
+    if t is None:
+        return None
+    return _TOOL_ACTION.get(tool) or getattr(t, "action", None) or ("draft" if t.writes else "read")
+
+
 def all_tools() -> dict:
     from app.services.company_mcp import TOOLS
-    return {**TOOLS, **GATEWAY_TOOLS}
+    return {**TOOLS, **GATEWAY_TOOLS, **ACTION_CLASSES}
 
 
 def _defaults() -> dict[str, dict[str, str]]:
     from app.services.company_mcp import TOOLS
     return {
-        "lead": {**{name: "allowed" for name in TOOLS}, **_GATEWAY_DEFAULTS["lead"]},
-        "executor": {**{name: ("off" if name in _EXECUTOR_OFF else "allowed") for name in TOOLS},
-                     **_GATEWAY_DEFAULTS["executor"]},
+        tier: {**base, **_GATEWAY_DEFAULTS[tier],
+               **{f"action:{k}": v for k, v in _ACTION_DEFAULTS[tier].items()}}
+        for tier, base in (
+            ("lead", {name: "allowed" for name in TOOLS}),
+            ("executor", {name: ("off" if name in _EXECUTOR_OFF else "allowed") for name in TOOLS}))
     }
 
 
@@ -71,7 +111,18 @@ def seat_tier(db: Session, member: Member) -> str:
 
 
 def resolve(db: Session, member: Member, tool: str) -> tuple[str, str]:
-    """(mức, nguồn). Nguồn: ``member`` | ``tier:<bậc>`` | ``default:<bậc>`` | ``unknown_tool``."""
+    """(mức, nguồn). Nguồn: ``member`` | ``tier:<bậc>`` | ``default:<bậc>`` | ``unknown_tool``
+    | ``action:<loại>/<nguồn>`` khi loại hành động chặt hơn hàng của tool."""
+    level, source = _resolve_one(db, member, tool)
+    cls = action_of(tool)
+    if cls and level != "off":
+        a_level, a_source = _resolve_one(db, member, f"action:{cls}")
+        if _STRICT[a_level] > _STRICT[level]:
+            return a_level, f"action:{cls}/{a_source}"
+    return level, source
+
+
+def _resolve_one(db: Session, member: Member, tool: str) -> tuple[str, str]:
     defaults = _defaults()
     tier = seat_tier(db, member)
     rows = db.execute(select(ToolPermission).where(
@@ -152,5 +203,6 @@ def matrix(db: Session, organization_id: int) -> dict:
             overrides.append({"member_id": r.member_id, "tool": r.tool, "level": r.level})
     return {"levels": list(TOOL_LEVELS), "tiers": list(TIERS),
             "tools": [{"name": t.name, "group": t.group, "writes": t.writes,
-                       "description": t.description} for t in TOOLS.values()],
+                       "description": t.description, "action": action_of(t.name),
+                       "label": getattr(t, "label", None)} for t in TOOLS.values()],
             "matrix": tiers, "member_overrides": overrides}

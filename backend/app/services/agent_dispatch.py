@@ -71,6 +71,11 @@ def resolve_seat(db: Session, task: Task) -> tuple[Member, Agent]:
 async def dispatch_task(db: Session, task: Task, *, trigger_kind: str = "manual",
                         wakeup_id: int | None = None) -> Task:
     member, agent = resolve_seat(db, task)
+    # Phase B việc 6: trần chi USD của ghế (ngày/tháng) — chạm trần thì không giao lượt mới.
+    from app.services import seat_limits
+    capped = seat_limits.check(db, member)
+    if capped:
+        raise DispatchConflict(f"{member.name}: {capped.removeprefix('budget: ')}")
     # D1.3: việc mình chờ chưa xong thì agent làm gì cũng là làm trên giả định.
     waiting = task_graph.open_blockers(db, task.id)
     if waiting:
@@ -170,6 +175,8 @@ async def _run_agent(runtime, agent, task, member, pack, session_key):
     }
     if route and route.get("applied") and route.get("model"):
         metadata["model"] = route["model"]
+        if route.get("thinking"):
+            metadata["thinking"] = route["thinking"]
     return await runtime.run_agent(
         runtime_agent_id=agent.runtime_agent_id,
         input_text=pack["text"],

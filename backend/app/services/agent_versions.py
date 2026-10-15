@@ -21,10 +21,12 @@ from app.models import Agent, Member
 from app.models.agent_hr import AgentFileSnapshot, AgentProfileVersion
 
 PROFILE_FIELDS = ("name", "role", "department_id", "manager_member_id", "personality", "address_style", "emoji",
-                  "job_description", "manager_notes", "model")
+                  "job_description", "manager_notes", "model", "monthly_budget", "daily_cap_usd",
+                  "model_policy")
 FIELD_VI = {"name": "tên", "role": "chức danh", "department_id": "phòng ban", "manager_member_id": "quản lý",
             "personality": "tính cách", "address_style": "xưng hô", "emoji": "emoji", "job_description": "mô tả công việc",
-            "manager_notes": "ghi chú quản lý", "model": "model"}
+            "manager_notes": "ghi chú quản lý", "model": "model", "monthly_budget": "hạn mức tháng",
+            "daily_cap_usd": "trần chi ngày", "model_policy": "model theo loại việc"}
 
 
 def current_profile(db: Session, agent: Agent, member: Member) -> dict:
@@ -35,7 +37,8 @@ def current_profile(db: Session, agent: Agent, member: Member) -> dict:
             "personality": spec.get("personality") or DEFAULT_PERSONALITY,
             "address_style": spec.get("address_style") or DEFAULT_ADDRESS_STYLE, "emoji": spec.get("emoji") or "",
             "job_description": spec.get("job_description") or "", "manager_notes": spec.get("manager_notes") or "",
-            "model": agent.model or ""}
+            "model": agent.model or "", "monthly_budget": spec.get("monthly_budget"),
+            "daily_cap_usd": spec.get("daily_cap_usd"), "model_policy": spec.get("model_policy") or {}}
 
 
 def _latest(db: Session, agent_id: int) -> AgentProfileVersion | None:
@@ -44,7 +47,8 @@ def _latest(db: Session, agent_id: int) -> AgentProfileVersion | None:
 
 
 # Trường thêm sau: bản cũ không có khoá này nghĩa là đang dùng mặc định.
-FIELD_DEFAULTS = {"address_style": "em-anh-chi"}
+FIELD_DEFAULTS = {"address_style": "em-anh-chi", "monthly_budget": None, "daily_cap_usd": None,
+                  "model_policy": {}}
 
 
 def changed_fields(old: dict, new: dict) -> list[str]:

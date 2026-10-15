@@ -28,7 +28,8 @@ const REASON_VI: Record<string, string> = lazy(() => ({
 const TIER_VI: Record<string, string> = lazy(() => ({lead: tr("tools.truong_nhom"), executor: tr("tools.thuc_thi")}));
 const GROUP_VI: Record<string, string> = lazy(() => ({
   context: tr("tools.ngu_canh"), work: tr("tools.cong_viec"), knowledge: tr("tools.tri_thuc"), collab: tr("tools.phoi_hop"),
-  control: tr("tools.kiem_soat"), report: tr("tools.bao_cao"),
+  control: tr("tools.kiem_soat"), report: tr("tools.bao_cao"), action: tr("tools.loai_hanh_dong"),
+  gateway: "Gateway",
 }));
 
 /* /auth/me trả User, không có vai trò; vai trò nằm trong JWT đang đăng nhập.
@@ -166,7 +167,7 @@ export function AgentToolsConsole() {
             {tiers.map(t => <th key={t} style={{padding: "6px 8px"}}>{TIER_VI[t] || t}</th>)}
           </tr></thead>
           <tbody>{tools.map(t => <tr key={t.name} style={{borderTop: "1px solid var(--border)"}}>
-            <td style={{padding: "8px"}}><code>{t.name}</code>{t.writes && <span className="ui-pill is-mid"
+            <td style={{padding: "8px"}}>{t.group === "action" ? <b>{t.label}</b> : <code>{t.name}</code>}{t.writes && t.group !== "action" && <span className="ui-pill is-mid"
               style={{marginLeft: 6}}>ghi</span>}
               <div style={{color: "var(--text-muted)", fontSize: 12}}>{t.description}</div></td>
             <td style={{padding: "8px"}}>{GROUP_VI[t.group] || t.group}</td>

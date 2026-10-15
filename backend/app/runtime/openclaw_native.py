@@ -352,8 +352,11 @@ class NativeOpenClawRuntime(AgentRuntime):
         # bằng model mặc định của ghế, và ta trả lý do về để ghi lại.
         route_error = ""
         if meta.get("model"):
+            patch = {"key": key, "model": str(meta["model"])}
+            if meta.get("thinking"):
+                patch["thinkingLevel"] = str(meta["thinking"])   # 2026.9.8: off|minimal|low|medium|high
             try:
-                await self._rpc(ocp.M_SESSIONS_PATCH, {"key": key, "model": str(meta["model"])})
+                await self._rpc(ocp.M_SESSIONS_PATCH, patch)
             except Exception as exc:  # noqa: BLE001
                 route_error = str(exc)[:300]
         # v35.1: ChatSendParamsSchema là closedObject,

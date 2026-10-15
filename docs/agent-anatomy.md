@@ -41,7 +41,7 @@ subtitle: "Giải phẫu agent, hiện trạng repo + gateway, và lộ trình (
 | Bộ nhớ tổ chức/nhóm | Chính sách, thuật ngữ, sản phẩm, khách hàng | — (cần kiểm tra chia sẻ chéo) | Bộ nhớ chung theo phạm vi org/phòng/dự án, chỉ đọc, qua MCP |
 | Kiến thức (sách, tài liệu, khóa học) | Kho tri thức có trích dẫn | memory search | Nạp tài liệu → đề thi tự sinh → nhật ký "câu chưa trả lời được" |
 | Kỹ năng | Thư mục SKILL.md có phiên bản, nạp khi cần | skills, ClawHub, Skill Workshop, library | Registry kỹ năng công ty + quy trình thăng cấp có eval |
-| Tay chân (công cụ) | MCP, trình duyệt, code, tích hợp | tool policy, sandbox, elevated, `mcp add` | Lưới quyền: công cụ × đọc/nháp/gửi/trả tiền/xóa × Cho phép/Hỏi trước/Tắt, trần chi VND |
+| Tay chân (công cụ) | MCP, trình duyệt, code, tích hợp | tool policy, sandbox, elevated, `mcp add` | Lưới quyền: công cụ × đọc/nháp/gửi/trả tiền/xóa × Cho phép/Hỏi trước/Tắt, trần chi USD |
 | Đầu óc (suy luận) | Model chính + dự phòng + model cố vấn + mức thinking | `model{primary,fallbacks}`, `thinkingDefault`, `decisionModel` | Preset định tuyến theo loại việc (rẻ cho việc thường, mạnh khi cần) |
 | Nhịp làm việc độc lập | Heartbeat, cron, sự kiện, ý định thường trực | heartbeat, cron, intents | Routine gắn mục tiêu, giờ yên lặng |
 | Lương tâm (rào chắn) | Điều kiện cứng cho hoàn tiền/hóa đơn/thanh toán, duyệt, audit | exec approvals, permission modes, audit | Tự chủ theo **hành động**, hộp duyệt trên điện thoại/Zalo |
@@ -79,7 +79,7 @@ subtitle: "Giải phẫu agent, hiện trạng repo + gateway, và lộ trình (
 - `MemoryItem(scope[org|team|project|agent|person], kind[fact|decision|lesson|preference|policy], provenance, sensitivity, importance, valid_from/to, superseded_by, recall_count)` — riêng agent vẫn nằm trong file OpenClaw; control plane chỉ mirror/index và sở hữu phạm vi org/phòng/dự án.
 - `KnowledgeSource(scope, type[book|sop|course|url|drive], ingest_status, exam_id)` — gộp 3 kho hiện tại thành một.
 - `Skill(scope[company|team|agent-learned], version, skill_md, files, status[draft|nominated|evaluating|approved|archived], eval_suite_id, approved_by)`.
-- `Permission(agent, connector, action_class[read|draft|send|pay|delete], mode[allow|ask|off], daily_cap_vnd, autonomy_level)` → biên dịch ra `tools.allow/deny`, sandbox, approvals.
+- `Permission(agent, connector, action_class[read|draft|send|pay|delete], mode[allow|ask|off], daily_cap_usd, autonomy_level)` → biên dịch ra `tools.allow/deny`, sandbox, approvals.
 - `EvalSuite / EvalRun / Scorecard / AgentVersion(hash persona+JD+skills+model+permissions, rollback_of)`.
 - `Approval`, `AuditEvent` (ghi kèm phiên bản bộ nhớ/kỹ năng/model của từng lượt chạy).
 
@@ -103,7 +103,7 @@ subtitle: "Giải phẫu agent, hiện trạng repo + gateway, và lộ trình (
 **Giai đoạn B — Nội tại có thể tùy chỉnh (M5a):**
 
 5. Form Tính cách + Mô tả công việc có phiên bản, biên dịch ra file; test giữ vai tiếng Việt.
-6. Lưới quyền theo hành động + trần chi VND; model chính/dự phòng/mức thinking theo loại việc.
+6. Lưới quyền theo hành động + trần chi USD; model chính/dự phòng/mức thinking theo loại việc.
 7. Bộ nhớ: UI xem/sửa/quên theo tầng; bộ nhớ chung org/phòng/dự án qua MCP.
 
 **Giai đoạn C — Tự học có kiểm soát (M5b, điểm khác biệt so với Paperclip):**

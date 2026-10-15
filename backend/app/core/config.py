@@ -76,6 +76,8 @@ class Settings(BaseSettings):
     # Định tuyến model theo tầng (services/model_routing.py). Tắt → mọi việc chạy
     # bằng model mặc định của ghế, quyết định vẫn được tính và ghi để so sánh.
     model_routing_enabled: bool = True
+    # Ranh giới "ngày" khi tính trần chi USD theo ghế (Phase B việc 6).
+    spend_day_tz: str = "UTC"
     # URL gateway dùng để gọi MCP công ty (mạng docker nội bộ).
     clawcompany_mcp_url: str = "http://api:8000/api/mcp"
     wakeup_follow: bool = True  # gắn follower ngay sau khi dispatch (cần cho thẻ duyệt và chi phí)

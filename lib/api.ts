@@ -776,6 +776,7 @@ export const apiAgentsHR = {
     remove_from_gateway?: boolean; reason?: string}) =>
     request<any>(`/agents/${agentId}/lifecycle`, {method: "POST", body: JSON.stringify(body)}),
   tools: (agentId: number) => request<any>(`/agents/${agentId}/tools`),
+  limits: (agentId: number) => request<any>(`/agents/${agentId}/limits`),
   versions: (agentId: number) => request<any>(`/agents/${agentId}/versions`),
   restore: (agentId: number, version: number) =>
     request<any>(`/agents/${agentId}/versions/${version}/restore`, {method: "POST"}),

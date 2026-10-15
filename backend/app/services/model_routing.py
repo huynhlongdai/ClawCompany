@@ -84,12 +84,15 @@ class Decision:
     reasons: list[str] = field(default_factory=list)
     escalated: bool = False
     est_usd: float = 0.0
+    kind: str = "default"
+    thinking: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         t = TIERS[self.tier]
         return {"tier": self.tier, "label": t.label, "model": self.model,
                 "base_tier": self.base_tier, "escalated": self.escalated,
-                "reasons": self.reasons, "est_usd": round(self.est_usd, 6)}
+                "reasons": self.reasons, "est_usd": round(self.est_usd, 6),
+                "kind": self.kind, "thinking": self.thinking}
 
 
 def _bump(tier: str, steps: int = 1) -> str:
@@ -107,13 +110,18 @@ def estimate_usd(tier: str, input_tokens: int, output_tokens: int) -> float:
 
 def decide(*, title: str = "", description: str = "", priority: str = "medium",
            role: str = "", rework_count: int = 0, context_chars: int = 0,
-           budget_state: str = "ok", pinned_tier: str | None = None) -> Decision:
+           budget_state: str = "ok", pinned_tier: str | None = None,
+           seat_policy: dict | None = None) -> Decision:
     """Chọn tầng cho một lượt. Hàm thuần — mọi tín hiệu truyền vào, dễ test.
 
     ``budget_state``: ``ok`` | ``warned`` (đã chạm nấc cảnh báo) | ``critical_only``.
     ``pinned_tier``: người quản lý ghim tầng cho việc này (ưu tiên tuyệt đối).
+    ``seat_policy``: chính sách model của ghế (``tiers``/``thinking`` theo loại việc).
+    Tầng ghế đặt thay cho tầng mặc định của loại việc, nhưng các sàn an toàn
+    (hành động ra ngoài ≥ T3, khách đọc ≠ T1…) vẫn áp sau đó.
     """
     reasons: list[str] = []
+    seat_policy = seat_policy or {}
     if pinned_tier in TIERS:
         reasons.append(f"người quản lý ghim tầng {pinned_tier}")
         d = Decision(pinned_tier, TIERS[pinned_tier].ref, pinned_tier, reasons)
@@ -122,13 +130,18 @@ def decide(*, title: str = "", description: str = "", priority: str = "medium",
 
     text = f"{title}\n{description}".lower()
     tier = "T2"
+    kind = "default"
     reasons.append("mặc định T2 cho việc thường")
-    for kind, kind_tier, words in _KINDS:
+    for k, kind_tier, words in _KINDS:
         hit = next((w for w in words if w in text), None)
         if hit:
-            tier = kind_tier
-            reasons[-1] = f"loại việc '{kind}' (khớp \"{hit}\") → {kind_tier}"
+            tier, kind = kind_tier, k
+            reasons[-1] = f"loại việc '{k}' (khớp \"{hit}\") → {kind_tier}"
             break
+    seat_tier = (seat_policy.get("tiers") or {}).get(kind)
+    if seat_tier in TIERS and seat_tier != tier:
+        tier = seat_tier
+        reasons.append(f"ghế đặt loại '{kind}' dùng {seat_tier}")
 
     risky = next((w for w in _RISKY if w in text), None)
     if not risky:
@@ -161,8 +174,15 @@ def decide(*, title: str = "", description: str = "", priority: str = "medium",
         tier = "T3"
         reasons.append("ngân sách đã chạm nấc cảnh báo → hạ T4 xuống T3")
 
-    d = Decision(tier, TIERS[tier].ref, base, reasons, escalated)
+    d = Decision(tier, TIERS[tier].ref, base, reasons, escalated, kind=kind)
     d.est_usd = estimate_usd(tier, max(1, context_chars // 3) + 1500, 800)
+    want = (seat_policy.get("thinking") or {}).get(kind)
+    if want:
+        if TIERS[tier].reasoning:
+            d.thinking = want
+            reasons.append(f"thinking {want} cho loại '{kind}'")
+        else:
+            reasons.append(f"{TIERS[tier].model_id} không có thinking — bỏ qua mức {want}")
     return d
 
 
@@ -192,13 +212,25 @@ def budget_state(db, member, task) -> str:
     return "ok"
 
 
+def seat_policy(db, member) -> dict:
+    if member is None:
+        return {}
+    try:
+        from app.services.seat_limits import _spec_for
+        p = _spec_for(db, member).get("model_policy")
+        return p if isinstance(p, dict) else {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def decide_for_task(db, task, member, *, context_chars: int = 0) -> Decision:
     policy = task.execution_policy if isinstance(getattr(task, "execution_policy", None), dict) else {}
     return decide(title=task.title or "", description=task.description or "",
                   priority=task.priority or "medium", role=(member.role if member else "") or "",
                   rework_count=rework_count(db, task.id), context_chars=context_chars,
                   budget_state=budget_state(db, member, task),
-                  pinned_tier=(policy or {}).get("model_tier"))
+                  pinned_tier=(policy or {}).get("model_tier"),
+                  seat_policy=seat_policy(db, member))
 
 
 def provider_models() -> list[dict]:
@@ -217,7 +249,7 @@ def provider_models() -> list[dict]:
     return out
 
 
-def seat_model_config(role: str, lead: bool | None = None) -> dict:
+def seat_model_config(role: str, lead: bool | None = None, fallback: str | None = None) -> dict:
     """Cấu hình model mặc định cho một ghế: quản lý T3, thừa hành T2.
 
     ``utilityModel`` và ``heartbeat.model`` luôn T1 — việc vặt không cần
@@ -225,7 +257,7 @@ def seat_model_config(role: str, lead: bool | None = None) -> dict:
     """
     is_lead = lead if lead is not None else bool(role and _LEAD_ROLE.search(role))
     primary = TIERS["T3"] if is_lead else TIERS["T2"]
-    return {"model": {"primary": primary.ref, "fallbacks": [f"{PROVIDER}/{FALLBACK_MODEL}"]},
+    return {"model": {"primary": primary.ref, "fallbacks": [f"{PROVIDER}/{fallback or FALLBACK_MODEL}"]},
             "utilityModel": TIERS["T1"].ref,
             "heartbeat": {"model": TIERS["T1"].ref, "lightContext": True}}
 

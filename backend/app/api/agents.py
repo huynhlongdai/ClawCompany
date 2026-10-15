@@ -56,6 +56,8 @@ class HireIn(BaseModel):
     emoji: str = Field(default="", max_length=16)
     job_description: str = Field(default="", max_length=8000)
     manager_notes: str = Field(default="", max_length=3000)
+    daily_cap_usd: float | None = Field(default=None, ge=0)
+    model_policy: dict = Field(default_factory=dict)
     monthly_budget: float | None = Field(default=None, ge=0)
     tools: dict[str, str] = Field(default_factory=dict)
 
@@ -71,6 +73,9 @@ class HrPatchIn(BaseModel):
     emoji: str | None = Field(default=None, max_length=16)
     job_description: str | None = Field(default=None, max_length=8000)
     manager_notes: str | None = Field(default=None, max_length=3000)
+    monthly_budget: float | None = Field(default=None, ge=0)
+    daily_cap_usd: float | None = Field(default=None, ge=0)
+    model_policy: dict | None = None
     # Sinh lại các file này từ hồ sơ kể cả khi đã được chỉnh tay trên UI.
     regenerate_files: list[str] = Field(default_factory=list)
 
@@ -247,6 +252,16 @@ async def hr_lifecycle(agent_id: int, payload: LifecycleIn, principal: Principal
     return await agent_hr.lifecycle(db, principal, active_org(principal), get_runtime(), agent_id,
                                     action=payload.action, reassign_to_member_id=payload.reassign_to_member_id,
                                     remove_from_gateway=payload.remove_from_gateway, reason=payload.reason)
+
+
+@router.get("/{agent_id}/limits")
+def hr_limits(agent_id: int, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    """Phase B việc 6: chi tiêu USD hôm nay/tháng này so với trần, và chính sách model theo loại việc."""
+    from app.services import seat_limits
+    agent, member = agent_hr.seat(db, active_org(principal), agent_id)
+    spec = agent_hr.hire_spec(db, agent)
+    return {**seat_limits.state(db, member, spec), "agent_id": agent.id,
+            "model_policy": spec.get("model_policy") or {}, "options": seat_limits.options()}
 
 
 @router.get("/{agent_id}/tools")
