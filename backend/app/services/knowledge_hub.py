@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import io
 import re
+import json
 from datetime import datetime
 from html.parser import HTMLParser
 
@@ -156,10 +157,16 @@ def reindex(db: Session, doc: KnowledgeDocument) -> int:
         db.query(KnowledgeVector).filter(KnowledgeVector.chunk_id.in_(old)).delete(synchronize_session=False)
         db.query(KnowledgeChunk).filter(KnowledgeChunk.document_id == doc.id).delete(synchronize_session=False)
     parts = chunk_text(doc.content)
+    from app.services import embeddings
+    real = embeddings.embed(parts)
+    prov = embeddings.provider_name() if real else "hash384"
     for i, part in enumerate(parts):
-        ch = KnowledgeChunk(document_id=doc.id, chunk_index=i, content=part, embedding_provider="hash384")
+        ch = KnowledgeChunk(document_id=doc.id, chunk_index=i, content=part, embedding_provider=prov)
         db.add(ch); db.flush()
-        index_chunk_vector(db, ch)
+        if real:
+            db.add(KnowledgeVector(chunk_id=ch.id, embedding_json=json.dumps(real[i])))
+        else:
+            index_chunk_vector(db, ch)
     doc.indexed = True
     db.add(doc); db.commit()
     return len(parts)
@@ -316,7 +323,10 @@ def search(db: Session, org_id: int, query: str, *, member: Member | None = None
     if not qt or not docs:
         hits = []
     else:
+        from app.services import embeddings
         qemb = hash384_embedding(query)
+        prov = embeddings.provider_name()
+        real_q = (embeddings.embed([query]) or [None])[0] if prov != "hash384" else None
         rows = (db.query(KnowledgeChunk, KnowledgeVector)
                 .outerjoin(KnowledgeVector, KnowledgeVector.chunk_id == KnowledgeChunk.id)
                 .filter(KnowledgeChunk.document_id.in_(list(docs))).limit(20000).all())
@@ -326,9 +336,18 @@ def search(db: Session, org_id: int, query: str, *, member: Member | None = None
             cover = len(qt & ct) / len(qt)
             title_bonus = 0.1 if qt & set(_tokens(docs[ch.document_id].title)) else 0.0
             try:
-                emb = _json.loads(kv.embedding_json) if kv else hash384_embedding(ch.content)
+                emb = _json.loads(kv.embedding_json) if kv else []
             except Exception:  # noqa: BLE001
                 emb = []
+            if real_q is not None and ch.embedding_provider == prov and emb:
+                # Embedding thật: hiểu cùng ý khác chữ ("bể" ~ "vỡ") → cho vào cả khi không trùng từ nào.
+                sem = embeddings.semantic(cosine(real_q, emb))
+                s = 0.45 * cover + 0.55 * sem + title_bonus
+                if cover > 0 or sem >= 0.35:
+                    scored.append((s, ch))
+                continue
+            if ch.embedding_provider != "hash384" or not emb:
+                emb = hash384_embedding(ch.content)
             s = 0.7 * cover + 0.3 * max(0.0, cosine(qemb, emb)) + title_bonus
             if cover > 0:
                 scored.append((s, ch))
@@ -494,3 +513,30 @@ async def sync_core(db: Session, principal, org_id: int, runtime) -> dict:
         except Exception as exc:  # noqa: BLE001
             rows.append({"agent_id": ag.id, "name": m.name, "written": False, "note": str(getattr(exc, "detail", exc))[:200]})
     return {"seats": rows, "written": sum(r["written"] for r in rows)}
+
+
+
+def reembed_all(db: Session, org_id: int) -> dict:
+    """Chỉ mục lại mọi tài liệu chưa dùng embedding hiện hành (sau khi bật embedding thật hoặc đổi model)."""
+    from app.services import embeddings
+    prov = embeddings.provider_name()
+    docs = db.query(KnowledgeDocument).filter(KnowledgeDocument.organization_id == org_id).all()
+    done = skipped = 0
+    for d in docs:
+        provs = {p for (p,) in db.query(KnowledgeChunk.embedding_provider).filter(KnowledgeChunk.document_id == d.id).distinct()}
+        if provs == {prov}:
+            skipped += 1
+            continue
+        reindex(db, d)
+        done += 1
+    return {"provider": prov, "reindexed": done, "skipped": skipped}
+
+
+def embedding_status(db: Session, org_id: int) -> dict:
+    from app.services import embeddings
+    prov = embeddings.provider_name()
+    q = (db.query(KnowledgeChunk.embedding_provider).join(KnowledgeDocument, KnowledgeDocument.id == KnowledgeChunk.document_id)
+         .filter(KnowledgeDocument.organization_id == org_id))
+    total = q.count()
+    current = q.filter(KnowledgeChunk.embedding_provider == prov).count()
+    return {"provider": prov, "semantic": prov != "hash384", "chunks": total, "chunks_current": current}

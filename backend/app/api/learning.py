@@ -122,6 +122,18 @@ def delete_doc(doc_id: int, background: BackgroundTasks, principal: Principal = 
     return out
 
 
+@router.get("/embeddings")
+def embeddings_status(principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    """Kho đang tìm theo nghĩa (embedding thật) hay theo từ khoá; bao nhiêu đoạn đã có vector hiện hành."""
+    return knowledge_hub.embedding_status(db, active_org(principal))
+
+
+@router.post("/embeddings/reindex")
+def embeddings_reindex(principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    """Chỉ mục lại các tài liệu còn vector cũ (sau khi bật embedding thật / đổi model)."""
+    return knowledge_hub.reembed_all(db, active_org(principal))
+
+
 @router.get("/core/{agent_id}")
 def core_preview(agent_id: int, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
     """Phần 'Kiến thức cốt lõi' sẽ nằm trong AGENTS.md của agent này (3 lớp, có hạn mức ký tự)."""

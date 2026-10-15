@@ -120,6 +120,11 @@ class Settings(BaseSettings):
     vector_backend: str = "pgvector"
     embedding_provider: str = "hash384"
     embedding_dim: int = 384
+    # Embedding thật (API kiểu OpenAI /embeddings). Trống → chỉ dùng hash384 (tìm theo từ khoá).
+    embedding_api_base: str = ""                       # ví dụ https://api.cometapi.com/v1
+    embedding_model: str = "text-embedding-3-small"
+    embedding_api_key: str = ""
+    embedding_api_key_file: str = ""                   # đọc key từ file (mount secret), ưu tiên hơn biến môi trường
     openclaw_rpc_create_agent: str = "agents.create"
     openclaw_rpc_run_agent: str = "agents.run"
     openclaw_rpc_cancel_run: str = "runs.cancel"

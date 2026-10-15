@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from app.models import Agent, Approval, Member
+from app.models import Agent, Approval, KnowledgeChunk, Member
 from app.models.learning import CourseEnrollment, KnowledgeGap
 from app.services import company_mcp, courses, knowledge_hub
 from tests.test_m3_agents import env, hire  # noqa: F401  (fixture)
@@ -244,3 +244,34 @@ def test_core_knowledge_three_layers_compiled_into_agents_md(L):
     r = L.c.patch(f"/api/learning/docs/{doc_id}", json={"is_core": False}, headers=L.tok("manager"))
     assert r.json()["core_sync"] is True
     assert "Khách VIP Lan" not in L.c.get(f"/api/learning/core/{a['agent_id']}", headers=L.tok("member")).json()["text"]
+
+
+def test_real_embeddings_find_meaning_without_shared_words(L, monkeypatch):
+    from app.core.config import settings
+    from app.services import embeddings
+    CONCEPTS = [("vỡ", "bể", "nứt", "hư"), ("giờ", "mấy", "mở", "đóng"), ("tiền", "thanh", "toán", "khoản")]
+
+    def fake_post(texts):
+        out = []
+        for t in texts:
+            low = t.lower()
+            v = [0.05] + [float(sum(low.count(w) for w in c)) for c in CONCEPTS]
+            out.append(embeddings._norm(v))
+        return out
+
+    add(L, title="Chính sách hàng vỡ", content="Hàng giao tới bị vỡ: gửi ảnh qua Zalo trong 48 giờ để được gửi bù.")
+    q = "món đồ nhận được bị bể"
+    assert not knowledge_hub.search(L.db, L.org.id, q, log_gap=False)["found"]          # hash384: không trùng chữ
+    monkeypatch.setattr(settings, "embedding_api_base", "https://emb.test/v1")
+    monkeypatch.setattr(settings, "embedding_api_key", "k")
+    monkeypatch.setattr(embeddings, "_post", fake_post)
+    st = L.c.get("/api/learning/embeddings", headers=L.tok("member")).json()
+    assert st["semantic"] is True and st["chunks_current"] == 0
+    r = L.c.post("/api/learning/embeddings/reindex", headers=L.tok("manager")).json()
+    assert r["reindexed"] >= 1 and r["provider"] == "api:text-embedding-3-small"
+    hit = knowledge_hub.search(L.db, L.org.id, q, log_gap=False)
+    assert hit["found"] and "Zalo" in hit["hits"][0]["content"]
+    # API lỗi → vẫn nạp được, rơi về hash384
+    monkeypatch.setattr(embeddings, "_post", lambda texts: (_ for _ in ()).throw(OSError("down")))
+    out = add(L, title="Giờ mở cửa", content="Tiệm mở 8 giờ đến 21 giờ.")
+    assert out["id"] and L.db.query(KnowledgeChunk).filter_by(document_id=out["id"]).first().embedding_provider == "hash384"
