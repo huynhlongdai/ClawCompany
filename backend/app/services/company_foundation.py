@@ -434,7 +434,17 @@ def brief_of(db: Session, p: Position | None) -> dict | None:
     boss = db.get(Position, p.reports_to_position_id) if p.reports_to_position_id else None
     return {"title": p.title, "job_description": p.job_description or "", "responsibilities": p.responsibilities or [],
             "kpis": p.kpis or [], "allowed_tools": p.allowed_tools or [], "allowed_skills": p.allowed_skills or [],
-            "headcount": p.headcount or 0, "reports_to": boss.title if boss else ""}
+            "headcount": p.headcount or 0, "reports_to": boss.title if boss else "",
+            "rules": _rules_lines(db, p)}
+
+
+def _rules_lines(db: Session, p: Position) -> list[str]:
+    try:
+        from app.services.runtime_rules import agents_md_lines
+        return agents_md_lines(db, None, position_id=p.id, company_id=p.company_id)
+    except Exception as exc:  # noqa: BLE001 — AGENTS.md vẫn sinh được khi bảng luật chưa có (migration chưa chạy)
+        print(f"[m2e] rules lines: {exc}")
+        return []
 
 
 PERIOD_VI = {"day": "ngày", "week": "tuần", "month": "tháng", "quarter": "quý", "year": "năm"}

@@ -137,6 +137,18 @@ def _handle(ctx: company_mcp.ToolContext, msg: dict) -> dict | None:
             raise Denied(_error(id_, -32003, f"Seat không được dùng {name}",
                                 {"error": "forbidden", "level": "off", "source": source}))
         args = params.get("arguments") or {}
+        # M2e.2 luật cứng: tool cấm / tool cần duyệt / chữ cấm khi gửi ra ngoài — cưỡng chế ở cổng MCP
+        from app.services import runtime_rules
+        decision, hit, args = runtime_rules.check_mcp_call(
+            ctx.db, ctx.member, name, args, session_key=ctx.session_key or "",
+            run_id=str(ctx.run.id) if getattr(ctx, "run", None) else "")
+        if decision == "block":
+            _deny_event(ctx, name, "rule", rule_id=hit.get("rule_id"))
+            msg = hit.get("message") or "Luật cứng của công ty chặn thao tác này."
+            return {"jsonrpc": "2.0", "id": id_, "result": tool_result(
+                {"error": "rule_blocked", "rule_id": hit.get("rule_id"), "message": f"Bị chặn bởi luật cứng: {msg}"}, False)}
+        if decision == "approve" and level != "off":
+            level = "ask"
         if not _allowed(ctx, spec):
             ok, result = False, {"error": "forbidden",
                                  "message": f"API key thiếu scope {spec.scope}"}

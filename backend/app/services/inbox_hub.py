@@ -39,7 +39,7 @@ GROUPS = [
     ("updates", "Thông báo"),
 ]
 GROUP_VI = dict(GROUPS)
-REVIEW_KINDS = {"task_review", "run_failed"}
+REVIEW_KINDS = {"task_review", "run_failed", "rule_violation", "output_escalated", "sla_breach"}   # + M2e
 BUDGET_KINDS = {"budget_warned", "budget_soft_stopped", "budget_exhausted"}
 LESSON_KINDS = {"lesson_proposal"}
 RISK_VI = {"critical": "Nghiêm trọng", "high": "Cao", "medium": "Vừa", "low": "Thấp"}

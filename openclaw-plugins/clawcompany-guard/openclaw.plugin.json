@@ -1,14 +1,32 @@
 {
   "id": "clawcompany-guard",
   "name": "ClawCompany Guard",
-  "description": "Nhân sự AI không tiết lộ model / nhà cung cấp AI đang chạy.",
-  "activation": { "onStartup": true },
+  "description": "Nhân sự AI không lộ model/nhà cung cấp; luật cứng của công ty (ClawCompany) được cưỡng chế lúc chạy.",
+  "activation": {
+    "onStartup": true
+  },
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
     "properties": {
-      "extraTerms": { "type": "array", "items": { "type": "string" } },
-      "replacement": { "type": "string" }
+      "extraTerms": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "replacement": {
+        "type": "string"
+      },
+      "rulesJson": {
+        "type": "string"
+      },
+      "reportUrl": {
+        "type": "string"
+      },
+      "reportToken": {
+        "type": "string"
+      }
     }
   }
 }

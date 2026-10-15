@@ -161,7 +161,10 @@ def render_files(*, name: str, role: str, company: str, department: str, manager
                                                              if position.get("reports_to") else "") + "\n\n"
                      + (f"## KPI của chức danh\n{kpis}\nBáo cáo tiến độ theo đúng các chỉ số này.\n\n" if kpis else "")
                      + (f"## Công cụ & kỹ năng của chức danh\n" + (f"- Công cụ công ty được dùng: {tools}\n" if tools else "")
-                        + (f"- Kỹ năng: {skills}\n" if skills else "") + "\n" if tools or skills else ""))
+                        + (f"- Kỹ năng: {skills}\n" if skills else "") + "\n" if tools or skills else "")
+                     + ("## Luật cứng (hệ thống cưỡng chế, không phải lời khuyên)\n" + "\n".join(position["rules"])
+                        + "\nVi phạm bị chặn hoặc bắt viết lại tự động và được ghi vào hồ sơ tuân thủ của ghế.\n\n"
+                        if position.get("rules") else ""))
     else:
         duties = own
     duties = duties or (f"- Làm các việc được giao cho vị trí {role} trên bảng công việc.\n"

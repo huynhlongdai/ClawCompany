@@ -777,6 +777,16 @@ export const apiCompany = {
 };
 
 // M2c: vận hành công ty — quy trình (D4), KPI (D5), giao ban (D6), tuân thủ (D7), sẵn sàng agent (D8).
+// M2e — công ty agent-native
+export const apiNative = {
+  rules: (companyId?: number | null) => request<any>(`/team/rules${cq(companyId)}`),
+  createRule: (body: any) => request<any>(`/team/rules`, {method: "POST", body: JSON.stringify(body)}),
+  updateRule: (id: number, body: any) => request<any>(`/team/rules/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  deleteRule: (id: number) => request<any>(`/team/rules/${id}`, {method: "DELETE"}),
+  testRules: (body: any) => request<any>(`/team/rules/test`, {method: "POST", body: JSON.stringify(body)}),
+  syncRules: () => request<any>(`/team/rules/sync`, {method: "POST"}),
+};
+
 export const apiOps = {
   processes: (companyId?: number | null) => request<any>(`/team/processes${cq(companyId)}`),
   createProcess: (body: any) => request<any>(`/team/processes`, {method: "POST", body: JSON.stringify(body)}),
