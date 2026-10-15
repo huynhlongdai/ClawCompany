@@ -318,3 +318,23 @@ def compliance_generate(payload: CompanyIn, principal: Principal = Depends(requi
 @router.post("/compliance/deadlines/{deadline_id}/done")
 def compliance_done(deadline_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
     return cc.mark_done(db, active_org(principal), deadline_id)
+
+
+# ------------------------------------------------------------------ D8 chẩn đoán sẵn sàng agent
+
+from app.services import agent_readiness as ar  # noqa: E402
+
+
+class ReadinessIn(BaseModel):
+    company_id: int | None = None
+    answers: dict | None = None
+
+
+@router.get("/readiness")
+def readiness(company_id: int | None = None, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+    return ar.latest(db, active_org(principal), company_id)
+
+
+@router.post("/readiness")
+def readiness_assess(payload: ReadinessIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    return ar.assess(db, active_org(principal), payload.company_id, answers=payload.answers, member_id=principal.member_id)

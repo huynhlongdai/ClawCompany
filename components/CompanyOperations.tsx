@@ -462,3 +462,63 @@ export function ComplianceTab({companyId, caps}: {companyId: number | null; caps
       </tr>)}</tbody></table></div>}
   </section>;
 }
+
+// ===================================================================== Chẩn đoán sẵn sàng agent (D8)
+
+export function ReadinessTab({companyId, caps}: {companyId: number | null; caps: any}) {
+  const {data, error, reload, setError} = useLoad(() => apiOps.readiness(companyId), [companyId]);
+  const [ans, setAns] = useState<any>(null), [busy, setBusy] = useState(false);
+  const toast = useToast();
+  const can = !!caps?.invite || !!caps?.manage_roles;
+  useEffect(() => { if (data) setAns({...((data as any).assessment?.answers || {})}); }, [data]);
+  if (error && !data) return <ErrorBanner error={error} onRetry={reload} testId="rd-error"/>;
+  if (!data || !ans) return <SkeletonRows n={5} h={44}/>;
+  const d: any = data, a = d.assessment;
+  async function assess() {
+    setBusy(true); setError(null);
+    try { const r = await apiOps.assessReadiness({company_id: companyId ?? d.company_id, answers: ans}); toast(tr("ops.rd_done", {p0: r.score})); await reload(); }
+    catch (e) { setError(e); } finally { setBusy(false); }
+  }
+  const lvlPill = (k: string) => k === "pilot_ready" ? "is-ok" : k === "building" ? "is-wait" : "is-risk";
+  return <section className="ui-section" data-testid="readiness">
+    {error ? <ErrorBanner error={error} onClose={() => setError(null)}/> : null}
+    <p className="tmGuide">{tr("ops.rd_explain")}</p>
+    {!a ? <EmptyState mood="chao" title={tr("ops.rd_empty")} testId="rd-empty">{tr("ops.rd_empty_hint")}</EmptyState> : <>
+      <div className="ui-grid is-2">
+        <section className="ui-panel tm-card" data-testid="rd-score">
+          <div className="tm-card-head"><div><b>{tr("ops.rd_score")}</b><span>{tr(`ops.rd_trigger_${a.trigger}` as Key)} · {new Date(a.created_at + "Z").toLocaleString()}</span></div>
+            <span className={"ui-pill " + lvlPill(a.level)}>{tr(`ops.rd_lv_${a.level}` as Key)}</span></div>
+          <div className="ops-big"><b>{a.score}</b><span>/100</span>{a.previous_score != null && <small> ({a.score >= a.previous_score ? "+" : ""}{a.score - a.previous_score} {tr("ops.rd_vs_prev")})</small>}</div>
+          <table className="ui-table"><tbody>{a.layers.map((l: any) => <tr key={l.key}>
+            <td>{tr(`ops.rd_l_${l.key}` as Key)}</td><td><Bar p={l.score}/> {l.score}</td>
+            <td style={{textAlign: "right"}}>{l.todo ? <Link href={l.fix_href}>{tr("ops.rd_todo", {p0: l.todo})}</Link> : "✓"}</td></tr>)}</tbody></table>
+        </section>
+        <section className="ui-panel tm-card" data-testid="rd-lighthouse">
+          <div className="tm-card-head"><div><b>{tr("ops.rd_lighthouse")}</b><span>{tr("ops.rd_lighthouse_desc")}</span></div>
+            {a.lighthouse?.score ? <span className="ui-pill is-info">{a.lighthouse.score}/100</span> : null}</div>
+          {a.lighthouse?.process_id ? <p className="ops-lh"><b>{a.lighthouse.name}</b></p> : <p>{tr("ops.rd_no_lighthouse")}</p>}
+          <ul className="ops-issues ops-lh-list">{(a.lighthouse?.reasons || []).map((r: string, i: number) => <li key={i}>• {r}</li>)}</ul>
+          {a.lighthouse?.process_id && <><b>{tr("ops.rd_next")}</b>
+            <ol className="ops-steps">{[1, 2, 3].map(i => <li key={i}>{tr(`ops.rd_ns_${i}` as Key)}</li>)}</ol></>}
+          <Link className="ui-btn is-ghost is-sm" href={a.lighthouse?.fix_href || "#"}>{tr("ops.rd_open_processes")}</Link>
+        </section>
+      </div>
+      <h3 className="ops-cat">{tr("ops.rd_checklist")}</h3>
+      <div className="ui-panel"><ul className="ops-check" data-testid="rd-checklist">{a.checks.map((c: any) => <li key={c.key} className={c.ok ? "is-ok" : ""}>
+        <span className="ops-tick">{c.ok ? "✓" : c.score > 0 ? "◐" : "○"}</span>
+        <span className="ui-grow"><b>{tr(`ops.rd_c_${c.key}` as Key)}</b> <small>— {c.detail}</small></span>
+        {!c.ok && <Link className="ui-btn is-ghost is-sm" href={c.fix_href}>{tr("ops.rd_fix")}</Link>}</li>)}</ul></div>
+    </>}
+    <h3 className="ops-cat">{tr("ops.rd_questions")}</h3>
+    <section className="ui-panel tm-card" data-testid="rd-questions">
+      <fieldset disabled={!can || busy} className="ui-form cf-form">
+        {d.questions.map((q: any) => <Field key={q.key} label={tr(`ops.rd_q_${q.key}` as Key)}>
+          <select value={ans[q.key] || ""} onChange={e => setAns({...ans, [q.key]: e.target.value || undefined})} data-testid={`rd-q-${q.key}`}>
+            <option value="">{tr("ops.choose")}</option>{q.options.map((o: string) => <option key={o} value={o}>{tr(`ops.rd_a_${q.key}_${o}` as Key)}</option>)}</select></Field>)}
+        <Field label={tr("ops.rd_q_goal")}><input value={ans.goal || ""} onChange={e => setAns({...ans, goal: e.target.value})}/></Field>
+      </fieldset>
+      {can ? <div className="tmRow"><button className="ui-btn is-primary" disabled={busy} onClick={assess} data-testid="rd-assess">{a ? tr("ops.rd_reassess") : tr("ops.rd_assess")}</button></div>
+        : <small>{tr("ops.need_manager")}</small>}
+    </section>
+  </section>;
+}

@@ -125,6 +125,11 @@ def seed_authority(db: Session, company: Company, template: str | None = None) -
         authority.seed_defaults(db, company.organization_id, company.id, template=template)
     except Exception as exc:  # noqa: BLE001
         db.rollback(); print(f"[authority] seed company #{company.id}: {exc}")
+    try:   # M2c D8: chẩn đoán sẵn sàng agent ngay khi tạo công ty (điểm + việc cần sửa + lighthouse)
+        from app.services import agent_readiness
+        agent_readiness.assess(db, company.organization_id, company.id, answers={}, trigger="company_created")
+    except Exception as exc:  # noqa: BLE001
+        db.rollback(); print(f"[readiness] company #{company.id}: {exc}")
 
 
 async def provision_company(

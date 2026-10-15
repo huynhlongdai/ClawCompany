@@ -636,3 +636,14 @@ a.org-node:hover{border-color:var(--text-muted);box-shadow:var(--shadow-2)}
 .ops-kpi-table td{vertical-align:top}
 .ops-report{background:var(--surface-sunken,var(--bg));padding:10px;border-radius:8px;font-family:inherit;margin:6px 0}
 [data-testid=cmp-rules] tr.is-off td{opacity:.55}
+.ops-big{display:flex;align-items:baseline;gap:4px;margin:6px 0 10px}
+.ops-big b{font-size:42px;line-height:1;color:var(--accent,#D63A2F)}
+.ops-big span{color:var(--text-muted)}
+.ops-check{list-style:none;margin:0;padding:6px 12px}
+.ops-check li{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border,#eee);font-size:13px}
+.ops-check li:last-child{border-bottom:0}
+.ops-check li.is-ok{opacity:.7}
+.ops-tick{width:18px;text-align:center;font-weight:700;color:var(--accent,#D63A2F)}
+.ops-check li.is-ok .ops-tick{color:var(--ok)}
+.ops-lh{font-size:16px;margin:4px 0}
+.ops-lh-list{color:var(--text-muted)}

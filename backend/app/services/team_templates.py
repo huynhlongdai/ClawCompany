@@ -156,6 +156,8 @@ async def create_from_template(db: Session, principal: Principal, org_id: int, k
         operating_rhythm.config(db, org_id, company.id, create=True)
         from app.services import compliance_calendar   # D7: lịch tuân thủ mặc định (sửa được)
         compliance_calendar.seed_defaults(db, org_id, company.id)
+        from app.services import agent_readiness   # D8: chấm lại sau khi mẫu đã dựng xong chức danh/quy trình
+        agent_readiness.assess(db, org_id, company.id, answers={}, trigger="company_created")
     except Exception as exc:  # noqa: BLE001
         db.rollback(); print(f"[m2c] seed processes company #{company.id}: {exc}")
     issues = []

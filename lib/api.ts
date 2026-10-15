@@ -802,6 +802,8 @@ export const apiOps = {
   updateComplianceRule: (id: number, body: any) => request<any>(`/team/compliance/rules/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
   deleteComplianceRule: (id: number) => request<any>(`/team/compliance/rules/${id}`, {method: "DELETE"}),
   complianceDone: (id: number) => request<any>(`/team/compliance/deadlines/${id}/done`, {method: "POST"}),
+  readiness: (companyId?: number | null) => request<any>(`/team/readiness${cq(companyId)}`),
+  assessReadiness: (body: any) => request<any>(`/team/readiness`, {method: "POST", body: JSON.stringify(body)}),
   syncKpis: (companyId?: number | null) => request<any>(`/team/kpis/sync-positions`, {method: "POST", body: JSON.stringify({company_id: companyId ?? null})}),
 };
 

@@ -218,3 +218,23 @@ class ComplianceDeadline(Base):
     reminded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     done_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# ------------------------------------------------------------------ D8 chẩn đoán sẵn sàng agent
+
+class ReadinessAssessment(Base):
+    """Một lần chấm "sẵn sàng agent": câu trả lời bảng hỏi + kiểm tra tự động theo lớp công ty → điểm từng
+    lớp, điểm chung, danh sách việc cần sửa (kèm đường dẫn) và quy trình lighthouse đề xuất."""
+    __tablename__ = "readiness_assessments"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    trigger: Mapped[str] = mapped_column(String(24), default="manual")      # manual | company_created
+    answers: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    score: Mapped[int] = mapped_column(Integer, default=0)
+    level: Mapped[str] = mapped_column(String(24), default="")
+    layers: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    checks: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    lighthouse: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_by_member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

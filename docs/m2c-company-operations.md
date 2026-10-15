@@ -126,3 +126,25 @@ căn cứ, luật chưa chắc gắn nhãn "Cần kiểm tra".
 
 API: `GET /team/compliance`, `PUT /team/compliance/settings` (admin), `POST /team/compliance/seed`, `POST/PATCH/DELETE
 /team/compliance/rules[/{id}]`, `POST /team/compliance/generate`, `POST /team/compliance/deadlines/{id}/done`.
+
+## D8. Chẩn đoán sẵn sàng agent — migration `0043_agent_readiness`
+
+**Dữ liệu**: `readiness_assessments` (lần chấm: trigger `company_created | manual`, câu trả lời, điểm, mức, điểm
+từng lớp, danh sách kiểm tra, lighthouse).
+
+**Bảng hỏi** (5 câu + mục tiêu tự do): khối lượng yêu cầu lặp lại/tuần, quy trình đã viết ra, dữ liệu số hoá, có
+người duyệt ngoại lệ hằng ngày, mức chấp nhận sai sót khi thử. Câu trả lời được nhớ cho lần chấm sau.
+
+**Kiểm tra tự động** (dữ liệu thật, mỗi mục có `fix_href` tới đúng tab): pháp nhân (4 trường) + hiến chương (sứ
+mệnh, giọng, điều cấm); chức danh có / định biên có người / có JD; ma trận có luật chi tiền, hoàn tiền, gửi ra ngoài;
+có quy trình / có chủ / bước gắn chức danh có người / đã chạy trọn; KPI công ty-phòng / KPI seat; tài liệu cốt lõi /
+bước có SOP; giao ban bật; lịch tuân thủ + cài đặt kê khai; 3 câu bảng hỏi.
+
+**Điểm**: mỗi lớp = TB điểm kiểm tra × 100; điểm chung có trọng số (pháp nhân 10, tổ chức 15, phân quyền 15, quy
+trình 20, KPI 10, tri thức 15, nhịp 5, tuân thủ 10, bảng hỏi 10). Mức: <40 mới bắt đầu, 40–69 đang xây nền, ≥70 sẵn
+sàng thí điểm. **Lighthouse**: chấm từng quy trình = 25 % tần suất (bảng hỏi + số lần chạy 30 ngày) + 20 % bước có
+SOP/hướng dẫn + 20 % bước có người + 15 % bước có thời lượng kỳ vọng + 10 % rủi ro tiền (bước chi/hoàn tiền đã có luật
+duyệt) + 10 % ROI (nhóm 4/5/6 ưu tiên), kèm lý do và bước tiếp theo. Không gọi model.
+
+**Khi nào chạy**: tạo công ty (`provisioning.seed_authority` — mọi đường tạo công ty; dựng từ mẫu chấm lại sau khi có
+chức danh/quy trình) và nút "Chấm lại". API: `GET /team/readiness`, `POST /team/readiness {answers}`.
