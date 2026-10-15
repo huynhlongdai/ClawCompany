@@ -152,6 +152,33 @@ def _mint_seat_key(db: Session, org_id: int, member: Member, rid: str, user_id: 
     return raw
 
 
+# Ghế thừa hành không cần chạy lệnh shell: chặn exec/process ở tầng gateway.
+# (Sandbox thật cần docker trong container gateway — chưa có, và mount
+# docker.sock cho nó là trao quyền root máy chủ; để anh quyết riêng.)
+EXECUTOR_DENY = ("exec", "process")
+_MANAGED = set(EXECUTOR_DENY)
+
+
+def seat_deny(db: Session, member: Member, rid: str, all_servers: list[str], current: list) -> list[str]:
+    """``tools.deny`` của một ghế = phần người khác đặt + phần ClawCompany quản.
+
+    Phần quản (tính lại mỗi lần, nên bỏ "Tắt" thì gateway cũng mở lại):
+    * máy chủ MCP của các ghế khác (``cc-<ghế khác>__*``);
+    * tool công ty đang ở mức ``off`` với ghế này (``cc-<ghế>__<tool>``) —
+      tầng 1 khớp tầng 2 (B-tool: "Tắt" phải thành ``tools.deny``);
+    * ``exec``/``process`` cho ghế thừa hành.
+    """
+    from app.services import tool_permissions
+    from app.services.company_mcp import TOOLS
+    own = mcp_server_name(rid)
+    keep = [d for d in (current or []) if not str(d).startswith(MCP_PREFIX) and d not in _MANAGED]
+    managed = [f"{s}__*" for s in all_servers if s != own]
+    managed += [f"{own}__{t}" for t in sorted(TOOLS) if tool_permissions.resolve(db, member, t)[0] == "off"]
+    if tool_permissions.seat_tier(db, member) == "executor":
+        managed += list(EXECUTOR_DENY)
+    return keep + managed
+
+
 def _embed_remote(config: dict) -> dict | None:
     custom = (((config.get("models") or {}).get("providers") or {}).get("custom")) or {}
     base = custom.get("baseUrl")
@@ -229,14 +256,15 @@ async def wire_gateway(db: Session, principal, org_id: int, runtime: Any, *, mcp
                 "toolFilter": {"include": ["company_*"]},
                 "connectionTimeoutMs": 10000, "requestTimeoutMs": 30000,
             }
-            deny = [d for d in (((entry.get("tools") or {}).get("deny")) or [])
-                    if not str(d).startswith(MCP_PREFIX)]
-            deny += [f"{s}__*" for s in all_servers if s != mcp_server_name(rid)]
             path = ("agents", "entries", rid, "tools", "deny")
-            values[path] = deny
+            values[path] = seat_deny(db, member, rid, all_servers,
+                                     ((entry.get("tools") or {}).get("deny")) or [])
             replace.append(path)
+            values[("agents", "entries", rid, "tools", "elevated", "enabled")] = False
         if seat_models:
-            cfg = model_routing.seat_model_config(member.role or "")
+            from app.services import tool_permissions
+            cfg = model_routing.seat_model_config(
+                member.role or "", lead=tool_permissions.seat_tier(db, member) == "lead")
             values[("agents", "entries", rid, "model")] = cfg["model"]
             values[("agents", "entries", rid, "utilityModel")] = cfg["utilityModel"]
             values[("agents", "entries", rid, "heartbeat", "model")] = cfg["heartbeat"]["model"]
@@ -286,3 +314,56 @@ async def provision_all(db: Session, principal, org_id: int, runtime: Any, **wir
             seats.append({"runtime_agent_id": rid, "ok": False, "error": exc.detail})
     wired = await wire_gateway(db, principal, org_id, runtime, **wire_kwargs)
     return {"seats": seats, "gateway": wired}
+
+
+async def sync_tool_policy(db: Session, org_id: int, runtime: Any) -> dict:
+    """Chỉ tính lại ``tools.deny`` của mọi ghế đã nối MCP. Không xoay key.
+
+    Gọi sau khi đổi mức quyền tool: "Tắt" trên ClawCompany có hiệu lực ở gateway
+    (tool biến mất khỏi agent), không chỉ bị từ chối lúc gọi.
+    """
+    if not agent_hr._has_rpc(runtime):
+        return {"skipped": "runtime không phải gateway thật"}
+    registry = ConfigRegistry(runtime)
+    snap = await registry.snapshot()
+    config = snap["config"] or {}
+    servers = set(((config.get("mcp") or {}).get("servers") or {}).keys())
+    entries = ((config.get("agents") or {}).get("entries")) or {}
+    rows = db.execute(
+        select(Agent, Member).join(Member, Agent.member_id == Member.id)
+        .where(Member.organization_id == org_id, Agent.lifecycle != "retired")).all()
+    wired = [(a, m) for a, m in rows if mcp_server_name(a.runtime_agent_id or "") in servers]
+    all_servers = [mcp_server_name(a.runtime_agent_id) for a, _ in wired]
+    values: dict[tuple, Any] = {}
+    replace: list[tuple] = []
+    for agent, member in wired:
+        rid = agent.runtime_agent_id
+        current = (((entries.get(rid) or {}).get("tools") or {}).get("deny")) or []
+        new = seat_deny(db, member, rid, all_servers, current)
+        if new != current:
+            path = ("agents", "entries", rid, "tools", "deny")
+            values[path] = new
+            replace.append(path)
+    if not values:
+        return {"changed": []}
+    result = await registry.patch(values, base_hash=snap["hash"] or None, replace_paths=replace,
+                                  note="ClawCompany · đồng bộ quyền tool")
+    return {"changed": [p[2] for p in values], "changed_paths": result.get("changed_paths")}
+
+
+def schedule_tool_policy_sync(org_id: int) -> None:
+    """Chạy trong BackgroundTasks (phiên DB riêng); lỗi chỉ ghi log, không làm hỏng request."""
+    import asyncio
+    import logging
+    from app.db.session import SessionLocal
+    from app.runtime.factory import get_runtime
+    runtime = get_runtime()
+    if not agent_hr._has_rpc(runtime):
+        return
+    db = SessionLocal()
+    try:
+        asyncio.run(sync_tool_policy(db, org_id, runtime))
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).exception("đồng bộ quyền tool lên gateway lỗi")
+    finally:
+        db.close()

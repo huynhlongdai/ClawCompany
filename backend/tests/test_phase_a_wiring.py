@@ -190,6 +190,7 @@ async def test_untracked_english_sample_counts_as_drift(db, org):
 @pytest.mark.asyncio
 async def test_wire_gateway_one_patch_with_seat_isolated_mcp_models_and_memory(db, org):
     nina, nina_m = seat(db, org, "nina", "Nina", "Chief of Staff")
+    org[2].head_member_id = nina_m.id; db.add(org[2]); db.commit()   # Nina là trưởng phòng → lead
     cskh, _ = seat(db, org, "cskh", "Lan", "Nhân viên CSKH")
     seat(db, org, "ghost", "Ma", "CSKH")                   # không có trên gateway
     gw = FakeGateway()
@@ -203,7 +204,11 @@ async def test_wire_gateway_one_patch_with_seat_isolated_mcp_models_and_memory(d
     assert servers["cc-nina"]["toolFilter"] == {"include": ["company_*"]}
     # Mỗi ghế chỉ thấy máy chủ MCP của chính mình; deny cũ được giữ.
     assert tree["agents"]["entries"]["nina"]["tools"]["deny"] == ["browser", "cc-cskh__*"]
-    assert tree["agents"]["entries"]["cskh"]["tools"]["deny"] == ["cc-nina__*"]
+    # Ghế thừa hành: tool công ty mặc định "Tắt" thành deny ở gateway, và không có shell.
+    assert tree["agents"]["entries"]["cskh"]["tools"]["deny"] == [
+        "cc-nina__*", "cc-cskh__company_budget_check", "cc-cskh__company_plan_submit",
+        "cc-cskh__company_task_assign", "exec", "process"]
+    assert tree["agents"]["entries"]["cskh"]["tools"]["elevated"] == {"enabled": False}
     assert "agents.entries.nina.tools.deny" in patches[0]["replacePaths"]
     # Key riêng từng ghế, đã băm trong DB, không trả ra ngoài.
     key = servers["cc-nina"]["headers"]["X-API-Key"]
@@ -306,3 +311,78 @@ def test_api_key_cache_skips_bcrypt_but_respects_revocation(db, org, monkeypatch
     row.is_active = False; db.add(row); db.commit()
     with pytest.raises(HTTPException):
         authz.get_principal(None, raw, db)
+
+
+@pytest.mark.asyncio
+async def test_turning_a_tool_off_reaches_the_gateway_and_back(db, org):
+    from app.services import tool_permissions
+    _, m = seat(db, org, "nina", "Nina", "Chief of Staff")
+    org[2].head_member_id = m.id; db.add(org[2]); db.commit()
+    gw = FakeGateway(roster=("nina",))
+    gw.config["mcp"] = {"servers": {"cc-nina": {}}}
+    gw.config["agents"]["entries"]["nina"]["tools"]["deny"] = ["browser"]
+    assert (await seat_provision.sync_tool_policy(db, org[0].id, gw)) == {"changed": []}
+    tool_permissions.set_level(db, org[0].id, "company_message_send", "off", member_id=m.id)
+    out = await seat_provision.sync_tool_policy(db, org[0].id, gw)
+    tree = json.loads(gw.sent(ocp.M_CONFIG_PATCH)[-1]["raw"])
+    assert tree["agents"]["entries"]["nina"]["tools"]["deny"] == ["browser", "cc-nina__company_message_send"]
+    assert out["changed"] == ["nina"]
+    gw.config["agents"]["entries"]["nina"]["tools"]["deny"] = tree["agents"]["entries"]["nina"]["tools"]["deny"]
+    tool_permissions.set_level(db, org[0].id, "company_message_send", "allowed", member_id=m.id)
+    await seat_provision.sync_tool_policy(db, org[0].id, gw)
+    tree = json.loads(gw.sent(ocp.M_CONFIG_PATCH)[-1]["raw"])
+    assert tree["agents"]["entries"]["nina"]["tools"]["deny"] == ["browser"]
+
+
+def test_weekly_report_counts_cost_per_accepted_output(db, org):
+    from app.models import Project, Task
+    from app.models.work_graph import TaskRun
+    from app.models.v37 import TaskJournalEntry
+    from app.services.company_event_bus import emit_event
+    _, m = seat(db, org, "cskh", "Lan", "CSKH")
+    p = Project(company_id=org[1].id, name="P", status="active"); db.add(p); db.commit()
+    for i, (status, cost, rework) in enumerate([("done", 0.002, False), ("done", 0.004, True), ("todo", 0.001, False)]):
+        t = Task(project_id=p.id, title=f"Việc {i}", status=status); db.add(t); db.commit()
+        r = TaskRun(organization_id=org[0].id, task_id=t.id, member_id=m.id, cost_usd=cost); db.add(r); db.commit()
+        if rework:
+            db.add(TaskJournalEntry(organization_id=org[0].id, task_id=t.id, seq=1, kind="review",
+                                    summary="trả về", outcome="rejected")); db.commit()
+        emit_event(db, organization_id=org[0].id, event_type="model.routed", aggregate_type="task",
+                   aggregate_id=str(t.id), payload={"tier": "T2", "task_run_id": r.id})
+    out = model_routing.report(db, org[0].id)
+    t2 = next(r for r in out["tiers"] if r["tier"] == "T2")
+    assert (t2["runs"], t2["accepted"]) == (3, 1)
+    assert t2["cost_usd"] == pytest.approx(0.007) and t2["cost_per_accepted_usd"] == pytest.approx(0.007)
+
+
+@pytest.mark.asyncio
+async def test_seat_chat_stream_talks_to_that_seat_only_inside_the_org(db, org, monkeypatch):
+    from app.runtime.openclaw_native import NativeOpenClawRuntime
+    from app.services import v36_insights
+    agent, _ = seat(db, org, "cskh", "Lan", "CSKH")
+    rt = NativeOpenClawRuntime.__new__(NativeOpenClawRuntime)
+
+    async def list_agents():
+        return [{"id": "cskh"}]
+
+    async def chat_stream(agent_id, message, *, session_key=None, timeout_seconds=120):
+        rt.who = (agent_id, session_key)
+        yield {"kind": "final", "text": "Dạ chào anh"}
+
+    rt.list_agents, rt.chat_stream = list_agents, chat_stream
+    monkeypatch.setattr("app.runtime.factory.get_runtime", lambda: rt)
+    frames = [f async for f in v36_insights.ask_nina_stream(sessionmaker_ctx(db), org[0].id, message="chào",
+                                                            seat_agent_id=agent.id)]
+    assert rt.who == ("cskh", "agent:cskh:main") and "Dạ chào anh" in frames[-1]
+    other = [f async for f in v36_insights.ask_nina_stream(sessionmaker_ctx(db), org[0].id + 99,
+                                                           message="chào", seat_agent_id=agent.id)]
+    assert "Không thấy" in other[-1]
+
+
+def sessionmaker_ctx(db):
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _f():
+        yield db
+    return _f

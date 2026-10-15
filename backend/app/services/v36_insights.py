@@ -544,13 +544,31 @@ async def ask_nina(db: Session, organization_id: int, *, message: str,
     }
 
 
+async def _pick_seat(db, organization_id: int, runtime, agent_id: int):
+    """Chat thẳng với một ghế: ghế phải thuộc tổ chức, còn làm việc, và có trên gateway."""
+    from app.models import Agent, Member
+    agent = db.get(Agent, agent_id)
+    member = db.get(Member, agent.member_id) if agent else None
+    if not agent or not member or member.organization_id != organization_id:
+        return None, {"answered": False, "reason": "Không thấy nhân sự AI này trong tổ chức"}
+    if agent.lifecycle in ("paused", "retired", "runtime_missing"):
+        return None, {"answered": False, "reason": f"{member.name} đang ở trạng thái {agent.lifecycle}"}
+    try:
+        roster = {str(a.get("id") or a.get("agentId")) for a in await runtime.list_agents()}
+    except Exception as exc:  # noqa: BLE001
+        return None, {"answered": False, "reason": f"không đọc được gateway: {exc}"[:300]}
+    if agent.runtime_agent_id not in roster:
+        return None, {"answered": False, "reason": f"{member.name} chưa có trên gateway — bấm \"Tạo / hoàn thiện trên gateway\""}
+    return (agent, member.name), None
+
+
 def _sse(event: str, data: dict) -> str:
     import json as _json
     return f"event: {event}\ndata: {_json.dumps(data, ensure_ascii=False, default=str)}\n\n"
 
 
 async def ask_nina_stream(session_factory, organization_id: int, *, message: str,
-                          timeout_seconds: int = 60):
+                          timeout_seconds: int = 60, seat_agent_id: int | None = None):
     """Như ``ask_nina`` nhưng đẩy câu trả lời ra từng đoạn (SSE).
 
     Sự kiện: ``meta`` (ghế nào trả lời) → ``tool``/``delta`` (toàn văn tích luỹ)
@@ -575,7 +593,10 @@ async def ask_nina_stream(session_factory, organization_id: int, *, message: str
     # Session riêng trong generator: dependency ``get_db`` của request đóng
     # trước khi StreamingResponse bắt đầu chạy generator.
     with session_factory() as db:
-        seat, problem = await _pick_nina_seat(db, organization_id, runtime)
+        if seat_agent_id is None:
+            seat, problem = await _pick_nina_seat(db, organization_id, runtime)
+        else:
+            seat, problem = await _pick_seat(db, organization_id, runtime, seat_agent_id)
         if problem:
             yield _sse("error", {**problem, "message": problem.get("reason")})
             return

@@ -101,7 +101,7 @@ async def dispatch_task(db: Session, task: Task, *, trigger_kind: str = "manual"
     # việc) trong gói, vì bốn dòng đó là một hợp đồng chứ không phải mô tả.
     pack = work_context.build_pack(db, task, organization_id=member.organization_id)
     # Quyết định định tuyến đi kèm gói (chữ ký _run_agent giữ nguyên 6 tham số).
-    pack["route"] = _route(db, task, member, pack)
+    pack["route"] = _route(db, task, member, pack, run_id=run_row.id)
 
     try:
         run = await _run_agent(runtime, agent, task, member, pack, session_key)
@@ -138,7 +138,7 @@ def follow_after_send(session_key: str | None, organization_id: int, task_id: in
         return f"error: {exc}"
 
 
-def _route(db, task, member, pack) -> dict:
+def _route(db, task, member, pack, run_id: int | None = None) -> dict:
     """Chọn tầng model cho lượt này và ghi lại quyết định (kể cả khi tắt).
 
     Ghi cả khi ``model_routing_enabled=False``: so được "nếu bật thì đã chọn gì"
@@ -150,7 +150,7 @@ def _route(db, task, member, pack) -> dict:
         decision = model_routing.decide_for_task(db, task, member, context_chars=pack.get("chars", 0))
     except Exception as exc:  # noqa: BLE001 - router không được làm hỏng dispatch
         return {"applied": False, "error": str(exc)[:200]}
-    out = {**decision.as_dict(), "applied": bool(settings.model_routing_enabled)}
+    out = {**decision.as_dict(), "applied": bool(settings.model_routing_enabled), "task_run_id": run_id}
     try:
         emit_event(db, organization_id=member.organization_id, event_type="model.routed",
                    source="model_routing", aggregate_type="task", aggregate_id=str(task.id),

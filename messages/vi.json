@@ -1307,7 +1307,9 @@
   "cho_nghi_viec_ten": "Cho {p0} nghỉ việc?",
   "tam_dung_nut": "Tạm dừng",
   "tao_hoan_thien_tren_gateway": "Tạo / hoàn thiện trên gateway",
-  "da_hoan_thien_tren_gateway": "Đã hoàn thiện trên gateway, ghi {p0} file tiếng Việt"
+  "da_hoan_thien_tren_gateway": "Đã hoàn thiện trên gateway, ghi {p0} file tiếng Việt",
+  "tro_chuyen": "Trò chuyện",
+  "tro_chuyen_voi": "Trò chuyện với {p0}"
  },
  "seat": {
   "ho_so": "Hồ sơ",

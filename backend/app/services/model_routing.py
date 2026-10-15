@@ -217,13 +217,14 @@ def provider_models() -> list[dict]:
     return out
 
 
-def seat_model_config(role: str) -> dict:
+def seat_model_config(role: str, lead: bool | None = None) -> dict:
     """Cấu hình model mặc định cho một ghế: quản lý T3, thừa hành T2.
 
     ``utilityModel`` và ``heartbeat.model`` luôn T1 — việc vặt không cần
     model đắt. Router vẫn ghi đè theo từng việc qua ``sessions.patch``.
     """
-    primary = TIERS["T3"] if role and _LEAD_ROLE.search(role) else TIERS["T2"]
+    is_lead = lead if lead is not None else bool(role and _LEAD_ROLE.search(role))
+    primary = TIERS["T3"] if is_lead else TIERS["T2"]
     return {"model": {"primary": primary.ref, "fallbacks": [f"{PROVIDER}/{FALLBACK_MODEL}"]},
             "utilityModel": TIERS["T1"].ref,
             "heartbeat": {"model": TIERS["T1"].ref, "lightContext": True}}
@@ -233,3 +234,64 @@ def tiers_public() -> list[dict]:
     return [{"tier": t.key, "label": t.label, "model": t.ref, "use_for": t.use_for,
              "usd_in_per_m": t.usd_in_per_m, "usd_out_per_m": t.usd_out_per_m}
             for t in TIERS.values()]
+
+
+# ------------------------------------------------------------ báo cáo tuần
+
+def report(db, organization_id: int, *, days: int = 7) -> dict:
+    """Chi phí trên mỗi kết quả ĐƯỢC CHẤP NHẬN, theo tầng — không phải giá token.
+
+    Một lượt "được chấp nhận" khi việc của nó đã ``done`` và sổ việc không có
+    mục làm lại/bị trả về. Gợi ý chỉ là gợi ý: đổi luật vẫn do người quyết.
+    """
+    import json as _json
+    from datetime import datetime, timedelta
+    from sqlalchemy import select
+    from app.models import Task
+    from app.models.v10 import CompanyEvent
+    from app.models.work_graph import TaskRun
+    since = datetime.utcnow() - timedelta(days=days)
+    events = db.execute(select(CompanyEvent).where(
+        CompanyEvent.organization_id == organization_id, CompanyEvent.event_type == "model.routed",
+        CompanyEvent.occurred_at >= since)).scalars().all()
+    per: dict[str, dict] = {k: {"tier": k, "model": TIERS[k].ref, "runs": 0, "cost_usd": 0.0,
+                                "accepted": 0, "escalated": 0} for k in ORDER}
+    reworked_cache: dict[int, int] = {}
+    for ev in events:
+        try:
+            p = _json.loads(ev.payload_json or "{}")
+        except Exception:  # noqa: BLE001
+            continue
+        tier = p.get("tier")
+        if tier not in per:
+            continue
+        row = per[tier]
+        row["runs"] += 1
+        row["escalated"] += 1 if p.get("escalated") else 0
+        run = db.get(TaskRun, p["task_run_id"]) if p.get("task_run_id") else None
+        if run is not None:
+            row["cost_usd"] += float(run.cost_usd or 0.0)
+        task_id = int(ev.aggregate_id) if str(ev.aggregate_id).isdigit() else None
+        task = db.get(Task, task_id) if task_id else None
+        if task is not None and task.status == "done":
+            if task_id not in reworked_cache:
+                reworked_cache[task_id] = rework_count(db, task_id)
+            if reworked_cache[task_id] == 0:
+                row["accepted"] += 1
+    rows, suggestions = [], []
+    for k in ORDER:
+        r = per[k]
+        r["cost_usd"] = round(r["cost_usd"], 6)
+        r["acceptance"] = round(r["accepted"] / r["runs"], 3) if r["runs"] else None
+        r["cost_per_accepted_usd"] = round(r["cost_usd"] / r["accepted"], 6) if r["accepted"] else None
+        rows.append(r)
+        if r["runs"] >= 5 and r["acceptance"] is not None:
+            idx = ORDER.index(k)
+            if r["acceptance"] >= 0.9 and idx > 0:
+                suggestions.append(f"{k}: {round(r['acceptance']*100)}% được chấp nhận trên {r['runs']} lượt — "
+                                   f"thử chuyển một phần việc xuống {ORDER[idx-1]} để giảm chi phí.")
+            elif r["acceptance"] < 0.6 and idx < len(ORDER) - 1:
+                suggestions.append(f"{k}: chỉ {round(r['acceptance']*100)}% được chấp nhận — "
+                                   f"cân nhắc nâng loại việc này lên {ORDER[idx+1]}.")
+    return {"days": days, "tiers": rows, "suggestions": suggestions,
+            "note": "Chấp nhận = việc đã xong và không bị làm lại. Chi phí lấy từ usage thật của gateway."}

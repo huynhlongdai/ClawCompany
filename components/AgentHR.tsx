@@ -6,6 +6,7 @@ import {useEffect, useMemo, useState} from "react";
 import Link from "next/link";
 import {apiAgentsHR, apiMcp, apiTeam, errorText} from "../lib/api";
 import {t as tr, lazy} from "../lib/i18n";
+import {AskNina} from "./shell/AskNina";
 
 export const LIFECYCLE_VI: Record<string, string> = lazy(() => ({
   active: tr("agentHr.dang_lam"), paused: tr("agentHr.tam_dung"), retired: tr("agentHr.da_nghi"), runtime_missing: tr("agentHr.cho_gateway"),
@@ -245,6 +246,7 @@ function HrForm({seat, opt, canEdit, busy, act}: any) {
 }
 
 function Lifecycle({seat, all, canEdit, busy, act}: any) {
+  const [chat, setChat] = useState(false);
   const [retire, setRetire] = useState(false), [to, setTo] = useState(""), [keep, setKeep] = useState(false), [reason, setReason] = useState("");
   const others = all.filter((a: any) => a.company_id === seat.company_id && a.agent_id !== seat.agent_id && a.lifecycle === "active");
   const lc = seat.lifecycle;
@@ -264,6 +266,9 @@ function Lifecycle({seat, all, canEdit, busy, act}: any) {
     <div className="lab-cardhead"><div><b>{tr("agentHr.vong_doi")}</b><span>{tr("agentHr.tam_dung_chan_luot_moi")}</span></div><Pill lc={lc}/></div>
     <dl className="hrFacts"><dt>Agent</dt><dd><code>{seat.runtime_agent_id}</code></dd>
       <dt>{tr("agentHr.tren_gateway")}</dt><dd>{seat.on_gateway === null ? tr("agentHr.khong_doc_duoc") : seat.on_gateway ? tr("agentHr.co_phien", {p0: seat.sessions, p1: seat.running ? tr("agentHr.dang_chay_hau_to") : ""}) : tr("agentHr.khong_co")}</dd></dl>
+    {lc === "active" && seat.on_gateway && <div className="tmRow">
+      <button className="ui-btn is-primary is-sm" onClick={() => setChat(true)} data-testid="hr-chat">{tr("agentHr.tro_chuyen")}</button></div>}
+    {chat && <AskNina agentId={seat.agent_id} title={tr("agentHr.tro_chuyen_voi", {p0: seat.name})} onClose={() => setChat(false)}/>}
     {canEdit && lc !== "retired" && <div className="tmRow">
       {lc === "paused" ? <button className="ui-btn is-primary" disabled={busy} data-testid="hr-resume"
           onClick={() => act(() => apiAgentsHR.lifecycle(seat.agent_id, {action: "resume"}), said)}>{tr("agentHr.tiep_tuc")}</button>

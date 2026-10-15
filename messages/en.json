@@ -1307,7 +1307,9 @@
   "cho_nghi_viec_ten": "Retire {p0}?",
   "tam_dung_nut": "Pause",
   "tao_hoan_thien_tren_gateway": "Create / complete on gateway",
-  "da_hoan_thien_tren_gateway": "Completed on gateway, wrote {p0} files"
+  "da_hoan_thien_tren_gateway": "Completed on gateway, wrote {p0} files",
+  "tro_chuyen": "Chat",
+  "tro_chuyen_voi": "Chat with {p0}"
  },
  "seat": {
   "ho_so": "Profile",

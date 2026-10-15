@@ -113,6 +113,14 @@ class RoutePreviewIn(BaseModel):
     rework_count: int = Field(default=0, ge=0, le=20)
 
 
+@router.get("/model-tiers/report")
+def model_tier_report(days: int = 7, principal: Principal = Depends(require_human()),
+                      db: Session = Depends(get_db)):
+    """Báo cáo tuần: chi phí trên mỗi kết quả được chấp nhận, theo tầng, kèm gợi ý."""
+    from app.services import model_routing
+    return model_routing.report(db, active_org(principal), days=max(1, min(days, 90)))
+
+
 @router.post("/model-tiers/preview")
 def model_tier_preview(payload: RoutePreviewIn, principal: Principal = Depends(require_human())):
     """Thử luật định tuyến cho một việc giả định — không gọi model nào."""
@@ -136,6 +144,24 @@ async def provision_all(payload: WireIn, principal: Principal = Depends(require_
     from app.services import seat_provision
     return await seat_provision.provision_all(db, principal, active_org(principal), get_runtime(),
                                               **payload.model_dump())
+
+
+class SeatChatIn(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+    timeout_seconds: int = Field(default=120, ge=5, le=120)
+
+
+@router.post("/{agent_id}/chat/stream")
+async def seat_chat_stream(agent_id: int, payload: SeatChatIn,
+                           principal: Principal = Depends(require_human())):
+    """Trò chuyện với một nhân sự AI, trả lời chảy ra theo SSE (cùng định dạng Hỏi Nina)."""
+    from fastapi.responses import StreamingResponse
+    from app.db.session import SessionLocal
+    from app.services import v36_insights
+    gen = v36_insights.ask_nina_stream(SessionLocal, active_org(principal), message=payload.message,
+                                       timeout_seconds=payload.timeout_seconds, seat_agent_id=agent_id)
+    return StreamingResponse(gen, media_type="text/event-stream",
+                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
 
 @router.post("/{agent_id}/provision")

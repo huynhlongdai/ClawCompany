@@ -21,7 +21,7 @@ import json
 import re
 import uuid
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -254,7 +254,7 @@ def tool_permissions_read(principal: Principal = Depends(require_role("member"))
 
 
 @router.put("/mcp/permissions")
-def tool_permissions_write(payload: ToolPermissionIn,
+def tool_permissions_write(payload: ToolPermissionIn, background: BackgroundTasks,
                            principal: Principal = Depends(require_role("admin")),
                            db: Session = Depends(get_db)):
     if payload.tool not in company_mcp.TOOLS:
@@ -274,4 +274,7 @@ def tool_permissions_write(payload: ToolPermissionIn,
                            aggregate_type="tool", aggregate_id=payload.tool,
                            actor_member_id=principal.member_id,
                            payload=payload.model_dump())
+    # Tầng 1 (gateway) phải khớp tầng 2 (MCP): "Tắt" → tools.deny của ghế.
+    from app.services import seat_provision
+    background.add_task(seat_provision.schedule_tool_policy_sync, principal.organization_id)
     return tool_permissions.matrix(db, principal.organization_id)

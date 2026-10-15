@@ -31,7 +31,7 @@ export async function* readSse(res: Response): AsyncGenerator<{event: string; da
   }
 }
 
-export function AskNina({onClose}: {onClose: () => void}) {
+export function AskNina({onClose, agentId, title}: {onClose: () => void; agentId?: number; title?: string}) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
@@ -51,7 +51,8 @@ export function AskNina({onClose}: {onClose: () => void}) {
     const ctrl = new AbortController(); abort.current = ctrl;
     try {
       const token = localStorage.getItem("clawcompany_token");
-      const res = await fetch(`${API_BASE}/v36/nina/ask/stream`, {
+      const url = agentId ? `${API_BASE}/agents/${agentId}/chat/stream` : `${API_BASE}/v36/nina/ask/stream`;
+      const res = await fetch(url, {
         method: "POST", signal: ctrl.signal, cache: "no-store",
         headers: {"Content-Type": "application/json", "Accept-Language": getLocale(),
                   ...(token ? {Authorization: `Bearer ${token}`} : {})},
@@ -73,8 +74,9 @@ export function AskNina({onClose}: {onClose: () => void}) {
     }
   }
 
-  return <Sheet label={t("shell.hoi_nina")} onClose={onClose} testId="ask-nina"
-                head={<strong>{t("shell.hoi_nina")}</strong>}>
+  const heading = title || t("shell.hoi_nina");
+  return <Sheet label={heading} onClose={onClose} testId="ask-nina"
+                head={<strong>{heading}</strong>}>
     <div style={{display: "flex", flexDirection: "column", gap: 14, minHeight: "100%"}}>
       {turns.map((x, i) => <div key={i} style={{display: "flex", flexDirection: "column", gap: 6}}>
         <div style={{alignSelf: "flex-end", maxWidth: "85%", background: "var(--surface-2)",
