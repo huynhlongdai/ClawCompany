@@ -82,10 +82,14 @@ class AuthorityDecision:
     reason: str
     notes: list[str] = field(default_factory=list)
 
+    min_amount_usd: float | None = None
+    max_amount_usd: float | None = None
+
     def card(self) -> dict:
         """Phần lưu vào approvals.payload["authority"] để Hộp việc hiện luật nào đã kích hoạt."""
         return {"rule_id": self.rule_id, "action_type": self.action_type, "label": self.label,
-                "approver_kind": self.approver_kind, "approver_name": self.approver_name, "reason": self.reason}
+                "approver_kind": self.approver_kind, "approver_name": self.approver_name, "reason": self.reason,
+                "min_amount_usd": self.min_amount_usd, "max_amount_usd": self.max_amount_usd}
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -276,7 +280,8 @@ def decide(db: Session, requester: Member | None, action_type: str | None, *, am
         reason = f"Cần {approver_name} duyệt." if needs else "Người xin chính là người có quyền duyệt."
     return AuthorityDecision(rule_id=r.id, action_type=at, label=label, approver_kind=r.approver_kind,
                              requires_approval=needs, approver_member_id=approver, approver_name=approver_name,
-                             agent_may_act_alone=alone, reason=reason, notes=notes)
+                             agent_may_act_alone=alone, reason=reason, notes=notes,
+                             min_amount_usd=r.min_amount_usd, max_amount_usd=r.max_amount_usd)
 
 
 def tool_floor(db: Session, member: Member, action_class: str) -> tuple[str, str] | None:
