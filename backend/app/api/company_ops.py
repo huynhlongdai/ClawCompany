@@ -103,3 +103,69 @@ def process_instance(instance_id: int, principal: Principal = Depends(require_ro
 @router.post("/process-instances/{instance_id}/cancel")
 def cancel_instance(instance_id: int, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
     return pm.cancel(db, active_org(principal), instance_id)
+
+
+# ------------------------------------------------------------------ D5 KPI chia tầng
+
+from app.services import kpi_cascade as kc  # noqa: E402
+
+
+class KpiIn(BaseModel):
+    company_id: int | None = None
+    level: str | None = Field(default=None, max_length=16)
+    name: str | None = Field(default=None, max_length=200)
+    unit: str | None = Field(default=None, max_length=40)
+    target: float | None = None
+    direction: str | None = Field(default=None, max_length=8)
+    period: str | None = Field(default=None, max_length=16)
+    metric: str | None = Field(default=None, max_length=40)
+    department_id: int | None = None
+    position_id: int | None = None
+    member_id: int | None = None
+    parent_id: int | None = None
+    goal_id: int | None = None
+    objective_id: int | None = None
+    process_id: int | None = None
+    weight: float | None = None
+
+
+class MeasureIn(BaseModel):
+    value: float
+    note: str = Field(default="", max_length=400)
+    period_key: str | None = Field(default=None, max_length=16)
+
+
+class CompanyIn(BaseModel):
+    company_id: int | None = None
+
+
+@router.get("/kpis")
+def list_kpis(company_id: int | None = None, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+    return kc.list_kpis(db, active_org(principal), company_id)
+
+
+@router.post("/kpis")
+def create_kpi(payload: KpiIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    return kc.create_kpi(db, active_org(principal), payload.model_dump(exclude_unset=True))
+
+
+@router.patch("/kpis/{kpi_id}")
+def update_kpi(kpi_id: int, payload: KpiIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    data = payload.model_dump(exclude_unset=True)
+    return kc.update_kpi(db, active_org(principal), kpi_id, data, set(data))
+
+
+@router.delete("/kpis/{kpi_id}")
+def delete_kpi(kpi_id: int, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    return kc.delete_kpi(db, active_org(principal), kpi_id)
+
+
+@router.post("/kpis/{kpi_id}/measurements")
+def record_kpi(kpi_id: int, payload: MeasureIn, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+    return kc.record(db, active_org(principal), kpi_id, payload.value, note=payload.note, period_key=payload.period_key,
+                     member_id=principal.member_id)
+
+
+@router.post("/kpis/sync-positions")
+def sync_position_kpis(payload: CompanyIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    return kc.sync_positions(db, active_org(principal), payload.company_id)

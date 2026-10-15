@@ -460,6 +460,9 @@ function Career({seat, canEdit, busy, act, tick}: any) {
       {stat(tr("agentHr.lo_hong_kien_thuc"), c.knowledge_gaps)}
       {stat(tr("agentHr.danh_gia_k_lan"), c.eval ? `${pct(c.eval.pass_k)} (k=${c.eval.k})` : "—")}
     </div>
+    {c.kpis?.length > 0 && <div data-testid="hr-career-kpis" style={{marginTop: 8}}><b>{tr("ops.seat_kpis", {p0: c.kpi_attainment == null ? "—" : c.kpi_attainment + "%"})}</b>
+      <ul className="cf-kpis">{c.kpis.map((k: any) => <li key={k.id}>{k.name}: <b>{k.value == null ? "—" : `${k.value}${k.unit ? " " + k.unit : ""}`}</b>
+        {k.target != null ? ` / ${k.target}${k.unit ? " " + k.unit : ""}` : ""}{k.progress != null ? ` (${k.progress}%)` : ""}</li>)}</ul></div>}
     <p style={{margin: "10px 0 4px"}}><b>{r.action === "promote" ? tr("agentHr.goi_y_thang", {p0: d.levels.find((l: any) => l.key === r.to)?.label})
       : r.action === "demote" ? tr("agentHr.goi_y_ha", {p0: d.levels.find((l: any) => l.key === r.to)?.label}) : tr("agentHr.goi_y_giu")}</b>
       {" "}<small>{r.reasons.join(" · ")}</small></p>

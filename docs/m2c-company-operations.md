@@ -36,3 +36,33 @@ API: `GET/POST /team/processes`, `PATCH/DELETE /team/processes/{id}`, `POST /tea
 
 Giới hạn tự khai: quy trình tuyến tính (chưa rẽ nhánh/song song); thời gian chu trình tính theo giờ đồng
 hồ (không trừ ngoài giờ); chọn người theo số việc mở, không theo kỹ năng.
+
+## D5. KPI chia tầng — migration `0040_kpi_cascade`
+
+**Dữ liệu**: `kpi_definitions` (tầng `company | department | position | seat`, chủ thể của tầng, `parent_id`
+nối tầng, `goal_id` → `executive_goals`, `objective_id` → `portfolio_objectives`, tên, đơn vị, mục tiêu, hướng
+`up/down`, kỳ `week/month/quarter`, nguồn số `metric`, quy trình (cho chỉ số D4), trọng số, nguồn `custom |
+position`), `kpi_measurements` (số nhập tay theo khoá kỳ `2026-10` / `2026-W42` / `2026-Q4`).
+
+**Số thực tế** (`kpi_cascade.compute`, kỳ hiện tại theo giờ Việt Nam, phạm vi theo tầng: cả công ty / thành
+viên của phòng / người ngồi chức danh / một seat): `tasks_done`, `cycle_time_minutes` (lần chạy D4 xong; tầng
+người = bước của họ), `on_time_rate` (bước D4 xong trong thời lượng kỳ vọng), `process_runs_done`,
+`cost_per_task_usd` (chi phí lượt chạy / việc xong), `first_pass_rate` (cùng cách đếm scorecard M6),
+`approvals_pending`, `approval_turnaround_hours`; `manual` = người nhập. Có số nhập tay cho kỳ → thắng số tự tính.
+
+**Tiến độ** = thực tế/mục tiêu (hướng down: mục tiêu/thực tế), chặn 0–150 %; ≥90 đúng hướng, ≥60 cần chú ý,
+dưới 60 chậm. **Cuộn lên**: mỗi nút có `rollup` = trung bình có trọng số tiến độ các con.
+
+**Từ chức danh (M2b)**: `POST /team/kpis/sync-positions` — mỗi KPI trong `positions.kpis` → KPI tầng chức danh
+(nguồn số đoán theo tên: "chu trình" → cycle time, "chi phí" → cost per task…, còn lại nhập tay; cha = KPI phòng
+cùng nguồn số nếu có) + một KPI tầng seat cho mỗi người đang ngồi. Chạy lại không nhân đôi.
+
+**Agent**: `career.scorecard` có `kpis` + `kpi_attainment` (KPI seat); `recommend` thêm điều kiện "KPI của seat
+đạt ≥ 90 %" khi seat có KPI có số (không có KPI → luật cũ). UI: thẻ Sự nghiệp trong hồ sơ agent hiện KPI seat.
+
+API: `GET/POST /team/kpis`, `PATCH/DELETE /team/kpis/{id}`, `POST /team/kpis/{id}/measurements {value, note,
+period_key?}`, `POST /team/kpis/sync-positions`.
+
+Giới hạn tự khai: "việc xong trong kỳ" dùng `tasks.updated_at` làm mốc xong (chưa có cột `done_at`); KPI tính
+khi đọc (chưa lưu lịch sử số tự tính theo kỳ); AGENTS.md vẫn chỉ ghi mục tiêu KPI của chức danh (D2), số thực tế
+nằm ở scorecard.

@@ -786,6 +786,12 @@ export const apiOps = {
   startProcess: (id: number, body: any) => request<any>(`/team/processes/${id}/start`, {method: "POST", body: JSON.stringify(body)}),
   instances: (id: number) => request<any>(`/team/processes/${id}/instances`),
   cancelInstance: (id: number) => request<any>(`/team/process-instances/${id}/cancel`, {method: "POST"}),
+  kpis: (companyId?: number | null) => request<any>(`/team/kpis${cq(companyId)}`),
+  createKpi: (body: any) => request<any>(`/team/kpis`, {method: "POST", body: JSON.stringify(body)}),
+  updateKpi: (id: number, body: any) => request<any>(`/team/kpis/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  deleteKpi: (id: number) => request<any>(`/team/kpis/${id}`, {method: "DELETE"}),
+  recordKpi: (id: number, body: any) => request<any>(`/team/kpis/${id}/measurements`, {method: "POST", body: JSON.stringify(body)}),
+  syncKpis: (companyId?: number | null) => request<any>(`/team/kpis/sync-positions`, {method: "POST", body: JSON.stringify({company_id: companyId ?? null})}),
 };
 
 // M3: Nhân sự AI — tuyển (wizard), sửa hồ sơ 2 chiều, lệch & đồng bộ lại, vòng đời, quyền tool theo seat.

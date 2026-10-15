@@ -182,3 +182,122 @@ function ProcessForm({d, edit, busy, onCancel, onSave}: any) {
     </div>
   </section>;
 }
+
+// ===================================================================== KPI chia tầng (D5)
+
+const HEALTH: Record<string, string> = {on_track: "is-ok", at_risk: "is-wait", off_track: "is-risk", no_data: ""};
+const fmt = (v: number | null | undefined, unit = "") => v == null ? "—" : `${Math.round(v * 100) / 100}${unit ? " " + unit : ""}`;
+
+function Bar({p}: {p: number | null | undefined}) {
+  if (p == null) return <span className="ops-bar is-empty"/>;
+  return <span className="ops-bar" title={`${p}%`}><i style={{width: `${Math.min(100, p)}%`}} className={p >= 90 ? "is-ok" : p >= 60 ? "is-wait" : "is-risk"}/></span>;
+}
+
+export function KpiTab({companyId, caps}: {companyId: number | null; caps: any}) {
+  const {data, error, reload, setError} = useLoad(() => apiOps.kpis(companyId), [companyId]);
+  const [edit, setEdit] = useState<any>(null), [busy, setBusy] = useState(false), [rec, setRec] = useState<any>(null);
+  const toast = useToast();
+  const can = !!caps?.invite || !!caps?.manage_roles;
+  if (error && !data) return <ErrorBanner error={error} onRetry={reload} testId="kpi-error"/>;
+  if (!data) return <SkeletonRows n={5} h={40}/>;
+  const d: any = data;
+  async function run(fn: () => Promise<any>, ok: string | ((r: any) => string)) {
+    setBusy(true); setError(null);
+    try { const r = await fn(); toast(typeof ok === "string" ? ok : ok(r)); await reload(); return r; }
+    catch (e) { setError(e); } finally { setBusy(false); }
+  }
+  const rows: any[] = [];
+  const walk = (ns: any[], depth: number) => ns.forEach(n => { rows.push({...n, depth}); walk(n.children || [], depth + 1); });
+  walk(d.tree, 0);
+  const s = d.summary;
+  return <section className="ui-section" data-testid="kpis">
+    {error ? <ErrorBanner error={error} onClose={() => setError(null)}/> : null}
+    <p className="tmGuide">{tr("ops.kpi_explain")}</p>
+    <div className="ui-toolbar">
+      <div className="org-stats" data-testid="kpi-summary"><span><b>{s.company_progress == null ? "—" : s.company_progress + "%"}</b> {tr("ops.company_progress")}</span>
+        <span><b>{s.kpis}</b> KPI</span><span className="is-ok"><b>{s.on_track}</b> {tr("ops.h_on_track")}</span>
+        <span className="is-warn"><b>{s.at_risk}</b> {tr("ops.h_at_risk")}</span><span className="is-warn"><b>{s.off_track}</b> {tr("ops.h_off_track")}</span></div>
+      <span className="ui-grow"/>
+      {can && <button className="ui-btn is-ghost is-sm" disabled={busy} data-testid="kpi-sync"
+        onClick={() => run(() => apiOps.syncKpis(companyId ?? d.company_id), (r: any) => tr("ops.kpi_synced", {p0: r.created, p1: r.updated}))}>{tr("ops.kpi_sync")}</button>}
+      {can && <button className="ui-btn is-primary is-sm" data-testid="kpi-new" onClick={() => setEdit({level: "company", name: "", metric: "manual", period: "month", weight: 1})}>{tr("ops.new_kpi")}</button>}
+    </div>
+    {edit && <KpiForm d={d} edit={edit} busy={busy} onCancel={() => setEdit(null)} onSave={async (body: any) => {
+      const r = await run(() => edit.id ? apiOps.updateKpi(edit.id, body) : apiOps.createKpi({...body, company_id: companyId ?? d.company_id}), tr("ops.kpi_saved"));
+      if (r) setEdit(null);
+    }}/>}
+    {rec && <section className="ui-panel tm-card cf-edit" data-testid="kpi-record">
+      <div className="tm-card-head"><div><b>{tr("ops.record_title", {p0: rec.name})}</b><span>{tr("ops.record_desc", {p0: rec.period_key})}</span></div></div>
+      <div className="tmRow"><input inputMode="decimal" value={rec.v ?? ""} onChange={e => setRec({...rec, v: e.target.value})} placeholder={rec.unit} data-testid="kpi-record-value"/>
+        <input value={rec.note ?? ""} onChange={e => setRec({...rec, note: e.target.value})} placeholder={tr("ops.note")}/>
+        <button className="ui-btn is-primary is-sm" disabled={busy || rec.v === undefined || rec.v === ""} data-testid="kpi-record-save"
+          onClick={async () => { const r = await run(() => apiOps.recordKpi(rec.id, {value: Number(rec.v), note: rec.note || ""}), tr("ops.recorded")); if (r) setRec(null); }}>{tr("ops.save")}</button>
+        <button className="ui-btn is-ghost is-sm" onClick={() => setRec(null)}>{tr("ops.cancel")}</button></div>
+    </section>}
+    {!rows.length ? <EmptyState mood="chao" title={tr("ops.kpi_empty")} testId="kpi-empty">{tr("ops.kpi_empty_hint")}</EmptyState>
+      : <div className="ui-panel"><table className="ui-table ops-kpi-table"><thead><tr>
+        <th>KPI</th><th>{tr("ops.k_owner")}</th><th>{tr("ops.k_source")}</th><th style={{textAlign: "right"}}>{tr("ops.k_target")}</th>
+        <th style={{textAlign: "right"}}>{tr("ops.k_actual")}</th><th>{tr("ops.k_progress")}</th><th/></tr></thead>
+        <tbody>{rows.map(r => <tr key={r.id} data-testid={`kpi-${r.id}`}>
+          <td style={{paddingLeft: 8 + r.depth * 18}}><span className="ui-pill is-info ops-lv">{tr(`ops.lv_${r.level}` as Key)}</span> <b>{r.name}</b>
+            {r.goal && <div><small>🎯 {r.goal.title} ({r.goal.progress}%)</small></div>}</td>
+          <td>{r.owner}</td>
+          <td><small>{tr(`ops.m_${r.metric}` as Key)}{r.value_source === "manual" && r.metric !== "manual" ? ` · ${tr("ops.manual_override")}` : ""}</small></td>
+          <td style={{textAlign: "right"}}>{r.direction === "down" ? "≤ " : ""}{fmt(r.target, r.unit)}</td>
+          <td style={{textAlign: "right"}}><b>{fmt(r.value, r.unit)}</b></td>
+          <td><Bar p={r.progress}/> <span className={"ui-pill " + HEALTH[r.health]}>{r.progress == null ? tr("ops.h_no_data") : r.progress + "%"}</span>
+            {r.rollup != null && <div><small>{tr("ops.rollup", {p0: r.rollup})}</small></div>}</td>
+          <td style={{textAlign: "right", whiteSpace: "nowrap"}}>
+            <button className="ui-btn is-ghost is-sm" onClick={() => setRec({...r, v: ""})} data-testid={`kpi-rec-${r.id}`}>{tr("ops.record")}</button>
+            {can && <button className="ui-btn is-ghost is-sm" onClick={() => setEdit({...r})}>{tr("ops.edit")}</button>}
+            {can && <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => run(() => apiOps.deleteKpi(r.id), tr("ops.kpi_deleted"))}>✕</button>}
+          </td></tr>)}</tbody></table></div>}
+  </section>;
+}
+
+function KpiForm({d, edit, busy, onCancel, onSave}: any) {
+  const [f, setF] = useState<any>(edit);
+  const set = (k: string, v: any) => setF({...f, [k]: v});
+  const num = (v: any) => v === "" || v == null ? null : Number(v);
+  const procMetric = ["cycle_time_minutes", "on_time_rate", "process_runs_done"].includes(f.metric);
+  return <section className="ui-panel tm-card cf-edit" data-testid="kpi-form">
+    <div className="tm-card-head"><div><b>{f.id ? tr("ops.edit_kpi") : tr("ops.new_kpi")}</b><span>{tr("ops.kpi_form_note")}</span></div></div>
+    <div className="ui-form cf-form">
+      <FormRow>
+        <Field label={tr("ops.k_name")}><input value={f.name} onChange={e => set("name", e.target.value)} data-testid="kf-name"/></Field>
+        <Field label={tr("ops.k_level")}><select value={f.level} onChange={e => set("level", e.target.value)} data-testid="kf-level">
+          {["company", "department", "position", "seat"].map(l => <option key={l} value={l}>{tr(`ops.lv_${l}` as Key)}</option>)}</select></Field>
+        {f.level === "department" && <Field label={tr("ops.k_dept")}><select value={f.department_id ?? ""} onChange={e => set("department_id", num(e.target.value))}>
+          <option value="">{tr("ops.choose")}</option>{d.departments.map((x: any) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></Field>}
+        {f.level === "position" && <Field label={tr("ops.position")}><select value={f.position_id ?? ""} onChange={e => set("position_id", num(e.target.value))}>
+          <option value="">{tr("ops.choose")}</option>{d.positions.map((x: any) => <option key={x.id} value={x.id}>{x.title}</option>)}</select></Field>}
+        {f.level === "seat" && <Field label={tr("ops.k_seat")}><select value={f.member_id ?? ""} onChange={e => set("member_id", num(e.target.value))}>
+          <option value="">{tr("ops.choose")}</option>{d.members.map((x: any) => <option key={x.id} value={x.id}>{x.name}{x.type === "agent" ? " (agent)" : ""}</option>)}</select></Field>}
+      </FormRow>
+      <FormRow>
+        <Field label={tr("ops.k_source")}><select value={f.metric} onChange={e => set("metric", e.target.value)} data-testid="kf-metric">
+          {d.metrics.map((m: any) => <option key={m.key} value={m.key}>{tr(`ops.m_${m.key}` as Key)}</option>)}</select></Field>
+        <Field label={tr("ops.k_target")}><input inputMode="decimal" value={f.target ?? ""} onChange={e => set("target", num(e.target.value))} data-testid="kf-target"/></Field>
+        <Field label={tr("ops.k_unit")}><input value={f.unit ?? ""} onChange={e => set("unit", e.target.value)}/></Field>
+        <Field label={tr("ops.k_period")}><select value={f.period} onChange={e => set("period", e.target.value)}>
+          {["week", "month", "quarter"].map(p => <option key={p} value={p}>{tr(`ops.p_${p}` as Key)}</option>)}</select></Field>
+      </FormRow>
+      <FormRow>
+        <Field label={tr("ops.k_parent")}><select value={f.parent_id ?? ""} onChange={e => set("parent_id", num(e.target.value))}>
+          <option value="">—</option>{d.items.filter((x: any) => x.id !== f.id).map((x: any) => <option key={x.id} value={x.id}>{x.name} · {x.owner}</option>)}</select></Field>
+        <Field label={tr("ops.k_goal")}><select value={f.goal?.id ?? f.goal_id ?? ""} onChange={e => set("goal_id", num(e.target.value))}>
+          <option value="">—</option>{d.goals.map((g: any) => <option key={g.id} value={g.id}>{g.title}</option>)}</select></Field>
+        {procMetric && <Field label={tr("ops.k_process")}><select value={f.process_id ?? ""} onChange={e => set("process_id", num(e.target.value))}>
+          <option value="">{tr("ops.all_processes")}</option>{d.processes.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>}
+        <Field label={tr("ops.k_weight")}><input inputMode="decimal" value={f.weight ?? 1} onChange={e => set("weight", num(e.target.value))}/></Field>
+      </FormRow>
+      <div className="tmRow"><button className="ui-btn is-primary" disabled={busy} data-testid="kf-save" onClick={() => onSave({
+        name: f.name, level: f.level, department_id: f.level === "department" ? f.department_id ?? null : null,
+        position_id: f.level === "position" ? f.position_id ?? null : (f.level === "seat" ? f.position_id ?? null : null),
+        member_id: f.level === "seat" ? f.member_id ?? null : null, metric: f.metric, target: f.target ?? null, unit: f.unit || "",
+        period: f.period, parent_id: f.parent_id ?? null, goal_id: f.goal?.id ?? f.goal_id ?? null,
+        process_id: procMetric ? f.process_id ?? null : null, weight: f.weight || 1})}>{tr("ops.save")}</button>
+        <button className="ui-btn is-ghost" onClick={onCancel}>{tr("ops.cancel")}</button></div>
+    </div>
+  </section>;
+}

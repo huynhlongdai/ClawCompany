@@ -86,3 +86,47 @@ class ProcessStepRun(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cycle_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
+# ------------------------------------------------------------------ D5 KPI chia tầng
+
+class KpiDefinition(Base):
+    """Một KPI ở một tầng: công ty → phòng ban → chức danh → seat (``parent_id`` nối tầng).
+    ``metric`` = nguồn số: ``manual`` (người nhập) hoặc một chỉ số tính từ dữ liệu thật
+    (việc xong, thời gian chu trình D4, chi phí mỗi việc, tỷ lệ qua review lần đầu, phê duyệt…)."""
+    __tablename__ = "kpi_definitions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    level: Mapped[str] = mapped_column(String(16), default="company")      # company|department|position|seat
+    department_id: Mapped[int | None] = mapped_column(ForeignKey("departments.id"), nullable=True)
+    position_id: Mapped[int | None] = mapped_column(ForeignKey("positions.id"), nullable=True)
+    member_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True, index=True)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("kpi_definitions.id"), nullable=True, index=True)
+    goal_id: Mapped[int | None] = mapped_column(ForeignKey("executive_goals.id"), nullable=True)
+    objective_id: Mapped[int | None] = mapped_column(ForeignKey("portfolio_objectives.id"), nullable=True)
+    name: Mapped[str] = mapped_column(String(200))
+    unit: Mapped[str] = mapped_column(String(40), default="")
+    target: Mapped[float | None] = mapped_column(Float, nullable=True)
+    direction: Mapped[str] = mapped_column(String(8), default="up")          # up = càng cao càng tốt | down
+    period: Mapped[str] = mapped_column(String(16), default="month")         # week|month|quarter
+    metric: Mapped[str] = mapped_column(String(40), default="manual")
+    process_id: Mapped[int | None] = mapped_column(ForeignKey("processes.id"), nullable=True)
+    weight: Mapped[float] = mapped_column(Float, default=1.0)
+    source: Mapped[str] = mapped_column(String(24), default="custom")       # custom | position
+    status: Mapped[str] = mapped_column(String(16), default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class KpiMeasurement(Base):
+    """Số nhập tay (hoặc ảnh chụp số tự tính) của một KPI cho một kỳ (``2026-10``, ``2026-W42``, ``2026-Q4``)."""
+    __tablename__ = "kpi_measurements"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kpi_id: Mapped[int] = mapped_column(ForeignKey("kpi_definitions.id"), index=True)
+    period_key: Mapped[str] = mapped_column(String(16), index=True)
+    value: Mapped[float] = mapped_column(Float)
+    source: Mapped[str] = mapped_column(String(16), default="manual")
+    note: Mapped[str] = mapped_column(String(400), default="")
+    recorded_by_member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

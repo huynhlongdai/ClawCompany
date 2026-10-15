@@ -171,7 +171,11 @@ def scorecard(db: Session, org_id: int, agent_id: int, *, days: int = 30) -> dic
     last = db.query(EvalRun).filter(EvalRun.agent_id == ag.id).order_by(EvalRun.id.desc()).first()
     v = agent_versions._latest(db, ag.id)
     spec = agent_hr.hire_spec(db, ag)
+    from app.services import kpi_cascade   # M2c D5: KPI của seat (chia từ chức danh) vào scorecard
+    kpis = kpi_cascade.seat_kpis(db, m.id)
+    scored = [k["progress"] for k in kpis if k["progress"] is not None]
     return {"agent_id": ag.id, "name": m.name, "days": days,
+            "kpis": kpis, "kpi_attainment": round(sum(scored) / len(scored), 1) if scored else None,
             "level": spec.get("career_level") or "standard", "level_vi": LEVEL_VI[spec.get("career_level") or "standard"],
             "tasks_touched": len(tasks), "tasks_done": len(done),
             "reviewed": reviewed, "first_pass_rate": round(first_pass / reviewed, 3) if reviewed else None,
@@ -198,14 +202,16 @@ def recommend(card: dict) -> dict:
             if (card.get("failure_rate") or 0) > 0.3:
                 reasons.append(f"{card['failure_rate']:.0%} lượt chạy lỗi")
             return {"action": "demote", "to": LEVELS[LEVELS.index(lvl) - 1], "reasons": reasons}
+    kpi = card.get("kpi_attainment")
+    kpi_need = {"KPI của seat đạt ≥ 90%": kpi >= 90} if kpi is not None else {}   # M2c D5: chỉ xét khi seat có KPI có số
     if lvl == "probation":
-        need = {"đánh giá pass^k ≥ 80%": pk is not None and pk >= 0.8, "≥ 5 việc xong": card["tasks_done"] >= 5,
+        need = {**kpi_need, "đánh giá pass^k ≥ 80%": pk is not None and pk >= 0.8, "≥ 5 việc xong": card["tasks_done"] >= 5,
                 "qua review lần đầu ≥ 70%": fp is None or fp >= 0.7, "không bị chặn quyền": card["policy_denials"] == 0}
         if all(need.values()):
             return {"action": "promote", "to": "standard", "reasons": list(need)}
         return {"action": "keep", "to": lvl, "reasons": [f"chưa đạt: {k}" for k, ok in need.items() if not ok]}
     if lvl == "standard":
-        need = {"đánh giá pass^k ≥ 90%": pk is not None and pk >= 0.9, "≥ 20 việc xong": card["tasks_done"] >= 20,
+        need = {**kpi_need, "đánh giá pass^k ≥ 90%": pk is not None and pk >= 0.9, "≥ 20 việc xong": card["tasks_done"] >= 20,
                 "qua review lần đầu ≥ 85%": fp is not None and fp >= 0.85, "không bị chặn quyền": card["policy_denials"] == 0}
         if all(need.values()):
             return {"action": "promote", "to": "trusted", "reasons": list(need)}
