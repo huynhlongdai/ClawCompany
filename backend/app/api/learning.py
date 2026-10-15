@@ -185,3 +185,100 @@ def agent_learning(agent_id: int, principal: Principal = Depends(require_human()
     from app.services import agent_hr
     agent_hr.seat(db, active_org(principal), agent_id)
     return courses.agent_learning(db, active_org(principal), agent_id)
+
+
+# ------------------------------------------------------------------ M5b việc 10: Skill Studio
+
+from app.services import skill_studio  # noqa: E402
+
+
+@router.get("/skills")
+def skills(principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    return {"items": skill_studio.list_skills(db, active_org(principal))}
+
+
+@router.get("/skills/governance")
+async def skills_governance(principal: Principal = Depends(require_human())):
+    """Chế độ tự học kỹ năng của OpenClaw: 'auto' = agent tự sửa kỹ năng không cần duyệt."""
+    return await skill_studio.governance(get_runtime())
+
+
+@router.post("/skills/governance")
+async def skills_enforce(principal: Principal = Depends(require_role("admin"))):
+    """Chuyển Workshop sang 'propose' + 'pending': agent chỉ đề xuất, người duyệt mới áp (nạp nóng)."""
+    return await skill_studio.enforce_governance(get_runtime())
+
+
+@router.post("/skills/sync")
+async def skills_sync(principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    """Kéo đề xuất kỹ năng đang chờ của mọi agent về Hộp việc."""
+    return await skill_studio.sync_workshop(db, active_org(principal), get_runtime())
+
+
+class SkillDraftIn(BaseModel):
+    slug: str = Field(max_length=64)
+    title: str = Field(default="", max_length=220)
+    description: str = Field(max_length=400)
+    content: str = Field(max_length=60_000)
+    eval_cases: list[dict] = []
+
+
+@router.post("/skills")
+def skill_create(payload: SkillDraftIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    """Soạn bản nháp (kỹ năng mới hoặc phiên bản mới của kỹ năng có sẵn cùng mã)."""
+    return skill_studio.create_draft(db, principal, active_org(principal), payload.model_dump())
+
+
+@router.get("/skills/{skill_id}")
+def skill_detail(skill_id: int, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    return skill_studio.detail(db, active_org(principal), skill_id)
+
+
+class VersionPatchIn(BaseModel):
+    content: str | None = Field(default=None, max_length=60_000)
+    eval_cases: list[dict] | None = None
+
+
+@router.put("/skill-versions/{version_id}")
+def version_update(version_id: int, payload: VersionPatchIn, principal: Principal = Depends(require_role("manager")),
+                   db: Session = Depends(get_db)):
+    return skill_studio.update_draft(db, active_org(principal), version_id, payload.model_dump())
+
+
+class EvalIn(BaseModel):
+    agent_id: int
+
+
+@router.post("/skill-versions/{version_id}/eval")
+async def version_eval(version_id: int, payload: EvalIn, principal: Principal = Depends(require_role("manager")),
+                       db: Session = Depends(get_db)):
+    """Chạy các ca kiểm hai lần trên một agent: có kỹ năng và không có — chấm bằng luật."""
+    return await skill_studio.run_eval(db, active_org(principal), get_runtime(), version_id, agent_id=payload.agent_id)
+
+
+@router.post("/skill-versions/{version_id}/submit")
+def version_submit(version_id: int, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    return skill_studio.submit(db, active_org(principal), version_id, requester_member_id=principal.member_id)
+
+
+class InstallIn(BaseModel):
+    agent_ids: list[int]
+    version_id: int | None = None
+
+
+@router.post("/skills/{skill_id}/install")
+async def skill_install(skill_id: int, payload: InstallIn, principal: Principal = Depends(require_role("manager")),
+                        db: Session = Depends(get_db)):
+    return await skill_studio.install(db, active_org(principal), get_runtime(), skill_id, agent_ids=payload.agent_ids,
+                                      version_id=payload.version_id)
+
+
+class RollbackIn(BaseModel):
+    version_id: int
+
+
+@router.post("/skills/{skill_id}/rollback")
+async def skill_rollback(skill_id: int, payload: RollbackIn, principal: Principal = Depends(require_role("manager")),
+                         db: Session = Depends(get_db)):
+    """Quay về một phiên bản đã duyệt trước đó và cài lại cho mọi agent đang có kỹ năng này."""
+    return await skill_studio.rollback(db, active_org(principal), get_runtime(), skill_id, version_id=payload.version_id)

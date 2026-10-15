@@ -34,6 +34,8 @@ CORE_BEAT_SCHEDULE = {
     "tick-routines": {"task": "routines.tick", "schedule": 30.0},
     # M5b việc 9: tới giờ học của khoá → mỗi agent học/thi một bước mỗi ngày.
     "tick-courses": {"task": "courses.tick", "schedule": 600.0},
+    # M5b việc 10: đề xuất kỹ năng của agent (Skill Workshop) → Hộp việc.
+    "sync-skill-proposals": {"task": "skills.sync_workshop", "schedule": 300.0},
 }
 
 

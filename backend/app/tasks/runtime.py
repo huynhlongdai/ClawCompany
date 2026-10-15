@@ -91,3 +91,22 @@ def tick_courses():
         return asyncio.run(courses.tick(db, get_runtime()))
     finally:
         db.close()
+
+
+@celery_app.task(name="skills.sync_workshop")
+def sync_skill_proposals():
+    """M5b việc 10: kéo đề xuất kỹ năng đang chờ trên gateway về Hộp việc (mọi tổ chức)."""
+    import asyncio
+    from app.core.config import settings
+    from app.db.session import SessionLocal
+    from app.models import Organization
+    from app.runtime.factory import get_runtime
+    from app.services import skill_studio
+    if (settings.openclaw_mode or "").lower() not in ("native", "gateway"):
+        return {"skipped": "not native"}
+    db = SessionLocal()
+    try:
+        rt = get_runtime()
+        return [asyncio.run(skill_studio.sync_workshop(db, o.id, rt)) for o in db.query(Organization).all()]
+    finally:
+        db.close()

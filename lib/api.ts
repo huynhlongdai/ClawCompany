@@ -799,6 +799,19 @@ export const apiLearning = {
   retake: (enrollmentId: number, from_start = false) =>
     request<any>(`/learning/enrollments/${enrollmentId}/retake`, {method: "POST", body: JSON.stringify({from_start})}),
   agent: (agentId: number) => request<any>(`/learning/agents/${agentId}`),
+  skills: () => request<any>(`/learning/skills`),
+  skill: (id: number) => request<any>(`/learning/skills/${id}`),
+  skillGovernance: () => request<any>(`/learning/skills/governance`),
+  skillEnforce: () => request<any>(`/learning/skills/governance`, {method: "POST"}),
+  skillSync: () => request<any>(`/learning/skills/sync`, {method: "POST"}),
+  skillCreate: (body: any) => request<any>(`/learning/skills`, {method: "POST", body: JSON.stringify(body)}),
+  versionUpdate: (id: number, body: any) => request<any>(`/learning/skill-versions/${id}`, {method: "PUT", body: JSON.stringify(body)}),
+  versionEval: (id: number, agent_id: number) => request<any>(`/learning/skill-versions/${id}/eval`, {method: "POST", body: JSON.stringify({agent_id})}),
+  versionSubmit: (id: number) => request<any>(`/learning/skill-versions/${id}/submit`, {method: "POST"}),
+  skillInstall: (id: number, agent_ids: number[], version_id?: number) =>
+    request<any>(`/learning/skills/${id}/install`, {method: "POST", body: JSON.stringify({agent_ids, version_id})}),
+  skillRollback: (id: number, version_id: number) =>
+    request<any>(`/learning/skills/${id}/rollback`, {method: "POST", body: JSON.stringify({version_id})}),
 };
 
 export const apiAgentsHR = {

@@ -48,7 +48,8 @@ STATUS_VI = {"approved": "duyệt", "rejected": "từ chối", "denied": "từ c
 KIND_OF = (("task_stage:", "stage", "Chặng duyệt của việc"), ("strategy:", "plan", "Kế hoạch của Nina"),
            ("budget_soft:", "budget", "Chi tiếp khi chạm nấc ngân sách"),
            ("openclaw:", "gateway", "Lệnh agent xin chạy (OpenClaw)"),
-           ("lesson:", "lesson", "Bài học đề xuất ghi vào MEMORY.md"))
+           ("lesson:", "lesson", "Bài học đề xuất ghi vào MEMORY.md"),
+           ("skill:", "skill", "Kỹ năng đề xuất cho thư viện công ty"))
 
 
 # ------------------------------------------------------------------ quyền
@@ -197,7 +198,7 @@ def feed(db: Session, organization_id: int, principal: Principal, *, status: str
                 appr = approval_card(db, a, principal, names, now)
                 seen_approvals.add(a.id)
         actionable = bool(appr and appr["can_decide"])
-        if a is not None and _kind(a)[0] == "lesson":
+        if a is not None and _kind(a)[0] in ("lesson", "skill"):
             kinds = kinds | LESSON_KINDS
         cards.append({**inbox.public(item), "key": f"item:{item.id}", "group": group_of(kinds, actionable),
                       "approval": appr, "task": _task(db, item.task_id),
@@ -354,6 +355,13 @@ async def decide(db: Session, organization_id: int, principal: Principal, approv
         res = await lessons.apply(db, a, principal, get_runtime(), edited_text=edited_text)
         extra = {**extra, **res}
         msg += " — đã ghi vào MEMORY.md của agent" if res.get("applied") else f" — nhưng CHƯA ghi được vào MEMORY.md ({res.get('apply_error')})"
+    if (a.policy_key or "").startswith("skill:"):
+        from app.services import skill_studio
+        from app.runtime.factory import get_runtime
+        res = await skill_studio.on_decided(db, a, get_runtime())
+        extra = {**extra, **res}
+        if res.get("message"):
+            msg += " — " + res["message"]
     db.refresh(a)
     return {"approval_id": a.id, "status": a.status, "message": msg, **extra}
 
@@ -399,6 +407,8 @@ def after_decision(db: Session, a: Approval, actor_member_id: int | None) -> dic
         except strategy.StrategyError as exc:
             raise WorkError(409, "plan_error", exc.message) from exc
         return {"effect": "plan"}
+    if key.startswith("skill:"):
+        return {"effect": "skill"}   # áp lên gateway là việc async → decide() làm tiếp
     if key.startswith("lesson:"):
         # Ghi MEMORY.md là việc async (gateway) → decide() làm sau khi trả về đây.
         return {"effect": "lesson", "applied": False}
@@ -435,9 +445,12 @@ FIELD_VI = {
     "description": "Mô tả", "note": "Ghi chú", "plan": "Kế hoạch", "steps": "Các bước",
     "source_vi": "Nguồn", "agent_name": "Agent", "task_title": "Việc liên quan", "applied_text": "Đã ghi vào MEMORY.md",
     "apply_error": "Lỗi khi ghi",
+    "skill": "Kỹ năng", "version": "Phiên bản", "eval": "Kết quả eval", "scan": "Quét an toàn",
+    "origin_agent": "Agent đề xuất", "goal": "Mục tiêu",
 }
 _SKIP = {"id", "event", "request", "systemRunBinding", "systemRunPlan", "nodeId", "ts", "createdAtMs",
-         "expiresAtMs", "revision", "source", "agent_id", "applied", "applied_at", "memory_hash"}
+         "expiresAtMs", "revision", "source", "agent_id", "applied", "applied_at", "memory_hash",
+         "skill_id", "version_id"}
 
 
 def _fields(obj: Any, prefix: str = "", depth: int = 0) -> list[dict]:

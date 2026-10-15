@@ -9,7 +9,7 @@ import {ErrorBanner} from "./ui/EmptyState";
 import {Field} from "./ui/Field";
 import {Any, LabBody, Panel, Pill, Table, useAction, useLoad} from "./lab/kit";
 
-type Sub = "library" | "gaps" | "courses";
+type Sub = "library" | "gaps" | "courses" | "skills";
 
 function tokenRole(): string {
   try {
@@ -27,11 +27,12 @@ export function LearningHub() {
   const opt = useLoad(async () => await apiSharedMemory.options(), null as Any);
   return <div className="lab" data-testid="learning-hub">
     <div className="ui-seg" role="tablist" style={{marginBottom: 12}}>
-      {(["library", "courses", "gaps"] as Sub[]).map(s => <button key={s} role="tab" aria-selected={sub === s} aria-pressed={sub === s}
+      {(["library", "courses", "skills", "gaps"] as Sub[]).map(s => <button key={s} role="tab" aria-selected={sub === s} aria-pressed={sub === s}
         onClick={() => setSub(s)} data-testid={`learning-tab-${s}`}>{tr(`learning.tab_${s}` as any)}</button>)}
     </div>
     {sub === "library" && <Library canEdit={canEdit} o={opt.data}/>}
     {sub === "courses" && <Courses canEdit={canEdit} o={opt.data}/>}
+    {sub === "skills" && <Skills canEdit={canEdit} o={opt.data}/>}
     {sub === "gaps" && <Gaps canEdit={canEdit}/>}
   </div>;
 }
@@ -209,6 +210,106 @@ function CourseDetail({id, canEdit, onClose}: {id: number; canEdit: boolean; onC
           {c.quiz.length ? tr("learning.soan_lai_de") : tr("learning.soan_de")}</Button>}
         <Button onClick={onClose}>{tr("learning.dong")}</Button>
       </div>
+    </div>}
+  </Panel>;
+}
+
+
+/* M5b việc 10: Skill Studio — đề xuất (agent qua Workshop hoặc quản lý soạn) → eval → duyệt → cài → rollback. */
+// Ca kiểm nhập mỗi dòng: câu hỏi || phải có: a, b || không được có: c
+function parseCases(text: string): Any[] {
+  return text.split("\n").map(l => l.trim()).filter(Boolean).map(l => {
+    const [prompt, ...rest] = l.split("||").map(x => x.trim());
+    const pick = (re: RegExp) => (rest.find(r => re.test(r)) || "").replace(re, "").split(",").map(x => x.trim()).filter(Boolean);
+    return {prompt, must_include: pick(/^(phải có|must)\s*:\s*/i), must_not_include: pick(/^(không được có|must not)\s*:\s*/i)};
+  });
+}
+const casesText = (cs: Any[]) => (cs || []).map(c => [c.prompt, c.must_include?.length ? `phải có: ${c.must_include.join(", ")}` : "",
+  c.must_not_include?.length ? `không được có: ${c.must_not_include.join(", ")}` : ""].filter(Boolean).join(" || ")).join("\n");
+const V_TONE: Record<string, string> = {approved: "ok", in_review: "wait", draft: "info", rejected: "risk", superseded: "info"};
+
+function Skills({canEdit, o}: {canEdit: boolean; o: Any}) {
+  const q = useLoad(async () => (await apiLearning.skills()).items as Any[], []);
+  const gov = useLoad(async () => { try { return await apiLearning.skillGovernance(); } catch { return null; } }, null as Any);
+  const act = useAction();
+  const [open, setOpen] = useState<number | null>(null);
+  const [f, setF] = useState<Any>({slug: "", title: "", description: "", content: "", cases: ""});
+  const create = () => act.run("create", async () => {
+    const r = await apiLearning.skillCreate({slug: f.slug, title: f.title, description: f.description, content: f.content, eval_cases: parseCases(f.cases)});
+    setF({slug: "", title: "", description: "", content: "", cases: ""}); await q.reload(); setOpen(r.id);
+  }, tr("learning.sk_da_tao"));
+  const g = gov.data;
+  return <LabBody q={q}>
+    {act.error ? <ErrorBanner error={act.error} context="Skill Studio" onClose={() => act.setError(null)}/> : null}
+    {g && !g.governed && <div className="ui-banner is-error" data-testid="skill-governance">
+      {tr("learning.sk_chua_kiem_soat", {p0: g.autonomous_mode})}
+      {canEdit && <> <Button size="sm" variant="primary" busy={act.busy === "gov"} onClick={() => act.run("gov", async () => { await apiLearning.skillEnforce(); await gov.reload(); }, tr("learning.sk_da_bat"))}>{tr("learning.sk_bat_duyet")}</Button></>}
+    </div>}
+    {g && g.governed && <p className="tmGuide">{tr("learning.sk_da_kiem_soat")}</p>}
+    {open !== null && <SkillDetail id={open} canEdit={canEdit} o={o} onClose={() => { setOpen(null); q.reload(); }}/>}
+    <Panel title={tr("learning.sk_thu_vien")} desc={tr("learning.sk_thu_vien_desc")}>
+      {canEdit && <div className="ui-toolbar" style={{marginBottom: 10}}><Button busy={act.busy === "sync"} onClick={() => act.run("sync", async () => {
+        const r = await apiLearning.skillSync(); await q.reload(); return r; }, tr("learning.sk_da_dong_bo"))}>{tr("learning.sk_dong_bo")}</Button></div>}
+      <Table rows={q.data} empty={tr("learning.sk_trong")} testId="skill-list" cols={[
+        {label: tr("learning.sk_ky_nang"), render: s => <button type="button" className="ibx-title-btn" onClick={() => setOpen(s.id)}><b>{s.title}</b><br/><small>{s.slug} · {s.description}</small></button>},
+        {label: tr("learning.sk_hien_hanh"), render: s => s.current_version ? `v${s.current_version}` : "—"},
+        {label: tr("learning.sk_cho"), render: s => s.pending ? <Pill s="wait" label={String(s.pending)}/> : "0", num: true},
+        {label: tr("learning.sk_da_cai"), render: s => s.installed, num: true},
+      ]}/>
+    </Panel>
+    {canEdit && <Panel title={tr("learning.sk_soan")} desc={tr("learning.sk_soan_desc")}>
+      <div className="ui-form" data-testid="skill-form">
+        <div className="ui-form-row">
+          <Field label={tr("learning.sk_ma")} hint={tr("learning.sk_ma_hint")}><input className="ui-input" value={f.slug} onChange={e => setF({...f, slug: e.target.value})}/></Field>
+          <Field label={tr("learning.tieu_de")}><input className="ui-input" value={f.title} onChange={e => setF({...f, title: e.target.value})}/></Field>
+        </div>
+        <Field label={tr("learning.sk_mo_ta")} hint={tr("learning.sk_mo_ta_hint")}><input className="ui-input" maxLength={160} value={f.description} onChange={e => setF({...f, description: e.target.value})}/></Field>
+        <Field label={tr("learning.noi_dung")}><textarea className="ui-textarea" rows={8} value={f.content} onChange={e => setF({...f, content: e.target.value})} placeholder={tr("learning.sk_noi_dung_ph")}/></Field>
+        <Field label={tr("learning.sk_ca_kiem")} hint={tr("learning.sk_ca_kiem_hint")}><textarea className="ui-textarea" rows={3} value={f.cases} onChange={e => setF({...f, cases: e.target.value})}/></Field>
+        <div className="ui-toolbar"><Button variant="primary" busy={act.busy === "create"} disabled={!f.slug || !f.description || f.content.trim().length < 40} onClick={create}>{tr("learning.sk_luu_nhap")}</Button></div>
+      </div>
+    </Panel>}
+  </LabBody>;
+}
+
+function SkillDetail({id, canEdit, o, onClose}: {id: number; canEdit: boolean; o: Any; onClose: () => void}) {
+  const q = useLoad(async () => await apiLearning.skill(id), null as Any, [id]);
+  const act = useAction();
+  const [agent, setAgent] = useState(""), [targets, setTargets] = useState<number[]>([]);
+  const [cases, setCases] = useState<Record<number, string>>({});
+  const s = q.data;
+  const run = (key: string, fn: () => Promise<Any>, ok?: string) => act.run(key, async () => { const r = await fn(); await q.reload(); return r; }, ok);
+  return <Panel title={s ? `${s.title} (${s.slug})` : tr("learning.dang_tai")} desc={s ? (s.current_version ? tr("learning.sk_dang_dung", {p0: s.current_version}) : tr("learning.sk_chua_duyet")) : ""}>
+    {act.error ? <ErrorBanner error={act.error} context="Skill Studio" onClose={() => act.setError(null)}/> : null}
+    {s && <div className="ui-form" data-testid={`skill-${id}`}>
+      {s.versions.map((v: Any) => <details key={v.id} className="ui-row" style={{display: "block"}} open={v.status === "draft" || v.status === "in_review"}>
+        <summary><b>v{v.version}</b> <Pill s={V_TONE[v.status]} label={v.status_vi}/> <small>{v.source_vi}{v.origin_agent ? ` · ${v.origin_agent}` : ""} · {v.description}</small></summary>
+        <pre className="ibx-pre" style={{maxHeight: 260, overflow: "auto"}}>{v.content}</pre>
+        {v.scan && <small>{tr("learning.sk_quet")}: {v.scan.state} ({v.scan.critical || 0}/{v.scan.warn || 0})</small>}
+        {v.eval_report && <div><b className="ibx-sub">Eval</b> <span>{tr("learning.sk_eval_ket_qua", {p0: v.eval_report.with_skill, p1: v.eval_report.total, p2: v.eval_report.baseline, p3: v.eval_report.agent})}</span>
+          <ul>{v.eval_report.cases.map((c: Any, i: number) => <li key={i}>{c.prompt} — {c.with_skill.passed ? "✓" : "✗"} / {c.baseline.passed ? "✓" : "✗"}
+            {c.with_skill.missing?.length ? <small> · {tr("learning.sk_thieu")}: {c.with_skill.missing.join(", ")}</small> : null}</li>)}</ul></div>}
+        {canEdit && (v.status === "draft" || v.status === "rejected") && <>
+          <Field label={tr("learning.sk_ca_kiem")} hint={tr("learning.sk_ca_kiem_hint")}><textarea className="ui-textarea" rows={3}
+            value={cases[v.id] ?? casesText(v.eval_cases)} onChange={e => setCases({...cases, [v.id]: e.target.value})}/></Field>
+          <div className="ui-toolbar">
+            {cases[v.id] !== undefined && <Button size="sm" onClick={() => run(`c${v.id}`, () => apiLearning.versionUpdate(v.id, {eval_cases: parseCases(cases[v.id])}), tr("learning.sk_da_luu_ca"))}>{tr("learning.sk_luu_ca")}</Button>}
+            <select className="ui-select" style={{width: "auto"}} value={agent} onChange={e => setAgent(e.target.value)}>
+              <option value="">{tr("learning.sk_chon_agent_eval")}</option>{(o?.agents || []).map((a: Any) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
+            <Button size="sm" disabled={!agent || !v.eval_cases.length} busy={act.busy === `e${v.id}`} onClick={() => run(`e${v.id}`, () => apiLearning.versionEval(v.id, Number(agent)), tr("learning.sk_da_eval"))}>{tr("learning.sk_chay_eval")}</Button>
+            <Button size="sm" variant="primary" busy={act.busy === `s${v.id}`} onClick={() => run(`s${v.id}`, () => apiLearning.versionSubmit(v.id), tr("learning.sk_da_gui"))}>{tr("learning.sk_gui_duyet")}</Button>
+          </div></>}
+        {canEdit && v.status === "superseded" && <Button size="sm" busy={act.busy === `r${v.id}`} onClick={() => { if (window.confirm(tr("learning.sk_xac_nhan_rollback"))) run(`r${v.id}`, () => apiLearning.skillRollback(id, v.id), tr("learning.sk_da_rollback")); }}>{tr("learning.sk_rollback")}</Button>}
+      </details>)}
+      <b className="ibx-sub">{tr("learning.sk_noi_cai")}</b>
+      <Table rows={s.installs} empty={tr("learning.sk_chua_cai")} rowKey={(r: Any) => r.agent_id} cols={[
+        {label: "Agent", render: (i: Any) => i.agent}, {label: tr("learning.sk_phien_ban"), render: (i: Any) => `v${i.version}`},
+        {label: tr("learning.sk_trang_thai"), render: (i: Any) => <>{i.status === "installed" ? <Pill s="ok" label={tr("learning.sk_da_cai_1")}/> : <Pill s="risk" label={tr("learning.sk_loi")}/>}{i.error ? <><br/><small>{i.error}</small></> : null}</>},
+      ]}/>
+      {canEdit && s.current_version_id && <><Field label={tr("learning.sk_cai_cho")}><div className="ui-chips">{(o?.agents || []).map((a: Any) => <button key={a.id} type="button" className="ui-chip"
+          aria-pressed={targets.includes(a.id)} onClick={() => setTargets(t => t.includes(a.id) ? t.filter(x => x !== a.id) : [...t, a.id])}>{a.name}</button>)}</div></Field>
+        <div className="ui-toolbar"><Button variant="primary" disabled={!targets.length} busy={act.busy === "inst"} onClick={() => run("inst", () => apiLearning.skillInstall(id, targets), tr("learning.sk_da_cai_xong"))}>{tr("learning.sk_cai", {p0: s.current_version})}</Button></div></>}
+      <div className="ui-toolbar"><Button onClick={onClose}>{tr("learning.dong")}</Button></div>
     </div>}
   </Panel>;
 }
