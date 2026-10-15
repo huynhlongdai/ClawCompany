@@ -108,7 +108,7 @@ def test_initialize_and_list_all_26_tools(env):
     tools = env["rpc"](k, "tools/list").json()["result"]["tools"]
     names = {t["name"] for t in tools}
     # 29 = 26 + company_lesson_propose + company_knowledge_gap_report (M5b) + company_ask_advisor (M6)
-    assert len(tools) == 29 and all(n.startswith("company_") for n in names)
+    assert len(tools) == 31 and all(n.startswith("company_") for n in names)  # +2 A2A: company_external_agents, company_delegate_external
     assert "company_task_checkout" in names and "company_memory_search" in names
 
 
@@ -233,7 +233,7 @@ def test_executor_seat_gets_403_on_budget_check_even_with_full_scopes(env):
     lead, junior = _lead_and_executor(env)
     k = env["key"](junior, scopes=("*",))     # gateway/scope đều cho qua
     names = {t["name"] for t in env["rpc"](k, "tools/list").json()["result"]["tools"]}
-    assert "company_budget_check" not in names and len(names) == 26   # +company_lesson_propose, company_knowledge_gap_report (M5b), company_ask_advisor (M6)
+    assert "company_budget_check" not in names and len(names) == 28   # +2 A2A (company_external_agents, company_delegate_external); +company_lesson_propose, company_knowledge_gap_report (M5b), company_ask_advisor (M6)
     r = env["rpc"](k, "tools/call", {"name": "company_budget_check", "arguments": {}})
     assert r.status_code == 403 and r.json()["error"]["data"]["level"] == "off"
     # Trưởng phòng thì được.

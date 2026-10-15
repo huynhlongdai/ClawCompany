@@ -162,6 +162,7 @@ def render_files(*, name: str, role: str, company: str, department: str, manager
         "- Kho chưa có câu trả lời: nói rõ là chưa có thông tin, hẹn kiểm tra lại, và gọi company_knowledge_gap_report.\n"
         "- Mã trích dẫn [KB#…] chỉ dùng trong báo cáo nội bộ, không gửi cho khách.\n"
         "- Quyết định khó hoặc rủi ro (khiếu nại nặng, số tiền lớn): hỏi company_ask_advisor trước khi trả lời.\n"
+        "- Việc ngoài chuyên môn của công ty mà đã thuê agent bên ngoài: company_external_agents rồi company_delegate_external.\n"
         "- Rút ra được bài học đáng nhớ: đề xuất bằng company_lesson_propose (người quản lý duyệt mới ghi nhớ).\n\n"
         f"## Ngân sách\n{budget_line}\n"
         + (f"\n{core_knowledge.strip()}\n" if core_knowledge.strip() else ""))

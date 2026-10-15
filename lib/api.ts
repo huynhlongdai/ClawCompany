@@ -773,6 +773,20 @@ export const apiSharedMemory = {
 };
 
 // M5b việc 9: kho tri thức hợp nhất + lỗ hổng + khoá học.
+export const apiA2A = {
+  external: () => request<any>(`/a2a/external`),
+  addExternal: (body: {card_url?: string; endpoint_url?: string; name?: string; auth_header?: string}) =>
+    request<any>(`/a2a/external`, {method: "POST", body: JSON.stringify(body)}),
+  patchExternal: (id: number, body: {enabled?: boolean; auth_header?: string; name?: string}) =>
+    request<any>(`/a2a/external/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  removeExternal: (id: number) => request<any>(`/a2a/external/${id}`, {method: "DELETE"}),
+  send: (id: number, text: string, context_id?: string) =>
+    request<any>(`/a2a/external/${id}/send`, {method: "POST", body: JSON.stringify({text, context_id})}),
+  exposure: (agentId: number) => request<any>(`/a2a/expose/${agentId}`),
+  expose: (agentId: number, body: {enabled: boolean; rotate?: boolean}) =>
+    request<any>(`/a2a/expose/${agentId}`, {method: "POST", body: JSON.stringify(body)}),
+};
+
 export const apiLearning = {
   docs: () => request<any>(`/learning/docs`),
   addDoc: (body: any) => request<any>(`/learning/docs`, {method: "POST", body: JSON.stringify(body)}),

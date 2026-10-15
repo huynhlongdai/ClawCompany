@@ -2,14 +2,14 @@
 /* M5b việc 9: Đào tạo agent — kho tri thức (nạp văn bản / tệp / URL, tra thử có trích dẫn),
    lỗ hổng kiến thức, khoá học (học từng module → bài học chờ duyệt → thi → chứng chỉ). */
 import {useState} from "react";
-import {apiLearning, apiSharedMemory} from "../lib/api";
+import {apiA2A, apiLearning, apiSharedMemory} from "../lib/api";
 import {t as tr} from "../lib/i18n";
 import {Button} from "./ui/Button";
 import {ErrorBanner} from "./ui/EmptyState";
 import {Field} from "./ui/Field";
 import {Any, LabBody, Panel, Pill, Table, useAction, useLoad} from "./lab/kit";
 
-type Sub = "library" | "gaps" | "courses" | "skills" | "evals";
+type Sub = "library" | "gaps" | "courses" | "skills" | "evals" | "a2a";
 
 function tokenRole(): string {
   try {
@@ -27,7 +27,7 @@ export function LearningHub() {
   const opt = useLoad(async () => await apiSharedMemory.options(), null as Any);
   return <div className="lab" data-testid="learning-hub">
     <div className="ui-seg" role="tablist" style={{marginBottom: 12}}>
-      {(["library", "courses", "skills", "evals", "gaps"] as Sub[]).map(s => <button key={s} role="tab" aria-selected={sub === s} aria-pressed={sub === s}
+      {(["library", "courses", "skills", "evals", "gaps", "a2a"] as Sub[]).map(s => <button key={s} role="tab" aria-selected={sub === s} aria-pressed={sub === s}
         onClick={() => setSub(s)} data-testid={`learning-tab-${s}`}>{tr(`learning.tab_${s}` as any)}</button>)}
     </div>
     {sub === "library" && <Library canEdit={canEdit} o={opt.data}/>}
@@ -35,6 +35,7 @@ export function LearningHub() {
     {sub === "skills" && <Skills canEdit={canEdit} o={opt.data}/>}
     {sub === "evals" && <Evals canEdit={canEdit}/>}
     {sub === "gaps" && <Gaps canEdit={canEdit}/>}
+    {sub === "a2a" && <A2A canEdit={canEdit} o={opt.data}/>}
   </div>;
 }
 
@@ -359,5 +360,67 @@ function Evals({canEdit}: {canEdit: boolean}) {
           {f.id && <Button onClick={() => setF({id: null, title: "", role_keyword: "", k: 3, cases: ""})}>{tr("learning.dong")}</Button>}</div>
       </div>
     </Panel>}
+  </LabBody>;
+}
+
+
+/* M6 việc 12b: A2A — thuê agent bên ngoài (dán Agent Card) + mở seat của công ty cho bên ngoài gọi. */
+function A2A({canEdit, o}: {canEdit: boolean; o: Any}) {
+  const q = useLoad(async () => (await apiA2A.external()).items as Any[], []);
+  const act = useAction();
+  const [f, setF] = useState<Any>({card_url: "", auth_header: ""});
+  const [test, setTest] = useState<Any>({});
+  const [reply, setReply] = useState<Any>({});
+  const [seat, setSeat] = useState("");
+  const [exp, setExp] = useState<Any>(null);
+  const loadExp = async (id: string) => { setSeat(id); setExp(id ? await apiA2A.exposure(Number(id)) : null); };
+  return <LabBody q={q}>
+    {act.error ? <ErrorBanner error={act.error} context="A2A" onClose={() => act.setError(null)}/> : null}
+    <Panel title={tr("learning.a2a_thue")} desc={tr("learning.a2a_thue_desc")}>
+      {canEdit && <form className="ui-form-row" onSubmit={e => { e.preventDefault(); act.run("add", async () => {
+        await apiA2A.addExternal({card_url: f.card_url.trim(), auth_header: f.auth_header.trim()}); setF({card_url: "", auth_header: ""}); await q.reload();
+      }, tr("learning.a2a_da_them")); }}>
+        <Field label={tr("learning.a2a_card_url")}><input className="ui-input" value={f.card_url} required
+          placeholder="https://…/.well-known/agent-card.json" onChange={e => setF({...f, card_url: e.target.value})} data-testid="a2a-card-url"/></Field>
+        <Field label={tr("learning.a2a_auth")} hint={tr("learning.a2a_auth_hint")}><input className="ui-input" value={f.auth_header} type="password"
+          placeholder="Bearer …" onChange={e => setF({...f, auth_header: e.target.value})}/></Field>
+        <div className="ui-toolbar"><Button variant="primary" busy={act.busy === "add"} type="submit">{tr("learning.a2a_them")}</Button></div>
+      </form>}
+      <Table rows={q.data} empty={tr("learning.a2a_chua_co")} testId="a2a-list" cols={[
+        {label: tr("learning.a2a_agent"), render: e => <><b>{e.name}</b><br/><small>{e.description}</small>
+          {e.skills?.length ? <><br/><small>{e.skills.map((s: Any) => s.name || s.id).join(" · ")}</small></> : null}</>},
+        {label: tr("learning.a2a_trang_thai"), render: e => <><Pill s={e.enabled ? "ok" : "info"} label={e.enabled ? tr("learning.a2a_bat") : tr("learning.a2a_tat")}/>
+          <br/><small>{tr("learning.a2a_so_lan", {p0: e.calls})}</small>{e.last_error ? <><br/><small className="is-risk">{e.last_error}</small></> : null}</>},
+        {label: "", render: e => canEdit ? <div style={{display: "grid", gap: 6}}>
+          <div className="ui-toolbar">
+            <Button size="sm" onClick={() => act.run(`t${e.id}`, async () => { await apiA2A.patchExternal(e.id, {enabled: !e.enabled}); await q.reload(); })}>
+              {e.enabled ? tr("learning.a2a_tat_di") : tr("learning.a2a_bat_len")}</Button>
+            <Button size="sm" onClick={() => { if (window.confirm(tr("learning.xac_nhan_xoa"))) act.run(`rm${e.id}`, async () => { await apiA2A.removeExternal(e.id); await q.reload(); }); }}>{tr("learning.xoa")}</Button>
+          </div>
+          <form className="ui-toolbar" onSubmit={ev => { ev.preventDefault(); act.run(`s${e.id}`, async () => {
+            const r = await apiA2A.send(e.id, test[e.id] || ""); setReply({...reply, [e.id]: r.reply}); await q.reload(); }); }}>
+            <input className="ui-input" placeholder={tr("learning.a2a_gui_thu_ph")} value={test[e.id] || ""} onChange={ev => setTest({...test, [e.id]: ev.target.value})}/>
+            <Button size="sm" busy={act.busy === `s${e.id}`} type="submit" disabled={!e.enabled || !(test[e.id] || "").trim()}>{tr("learning.a2a_gui_thu")}</Button>
+          </form>
+          {reply[e.id] ? <div className="tmGuide" style={{whiteSpace: "pre-wrap"}}>{reply[e.id]}</div> : null}
+        </div> : null},
+      ]}/>
+    </Panel>
+    <Panel title={tr("learning.a2a_mo")} desc={tr("learning.a2a_mo_desc")}>
+      <Field label={tr("learning.pv_agent")}><select className="ui-select" value={seat} onChange={e => act.run("ld", () => loadExp(e.target.value))} data-testid="a2a-seat">
+        <option value="">{tr("learning.chon")}</option>{(o?.agents || []).map((x: Any) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></Field>
+      {exp && <div style={{display: "grid", gap: 8, marginTop: 8}}>
+        <div><Pill s={exp.enabled ? "ok" : "info"} label={exp.enabled ? tr("learning.a2a_dang_mo") : tr("learning.a2a_dang_dong")}/>
+          {" "}<small>{tr("learning.a2a_so_lan", {p0: exp.calls})}</small></div>
+        {exp.enabled && <small>{tr("learning.a2a_card_url")}: <code>{exp.card_url}</code></small>}
+        {exp.token && <div className="ui-banner" data-testid="a2a-token">{tr("learning.a2a_khoa_mot_lan")}<br/><code style={{wordBreak: "break-all"}}>{exp.token}</code></div>}
+        {canEdit && <div className="ui-toolbar">
+          <Button size="sm" variant={exp.enabled ? undefined : "primary"} busy={act.busy === "ex"} onClick={() => act.run("ex", async () =>
+            setExp(await apiA2A.expose(Number(seat), {enabled: !exp.enabled})))}>{exp.enabled ? tr("learning.a2a_dong") : tr("learning.a2a_mo_ngay")}</Button>
+          {exp.enabled && <Button size="sm" busy={act.busy === "rot"} onClick={() => { if (window.confirm(tr("learning.a2a_xac_nhan_doi"))) act.run("rot", async () =>
+            setExp(await apiA2A.expose(Number(seat), {enabled: true, rotate: true}))); }}>{tr("learning.a2a_doi_khoa")}</Button>}
+        </div>}
+      </div>}
+    </Panel>
   </LabBody>;
 }

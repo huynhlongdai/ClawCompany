@@ -34,3 +34,4 @@ from .agent_hr import *  # noqa: E402,F401,F403  (M3)
 # chỉ dùng ORM — đều đi qua cùng một chỗ.
 from app.services import inbox as _inbox_hooks  # noqa: E402,F401
 from .learning import *  # noqa: E402,F401,F403  (M5b việc 9)
+from .a2a import *  # noqa: E402,F401,F403  (M6 việc 12b)

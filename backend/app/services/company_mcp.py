@@ -561,6 +561,35 @@ def _ask_advisor(ctx: ToolContext, args: dict) -> dict:
     return {"advice": answer[:6000], "model": tier.ref, **({"warning": err} if err else {})}
 
 
+@tool("company_external_agents", "collab",
+      "Danh sách agent BÊN NGOÀI công ty đã được thuê (A2A): tên, mô tả, kỹ năng. Dùng trước company_delegate_external.",
+      "company.messages:write", {})
+def _external_agents(ctx: ToolContext, args: dict) -> dict:
+    from app.services import a2a
+    return {"items": [{"id": e["id"], "name": e["name"], "description": e["description"][:400], "skills": e["skills"]}
+                      for e in a2a.list_ext(ctx.db, ctx.org) if e["enabled"]]}
+
+
+@tool("company_delegate_external", "collab",
+      "Giao một việc/câu hỏi cho agent BÊN NGOÀI đã thuê (giao thức A2A) và nhận câu trả lời. Chỉ gửi đúng thông tin "
+      "cần cho việc đó — không gửi dữ liệu khách hàng hay nội bộ nhạy cảm. Giữ context_id để hỏi tiếp cùng mạch.",
+      "company.messages:write",
+      {"external_agent_id": {"type": "integer"}, "message": {"type": "string"}, "context_id": {"type": "string"}},
+      ("external_agent_id", "message"))
+def _delegate_external(ctx: ToolContext, args: dict) -> dict:
+    from fastapi import HTTPException
+    from app.services import a2a, seat_limits
+    blocked = seat_limits.check(ctx.db, ctx.member)
+    if blocked:
+        raise ToolError("budget", blocked)
+    try:
+        return a2a.send(ctx.db, ctx.org, _int(args, "external_agent_id"), _str(args, "message", limit=12000),
+                        context_id=_str(args, "context_id", required=False, limit=120) or None,
+                        actor=ctx.member, task_run_id=ctx.run.id if ctx.run else None)
+    except HTTPException as exc:
+        raise ToolError("external_error", str(exc.detail)) from exc
+
+
 # Đọc tài liệu dài theo từng lát thay vì cắt cụt ở 20.000 ký tự. Bản cũ trả
 # 20k ký tự đầu (~5–7k token) cho MỌI lần đọc, và phần sau mốc đó thì agent
 # không bao giờ thấy. Học từ FastClaw: kết quả tool phải nhỏ để lượt sau của
