@@ -193,7 +193,7 @@ def sync_position_kpis(payload: CompanyIn, principal: Principal = Depends(requir
 def snapshot_kpis(payload: KpiSnapIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
     """M2d.2: chụp số KPI ngay (kỳ hiện tại) + tuỳ chọn tính lại ``backfill`` kỳ cũ từ dữ liệu hiện có."""
     from app.services.company_foundation import _company
-    co = _company(db, active_org(principal), payload.company_id)
+    co = _company(db, active_org(principal), payload.company_id, write=True)
     return kc.snapshot_company(db, co.id, trigger="manual", backfill=payload.backfill)
 
 
@@ -246,7 +246,7 @@ async def rhythm_run(payload: RhythmRunIn, principal: Principal = Depends(requir
     """Gửi ngay giao ban / báo cáo tuần của kỳ hiện tại (đã gửi kỳ này thì trả bản cũ, không gửi lại)."""
     from app.services.company_foundation import _company
     org = active_org(principal)
-    co = _company(db, org, payload.company_id)
+    co = _company(db, org, payload.company_id, write=True)
     if payload.all_departments:
         items = await rh.generate_all(db, org, co.id, payload.kind, runtime=_runtime())
         return {"items": items}
@@ -309,7 +309,7 @@ def compliance_settings(payload: ComplianceSettingsIn, principal: Principal = De
 def compliance_seed(payload: SeedComplianceIn, principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
     from app.services.company_foundation import _company
     org = active_org(principal)
-    co = _company(db, org, payload.company_id)
+    co = _company(db, org, payload.company_id, write=True)
     return cc.seed_defaults(db, org, co.id, replace=payload.replace)
 
 

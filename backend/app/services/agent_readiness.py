@@ -178,7 +178,7 @@ def lighthouse(db: Session, co: Company, answers: dict) -> dict:
 def assess(db: Session, org_id: int, company_id: int | None, *, answers: dict | None = None, trigger: str = "manual",
            member_id: int | None = None) -> dict:
     from app.services.company_foundation import _company
-    co = _company(db, org_id, company_id)
+    co = _company(db, org_id, company_id, write=True)
     if answers is None:
         prev = (db.query(ReadinessAssessment).filter(ReadinessAssessment.company_id == co.id)
                 .order_by(ReadinessAssessment.id.desc()).first())

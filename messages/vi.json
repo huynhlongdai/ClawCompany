@@ -513,7 +513,9 @@
   "kind_authority": "Theo ma trận phân quyền",
   "kind_standup": "Giao ban ngày",
   "kind_weekly": "Báo cáo tuần",
-  "kind_compliance": "Hạn tuân thủ"
+  "kind_compliance": "Hạn tuân thủ",
+  "loc_cong_ty": "Lọc theo công ty",
+  "moi_cong_ty": "Mọi công ty"
  },
  "work": {
   "tam_dung": "tạm dừng",
@@ -2767,5 +2769,19 @@
   "hol_kind": "Loại",
   "hol_name_ph": "Tên (vd. Giỗ Tổ Hùng Vương)",
   "hol_saved": "Đã lưu lịch nghỉ — cập nhật hạn pháp lý của {p0} hạn."
+ },
+ "market": {
+  "load_failed": "Không tải được marketplace",
+  "job_created": "Đã tạo job cài đặt: {p0}",
+  "install_failed": "Không cài được: {p0}",
+  "installs": "{p0} lượt cài",
+  "free": "Miễn phí",
+  "only_company": "Chỉ template loại company có luồng cài đặt thật (v8 company factory)",
+  "install_into_org": "Cài vào tổ chức của bạn",
+  "installing": "Đang cài…",
+  "install": "Cài đặt",
+  "view_jobs": "Xem job cài đặt →",
+  "empty": "Chưa có template nào.",
+  "footnote": "Nút \"Cài đặt\" gọi thật /api/company-factory/install; template không phải loại company thì v8 chưa có luồng cài, nên nút bị khoá thay vì bấm vào không có gì xảy ra."
  }
 }

@@ -236,7 +236,8 @@ def snapshot_company(db: Session, company_id: int, *, now: datetime | None = Non
 
 def tick(db: Session) -> dict:
     """Beat ``kpi.snapshot`` (mỗi giờ): mọi công ty có KPI."""
-    ids = [r[0] for r in db.query(KpiDefinition.company_id).filter(KpiDefinition.status == "active").distinct().all()]
+    ids = [r[0] for r in db.query(KpiDefinition.company_id).join(Company, Company.id == KpiDefinition.company_id)
+           .filter(KpiDefinition.status == "active", Company.status != "archived").distinct().all()]
     out = []
     for cid in ids:
         try:
@@ -431,7 +432,16 @@ def _apply(db: Session, co: Company, k: KpiDefinition, data: dict, fields: set[s
         k.parent_id = v
     for f in ("goal_id", "objective_id"):
         if f in fields:
-            setattr(k, f, data.get(f))
+            v = data.get(f)
+            if v is not None:
+                from app.models.v9 import ExecutiveGoal
+                from app.models.v14 import PortfolioObjective
+                row = db.get(ExecutiveGoal if f == "goal_id" else PortfolioObjective, v)
+                # an org-wide goal (company_id NULL) of the same org is fine; another org's or company's is not
+                if row is None or row.organization_id != co.organization_id or row.company_id not in (None, co.id):
+                    label = "Mục tiêu" if f == "goal_id" else "Mục tiêu danh mục"
+                    raise _err(422, f"{label} #{v} không thuộc công ty {co.name}.")
+            setattr(k, f, v)
     need = {"department": k.department_id, "position": k.position_id, "seat": k.member_id}.get(k.level, True)
     if not need:
         raise _err(422, {"department": "KPI tầng phòng ban cần chọn phòng ban.", "position": "KPI tầng chức danh cần chọn chức danh.",
@@ -440,7 +450,7 @@ def _apply(db: Session, co: Company, k: KpiDefinition, data: dict, fields: set[s
 
 def create_kpi(db: Session, org_id: int, data: dict) -> dict:
     from app.services.company_foundation import _company
-    co = _company(db, org_id, data.get("company_id"))
+    co = _company(db, org_id, data.get("company_id"), write=True)
     k = KpiDefinition(organization_id=org_id, company_id=co.id, name="")
     _apply(db, co, k, data, set(data) | {"name"})
     db.add(k); db.commit(); db.refresh(k)
@@ -491,7 +501,7 @@ def sync_positions(db: Session, org_id: int, company_id: int | None) -> dict:
     """Mỗi KPI của chức danh (M2b) → một KPI tầng chức danh (con của KPI phòng ban cùng nguồn số nếu có),
     và mỗi người đang ngồi → một KPI tầng seat (con). Chạy lại an toàn: cập nhật mục tiêu, không nhân đôi."""
     from app.services.company_foundation import _company, seats_of
-    co = _company(db, org_id, company_id)
+    co = _company(db, org_id, company_id, write=True)
     made = updated = 0
     for p in db.query(Position).filter(Position.company_id == co.id, Position.status != "archived").all():
         for spec in (p.kpis or []):

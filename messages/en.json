@@ -513,7 +513,9 @@
   "kind_authority": "Authority matrix",
   "kind_standup": "Daily stand-up",
   "kind_weekly": "Weekly report",
-  "kind_compliance": "Compliance deadline"
+  "kind_compliance": "Compliance deadline",
+  "loc_cong_ty": "Filter by company",
+  "moi_cong_ty": "All companies"
  },
  "work": {
   "tam_dung": "paused",
@@ -2767,5 +2769,19 @@
   "hol_kind": "Type",
   "hol_name_ph": "Name (e.g. Hung Kings Commemoration)",
   "hol_saved": "Holiday calendar saved — legal deadline updated on {p0} deadlines."
+ },
+ "market": {
+  "load_failed": "Couldn't load the marketplace",
+  "job_created": "Install job created: {p0}",
+  "install_failed": "Couldn't install: {p0}",
+  "installs": "{p0} installs",
+  "free": "Free",
+  "only_company": "Only company templates have a real install flow (v8 company factory)",
+  "install_into_org": "Install into your organization",
+  "installing": "Installing…",
+  "install": "Install",
+  "view_jobs": "View install jobs →",
+  "empty": "No templates yet.",
+  "footnote": "The \"Install\" button really calls /api/company-factory/install; non-company templates have no install flow in v8 yet, so the button is disabled instead of doing nothing."
  }
 }

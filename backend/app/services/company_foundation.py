@@ -46,9 +46,21 @@ CHARTER_FIELDS = ("mission", "values", "brand_voice", "prohibitions", "customer_
 CHARTER_BUDGET = 3_000
 
 
-def _company(db: Session, org_id: int, company_id: int | None) -> Company:
+def _company(db: Session, org_id: int, company_id: int | None, *, write: bool = False) -> Company:
+    """Resolve the company a call acts on. M2e: no more silent "first company" fallback.
+    Writes must name company_id explicitly (422 otherwise). Reads without company_id resolve only when the org
+    has exactly one active company — with several, guessing would show/affect the wrong shop."""
     q = db.query(Company).filter(Company.organization_id == org_id, Company.status != "archived")
-    co = q.filter(Company.id == company_id).first() if company_id else q.order_by(Company.id).first()
+    if company_id:
+        co = q.filter(Company.id == company_id).first()
+    else:
+        if write:
+            raise HTTPException(422, "Thiếu company_id: thao tác ghi phải nói rõ công ty nào. Chọn công ty ở góc trên "
+                                     "rồi thử lại.")
+        rows = q.order_by(Company.id).limit(2).all()
+        if len(rows) > 1:
+            raise HTTPException(422, "Tổ chức có nhiều công ty — cần company_id để biết anh đang xem công ty nào.")
+        co = rows[0] if rows else None
     if co is None:
         raise HTTPException(404, "Không thấy công ty này trong tổ chức của anh. Chọn lại công ty ở góc trên "
                                  "hoặc tạo công ty ở tab \"Dựng công ty\".")
@@ -119,7 +131,7 @@ def get_profile(db: Session, org_id: int, company_id: int | None) -> dict:
 
 def save_profile(db: Session, org_id: int, company_id: int | None, data: dict, *, user_id: int | None) -> tuple[dict, bool]:
     """Lưu hồ sơ. Trả (hồ sơ, hiến chương có đổi không) — đổi thì gọi đồng bộ AGENTS.md."""
-    co = _company(db, org_id, company_id)
+    co = _company(db, org_id, company_id, write=True)
     p = profile_row(db, co.id)
     if p is None:
         p = CompanyProfile(organization_id=org_id, company_id=co.id, charter_version=0)
@@ -340,7 +352,7 @@ def _apply(db: Session, org_id: int, p: Position, data: dict, fields: set[str]) 
 
 
 def create_position(db: Session, org_id: int, data: dict) -> Position:
-    co = _company(db, org_id, data.get("company_id"))
+    co = _company(db, org_id, data.get("company_id"), write=True)
     p = Position(organization_id=org_id, company_id=co.id, title="", headcount=1, status="active")
     fields = {k for k in data if k != "company_id"} | {"title"}
     _apply(db, org_id, p, {"headcount": 1, **data}, fields | {"headcount"} if "headcount" not in data else fields)

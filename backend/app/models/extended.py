@@ -25,6 +25,8 @@ class InboxItem(Base, TimestampMixin):
     kinds: Mapped[str] = mapped_column(String(200), default="")
     count: Mapped[int] = mapped_column(Integer, default=1)
     body: Mapped[str] = mapped_column(Text, default="")
+    # M2e.1 (0047): công ty của dòng hộp việc — điền tự động khi insert (task → dự án → công ty; phê duyệt; người nhận)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)
 
 class Mission(Base, TimestampMixin):
     __tablename__ = "missions"
@@ -77,6 +79,8 @@ class SOP(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
     department_id: Mapped[int | None] = mapped_column(ForeignKey("departments.id"), nullable=True)
+    # M2e.1 (0047): SOP thuộc một công ty (NULL = dùng chung cả tổ chức, chỉ dữ liệu cũ không suy ra được)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(220))
     version: Mapped[str] = mapped_column(String(40), default="v1.0")
     owner_member_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True)
@@ -263,3 +267,43 @@ class PermissionPolicy(Base, TimestampMixin):
     minimum_role: Mapped[str] = mapped_column(String(80), default="member")
     requires_approval: Mapped[bool] = mapped_column(Boolean, default=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+# ------------------------------------------------------------------ M2e.1: company_id tự điền khi insert
+from sqlalchemy import event as _event, text as _text  # noqa: E402
+
+
+def _one(conn, sql: str, **kw):
+    row = conn.execute(_text(sql), kw).first()
+    return row[0] if row else None
+
+
+def infer_inbox_company(conn, item: "InboxItem") -> int | None:
+    """task → dự án → công ty; phê duyệt → company_id / công ty người xin; cuối cùng công ty người nhận."""
+    if item.task_id:
+        cid = _one(conn, "SELECT p.company_id FROM tasks t JOIN projects p ON p.id = t.project_id WHERE t.id = :i",
+                   i=item.task_id)
+        if cid:
+            return cid
+    if item.related_type == "approval" and str(item.related_id or "").isdigit():
+        cid = _one(conn, "SELECT COALESCE(a.company_id, m.company_id) FROM approvals a LEFT JOIN members m "
+                         "ON m.id = a.requester_member_id WHERE a.id = :i", i=int(item.related_id))
+        if cid:
+            return cid
+    if item.recipient_member_id:
+        return _one(conn, "SELECT company_id FROM members WHERE id = :i", i=item.recipient_member_id)
+    return None
+
+
+@_event.listens_for(InboxItem, "before_insert")
+def _inbox_company(mapper, conn, target):  # noqa: ANN001
+    if target.company_id is None:
+        target.company_id = infer_inbox_company(conn, target)
+
+
+@_event.listens_for(SOP, "before_insert")
+def _sop_company(mapper, conn, target):  # noqa: ANN001
+    if target.company_id is None:
+        if target.department_id:
+            target.company_id = _one(conn, "SELECT company_id FROM departments WHERE id = :i", i=target.department_id)
+        if target.company_id is None and target.owner_member_id:
+            target.company_id = _one(conn, "SELECT company_id FROM members WHERE id = :i", i=target.owner_member_id)

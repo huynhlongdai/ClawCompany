@@ -254,7 +254,7 @@ def create_position(payload: PositionIn, principal: Principal = Depends(require_
 def positions_from_members(company_id: int | None = None, principal: Principal = Depends(require_role("manager")),
                            db: Session = Depends(get_db)):
     org_id = active_org(principal)
-    co = cf._company(db, org_id, company_id)
+    co = cf._company(db, org_id, company_id, write=True)
     return cf.positions_from_members(db, org_id, co.id)
 
 
@@ -355,7 +355,7 @@ def delete_rule(rule_id: int, principal: Principal = Depends(require_role("admin
 @router.post("/authority/seed-defaults")
 def seed_authority(payload: SeedIn, principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
     org_id = active_org(principal)
-    co = cf._company(db, org_id, payload.company_id)
+    co = cf._company(db, org_id, payload.company_id, write=True)
     out = auth_svc.seed_defaults(db, org_id, co.id, template=payload.template, replace=payload.replace)
     if out["seeded"] == 0 and out["kept"]:
         raise HTTPException(409, f"Công ty đã có {out['kept']} luật. Chọn \"Thay bằng mặc định\" nếu muốn xoá và gieo lại.")

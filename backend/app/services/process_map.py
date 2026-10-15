@@ -23,6 +23,7 @@ import statistics
 from datetime import datetime
 
 from fastapi import HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models import SOP, Company, Department, Member, Project, Task
@@ -56,9 +57,9 @@ def _err(status: int, msg: str) -> HTTPException:
     return HTTPException(status, msg)
 
 
-def _company(db: Session, org_id: int, company_id: int | None) -> Company:
+def _company(db: Session, org_id: int, company_id: int | None, *, write: bool = False) -> Company:
     from app.services.company_foundation import _company as c
-    return c(db, org_id, company_id)
+    return c(db, org_id, company_id, write=write)
 
 
 def _process(db: Session, org_id: int, pid: int) -> Process:
@@ -218,7 +219,7 @@ def list_processes(db: Session, org_id: int, company_id: int | None, *, include_
             "positions": [{"id": x.id, "title": x.title} for x in db.query(Position).filter(
                 Position.company_id == co.id, Position.status != "archived").order_by(Position.id).all()],
             "sops": [{"id": s.id, "title": s.title} for s in db.query(SOP).filter(
-                SOP.organization_id == org_id).order_by(SOP.id.desc()).limit(200).all()]}
+                SOP.organization_id == org_id, or_(SOP.company_id.is_(None), SOP.company_id == co.id)).order_by(SOP.id.desc()).limit(200).all()]}
 
 
 # ------------------------------------------------------------------ ghi định nghĩa
@@ -366,8 +367,8 @@ def save_steps(db: Session, org_id: int, p: Process, steps: list[dict]) -> None:
         sop_id = s.get("sop_id")
         if sop_id:
             sop = db.get(SOP, sop_id)
-            if sop is None or sop.organization_id != org_id:
-                raise _err(422, f"Bước {i}: SOP #{sop_id} không thuộc tổ chức này.")
+            if sop is None or sop.organization_id != org_id or sop.company_id not in (None, p.company_id):
+                raise _err(422, f"Bước {i}: SOP #{sop_id} không thuộc công ty của quy trình này.")
         em = s.get("expected_minutes")
         if em is not None and (not isinstance(em, int) or em <= 0 or em > 60 * 24 * 60):
             raise _err(422, f"Bước {i}: thời lượng kỳ vọng phải là số phút dương (tối đa 60 ngày).")
@@ -401,7 +402,7 @@ def save_steps(db: Session, org_id: int, p: Process, steps: list[dict]) -> None:
 
 
 def create_process(db: Session, org_id: int, data: dict) -> Process:
-    co = _company(db, org_id, data.get("company_id"))
+    co = _company(db, org_id, data.get("company_id"), write=True)
     p = Process(organization_id=org_id, company_id=co.id, name="", category="6")
     fields = (set(data) & {"description", "owner_position_id"}) | {"name", "category"}
     _apply(db, co, p, {"category": "6", **data}, fields)
@@ -806,15 +807,15 @@ def _find_position(positions: list[Position], hint: str) -> int | None:
 def seed_templates(db: Session, org_id: int, company_id: int, template: str, *, skip_existing: bool = True) -> dict:
     if template not in TEMPLATES:
         raise _err(422, f"Không có bộ quy trình mẫu \"{template}\". Chọn một trong: {', '.join(TEMPLATES)}.")
-    co = _company(db, org_id, company_id)
+    co = _company(db, org_id, company_id, write=True)
     positions = db.query(Position).filter(Position.company_id == co.id, Position.status != "archived").order_by(Position.id).all()
     made, skipped = [], []
     for spec in TEMPLATES[template]:
         if skip_existing and db.query(Process).filter(Process.company_id == co.id, Process.template_key == spec["key"],
                                                        Process.status != "archived").first():
             skipped.append(spec["name"]); continue
-        sop = SOP(organization_id=org_id, title=f"SOP: {spec['name']}", version="v1.0", status="published",
-                  department_id=None,
+        sop = SOP(organization_id=org_id, company_id=co.id, title=f"SOP: {spec['name']}", version="v1.0",
+                  status="published", department_id=None,
                   content="\n".join([spec["description"], ""] + [f"{i}. {s['name']}" + (f" — {s['instructions']}" if s["instructions"] else "")
                                                                   for i, s in enumerate(spec["steps"], start=1)]))
         db.add(sop); db.commit(); db.refresh(sop)

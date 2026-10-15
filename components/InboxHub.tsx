@@ -14,7 +14,8 @@ import {EmptyState, ErrorState} from "./ui/EmptyState";
 import {SkeletonRows} from "./ui/Skeleton";
 import {Sheet} from "./ui/Dialog";
 import {useToast} from "./ui/Toast";
-import {apiInboxHub, errorText} from "../lib/api";
+import {api, apiInboxHub, errorText} from "../lib/api";
+import {activeOrganizationId} from "../lib/auth";
 import {refreshCounts} from "../lib/counts";
 import {t, lazy} from "../lib/i18n";
 
@@ -277,18 +278,28 @@ function groupLabel(g: {key: string; label: string}) {
 export function InboxHub() {
   const params = useSearchParams(), router = useRouter(), pathname = usePathname();
   const group = params.get("group") || "";
+  const company = params.get("company") || "";
   const [data, setData] = useState<any>(null), [error, setError] = useState<unknown>(null);
+  const [companies, setCompanies] = useState<{id: number; name: string}[]>([]);
   const toast = useToast(); const setToast = (m: string) => { if (m) toast(m); };
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
-    try { setData(await apiInboxHub.items()); }
+    try { setData(await apiInboxHub.items(company ? {company_id: company} : {})); }
     catch (e) { setError(e); }
-  }, []);
+  }, [company]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    (api.companies(activeOrganizationId()) as Promise<any>).then((rows: any[]) =>
+      setCompanies((rows || []).filter((c: any) => c.status !== "archived").map((c: any) => ({id: c.id, name: c.name})))).catch(() => {});
+  }, []);
 
-  const setGroup = (g: string) => router.replace(g ? `${pathname}?group=${g}` : pathname);
+  const go = (g: string, c: string) => {
+    const q = new URLSearchParams(); if (g) q.set("group", g); if (c) q.set("company", c);
+    router.replace(q.toString() ? `${pathname}?${q}` : pathname);
+  };
+  const setGroup = (g: string) => go(g, company);
   const after = (msg?: string) => { if (msg) setToast(msg); load(); refreshCounts(); };
 
   async function readAll() {
@@ -321,6 +332,11 @@ export function InboxHub() {
           {counts?.by_group?.[g.key] ? <i className="ui-count">{counts.by_group[g.key]}</i> : null}</button>)}
       </div>
       <div className="ibx-tools">
+        {companies.length > 1 && <select className="ui-select is-sm" value={company} aria-label={t("inbox.loc_cong_ty")}
+          data-testid="inbox-company" onChange={e => go(group, e.target.value)}>
+          <option value="">{t("inbox.moi_cong_ty")}</option>
+          {companies.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+        </select>}
         <button className="ui-btn is-ghost is-sm" disabled={busy || !counts?.unread} onClick={readAll}>{t("inbox.doc_het")}</button>
         {data?.caps?.escalate && <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={escalate}
           title={t("inbox.chuyen_cac_yeu_cau_qua")}>{t("inbox.leo_thang_ngay")}</button>}

@@ -107,7 +107,8 @@ def _top_humans(db: Session, organization_id: int, company_id: int | None) -> li
 
 def notify(db: Session, *, organization_id: int, recipients: Iterable[int | None], kind: str, title: str,
            task_id: int | None = None, related_type: str = "", related_id: str = "",
-           priority: str = "normal", line: str = "", source: str = "", commit: bool = True) -> list[InboxItem]:
+           priority: str = "normal", line: str = "", source: str = "", commit: bool = True,
+           company_id: int | None = None) -> list[InboxItem]:
     if kind not in KINDS:
         raise ValueError(f"kind phải là một trong {', '.join(KINDS)}")
     people: list[int] = []
@@ -129,7 +130,7 @@ def notify(db: Session, *, organization_id: int, recipients: Iterable[int | None
                 item = InboxItem(organization_id=organization_id, recipient_member_id=rid, source=source or kind,
                                  title=title[:220], item_type=kind, priority=priority, status="unread",
                                  related_type=related_type, related_id=str(related_id or ""), task_id=task_id,
-                                 group_key=group, kinds=kind, count=1, body=text)
+                                 group_key=group, kinds=kind, count=1, body=text, company_id=company_id)
                 db.add(item)
             else:
                 kinds = [k for k in (item.kinds or "").split(",") if k]
@@ -155,6 +156,7 @@ def public(item: InboxItem) -> dict:
     return {"id": item.id, "recipient_member_id": item.recipient_member_id, "title": item.title,
             "kind": item.item_type, "kinds": [k for k in (item.kinds or "").split(",") if k],
             "kinds_vi": [KIND_VI.get(k, k) for k in (item.kinds or "").split(",") if k],
+            "company_id": getattr(item, "company_id", None),
             "count": item.count or 1, "priority": item.priority, "status": item.status, "task_id": item.task_id,
             "group_key": item.group_key, "related_type": item.related_type, "related_id": item.related_id,
             "lines": (item.body or "").splitlines(), "source": item.source,

@@ -66,12 +66,12 @@ class DecideIn(BaseModel):
 
 @router.get("/items")
 def items(status: str = "open", group: str | None = None, member_id: int | None = None,
-          department_id: int | None = None, principal: Principal = Depends(require_human()),
-          db: Session = Depends(get_db)):
+          department_id: int | None = None, company_id: int | None = None,
+          principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
     if group is not None and group not in inbox_hub.GROUP_VI:
         raise WorkError(422, "bad_group", "Nhóm chỉ được là approvals, review, budget, lessons hoặc updates")
     return inbox_hub.feed(db, active_org(principal), principal, status=status, group=group,
-                          member_id=member_id, department_id=department_id)
+                          member_id=member_id, department_id=department_id, company_id=company_id)
 
 
 @router.get("/summary")

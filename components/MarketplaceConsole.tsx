@@ -2,7 +2,7 @@
 import {useEffect, useState} from "react";
 import {api, apiV8} from "../lib/api";
 import {Icon} from "./Icon";
-import {intlLocale} from "../lib/i18n";
+import {intlLocale, t} from "../lib/i18n";
 import {ErrorBanner} from "./ui/EmptyState";
 
 /* Marketplace — có trong mẫu, app chưa có route.
@@ -26,7 +26,7 @@ export function MarketplaceConsole() {
 
   async function load() {
     try { setRows((await api.marketplace() as Row[]) || []); }
-    catch (e: any) { setError(e?.message || "Không tải được marketplace"); }
+    catch (e: any) { setError(e?.message || t("market.load_failed")); }
   }
   useEffect(() => { load(); }, []);
 
@@ -36,9 +36,9 @@ export function MarketplaceConsole() {
       const out = await apiV8.companyFactoryInstall({
         organization_id: row.organization_id, template_id: row.id,
       });
-      setResult(`Đã tạo job cài đặt: ${JSON.stringify(out).slice(0, 160)}`);
+      setResult(t("market.job_created", {p0: JSON.stringify(out).slice(0, 160)}));
     } catch (e: any) {
-      setResult(`Không cài được: ${String(e?.message || e).slice(0, 200)}`);
+      setResult(t("market.install_failed", {p0: String(e?.message || e).slice(0, 200)}));
     } finally { setBusy(null); }
   }
 
@@ -62,28 +62,27 @@ export function MarketplaceConsole() {
         <div className="lab-divider"/>
 
         <div className="companyMeta" style={{marginTop: 0}}>
-          <span>{(r.installs || 0).toLocaleString(intlLocale())} lượt cài</span>
-          <b>{r.price ? `$${r.price}` : "Miễn phí"}</b>
+          <span>{t("market.installs", {p0: (r.installs || 0).toLocaleString(intlLocale())})}</span>
+          {" · "}
+          <b>{r.price ? `$${r.price}` : t("market.free")}</b>
         </div>
 
         <div className="ui-toolbar" style={{marginTop: 12}}>
           <button className="ui-btn is-primary" disabled={busy === r.id || r.template_type !== "company"}
                   onClick={() => install(r)}
                   title={r.template_type !== "company"
-                    ? "Chỉ template loại company có luồng cài đặt thật (v8 company factory)"
-                    : "Cài vào tổ chức của bạn"}>
-            {busy === r.id ? "Đang cài…" : "Cài đặt"}
+                    ? t("market.only_company")
+                    : t("market.install_into_org")}>
+            {busy === r.id ? t("market.installing") : t("market.install")}
           </button>
-          <a className="ui-btn" href="/app/company-factory">Xem job cài đặt →</a>
+          <a className="ui-btn" href="/app/company-factory">{t("market.view_jobs")}</a>
         </div>
       </div>)}
-      {!rows.length && <div className="ui-empty-line">Chưa có template nào.</div>}
+      {!rows.length && <div className="ui-empty-line">{t("market.empty")}</div>}
     </section>
 
     <small style={{display: "block", marginTop: 14}}>
-      Nút "Cài đặt" gọi thật <code>/api/company-factory/install</code>; template
-      không phải loại <code>company</code> thì v8 chưa có luồng cài, nên nút bị khoá
-      thay vì bấm vào không có gì xảy ra.
+      {t("market.footnote")}
     </small>
   </div>;
 }

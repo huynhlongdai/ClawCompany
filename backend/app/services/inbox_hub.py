@@ -171,7 +171,7 @@ def group_of(kinds: set[str], actionable: bool) -> str:
 
 def feed(db: Session, organization_id: int, principal: Principal, *, status: str = "open",
          group: str | None = None, member_id: int | None = None, department_id: int | None = None,
-         now: datetime | None = None) -> dict:
+         company_id: int | None = None, now: datetime | None = None) -> dict:
     """Hộp việc của người đăng nhập, nhóm theo việc cần làm, kèm số đếm."""
     now = now or datetime.utcnow()
     me = principal.member_id
@@ -184,6 +184,8 @@ def feed(db: Session, organization_id: int, principal: Principal, *, status: str
             q = q.filter(InboxItem.status.in_(inbox.OPEN))
         elif status != "all":
             q = q.filter(InboxItem.status == status)
+        if company_id is not None:      # M2e.1: hộp việc theo từng công ty
+            q = q.filter(InboxItem.company_id == company_id)
         rows = q.order_by(InboxItem.updated_at.desc(), InboxItem.id.desc()).limit(300).all()
 
     from app.models import Department
@@ -211,6 +213,8 @@ def feed(db: Session, organization_id: int, principal: Principal, *, status: str
         for a in sorted(pending.values(), key=lambda x: x.id):
             if a.id in seen_approvals or me not in deciders(db, a):
                 continue
+            if company_id is not None and approval_company(db, a) != company_id:
+                continue
             card = approval_card(db, a, principal, names, now)
             cards.append({**_subject(db, card["task"]["id"] if card["task"] else None, a, depts), "id": None, "key": f"approval:{a.id}", "title": f"Chờ duyệt: {a.action}"[:220],
                           "kind": "approval_pending", "kinds": ["approval_pending"],
@@ -219,6 +223,7 @@ def feed(db: Session, organization_id: int, principal: Principal, *, status: str
                           "status": "unread", "task_id": card["task"]["id"] if card["task"] else None,
                           "group_key": f"approval:{a.id}", "related_type": "approval", "related_id": str(a.id),
                           "lines": [], "source": "approvals", "created_at": card["created_at"],
+                          "company_id": approval_company(db, a),
                           "updated_at": card["created_at"],
                           "group": "lessons" if card["kind"] == "lesson" else "approvals", "approval": card,
                           "task": card["task"]})
@@ -242,6 +247,13 @@ def feed(db: Session, organization_id: int, principal: Principal, *, status: str
             "groups": [{"key": k, "label": label, "items": [c for c in shown if c["group"] == k]}
                        for k, label in GROUPS if not group or k == group],
             "caps": {"escalate": is_manager(principal)}}
+
+
+def approval_company(db: Session, a: Approval) -> int | None:
+    if a.company_id:
+        return a.company_id
+    req = db.get(Member, a.requester_member_id) if a.requester_member_id else None
+    return req.company_id if req else None
 
 
 def _subject(db: Session, task_id: int | None, a: Approval | None, depts: dict[int, str]) -> dict:

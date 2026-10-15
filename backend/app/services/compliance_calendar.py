@@ -144,9 +144,9 @@ def periods(rule: ComplianceRule, start: date, end: date) -> list[tuple[str, dat
 
 # ------------------------------------------------------------------ cài đặt + luật
 
-def _profile(db: Session, org_id: int, company_id: int | None) -> tuple[Company, CompanyProfile | None]:
+def _profile(db: Session, org_id: int, company_id: int | None, *, write: bool = False) -> tuple[Company, CompanyProfile | None]:
     from app.services.company_foundation import _company, profile_row
-    co = _company(db, org_id, company_id)
+    co = _company(db, org_id, company_id, write=write)
     return co, profile_row(db, co.id)
 
 
@@ -159,7 +159,7 @@ def settings_of(p: CompanyProfile | None) -> dict:
 
 def save_settings(db: Session, org_id: int, company_id: int | None, data: dict) -> dict:
     from app.services.company_foundation import CompanyProfile as CP
-    co, p = _profile(db, org_id, company_id)
+    co, p = _profile(db, org_id, company_id, write=True)
     for f in ("vat_period", "pit_period"):
         if data.get(f) is not None and data[f] not in ("monthly", "quarterly"):
             raise _err(422, "Kỳ kê khai phải là monthly (tháng) hoặc quarterly (quý). Doanh nghiệp mới thành lập và doanh nghiệp "
@@ -268,7 +268,7 @@ def _apply_rule(r: ComplianceRule, data: dict) -> None:
 
 
 def create_rule(db: Session, org_id: int, company_id: int | None, data: dict) -> dict:
-    co, _ = _profile(db, org_id, company_id)
+    co, _ = _profile(db, org_id, company_id, write=True)
     r = ComplianceRule(organization_id=org_id, company_id=co.id, source="custom", key="custom", name="",
                        frequency="once", category="license", due_rule={"type": "fixed_date"}, remind_days=30)
     _apply_rule(r, {"name": "", **data})
@@ -314,7 +314,7 @@ def accountant(db: Session, org_id: int, co: Company, s: dict) -> tuple[int | No
 
 def generate(db: Session, org_id: int, company_id: int | None, *, today: date | None = None,
              horizon_days: int = HORIZON_DAYS) -> dict:
-    co, p = _profile(db, org_id, company_id)
+    co, p = _profile(db, org_id, company_id, write=True)
     s = settings_of(p)
     today = today or (datetime.utcnow() + timedelta(hours=7)).date()
     who, who_label = accountant(db, org_id, co, s)
@@ -371,7 +371,7 @@ def _project(db: Session, company_id: int) -> Project:
 def remind(db: Session, org_id: int, company_id: int | None, *, today: date | None = None) -> dict:
     from app.services import authority, inbox
     from app.services import workspace_ops as ops
-    co, _ = _profile(db, org_id, company_id)
+    co, _ = _profile(db, org_id, company_id, write=True)
     today = today or (datetime.utcnow() + timedelta(hours=7)).date()
     sent = 0
     rows = (db.query(ComplianceDeadline).filter(ComplianceDeadline.company_id == co.id, ComplianceDeadline.status == "upcoming",
@@ -399,7 +399,7 @@ def remind(db: Session, org_id: int, company_id: int | None, *, today: date | No
         to = [d.assignee_member_id, authority.owner_member(db, org_id, co.id)]
         inbox.notify(db, organization_id=org_id, recipients=to, kind="compliance_due", title=title[:220], task_id=d.task_id,
                      related_type="compliance_deadline", related_id=str(d.id), priority="high" if days <= 3 else "normal",
-                     line=title, source="compliance", commit=False)
+                     line=title, source="compliance", commit=False, company_id=co.id)
         d.reminded_at = datetime.utcnow()
         db.commit(); sent += 1
     return {"company_id": co.id, "reminded": sent}
@@ -464,7 +464,9 @@ def overview(db: Session, org_id: int, company_id: int | None, *, today: date | 
 
 def tick(db: Session, *, today: date | None = None) -> list[dict]:
     out = []
-    for org_id, company_id in {(r.organization_id, r.company_id) for r in db.query(ComplianceRule).all()}:
+    rows = db.query(ComplianceRule).join(Company, Company.id == ComplianceRule.company_id).filter(
+        Company.status != "archived").all()   # archived companies: no deadlines/reminders (was a 404 every tick)
+    for org_id, company_id in {(r.organization_id, r.company_id) for r in rows}:
         try:
             g = generate(db, org_id, company_id, today=today)
             m = remind(db, org_id, company_id, today=today)

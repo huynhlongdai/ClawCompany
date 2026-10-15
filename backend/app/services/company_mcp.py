@@ -631,6 +631,9 @@ def _sop_get(ctx: ToolContext, args: dict) -> dict:
     q = select(SOP).where(SOP.organization_id == ctx.org,
                           or_(SOP.department_id.is_(None),
                               SOP.department_id == ctx.member.department_id))
+    # M2e.1: SOP của công ty khác trong cùng tổ chức không lộ sang (NULL = SOP cũ dùng chung)
+    q = q.where(or_(SOP.company_id.is_(None), SOP.company_id == ctx.member.company_id)) if ctx.member.company_id \
+        else q.where(SOP.company_id.is_(None))
     if args.get("sop_id") is not None:
         sop = ctx.db.execute(q.where(SOP.id == _int(args, "sop_id"))).scalar_one_or_none()
         if sop is None:

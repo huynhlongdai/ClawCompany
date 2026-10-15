@@ -304,9 +304,9 @@ def annotate(payload: dict | None, d: AuthorityDecision | None) -> dict | None:
 
 # ------------------------------------------------------------------ CRUD
 
-def _company(db: Session, org_id: int, company_id: int | None) -> Company:
+def _company(db: Session, org_id: int, company_id: int | None, *, write: bool = False) -> Company:
     from app.services.company_foundation import _company as c
-    return c(db, org_id, company_id)
+    return c(db, org_id, company_id, write=write)
 
 
 def public_rule(db: Session, r: AuthorityRule) -> dict:
@@ -395,7 +395,7 @@ def _overlap_check(db: Session, r: AuthorityRule) -> None:
 
 
 def create_rule(db: Session, org_id: int, data: dict) -> AuthorityRule:
-    co = _company(db, org_id, data.get("company_id"))
+    co = _company(db, org_id, data.get("company_id"), write=True)
     r = AuthorityRule(organization_id=org_id, company_id=co.id, action_type="spend", approver_kind="manager",
                       source="custom", enabled=True, min_risk="", agent_alone_level="", note="")
     fields = set(data) - {"company_id"}

@@ -71,7 +71,7 @@ def public_config(c: RhythmConfig | None) -> dict:
 def save_config(db: Session, org_id: int, company_id: int | None, data: dict) -> dict:
     """Kiểm hết rồi mới ghi: yêu cầu sai không được để lại cấu hình (bật giao ban) nửa vời."""
     from app.services.company_foundation import _company
-    co = _company(db, org_id, company_id)
+    co = _company(db, org_id, company_id, write=True)
     clean: dict = {}
     for f, lo, hi, msg in (("standup_hour", 0, 23, "Giờ giao ban phải từ 0 tới 23."),
                            ("weekly_hour", 0, 23, "Giờ báo cáo tuần phải từ 0 tới 23."),
@@ -250,7 +250,7 @@ def _prepare(db: Session, org_id: int, company_id: int, kind: str, department_id
     from app.services.company_foundation import _company
     if kind not in KINDS:
         raise _err(422, "Loại báo cáo phải là standup (giao ban ngày) hoặc weekly (báo cáo tuần).")
-    co = _company(db, org_id, company_id)
+    co = _company(db, org_id, company_id, write=True)
     if department_id is not None:
         dept = db.get(Department, department_id)
         if dept is None or dept.company_id != co.id:
@@ -317,7 +317,8 @@ def _finalize(db: Session, org_id: int, ctx: dict) -> dict:
     db.refresh(rep)
     body = rep.content + (f"\n\n_{rep.author_note}_" if rep.author_note else "")
     for rid in to:
-        db.add(InboxItem(organization_id=org_id, recipient_member_id=rid, source="rhythm", title=rep.title,
+        db.add(InboxItem(organization_id=org_id, company_id=rep.company_id, recipient_member_id=rid, source="rhythm",
+                         title=rep.title,
                          item_type=INBOX_KIND[kind], priority="normal", status="unread", related_type="rhythm_report",
                          related_id=str(rep.id), group_key=f"rhythm:{rep.id}", kinds=INBOX_KIND[kind], count=1, body=body))
     db.commit()
@@ -364,7 +365,9 @@ def due(cfg: RhythmConfig, now: datetime) -> list[str]:
 async def tick(db: Session, *, now: datetime | None = None, runtime: Any = None) -> list[dict]:
     now = now or datetime.utcnow()
     out = []
-    for cfg in db.query(RhythmConfig).all():
+    # archived companies get no stand-ups (an agent writing reports for a closed shop burns money)
+    for cfg in db.query(RhythmConfig).join(Company, Company.id == RhythmConfig.company_id).filter(
+            Company.status != "archived").all():
         for kind in due(cfg, now):
             try:
                 rows = await generate_all(db, cfg.organization_id, cfg.company_id, kind, now=now, runtime=runtime)

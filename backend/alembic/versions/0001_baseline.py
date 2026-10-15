@@ -94,7 +94,9 @@ COLUMNS_OWNED_BY_LATER_MIGRATIONS = {
               "completed_at"],                       # 0045_kpi_history
     "departments": ["row_revision", "status",       # 0013, 0014
                     "guide"],                       # 0024
-    "inbox_items": ["task_id", "group_key", "kinds", "count", "body"],   # 0025_inbox_escalation
+    "inbox_items": ["task_id", "group_key", "kinds", "count", "body",   # 0025_inbox_escalation
+                    "company_id"],                                    # 0047_company_scope
+    "sops": ["company_id"],                                           # 0047_company_scope
     "approvals": ["expires_at", "escalate_to_member_id", "escalated_at",   # 0025
                   "payload", "revision"],                                 # 0027_strategy_plans
     "user_organization_access": ["status"],                                 # 0028_team_invitations
