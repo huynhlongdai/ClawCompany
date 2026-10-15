@@ -758,6 +758,20 @@ export const apiTeam = {
 
 // M3: Nhân sự AI — tuyển (wizard), sửa hồ sơ 2 chiều, lệch & đồng bộ lại, vòng đời, quyền tool theo seat.
 // agentId ở đây là id của bảng agents (seat), không phải member id.
+export const apiSharedMemory = {
+  list: (p: {scope?: string; scope_id?: number | null; q?: string} = {}) => {
+    const qs = new URLSearchParams();
+    if (p.scope) qs.set("scope", p.scope);
+    if (p.scope_id) qs.set("scope_id", String(p.scope_id));
+    if (p.q) qs.set("q", p.q);
+    return request<any>(`/shared-memory${qs.toString() ? `?${qs}` : ""}`);
+  },
+  options: () => request<any>(`/shared-memory/options`),
+  create: (body: any) => request<any>(`/shared-memory`, {method: "POST", body: JSON.stringify(body)}),
+  update: (id: number, body: any) => request<any>(`/shared-memory/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  forget: (id: number) => request<any>(`/shared-memory/${id}`, {method: "DELETE"}),
+};
+
 export const apiAgentsHR = {
   roster: (companyId?: number | null) => request<any>(`/agents/roster${companyId ? `?company_id=${companyId}` : ""}`),
   options: () => request<any>(`/agents/hire/options`),
@@ -777,6 +791,9 @@ export const apiAgentsHR = {
     request<any>(`/agents/${agentId}/lifecycle`, {method: "POST", body: JSON.stringify(body)}),
   tools: (agentId: number) => request<any>(`/agents/${agentId}/tools`),
   limits: (agentId: number) => request<any>(`/agents/${agentId}/limits`),
+  memory: (agentId: number) => request<any>(`/agents/${agentId}/memory`),
+  memoryChange: (agentId: number, body: any) =>
+    request<any>(`/agents/${agentId}/memory`, {method: "POST", body: JSON.stringify(body)}),
   versions: (agentId: number) => request<any>(`/agents/${agentId}/versions`),
   restore: (agentId: number, version: number) =>
     request<any>(`/agents/${agentId}/versions/${version}/restore`, {method: "POST"}),

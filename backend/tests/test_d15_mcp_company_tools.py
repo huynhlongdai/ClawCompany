@@ -95,7 +95,7 @@ def env():
     db.close()
 
 
-def test_initialize_and_list_all_25_tools(env):
+def test_initialize_and_list_all_26_tools(env):
     k = env["key"](env["nina"])
     r = env["rpc"](k, "initialize", {"protocolVersion": "2025-03-26", "capabilities": {},
                                      "clientInfo": {"name": "openclaw"}})
@@ -107,8 +107,8 @@ def test_initialize_and_list_all_25_tools(env):
     assert n.status_code == 202
     tools = env["rpc"](k, "tools/list").json()["result"]["tools"]
     names = {t["name"] for t in tools}
-    assert len(tools) == 25 and all(n.startswith("company_") for n in names)
-    assert "company_task_checkout" in names
+    assert len(tools) == 26 and all(n.startswith("company_") for n in names)
+    assert "company_task_checkout" in names and "company_memory_search" in names
 
 
 def test_nina_counts_running_projects_from_the_database_and_the_call_is_logged(env):
@@ -232,7 +232,7 @@ def test_executor_seat_gets_403_on_budget_check_even_with_full_scopes(env):
     lead, junior = _lead_and_executor(env)
     k = env["key"](junior, scopes=("*",))     # gateway/scope đều cho qua
     names = {t["name"] for t in env["rpc"](k, "tools/list").json()["result"]["tools"]}
-    assert "company_budget_check" not in names and len(names) == 22
+    assert "company_budget_check" not in names and len(names) == 23
     r = env["rpc"](k, "tools/call", {"name": "company_budget_check", "arguments": {}})
     assert r.status_code == 403 and r.json()["error"]["data"]["level"] == "off"
     # Trưởng phòng thì được.

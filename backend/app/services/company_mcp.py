@@ -424,6 +424,25 @@ def _knowledge_search(ctx: ToolContext, args: dict) -> dict:
     return {"hits": hits}
 
 
+@tool("company_memory_search", "knowledge",
+      "Tra bộ nhớ chung của công ty (chính sách, thuật ngữ, quyết định, bài học) trong phạm vi của bạn: "
+      "toàn tổ chức, công ty, phòng ban, dự án bạn đang làm và mục ghi riêng cho bạn. Bỏ trống query để xem mục quan trọng nhất.",
+      "company.knowledge:read", {"query": {"type": "string"}, "limit": {"type": "integer"}})
+def _memory_search(ctx: ToolContext, args: dict) -> dict:
+    from app.services import agent_memory
+    q = _str(args, "query", required=False, limit=300).lower()
+    tokens = [t for t in q.split() if len(t) > 1][:8]
+    rows = agent_memory.visible_for(ctx.db, ctx.member, ctx.agent)
+    if tokens:
+        scored = [(sum(t in (m.content or "").lower() for t in tokens), m) for m in rows]
+        rows = [m for sc, m in sorted(scored, key=lambda x: (-x[0], -x[1].importance)) if sc > 0]
+    out = []
+    for m in rows[:_limit(args, 10)]:
+        it = agent_memory.item(ctx.db, m)
+        out.append({k: it[k] for k in ("id", "kind_label", "scope_label", "scope_name", "content", "importance")})
+    return {"total_visible": len(rows), "items": out}
+
+
 # Đọc tài liệu dài theo từng lát thay vì cắt cụt ở 20.000 ký tự. Bản cũ trả
 # 20k ký tự đầu (~5–7k token) cho MỌI lần đọc, và phần sau mốc đó thì agent
 # không bao giờ thấy. Học từ FastClaw: kết quả tool phải nhỏ để lượt sau của

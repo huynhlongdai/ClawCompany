@@ -254,6 +254,30 @@ async def hr_lifecycle(agent_id: int, payload: LifecycleIn, principal: Principal
                                     remove_from_gateway=payload.remove_from_gateway, reason=payload.reason)
 
 
+class MemoryChangeIn(BaseModel):
+    op: str = Field(pattern="^(add|edit|forget)$")
+    entry_id: str | None = Field(default=None, max_length=40)
+    text: str = Field(default="", max_length=2000)
+    expected_hash: str | None = Field(default=None, max_length=128)
+
+
+@router.get("/{agent_id}/memory")
+async def hr_memory(agent_id: int, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    """Phase B việc 7: ký ức riêng (MEMORY.md) tách thành từng mục."""
+    from app.services import agent_memory
+    return await agent_memory.personal(db, active_org(principal), get_runtime(), agent_id)
+
+
+@router.post("/{agent_id}/memory")
+async def hr_memory_change(agent_id: int, payload: MemoryChangeIn,
+                           principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    """Thêm / sửa / quên một mục ký ức. Quên = xoá khỏi MEMORY.md, nhật ký chỉ giữ dấu vân tay."""
+    from app.services import agent_memory
+    return await agent_memory.change_personal(db, principal, active_org(principal), get_runtime(), agent_id,
+                                              op=payload.op, entry_id=payload.entry_id, text=payload.text,
+                                              expected_hash=payload.expected_hash)
+
+
 @router.get("/{agent_id}/limits")
 def hr_limits(agent_id: int, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
     """Phase B việc 6: chi tiêu USD hôm nay/tháng này so với trần, và chính sách model theo loại việc."""

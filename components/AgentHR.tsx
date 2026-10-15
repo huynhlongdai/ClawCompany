@@ -185,6 +185,7 @@ export function AgentHRPanel({memberId}: {memberId: number}) {
     </div>
     <Drift seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Versions seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
+    <Memory seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Limits seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Tools seat={seat} isAdmin={isAdmin} busy={busy} act={act} tick={tick}/>
   </div>;
@@ -380,6 +381,48 @@ function Tools({seat, isAdmin, busy, act, tick}: any) {
         : <span className={x.level === "off" ? "is-warn" : ""}>{LEVEL_VI[x.level] || x.level}</span>}</td>
       <td className="hrSrc"><small>{src(x.source)}</small></td></tr>)}</tbody></table></div>}
     {t && !isAdmin && <small className="tmGuide">{tr("agentHr.doi_quyen_tool_can_vai")}</small>}
+  </section>;
+}
+
+
+// ------------------------------------------------------------------ Phase B việc 7: ký ức riêng (MEMORY.md)
+
+function Memory({seat, canEdit, busy, act, tick}: any) {
+  const [m, setM] = useState<any>(null), [err, setErr] = useState("");
+  const [draft, setDraft] = useState(""), [edit, setEdit] = useState<{id: string; text: string} | null>(null);
+  const [n, setN] = useState(0);
+  useEffect(() => { apiAgentsHR.memory(seat.agent_id).then(setM).catch(e => setErr(errorText(e))); }, [seat.agent_id, tick, n]);
+  const run = (body: any, ok: string) => act(async () => {
+    const r = await apiAgentsHR.memoryChange(seat.agent_id, {...body, expected_hash: m?.hash});
+    setM(r); setDraft(""); setEdit(null); return r;
+  }, () => ok);
+  const editable = canEdit && seat.lifecycle !== "retired";
+  return <section className="ui-panel ui-panel-body" data-testid="hr-memory">
+    <div className="lab-cardhead"><div><b>{tr("agentHr.ky_uc_rieng")}</b>
+      <span>{m ? tr("agentHr.ky_uc_so_muc", {p0: m.entries.length}) : tr("agentHr.dang_tai")}</span></div>
+      <div className="tmRow"><button className="ui-btn" onClick={() => setN(n + 1)}>{tr("agentHr.tai_lai")}</button>
+        <Link className="ui-btn" href="/app/memory">{tr("agentHr.bo_nho_chung")}</Link></div></div>
+    {err && <div className="ui-banner is-error">{err}</div>}
+    {m && <div className="ui-list">{m.entries.map((e: any) => <div className="ui-row" key={e.id} data-testid={`hr-mem-${e.id}`}>
+      {edit?.id === e.id
+        ? <><textarea className="ui-textarea" rows={2} value={edit.text} onChange={x => setEdit({id: e.id, text: x.target.value})}/>
+            <div className="tmRow"><button className="ui-btn is-primary" disabled={busy || !edit.text.trim()}
+              onClick={() => run({op: "edit", entry_id: e.id, text: edit.text}, tr("agentHr.da_sua_ky_uc"))}>{tr("agentHr.luu")}</button>
+              <button className="ui-btn" onClick={() => setEdit(null)}>{tr("agentHr.huy")}</button></div></>
+        : <><span>{e.body}</span>
+            <small>{e.date || ""}</small>
+            {editable && <div className="tmRow">
+              <button className="ui-btn" disabled={busy} onClick={() => setEdit({id: e.id, text: e.body})}>{tr("agentHr.sua")}</button>
+              <button className="ui-btn" disabled={busy} data-testid={`hr-mem-forget-${e.id}`}
+                onClick={() => { if (window.confirm(tr("agentHr.xac_nhan_quen"))) run({op: "forget", entry_id: e.id}, tr("agentHr.da_quen")); }}>{tr("agentHr.quen")}</button></div>}</>}
+    </div>)}</div>}
+    {m && editable && <div className="ui-form" style={{marginTop: 10}}>
+      <textarea className="ui-textarea" rows={2} placeholder={tr("agentHr.them_ky_uc_placeholder")} value={draft}
+        onChange={e => setDraft(e.target.value)} data-testid="hr-mem-new"/>
+      <div className="tmRow"><button className="ui-btn is-primary" disabled={busy || !draft.trim()}
+        onClick={() => run({op: "add", text: draft}, tr("agentHr.da_them_ky_uc"))} data-testid="hr-mem-add">{tr("agentHr.them_ky_uc")}</button></div>
+    </div>}
+    <small className="tmGuide">{tr("agentHr.ky_uc_giai_thich")}</small>
   </section>;
 }
 

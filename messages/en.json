@@ -1333,7 +1333,20 @@
   "theo_router": "Router default",
   "model_du_phong": "Fallback model (when primary fails)",
   "san_an_toan_van_ap": "Safety floors still apply: outbound work is at least T3, customer-facing never T1. Thinking applies only to reasoning models.",
-  "da_luu_chi_phi_model": "Spend and models saved."
+  "da_luu_chi_phi_model": "Spend and models saved.",
+  "ky_uc_rieng": "Personal memory",
+  "ky_uc_so_muc": "{p0} entries in MEMORY.md",
+  "tai_lai": "Reload",
+  "bo_nho_chung": "Shared memory",
+  "da_sua_ky_uc": "Memory updated.",
+  "sua": "Edit",
+  "quen": "Forget",
+  "xac_nhan_quen": "Forget this entry? It is deleted from MEMORY.md and can't be restored.",
+  "da_quen": "Forgotten.",
+  "them_ky_uc_placeholder": "Something the agent should remember long term",
+  "them_ky_uc": "Add memory",
+  "da_them_ky_uc": "Memory added.",
+  "ky_uc_giai_thich": "The agent reads MEMORY.md every session. If the agent just wrote to it, saving reports a conflict instead of overwriting; reload and retry. Daily notes (memory/…) aren't readable through the gateway yet."
  },
  "seat": {
   "ho_so": "Profile",
@@ -1945,5 +1958,31 @@
   "send_fail": "Send message",
   "load_fail": "Load conversations",
   "new_chat": "AI chat"
+ },
+ "memory": {
+  "bo_nho_chung": "Shared memory",
+  "ghi_nho": "Remember",
+  "sua_muc": "Edit entry",
+  "ghi_nho_desc": "Policies, terms and decisions for the whole organization, a company, department, project or a single seat. Agents only see what's in their scope.",
+  "pham_vi": "Scope",
+  "thuoc": "For",
+  "chon": "— Choose —",
+  "loai": "Type",
+  "quan_trong": "Importance",
+  "noi_dung": "Content",
+  "noi_dung_placeholder": "e.g. Orders over $20 ship free",
+  "luu": "Save",
+  "huy": "Cancel",
+  "sua": "Edit",
+  "quen": "Forget",
+  "xac_nhan_quen": "Forget this entry? Agents will no longer see it and it can't be restored.",
+  "da_quen": "Forgotten.",
+  "da_ghi": "Saved.",
+  "da_sua": "Updated.",
+  "so_muc": "{p0} entries",
+  "moi_pham_vi": "All scopes",
+  "tim": "Search shared memory…",
+  "tim_nut": "Search",
+  "trong": "No matching entries."
  }
 }

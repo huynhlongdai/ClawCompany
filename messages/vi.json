@@ -1333,7 +1333,20 @@
   "theo_router": "Theo router",
   "model_du_phong": "Model dự phòng (khi model chính lỗi)",
   "san_an_toan_van_ap": "Sàn an toàn vẫn áp: việc gửi ra ngoài tối thiểu T3, khách đọc thì không dùng T1. Thinking chỉ áp cho model có suy luận.",
-  "da_luu_chi_phi_model": "Đã lưu chi phí và model."
+  "da_luu_chi_phi_model": "Đã lưu chi phí và model.",
+  "ky_uc_rieng": "Ký ức riêng",
+  "ky_uc_so_muc": "{p0} mục trong MEMORY.md",
+  "tai_lai": "Tải lại",
+  "bo_nho_chung": "Bộ nhớ chung",
+  "da_sua_ky_uc": "Đã sửa ký ức.",
+  "sua": "Sửa",
+  "quen": "Quên",
+  "xac_nhan_quen": "Quên mục này? Nội dung bị xoá khỏi MEMORY.md, không khôi phục được.",
+  "da_quen": "Đã quên.",
+  "them_ky_uc_placeholder": "Điều agent cần nhớ lâu dài, ví dụ: Khách Lan dị ứng men chì",
+  "them_ky_uc": "Thêm ký ức",
+  "da_them_ky_uc": "Đã thêm ký ức.",
+  "ky_uc_giai_thich": "Agent đọc MEMORY.md ở mỗi phiên. Nếu agent vừa tự ghi thêm, lưu sẽ báo xung đột để không đè mất; tải lại rồi làm tiếp. Nhật ký ngày (memory/…) chưa xem được qua gateway."
  },
  "seat": {
   "ho_so": "Hồ sơ",
@@ -1945,5 +1958,31 @@
   "send_fail": "Gửi tin",
   "load_fail": "Tải cuộc trò chuyện",
   "new_chat": "Trò chuyện với AI"
+ },
+ "memory": {
+  "bo_nho_chung": "Bộ nhớ chung",
+  "ghi_nho": "Ghi nhớ",
+  "sua_muc": "Sửa mục",
+  "ghi_nho_desc": "Chính sách, thuật ngữ, quyết định cho cả tổ chức, một công ty, phòng ban, dự án hoặc riêng một ghế. Agent chỉ thấy phần thuộc phạm vi của mình.",
+  "pham_vi": "Phạm vi",
+  "thuoc": "Thuộc",
+  "chon": "— Chọn —",
+  "loai": "Loại",
+  "quan_trong": "Quan trọng",
+  "noi_dung": "Nội dung",
+  "noi_dung_placeholder": "Ví dụ: Đơn từ 500k được giao miễn phí trong nội thành",
+  "luu": "Lưu",
+  "huy": "Huỷ",
+  "sua": "Sửa",
+  "quen": "Quên",
+  "xac_nhan_quen": "Quên mục này? Agent sẽ không còn thấy nó, và không khôi phục được.",
+  "da_quen": "Đã quên.",
+  "da_ghi": "Đã ghi nhớ.",
+  "da_sua": "Đã sửa.",
+  "so_muc": "{p0} mục",
+  "moi_pham_vi": "Mọi phạm vi",
+  "tim": "Tìm trong bộ nhớ chung…",
+  "tim_nut": "Tìm",
+  "trong": "Chưa có mục nào khớp."
  }
 }
