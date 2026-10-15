@@ -464,6 +464,28 @@ class NativeOpenClawRuntime(AgentRuntime):
                 if event.get("terminal"):
                     break
 
+    async def listen_approvals(self, idle_seconds: float = 30) -> AsyncIterator[dict]:
+        """Kết nối thường trực khai ``exec-approvals`` để gateway LUÔN có nơi gửi thẻ duyệt.
+
+        Đo trên 2026.9.8 (gate M4b): follower của lượt chạy chỉ mở socket sau khi bắt kịp/đối soát
+        (vài giây), còn agent gọi ``exec`` ngay → lúc đó không có approval client nào → gateway hết hạn
+        yêu cầu với ``no-approval-route`` và từ chối ("Headless runs cannot wait…"). Socket này đứng
+        sẵn: gateway thấy approval client, giữ lệnh chờ, phát ``exec.approval.requested`` tới đây.
+        Mỗi ``idle_seconds`` không có gì thì trả ``{"family": "_idle"}`` để bên gọi gia hạn lease.
+        """
+        async with websockets.connect(self.url, additional_headers=self._headers(),
+                                      max_size=settings.openclaw_max_frame_bytes) as ws:
+            await self._handshake(ws)
+            while True:
+                try:
+                    raw = await _recv(ws, timeout=idle_seconds)
+                except (asyncio.TimeoutError, TimeoutError):
+                    yield {"family": "_idle"}
+                    continue
+                event = normalize_event(json.loads(raw))
+                if event:
+                    yield event
+
     async def chat_stream(self, runtime_agent_id: str, message: str, *,
                           session_key: str | None = None,
                           timeout_seconds: float = 120) -> AsyncIterator[dict]:

@@ -255,6 +255,20 @@ async def start_routines_tick() -> None:
 
 
 @app.on_event("startup")
+async def start_approval_listener() -> None:
+    """Gate M4b: socket thường trực nhận thẻ duyệt exec của gateway (chỉ khi đã xin quyền duyệt)."""
+    if settings.openclaw_mode not in ("native", "gateway") or not settings.openclaw_request_approvals_scope:
+        return
+    import asyncio
+
+    from app.services.approval_listener import listen_forever
+    try:
+        asyncio.create_task(listen_forever(), name="approval-listener")
+    except Exception as exc:  # noqa: BLE001 - never block startup
+        print(f"[m4b] approval listener not started: {exc}")
+
+
+@app.on_event("startup")
 async def start_orphan_sweep() -> None:
     """v22: keep taking over sessions whose follower died.
 
