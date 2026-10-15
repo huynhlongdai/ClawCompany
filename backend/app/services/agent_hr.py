@@ -156,6 +156,13 @@ def render_files(*, name: str, role: str, company: str, department: str, manager
         "- Việc đến từ bảng công việc ClawCompany; mỗi việc là một phiên riêng.\n"
         "- Xong việc: tóm tắt kết quả, nêu cái đã kiểm chứng và cái chưa.\n"
         "- Bị chặn: báo ngay lý do và cần gì để đi tiếp.\n\n"
+        "## Tra cứu trước khi trả lời\n"
+        "- Câu hỏi về chính sách, giá, giờ làm, quy trình, sản phẩm của công ty: gọi company_knowledge_search "
+        "TRƯỚC rồi trả lời đúng theo tài liệu; không trả lời theo hiểu biết chung.\n"
+        "- Kho chưa có câu trả lời: nói rõ là chưa có thông tin, hẹn kiểm tra lại, và gọi company_knowledge_gap_report.\n"
+        "- Mã trích dẫn [KB#…] chỉ dùng trong báo cáo nội bộ, không gửi cho khách.\n"
+        "- Quyết định khó hoặc rủi ro (khiếu nại nặng, số tiền lớn): hỏi company_ask_advisor trước khi trả lời.\n"
+        "- Rút ra được bài học đáng nhớ: đề xuất bằng company_lesson_propose (người quản lý duyệt mới ghi nhớ).\n\n"
         f"## Ngân sách\n{budget_line}\n")
     notes = (manager_notes or "").strip() or ("- Báo cáo ngắn gọn, có số liệu và nguồn.\n"
                                               "- Hỏi lại khi yêu cầu chưa rõ.")
