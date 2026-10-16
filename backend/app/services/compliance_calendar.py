@@ -225,6 +225,8 @@ def _rule(db: Session, org_id: int, rid: int) -> ComplianceRule:
     r = db.get(ComplianceRule, rid)
     if r is None or r.organization_id != org_id:
         raise _err(404, "Không thấy luật tuân thủ này. Tải lại tab Tuân thủ.")
+    from app.core import company_scope as _cs
+    _cs.check(r.company_id)  # R1 vai trò theo công ty
     return r
 
 
@@ -417,6 +419,8 @@ def mark_done(db: Session, org_id: int, did: int) -> dict:
     d = db.get(ComplianceDeadline, did)
     if d is None or d.organization_id != org_id:
         raise _err(404, "Không thấy hạn này.")
+    from app.core import company_scope as _cs
+    _cs.check(d.company_id)  # R1 vai trò theo công ty
     d.status, d.done_at = "done", datetime.utcnow()
     db.commit()
     return public_deadline(db, d)

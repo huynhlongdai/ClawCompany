@@ -199,6 +199,8 @@ def _member(db: Session, org_id: int, member_id: int) -> Member:
     m = db.get(Member, member_id)
     if m is None or m.organization_id != org_id:
         raise _err(404, "Không thấy ghế này.")
+    from app.core import company_scope as _cs
+    _cs.check(m.company_id)  # R1 vai trò theo công ty
     return m
 
 
@@ -227,6 +229,8 @@ def delete_leave(db: Session, org_id: int, leave_id: int) -> dict:
     m = db.get(Member, lv.member_id) if lv else None
     if lv is None or m is None or m.organization_id != org_id:
         raise _err(404, "Không thấy ngày nghỉ này.")
+    from app.core import company_scope as _cs
+    _cs.check(m.company_id)  # R1 vai trò theo công ty
     db.delete(lv); db.commit()
     return seat_view(db, m)
 
@@ -337,6 +341,8 @@ def _policy(db: Session, org_id: int, pid: int) -> SlaPolicy:
     p = db.get(SlaPolicy, pid)
     if p is None or p.organization_id != org_id:
         raise _err(404, "Không thấy SLA này.")
+    from app.core import company_scope as _cs
+    _cs.check(p.company_id)  # R1 vai trò theo công ty
     return p
 
 

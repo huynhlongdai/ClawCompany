@@ -393,6 +393,8 @@ def _kpi(db: Session, org_id: int, kid: int) -> KpiDefinition:
     k = db.get(KpiDefinition, kid)
     if k is None or k.organization_id != org_id or k.status != "active":
         raise _err(404, "Không thấy KPI này. Tải lại tab KPI — có thể nó đã bị xoá.")
+    from app.core import company_scope as _cs
+    _cs.check(k.company_id)  # R1 vai trò theo công ty
     return k
 
 

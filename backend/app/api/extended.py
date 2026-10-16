@@ -29,8 +29,10 @@ def requested_org(value: int | None, principal: Principal) -> int:
 
 # Inbox
 @router.get("/inbox")
-def list_inbox(organization_id:int|None=None, status:str|None=None, principal:Principal=Depends(require_human()), db:Session=Depends(get_db)):
+def list_inbox(organization_id:int|None=None, status:str|None=None, company_id:int|None=None, principal:Principal=Depends(require_human()), db:Session=Depends(get_db)):
     org_id=requested_org(organization_id,principal); q=db.query(InboxItem).filter(InboxItem.organization_id==org_id)
+    from app.core import company_scope  # R1: lọc theo công ty (tham số hoặc vai trò công ty)
+    q=company_scope.scope_filter(q, InboxItem.company_id, company_id, include_null=company_id is None and not company_scope.restricted(principal))
     if status:q=q.filter(InboxItem.status==status)
     return q.order_by(InboxItem.id.desc()).all()
 

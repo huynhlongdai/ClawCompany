@@ -18,6 +18,23 @@ class Principal:
     auth_type: str
     scopes: list[str]
     member_id: int | None = None
+    # R1: None = phạm vi cả tổ chức theo ``role``; dict = CHỈ các công ty này với vai trò công ty
+    company_roles: dict | None = None
+    # R1: mọi ghế của user trong org: member_id → company_id (một người nhiều ghế, mỗi công ty một ghế)
+    seats: dict | None = None
+
+    @property
+    def member_ids(self) -> list[int]:
+        ids = list((self.seats or {}).keys())
+        if self.member_id and self.member_id not in ids:
+            ids.insert(0, self.member_id)
+        return ids
+
+    def seat_in(self, company_id: int | None) -> int | None:
+        for mid, cid in (self.seats or {}).items():
+            if cid == company_id:
+                return mid
+        return self.member_id
 
 
 # bcrypt cố ý chậm (~0,1–0,3 s). Mỗi lượt gọi tool MCP của agent đều mang key,
@@ -91,7 +108,33 @@ def get_principal(
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                                     detail="Quyền truy cập tổ chức này đã bị thu hồi")
             role = access.role
-    return Principal(user.id, org_id, role, "jwt", [], user.member_id)
+    p = Principal(user.id, org_id, role, "jwt", [], user.member_id)
+    if org_id is not None:
+        _load_company_scope(db, p, user)
+    from app.core import company_scope
+    company_scope.remember(p)
+    return p
+
+
+def _load_company_scope(db: Session, p: Principal, user: User) -> None:
+    from app.models import Member
+    from app.models.company_access import CompanyAccess, UserSeat
+    org = int(p.organization_id)
+    seats = {s.member_id: s.company_id for s in db.query(UserSeat).filter(
+        UserSeat.user_id == user.id, UserSeat.organization_id == org).all()}
+    if user.member_id and user.member_id not in seats:
+        m = db.get(Member, user.member_id)
+        if m is not None and m.organization_id == org:
+            seats[m.id] = m.company_id
+    p.seats = seats
+    if p.member_id is None or p.member_id not in seats:
+        p.member_id = next(iter(seats), None)
+    if user.is_superuser or ROLE_ORDER.get(p.role, 0) >= ROLE_ORDER["admin"]:
+        return
+    rows = db.query(CompanyAccess).filter(CompanyAccess.user_id == user.id, CompanyAccess.organization_id == org,
+                                          CompanyAccess.status == "active").all()
+    if rows:
+        p.company_roles = {r.company_id: r.role for r in rows}
 
 
 
@@ -110,6 +153,25 @@ def require_role(minimum_role: str):
             raise HTTPException(status_code=403, detail="Human role required")
         if ROLE_ORDER.get(principal.role, -1) < ROLE_ORDER.get(minimum_role, 999):
             raise HTTPException(status_code=403, detail=f"{minimum_role} role required")
+        return principal
+    return dep
+
+
+def require_company_role(minimum_role: str):
+    """R1: như require_role cho route thuộc phạm vi công ty. Người bị giới hạn công ty qua cổng nếu vai trò công ty
+    CAO NHẤT đủ; service kiểm lại đúng công ty của thao tác qua company_scope.check (dùng ``minimum_role`` này)."""
+    def dep(principal: Principal = Depends(get_principal)):
+        from app.core import company_scope
+        if principal.auth_type == "api_key":
+            raise HTTPException(status_code=403, detail="Human role required")
+        need = ROLE_ORDER.get(minimum_role, 999)
+        if principal.company_roles is not None:
+            best = max((company_scope.COMPANY_LEVEL.get(r, 0) for r in principal.company_roles.values()), default=-1)
+            if best < need:
+                raise HTTPException(status_code=403, detail=f"{minimum_role} role required")
+        elif ROLE_ORDER.get(principal.role, -1) < need:
+            raise HTTPException(status_code=403, detail=f"{minimum_role} role required")
+        company_scope.remember(principal, minimum_role)
         return principal
     return dep
 

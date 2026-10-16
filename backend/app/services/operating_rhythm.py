@@ -424,4 +424,6 @@ def get_report(db: Session, org_id: int, report_id: int) -> dict:
     r = db.get(RhythmReport, report_id)
     if r is None or r.organization_id != org_id:
         raise _err(404, "Không thấy bản giao ban này.")
+    from app.core import company_scope as _cs
+    _cs.check(r.company_id)  # R1 vai trò theo công ty
     return public_report(db, r)

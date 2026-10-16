@@ -301,6 +301,8 @@ def _contract(db: Session, org_id: int, cid: int) -> IoContract:
     c = db.get(IoContract, cid)
     if c is None or c.organization_id != org_id:
         raise _err(404, "Không thấy hợp đồng dữ liệu này. Tải lại tab Hợp đồng dữ liệu.")
+    from app.core import company_scope as _cs
+    _cs.check(c.company_id)  # R1 vai trò theo công ty
     return c
 
 

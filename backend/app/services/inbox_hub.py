@@ -75,8 +75,13 @@ def can_decide(db: Session, a: Approval, principal: Principal) -> bool:
     if a.status != "pending":
         return False
     allowed = deciders(db, a)
+    mine = set(getattr(principal, "member_ids", None) or ([principal.member_id] if principal.member_id else []))
     if allowed:
-        return principal.member_id is not None and principal.member_id in allowed
+        return bool(mine & allowed)
+    # R1: vai trò theo công ty — approver/manager/owner của công ty của phê duyệt được quyết khi chưa có người duyệt
+    roles = getattr(principal, "company_roles", None)
+    if roles is not None:
+        return roles.get(a.company_id) in ("approver", "manager", "owner")
     return is_manager(principal)
 
 
@@ -175,11 +180,12 @@ def feed(db: Session, organization_id: int, principal: Principal, *, status: str
     """Hộp việc của người đăng nhập, nhóm theo việc cần làm, kèm số đếm."""
     now = now or datetime.utcnow()
     me = principal.member_id
+    mine = list(getattr(principal, "member_ids", None) or ([me] if me else []))   # R1: mọi ghế của người này
     names = {m.id: m.name for m in db.query(Member).filter(Member.organization_id == organization_id).all()}
     rows: list[InboxItem] = []
     if me is not None:
         q = db.query(InboxItem).filter(InboxItem.organization_id == organization_id,
-                                       InboxItem.recipient_member_id == me)
+                                       InboxItem.recipient_member_id.in_(mine))
         if status == "open":
             q = q.filter(InboxItem.status.in_(inbox.OPEN))
         elif status != "all":
@@ -211,7 +217,7 @@ def feed(db: Session, organization_id: int, principal: Principal, *, status: str
     # Phê duyệt anh là người quyết nhưng không có dòng hộp việc (tạo trước D3.5, hoặc báo đi chỗ khác).
     if status in ("open", "all") and me is not None:
         for a in sorted(pending.values(), key=lambda x: x.id):
-            if a.id in seen_approvals or me not in deciders(db, a):
+            if a.id in seen_approvals or not (set(mine) & deciders(db, a)):
                 continue
             if company_id is not None and approval_company(db, a) != company_id:
                 continue
@@ -287,7 +293,7 @@ def set_status(db: Session, organization_id: int, principal: Principal, item_id:
     item = db.get(InboxItem, item_id)
     if item is None or item.organization_id != organization_id:
         raise WorkError(404, "not_found", "Không tìm thấy mục này trong hộp việc")
-    if item.recipient_member_id not in (None, principal.member_id):
+    if item.recipient_member_id not in (None, *getattr(principal, "member_ids", [principal.member_id])):
         raise WorkError(403, "not_yours", "Mục này thuộc hộp việc của người khác")
     item.status = status
     db.add(item); db.commit(); db.refresh(item)

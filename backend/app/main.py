@@ -87,6 +87,9 @@ app.add_middleware(
 # và vẫn giữ header CORS. Mặc định vi; Accept-Language: en → dịch detail theo app/core/i18n.py.
 from app.core.i18n import LocaleErrorMiddleware
 app.add_middleware(LocaleErrorMiddleware)
+# R1: ngữ cảnh phạm vi công ty theo request (vai trò theo công ty)
+from app.core.company_scope import CompanyScopeMiddleware
+app.add_middleware(CompanyScopeMiddleware)
 
 @app.get("/health")
 async def health(deep: bool = False):

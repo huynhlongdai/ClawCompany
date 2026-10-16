@@ -50,7 +50,10 @@ def _company(db: Session, org_id: int, company_id: int | None, *, write: bool = 
     """Resolve the company a call acts on. M2e: no more silent "first company" fallback.
     Writes must name company_id explicitly (422 otherwise). Reads without company_id resolve only when the org
     has exactly one active company — with several, guessing would show/affect the wrong shop."""
+    from app.core import company_scope
     q = db.query(Company).filter(Company.organization_id == org_id, Company.status != "archived")
+    if not company_id and company_scope.default_company_id():
+        company_id = company_scope.default_company_id()   # R1: người chỉ có một công ty → công ty đó
     if company_id:
         co = q.filter(Company.id == company_id).first()
     else:
@@ -64,6 +67,7 @@ def _company(db: Session, org_id: int, company_id: int | None, *, write: bool = 
     if co is None:
         raise HTTPException(404, "Không thấy công ty này trong tổ chức của anh. Chọn lại công ty ở góc trên "
                                  "hoặc tạo công ty ở tab \"Dựng công ty\".")
+    company_scope.check(co.id)   # R1: vai trò theo công ty
     return co
 
 
@@ -255,6 +259,8 @@ def _position(db: Session, org_id: int, position_id: int) -> Position:
     p = db.get(Position, position_id)
     if p is None or p.organization_id != org_id or p.status == "archived":
         raise HTTPException(404, "Không thấy chức danh này (có thể đã bị lưu trữ). Tải lại trang Chức danh.")
+    from app.core import company_scope as _cs
+    _cs.check(p.company_id)  # R1 vai trò theo công ty
     return p
 
 
@@ -391,6 +397,8 @@ def assign_seat(db: Session, org_id: int, position_id: int, member_id: int, *, a
     m = db.get(Member, member_id)
     if m is None or m.organization_id != org_id or m.status == "archived":
         raise HTTPException(404, "Không thấy người/agent này.")
+    from app.core import company_scope as _cs
+    _cs.check(m.company_id)  # R1 vai trò theo công ty
     if m.company_id != p.company_id:
         raise HTTPException(422, "Người/agent và chức danh phải cùng công ty.")
     if m.position_id == p.id:

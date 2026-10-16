@@ -66,6 +66,8 @@ def _process(db: Session, org_id: int, pid: int) -> Process:
     p = db.get(Process, pid)
     if p is None or p.organization_id != org_id:
         raise _err(404, "Không thấy quy trình này. Tải lại tab Quy trình — có thể nó đã bị lưu trữ.")
+    from app.core import company_scope as _cs
+    _cs.check(p.company_id)  # R1 vai trò theo công ty
     return p
 
 
@@ -749,6 +751,8 @@ def set_outcome(db: Session, org_id: int, run_id: int, outcome: str) -> dict:
     inst = db.get(ProcessInstance, run.instance_id) if run else None
     if run is None or inst is None or inst.organization_id != org_id:
         raise _err(404, "Không thấy bước này của lần chạy.")
+    from app.core import company_scope as _cs
+    _cs.check(inst.company_id)  # R1 vai trò theo công ty
     if inst.status != "running":
         raise _err(409, f"Lần chạy đã {inst.status}; kết quả bước không đổi được nữa.")
     if run.status in ("skipped", "cancelled"):
@@ -763,6 +767,8 @@ def cancel(db: Session, org_id: int, instance_id: int, *, reason: str = "huỷ t
     inst = db.get(ProcessInstance, instance_id)
     if inst is None or inst.organization_id != org_id:
         raise _err(404, "Không thấy lần chạy này.")
+    from app.core import company_scope as _cs
+    _cs.check(inst.company_id)  # R1 vai trò theo công ty
     if inst.status != "running":
         raise _err(409, f"Lần chạy đã {inst.status}, không huỷ được nữa.")
     now = datetime.utcnow()
@@ -828,6 +834,8 @@ def get_instance(db: Session, org_id: int, instance_id: int) -> dict:
     inst = db.get(ProcessInstance, instance_id)
     if inst is None or inst.organization_id != org_id:
         raise _err(404, "Không thấy lần chạy này.")
+    from app.core import company_scope as _cs
+    _cs.check(inst.company_id)  # R1 vai trò theo công ty
     return public_instance(db, inst)
 
 

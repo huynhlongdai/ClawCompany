@@ -1,5 +1,5 @@
 
-import {ApiError, describeError, request, API_BASE} from "./http";
+import {ApiError, describeError, request, API_BASE, activeOrg, activeCompany} from "./http";
 export {ApiError, describeError};
 
 export const api = {
@@ -9,8 +9,8 @@ export const api = {
   // i18n: ngôn ngữ giao diện lưu theo tài khoản.
   updateMe: (body:{locale:"vi"|"en"}) => request<any>(`/auth/me`, {method:"PATCH", body: JSON.stringify(body)}),
   labStatus: () => request<{lab_jobs_enabled:boolean; env:string; jobs:string[]}>(`/health/lab`),
-  dashboard: (organizationId=1) => request(`/dashboard/summary?organization_id=${organizationId}`),
-  companies: (organizationId=1) => request(`/companies?organization_id=${organizationId}`),
+  dashboard: (organizationId:number=activeOrg()) => request(`/dashboard/summary?organization_id=${organizationId}`),
+  companies: (organizationId:number=activeOrg()) => request(`/companies?organization_id=${organizationId}`),
   departments: (companyId?:number) => request(`/departments${companyId?`?company_id=${companyId}`:""}`),
   members: () => request(`/members`),
   agents: () => request(`/agents`),
@@ -18,27 +18,27 @@ export const api = {
   tasks: () => request(`/tasks`),
   knowledge: () => request(`/knowledge`),
   approvals: () => request(`/approvals`),
-  inbox: (organizationId=1) => request(`/inbox?organization_id=${organizationId}`),
+  inbox: (organizationId:number=activeOrg(), companyId:number|null=activeCompany()) => request(`/inbox?organization_id=${organizationId}${companyId?`&company_id=${companyId}`:""}`),
   missions: () => request(`/missions`),
-  workflows: (organizationId=1) => request(`/workflows?organization_id=${organizationId}`),
-  automations: (organizationId=1) => request(`/automations?organization_id=${organizationId}`),
-  sops: (organizationId=1) => request(`/sops?organization_id=${organizationId}`),
-  decisions: (organizationId=1) => request(`/decisions?organization_id=${organizationId}`),
-  conversations: (organizationId=1) => request(`/conversations?organization_id=${organizationId}`),
-  customers: (organizationId=1) => request(`/customers?organization_id=${organizationId}`),
-  reports: (organizationId=1) => request(`/reports?organization_id=${organizationId}`),
-  analytics: (organizationId=1) => request(`/analytics?organization_id=${organizationId}`),
-  activity: (organizationId=1) => request(`/activity?organization_id=${organizationId}`),
-  integrations: (organizationId=1) => request(`/integrations?organization_id=${organizationId}`),
-  skills: (organizationId=1) => request(`/skills?organization_id=${organizationId}`),
-  tools: (organizationId=1) => request(`/tools?organization_id=${organizationId}`),
-  marketplace: (organizationId=1) => request(`/marketplace?organization_id=${organizationId}`),
+  workflows: (organizationId:number=activeOrg()) => request(`/workflows?organization_id=${organizationId}`),
+  automations: (organizationId:number=activeOrg()) => request(`/automations?organization_id=${organizationId}`),
+  sops: (organizationId:number=activeOrg()) => request(`/sops?organization_id=${organizationId}`),
+  decisions: (organizationId:number=activeOrg()) => request(`/decisions?organization_id=${organizationId}`),
+  conversations: (organizationId:number=activeOrg()) => request(`/conversations?organization_id=${organizationId}`),
+  customers: (organizationId:number=activeOrg()) => request(`/customers?organization_id=${organizationId}`),
+  reports: (organizationId:number=activeOrg()) => request(`/reports?organization_id=${organizationId}`),
+  analytics: (organizationId:number=activeOrg()) => request(`/analytics?organization_id=${organizationId}`),
+  activity: (organizationId:number=activeOrg()) => request(`/activity?organization_id=${organizationId}`),
+  integrations: (organizationId:number=activeOrg()) => request(`/integrations?organization_id=${organizationId}`),
+  skills: (organizationId:number=activeOrg()) => request(`/skills?organization_id=${organizationId}`),
+  tools: (organizationId:number=activeOrg()) => request(`/tools?organization_id=${organizationId}`),
+  marketplace: (organizationId:number=activeOrg()) => request(`/marketplace?organization_id=${organizationId}`),
   billing: () => request(`/billing/subscriptions`),
-  settings: (organizationId=1) => request(`/settings?organization_id=${organizationId}`),
-  ninaBrief: (organizationId=1) => request(`/nina/brief?organization_id=${organizationId}`),
-  ninaCommand: (message:string, organizationId=1) => request(`/nina/command`, {method:"POST", body:JSON.stringify({organization_id:organizationId,message})}),
-  vectorSearch: (query:string, organizationId=1, limit=10) => request(`/knowledge/vector-search`, {method:"POST", body:JSON.stringify({organization_id:organizationId,query,limit})}),
-  policyCheck: (action:string, organizationId=1, actorMemberId?:number) => request(`/policies/check`, {method:"POST", body:JSON.stringify({organization_id:organizationId,action,actor_member_id:actorMemberId})}),
+  settings: (organizationId:number=activeOrg()) => request(`/settings?organization_id=${organizationId}`),
+  ninaBrief: (organizationId:number=activeOrg()) => request(`/nina/brief?organization_id=${organizationId}`),
+  ninaCommand: (message:string, organizationId:number=activeOrg()) => request(`/nina/command`, {method:"POST", body:JSON.stringify({organization_id:organizationId,message})}),
+  vectorSearch: (query:string, organizationId:number=activeOrg(), limit=10) => request(`/knowledge/vector-search`, {method:"POST", body:JSON.stringify({organization_id:organizationId,query,limit})}),
+  policyCheck: (action:string, organizationId:number=activeOrg(), actorMemberId?:number) => request(`/policies/check`, {method:"POST", body:JSON.stringify({organization_id:organizationId,action,actor_member_id:actorMemberId})}),
   startWorkflow: (workflowId:number, inputData:Record<string,unknown>={}) => request(`/workflow-runs/${workflowId}/start`, {method:"POST", body:JSON.stringify(inputData)}),
   advanceWorkflow: (runId:number, externalResult?:Record<string,unknown>) => request(`/workflow-runs/${runId}/advance`, {method:"POST", body:JSON.stringify(externalResult||null)}),
   runtimeRun: (runtimeAgentId:string,input:string,metadata:Record<string,unknown>={}) => request(`/runtime/run`, {method:"POST", body:JSON.stringify({runtime_agent_id:runtimeAgentId,input,metadata})}),
@@ -999,4 +999,13 @@ export const apiCosts = {
   override: (id: number, body: {reason: string; add_usd?: number; amount_limit?: number}) =>
     request<any>(`/costs/budgets/${id}/override`, {method: "POST", body: JSON.stringify(body)}),
   archive: (id: number) => request<any>(`/costs/budgets/${id}`, {method: "DELETE"}),
+};
+
+/* R1 vai trò theo công ty + R2 cho thuê agent (seat_leases) */
+export const apiRental = {
+  myCompanies: () => request<any>(`/team/my-companies`),
+  companyAccess: (companyId: number) => request<any>(`/team/company-access?company_id=${companyId}`),
+  setCompanyAccess: (body: any) => request<any>(`/team/company-access`, {method: "PUT", body: JSON.stringify(body)}),
+  removeCompanyAccess: (id: number) => request<any>(`/team/company-access/${id}`, {method: "DELETE"}),
+  linkSeat: (body: any) => request<any>(`/team/user-seats`, {method: "POST", body: JSON.stringify(body)}),
 };

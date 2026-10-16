@@ -58,3 +58,23 @@ export async function request<T = any>(path:string, init?:RequestInit):Promise<T
   return res.json();
 }
 
+
+/* R1: tổ chức đang dùng = claim org_id trong JWT (trước đây các trang cũ ghim organization_id=1, nên người của
+   tổ chức khác nhận 403). Không có token → 1 (chế độ demo không đăng nhập). */
+export function activeOrg(): number {
+  if (typeof window === "undefined") return 1;
+  const t = localStorage.getItem("clawcompany_token");
+  if (!t) return 1;
+  try {
+    const part = t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const claims = JSON.parse(atob(part.padEnd(part.length + ((4 - (part.length % 4)) % 4), "=")));
+    return Number(claims.org_id) || 1;
+  } catch { return 1; }
+}
+
+/* R1: công ty đang chọn ở bộ chọn công ty (localStorage cc_company), hoặc null. */
+export function activeCompany(): number | null {
+  if (typeof window === "undefined") return null;
+  const v = localStorage.getItem("cc_company");
+  return v ? Number(v) || null : null;
+}

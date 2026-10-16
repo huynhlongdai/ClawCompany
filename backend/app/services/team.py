@@ -255,7 +255,8 @@ def accept_invitation(db: Session, token: str, *, password: str, display_name: s
     member = db.get(Member, inv.member_id) if inv.member_id else None
     if member is None and user.member_id:
         mine = db.get(Member, user.member_id)
-        if mine and mine.organization_id == inv.organization_id:
+        # R1: chỉ dùng lại ghế cũ khi nó ở ĐÚNG công ty được mời; công ty khác → ghế mới (user_seats)
+        if mine and mine.organization_id == inv.organization_id and (not inv.company_id or mine.company_id == inv.company_id):
             member = mine
     if member is None:
         # chưa chọn người quản lý → báo cáo trưởng phòng (nếu phòng có)
@@ -272,6 +273,11 @@ def accept_invitation(db: Session, token: str, *, password: str, display_name: s
         taken = db.query(User).filter(User.member_id == member.id, User.id != user.id).first()
         if not taken:
             user.member_id = member.id
+    from app.models.company_access import UserSeat
+    if not db.query(UserSeat).filter(UserSeat.member_id == member.id).first() and not db.query(UserSeat).filter(
+            UserSeat.user_id == user.id, UserSeat.company_id == member.company_id).first():
+        db.add(UserSeat(user_id=user.id, member_id=member.id, organization_id=inv.organization_id,
+                        company_id=member.company_id))
     acc = _access(db, user.id, inv.organization_id)
     if acc is None:
         acc = UserOrganizationAccess(user_id=user.id, organization_id=inv.organization_id, role=inv.role,

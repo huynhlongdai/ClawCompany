@@ -61,6 +61,7 @@ APPROVER_KINDS = {
     "manager": {"vi": "Quản lý trực tiếp", "en": "Direct manager"},
     "department_head": {"vi": "Trưởng phòng", "en": "Department head"},
     "position": {"vi": "Chức danh cụ thể", "en": "Specific position"},
+    "company_approver": {"vi": "Người duyệt của công ty", "en": "Company approver"},
     "owner": {"vi": "Chủ doanh nghiệp", "en": "Owner"},
 }
 LEVELS = ("probation", "standard", "trusted")
@@ -183,7 +184,33 @@ def _first_human(db: Session, member_id: int | None) -> int | None:
     return got[0] if got else None
 
 
+def company_role_seat(db: Session, organization_id: int, company_id: int | None, roles: tuple[str, ...]) -> int | None:
+    """R1: ghế (trong ĐÚNG công ty này) của người có vai trò công ty ∈ roles; ưu tiên thứ tự roles."""
+    if not company_id:
+        return None
+    from app.models.company_access import CompanyAccess, UserSeat
+    acc = (db.query(CompanyAccess).filter(CompanyAccess.organization_id == organization_id,
+                                          CompanyAccess.company_id == company_id, CompanyAccess.status == "active",
+                                          CompanyAccess.role.in_(roles)).order_by(CompanyAccess.id).all())
+    acc.sort(key=lambda a: roles.index(a.role))
+    for a in acc:
+        seat = db.query(UserSeat).filter(UserSeat.user_id == a.user_id, UserSeat.company_id == company_id).first()
+        mid = seat.member_id if seat else None
+        if mid is None:
+            u = db.get(User, a.user_id)
+            m = db.get(Member, u.member_id) if u and u.member_id else None
+            mid = m.id if m is not None and m.company_id == company_id else None
+        m = db.get(Member, mid) if mid else None
+        if m is not None and m.status != "archived":
+            return m.id
+    return None
+
+
 def owner_member(db: Session, organization_id: int, company_id: int | None) -> int | None:
+    # R1: chủ / giám đốc CỦA CÔNG TY (vai trò công ty owner) đứng trước owner của tổ chức
+    own = company_role_seat(db, organization_id, company_id, ("owner",))
+    if own:
+        return own
     rows = (db.query(User.member_id).join(UserOrganizationAccess, UserOrganizationAccess.user_id == User.id)
             .filter(UserOrganizationAccess.organization_id == organization_id, UserOrganizationAccess.role == "owner",
                     UserOrganizationAccess.status == "active", User.member_id.isnot(None))
@@ -216,6 +243,10 @@ def resolve_approver(db: Session, r: AuthorityRule, requester: Member | None) ->
         elif requester is not None and target == requester.id:
             target = requester.manager_id
             notes.append("Người xin chính là trưởng phòng → chuyển lên quản lý của trưởng phòng.")
+    elif r.approver_kind == "company_approver":
+        target = company_role_seat(db, org, requester.company_id if requester else None, ("approver", "owner"))
+        if target is None:
+            notes.append("Công ty chưa có người giữ vai trò duyệt → chuyển chủ doanh nghiệp.")
     elif r.approver_kind == "position" and r.approver_position_id:
         seats = (db.query(Member).filter(Member.position_id == r.approver_position_id, Member.status != "archived")
                  .order_by(Member.member_type.desc(), Member.id).all())   # "human" > "agent"
@@ -412,6 +443,8 @@ def _rule(db: Session, org_id: int, rule_id: int) -> AuthorityRule:
     r = db.get(AuthorityRule, rule_id)
     if r is None or r.organization_id != org_id:
         raise HTTPException(404, "Không thấy luật này. Tải lại tab Phân quyền.")
+    from app.core import company_scope as _cs
+    _cs.check(r.company_id)  # R1 vai trò theo công ty
     return r
 
 

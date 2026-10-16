@@ -11,7 +11,8 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(160), default="")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
-    member_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True, unique=True)
+    # R1: không còn unique — một người nhiều ghế qua user_seats; đây là ghế chính.
+    member_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True, index=True)
     locale: Mapped[str | None] = mapped_column(String(8), nullable=True)  # i18n: "vi" | "en"; NULL = vi
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

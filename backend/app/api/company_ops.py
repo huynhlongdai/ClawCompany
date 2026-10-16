@@ -4,7 +4,7 @@ from fastapi import HTTPException, APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.core.authz import Principal, require_role
+from app.core.authz import Principal, require_role, require_company_role
 from app.core.tenancy import active_org
 from app.db.session import get_db
 from app.services import process_map as pm
@@ -62,12 +62,12 @@ def _dump(payload: BaseModel) -> tuple[dict, set[str]]:
 
 @router.get("/processes")
 def list_processes(company_id: int | None = None, include_archived: bool = False,
-                   principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+                   principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
     return pm.list_processes(db, active_org(principal), company_id, include_archived=include_archived)
 
 
 @router.post("/processes")
-def create_process(payload: ProcessIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def create_process(payload: ProcessIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     data, _ = _dump(payload)
     p = pm.create_process(db, active_org(principal), data)
     return pm.public_process(db, p)
@@ -75,7 +75,7 @@ def create_process(payload: ProcessIn, principal: Principal = Depends(require_ro
 
 @router.patch("/processes/{process_id}")
 def update_process(process_id: int, payload: ProcessIn, background: BackgroundTasks,
-                   principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+                   principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     data, fields = _dump(payload)
     p = pm.update_process(db, active_org(principal), process_id, data, fields)
     if any(s.get("contract_id") for s in data.get("steps") or []):   # M2e.3: hợp đồng của bước → AGENTS.md chức danh
@@ -85,40 +85,40 @@ def update_process(process_id: int, payload: ProcessIn, background: BackgroundTa
 
 
 @router.delete("/processes/{process_id}")
-def archive_process(process_id: int, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def archive_process(process_id: int, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     return pm.archive_process(db, active_org(principal), process_id)
 
 
 @router.post("/processes/seed")
-def seed_processes(payload: SeedProcIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def seed_processes(payload: SeedProcIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     return pm.seed_templates(db, active_org(principal), payload.company_id, payload.template)
 
 
 @router.post("/processes/{process_id}/start")
-def start_process(process_id: int, payload: StartIn, principal: Principal = Depends(require_role("member")),
+def start_process(process_id: int, payload: StartIn, principal: Principal = Depends(require_company_role("member")),
                   db: Session = Depends(get_db)):
     return pm.start(db, active_org(principal), process_id, title=payload.title, amount_usd=payload.amount_usd,
                     input_data=payload.input, actor_member_id=principal.member_id)
 
 
 @router.get("/processes/{process_id}/instances")
-def process_instances(process_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+def process_instances(process_id: int, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
     return pm.instances(db, active_org(principal), process_id)
 
 
 @router.get("/process-instances/{instance_id}")
-def process_instance(instance_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+def process_instance(instance_id: int, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
     return pm.get_instance(db, active_org(principal), instance_id)
 
 
 @router.post("/process-step-runs/{run_id}/outcome")
-def step_outcome(run_id: int, payload: OutcomeIn, principal: Principal = Depends(require_role("member")),
+def step_outcome(run_id: int, payload: OutcomeIn, principal: Principal = Depends(require_company_role("member")),
                  db: Session = Depends(get_db)):
     return pm.set_outcome(db, active_org(principal), run_id, payload.outcome)
 
 
 @router.post("/process-instances/{instance_id}/cancel")
-def cancel_instance(instance_id: int, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def cancel_instance(instance_id: int, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     return pm.cancel(db, active_org(principal), instance_id)
 
 
@@ -162,39 +162,39 @@ class CompanyIn(BaseModel):
 
 
 @router.get("/kpis")
-def list_kpis(company_id: int | None = None, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+def list_kpis(company_id: int | None = None, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
     return kc.list_kpis(db, active_org(principal), company_id)
 
 
 @router.post("/kpis")
-def create_kpi(payload: KpiIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def create_kpi(payload: KpiIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     return kc.create_kpi(db, active_org(principal), payload.model_dump(exclude_unset=True))
 
 
 @router.patch("/kpis/{kpi_id}")
-def update_kpi(kpi_id: int, payload: KpiIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def update_kpi(kpi_id: int, payload: KpiIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     data = payload.model_dump(exclude_unset=True)
     return kc.update_kpi(db, active_org(principal), kpi_id, data, set(data))
 
 
 @router.delete("/kpis/{kpi_id}")
-def delete_kpi(kpi_id: int, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def delete_kpi(kpi_id: int, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     return kc.delete_kpi(db, active_org(principal), kpi_id)
 
 
 @router.post("/kpis/{kpi_id}/measurements")
-def record_kpi(kpi_id: int, payload: MeasureIn, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+def record_kpi(kpi_id: int, payload: MeasureIn, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
     return kc.record(db, active_org(principal), kpi_id, payload.value, note=payload.note, period_key=payload.period_key,
                      member_id=principal.member_id)
 
 
 @router.post("/kpis/sync-positions")
-def sync_position_kpis(payload: CompanyIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def sync_position_kpis(payload: CompanyIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     return kc.sync_positions(db, active_org(principal), payload.company_id)
 
 
 @router.post("/kpis/snapshot")
-def snapshot_kpis(payload: KpiSnapIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def snapshot_kpis(payload: KpiSnapIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     """M2d.2: chụp số KPI ngay (kỳ hiện tại) + tuỳ chọn tính lại ``backfill`` kỳ cũ từ dữ liệu hiện có."""
     from app.services.company_foundation import _company
     co = _company(db, active_org(principal), payload.company_id, write=True)
@@ -235,18 +235,18 @@ def _runtime():
 
 
 @router.get("/rhythm")
-def rhythm(company_id: int | None = None, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+def rhythm(company_id: int | None = None, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
     return rh.overview(db, active_org(principal), company_id)
 
 
 @router.put("/rhythm/config")
-def rhythm_config(payload: RhythmConfigIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def rhythm_config(payload: RhythmConfigIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     data = payload.model_dump(exclude_unset=True)
     return rh.save_config(db, active_org(principal), data.pop("company_id", None), data)
 
 
 @router.post("/rhythm/run")
-async def rhythm_run(payload: RhythmRunIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+async def rhythm_run(payload: RhythmRunIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     """Gửi ngay giao ban / báo cáo tuần của kỳ hiện tại (đã gửi kỳ này thì trả bản cũ, không gửi lại)."""
     from app.services.company_foundation import _company
     org = active_org(principal)
@@ -259,7 +259,7 @@ async def rhythm_run(payload: RhythmRunIn, principal: Principal = Depends(requir
 
 
 @router.get("/rhythm/reports/{report_id}")
-def rhythm_report(report_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+def rhythm_report(report_id: int, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
     return rh.get_report(db, active_org(principal), report_id)
 
 
@@ -297,12 +297,12 @@ class SeedComplianceIn(BaseModel):
 
 
 @router.get("/compliance")
-def compliance(company_id: int | None = None, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+def compliance(company_id: int | None = None, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
     return cc.overview(db, active_org(principal), company_id)
 
 
 @router.put("/compliance/settings")
-def compliance_settings(payload: ComplianceSettingsIn, principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
+def compliance_settings(payload: ComplianceSettingsIn, principal: Principal = Depends(require_company_role("admin")), db: Session = Depends(get_db)):
     data = payload.model_dump(exclude_unset=True)
     org = active_org(principal)
     out = cc.save_settings(db, org, data.pop("company_id", None), data)
@@ -310,7 +310,7 @@ def compliance_settings(payload: ComplianceSettingsIn, principal: Principal = De
 
 
 @router.post("/compliance/seed")
-def compliance_seed(payload: SeedComplianceIn, principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
+def compliance_seed(payload: SeedComplianceIn, principal: Principal = Depends(require_company_role("admin")), db: Session = Depends(get_db)):
     from app.services.company_foundation import _company
     org = active_org(principal)
     co = _company(db, org, payload.company_id, write=True)
@@ -318,13 +318,13 @@ def compliance_seed(payload: SeedComplianceIn, principal: Principal = Depends(re
 
 
 @router.post("/compliance/rules")
-def compliance_rule_create(payload: ComplianceRuleIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def compliance_rule_create(payload: ComplianceRuleIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     data = payload.model_dump(exclude_unset=True)
     return cc.create_rule(db, active_org(principal), data.pop("company_id", None), data)
 
 
 @router.patch("/compliance/rules/{rule_id}")
-def compliance_rule_update(rule_id: int, payload: ComplianceRuleIn, principal: Principal = Depends(require_role("admin")),
+def compliance_rule_update(rule_id: int, payload: ComplianceRuleIn, principal: Principal = Depends(require_company_role("admin")),
                            db: Session = Depends(get_db)):
     data = payload.model_dump(exclude_unset=True)
     data.pop("company_id", None)
@@ -332,12 +332,12 @@ def compliance_rule_update(rule_id: int, payload: ComplianceRuleIn, principal: P
 
 
 @router.delete("/compliance/rules/{rule_id}")
-def compliance_rule_delete(rule_id: int, principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
+def compliance_rule_delete(rule_id: int, principal: Principal = Depends(require_company_role("admin")), db: Session = Depends(get_db)):
     return cc.delete_rule(db, active_org(principal), rule_id)
 
 
 @router.post("/compliance/generate")
-def compliance_generate(payload: CompanyIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def compliance_generate(payload: CompanyIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     """Sinh hạn 120 ngày tới + gửi nhắc tới hạn ngay (không chờ beat)."""
     org = active_org(principal)
     g = cc.generate(db, org, payload.company_id)
@@ -359,14 +359,14 @@ class HolidayIn(BaseModel):
 
 
 @router.get("/compliance/holidays")
-def holidays_list(year: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+def holidays_list(year: int, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
     if year < 2000 or year > 2100:
         raise HTTPException(422, "Năm không hợp lệ.")
     return hol.list_year(db, active_org(principal), year)
 
 
 @router.post("/compliance/holidays")
-def holidays_create(payload: HolidayIn, principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
+def holidays_create(payload: HolidayIn, principal: Principal = Depends(require_company_role("admin")), db: Session = Depends(get_db)):
     org = active_org(principal)
     out = hol.create(db, org, payload.model_dump(exclude_unset=True))
     out["legal_due_updated"] = cc.refresh_legal(db, org)
@@ -374,7 +374,7 @@ def holidays_create(payload: HolidayIn, principal: Principal = Depends(require_r
 
 
 @router.patch("/compliance/holidays/{holiday_id}")
-def holidays_update(holiday_id: int, payload: HolidayIn, principal: Principal = Depends(require_role("admin")),
+def holidays_update(holiday_id: int, payload: HolidayIn, principal: Principal = Depends(require_company_role("admin")),
                     db: Session = Depends(get_db)):
     org = active_org(principal)
     out = hol.update(db, org, holiday_id, payload.model_dump(exclude_unset=True))
@@ -383,7 +383,7 @@ def holidays_update(holiday_id: int, payload: HolidayIn, principal: Principal = 
 
 
 @router.delete("/compliance/holidays/{holiday_id}")
-def holidays_delete(holiday_id: int, principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
+def holidays_delete(holiday_id: int, principal: Principal = Depends(require_company_role("admin")), db: Session = Depends(get_db)):
     org = active_org(principal)
     out = hol.delete(db, org, holiday_id)
     out["legal_due_updated"] = cc.refresh_legal(db, org)
@@ -391,7 +391,7 @@ def holidays_delete(holiday_id: int, principal: Principal = Depends(require_role
 
 
 @router.post("/compliance/deadlines/{deadline_id}/done")
-def compliance_done(deadline_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+def compliance_done(deadline_id: int, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
     return cc.mark_done(db, active_org(principal), deadline_id)
 
 
@@ -406,10 +406,10 @@ class ReadinessIn(BaseModel):
 
 
 @router.get("/readiness")
-def readiness(company_id: int | None = None, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+def readiness(company_id: int | None = None, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
     return ar.latest(db, active_org(principal), company_id)
 
 
 @router.post("/readiness")
-def readiness_assess(payload: ReadinessIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def readiness_assess(payload: ReadinessIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     return ar.assess(db, active_org(principal), payload.company_id, answers=payload.answers, member_id=principal.member_id)

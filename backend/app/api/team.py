@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.core.authz import Principal, require_role
+from app.core.authz import Principal, require_company_role, require_role
 from app.core.tenancy import active_org, ensure_department, ensure_member
 from app.db.session import get_db
 from app.models import Organization, User
@@ -109,18 +109,18 @@ def remove_access(user_id: int, principal: Principal = Depends(require_role("adm
 
 
 @router.get("/org-chart")
-def org_chart(company_id: int | None = None, principal: Principal = Depends(require_role("guest")), db: Session = Depends(get_db)):
+def org_chart(company_id: int | None = None, principal: Principal = Depends(require_company_role("guest")), db: Session = Depends(get_db)):
     return svc.org_chart(db, active_org(principal), company_id)
 
 
 @router.put("/departments/{department_id}/head")
-def department_head(department_id: int, payload: HeadIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def department_head(department_id: int, payload: HeadIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     dept = ensure_department(db, department_id, principal)
     return svc.set_department_head(db, active_org(principal), dept, payload.member_id, actor=_actor(principal))
 
 
 @router.put("/members/{member_id}/manager")
-def member_manager(member_id: int, payload: ManagerIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def member_manager(member_id: int, payload: ManagerIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     member = ensure_member(db, member_id, principal)
     return svc.set_manager(db, active_org(principal), member, payload.manager_id, actor=_actor(principal))
 
@@ -196,14 +196,14 @@ class ProfileIn(BaseModel):
 
 
 @router.get("/company-profile")
-def company_profile(company_id: int | None = None, principal: Principal = Depends(require_role("member")),
+def company_profile(company_id: int | None = None, principal: Principal = Depends(require_company_role("member")),
                     db: Session = Depends(get_db)):
     return cf.get_profile(db, active_org(principal), company_id)
 
 
 @router.put("/company-profile")
 def save_company_profile(payload: ProfileIn, background: BackgroundTasks,
-                         principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
+                         principal: Principal = Depends(require_company_role("admin")), db: Session = Depends(get_db)):
     org_id = active_org(principal)
     data = payload.model_dump(exclude_unset=True)
     out, changed = cf.save_profile(db, org_id, data.pop("company_id", None), data, user_id=principal.user_id)
@@ -237,13 +237,13 @@ class SeatIn(BaseModel):
 
 
 @router.get("/positions")
-def positions(company_id: int | None = None, principal: Principal = Depends(require_role("member")),
+def positions(company_id: int | None = None, principal: Principal = Depends(require_company_role("member")),
               db: Session = Depends(get_db)):
     return cf.list_positions(db, active_org(principal), company_id)
 
 
 @router.post("/positions")
-def create_position(payload: PositionIn, principal: Principal = Depends(require_role("manager")),
+def create_position(payload: PositionIn, principal: Principal = Depends(require_company_role("manager")),
                     db: Session = Depends(get_db)):
     data = payload.model_dump(exclude_unset=True)
     p = cf.create_position(db, active_org(principal), data)
@@ -251,7 +251,7 @@ def create_position(payload: PositionIn, principal: Principal = Depends(require_
 
 
 @router.post("/positions/from-members")
-def positions_from_members(company_id: int | None = None, principal: Principal = Depends(require_role("manager")),
+def positions_from_members(company_id: int | None = None, principal: Principal = Depends(require_company_role("manager")),
                            db: Session = Depends(get_db)):
     org_id = active_org(principal)
     co = cf._company(db, org_id, company_id, write=True)
@@ -260,7 +260,7 @@ def positions_from_members(company_id: int | None = None, principal: Principal =
 
 @router.patch("/positions/{position_id}")
 def update_position(position_id: int, payload: PositionIn, background: BackgroundTasks,
-                    principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+                    principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     org_id = active_org(principal)
     data = payload.model_dump(exclude_unset=True)
     data.pop("company_id", None)
@@ -272,14 +272,14 @@ def update_position(position_id: int, payload: PositionIn, background: Backgroun
 
 
 @router.delete("/positions/{position_id}")
-def archive_position(position_id: int, principal: Principal = Depends(require_role("manager")),
+def archive_position(position_id: int, principal: Principal = Depends(require_company_role("manager")),
                      db: Session = Depends(get_db)):
     return cf.archive_position(db, active_org(principal), position_id)
 
 
 @router.post("/positions/{position_id}/seats")
 def assign_seat(position_id: int, payload: SeatIn, background: BackgroundTasks,
-                principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+                principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     org_id = active_org(principal)
     out = cf.assign_seat(db, org_id, position_id, payload.member_id)
     agents = [s["agent_id"] for s in out["seats"] if s["member_id"] == payload.member_id and s["agent_id"]]
@@ -290,7 +290,7 @@ def assign_seat(position_id: int, payload: SeatIn, background: BackgroundTasks,
 
 @router.delete("/positions/{position_id}/seats/{member_id}")
 def unassign_seat(position_id: int, member_id: int, background: BackgroundTasks,
-                  principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+                  principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     from app.models import Agent
     org_id = active_org(principal)
     out = cf.unassign_seat(db, org_id, position_id, member_id)
@@ -327,19 +327,19 @@ class EvaluateIn(BaseModel):
 
 
 @router.get("/authority")
-def authority_matrix(company_id: int | None = None, principal: Principal = Depends(require_role("member")),
+def authority_matrix(company_id: int | None = None, principal: Principal = Depends(require_company_role("member")),
                      db: Session = Depends(get_db)):
     return auth_svc.list_rules(db, active_org(principal), company_id)
 
 
 @router.post("/authority/rules")
-def create_rule(payload: RuleIn, principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
+def create_rule(payload: RuleIn, principal: Principal = Depends(require_company_role("admin")), db: Session = Depends(get_db)):
     r = auth_svc.create_rule(db, active_org(principal), payload.model_dump(exclude_unset=True))
     return auth_svc.public_rule(db, r)
 
 
 @router.patch("/authority/rules/{rule_id}")
-def update_rule(rule_id: int, payload: RuleIn, principal: Principal = Depends(require_role("admin")),
+def update_rule(rule_id: int, payload: RuleIn, principal: Principal = Depends(require_company_role("admin")),
                 db: Session = Depends(get_db)):
     data = payload.model_dump(exclude_unset=True)
     data.pop("company_id", None)
@@ -348,12 +348,12 @@ def update_rule(rule_id: int, payload: RuleIn, principal: Principal = Depends(re
 
 
 @router.delete("/authority/rules/{rule_id}")
-def delete_rule(rule_id: int, principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
+def delete_rule(rule_id: int, principal: Principal = Depends(require_company_role("admin")), db: Session = Depends(get_db)):
     return auth_svc.delete_rule(db, active_org(principal), rule_id)
 
 
 @router.post("/authority/seed-defaults")
-def seed_authority(payload: SeedIn, principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
+def seed_authority(payload: SeedIn, principal: Principal = Depends(require_company_role("admin")), db: Session = Depends(get_db)):
     org_id = active_org(principal)
     co = cf._company(db, org_id, payload.company_id, write=True)
     out = auth_svc.seed_defaults(db, org_id, co.id, template=payload.template, replace=payload.replace)
@@ -363,7 +363,7 @@ def seed_authority(payload: SeedIn, principal: Principal = Depends(require_role(
 
 
 @router.post("/authority/evaluate")
-def evaluate(payload: EvaluateIn, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+def evaluate(payload: EvaluateIn, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
     """Thử luật: người/agent này làm việc này với số tiền này thì ai duyệt? Không tạo phê duyệt."""
     from app.models import Member
     m = ensure_member(db, payload.member_id, principal)
@@ -374,3 +374,60 @@ def evaluate(payload: EvaluateIn, principal: Principal = Depends(require_role("m
         return {"matched": False, "message": "Không có luật nào khớp → hệ thống dùng hành vi cũ "
                                               "(lưới quyền công cụ / chính sách hiện có)."}
     return {"matched": True, **d.as_dict()}
+
+
+# ------------------------------------------------------------------ R1 vai trò theo công ty + nhiều ghế
+
+class CompanyAccessIn(BaseModel):
+    company_id: int
+    role: str
+    user_id: int | None = None
+    email: str | None = None
+
+
+class SeatLinkIn(BaseModel):
+    user_id: int
+    member_id: int
+
+
+@router.get("/my-companies")
+def my_companies(principal: Principal = Depends(require_role("guest")), db: Session = Depends(get_db)):
+    from app.services import company_roles
+    return company_roles.my_companies(db, active_org(principal), principal)
+
+
+@router.get("/company-access")
+def company_access(company_id: int, principal: Principal = Depends(require_company_role("member")),
+                   db: Session = Depends(get_db)):
+    from app.services import company_roles
+    return company_roles.list_access(db, active_org(principal), company_id)
+
+
+@router.put("/company-access")
+def set_company_access(payload: CompanyAccessIn, principal: Principal = Depends(require_company_role("member")),
+                       db: Session = Depends(get_db)):
+    from app.services import company_roles
+    return company_roles.set_access(db, active_org(principal), principal, company_id=payload.company_id,
+                                    role=payload.role, user_id=payload.user_id, email=payload.email)
+
+
+@router.delete("/company-access/{access_id}")
+def remove_company_access(access_id: int, principal: Principal = Depends(require_company_role("member")),
+                          db: Session = Depends(get_db)):
+    from app.services import company_roles
+    return company_roles.remove_access(db, active_org(principal), principal, access_id)
+
+
+@router.post("/user-seats")
+def link_user_seat(payload: SeatLinkIn, principal: Principal = Depends(require_company_role("member")),
+                   db: Session = Depends(get_db)):
+    from app.services import company_roles
+    return company_roles.link_seat(db, active_org(principal), principal, user_id=payload.user_id,
+                                   member_id=payload.member_id)
+
+
+@router.delete("/user-seats/{seat_id}")
+def unlink_user_seat(seat_id: int, principal: Principal = Depends(require_company_role("member")),
+                     db: Session = Depends(get_db)):
+    from app.services import company_roles
+    return company_roles.unlink_seat(db, active_org(principal), principal, seat_id)

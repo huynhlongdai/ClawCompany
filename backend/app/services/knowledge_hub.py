@@ -291,8 +291,11 @@ def public(db: Session, doc: KnowledgeDocument) -> dict:
             "created_at": doc.created_at.isoformat() if getattr(doc, "created_at", None) else None}
 
 
-def list_docs(db: Session, org_id: int) -> list[dict]:
-    rows = db.query(KnowledgeDocument).filter(KnowledgeDocument.organization_id == org_id).order_by(KnowledgeDocument.id.desc()).limit(300).all()
+def list_docs(db: Session, org_id: int, company_id: int | None = None) -> list[dict]:
+    from app.core import company_scope
+    q = db.query(KnowledgeDocument).filter(KnowledgeDocument.organization_id == org_id)
+    q = company_scope.scope_filter(q, KnowledgeDocument.company_id, company_id)   # R1: theo công ty
+    rows = q.order_by(KnowledgeDocument.id.desc()).limit(300).all()
     return [public(db, d) for d in rows]
 
 

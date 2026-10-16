@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.core.authz import Principal, require_role
+from app.core.authz import Principal, require_role, require_company_role
 from app.core.tenancy import active_org
 from app.db.session import get_db
 from app.services import runtime_rules as rr
@@ -58,13 +58,13 @@ class RuleTestIn(BaseModel):
 
 
 @router.get("/rules")
-def rules(company_id: int | None = None, principal: Principal = Depends(require_role("member")),
+def rules(company_id: int | None = None, principal: Principal = Depends(require_company_role("member")),
           db: Session = Depends(get_db)):
     return rr.list_rules(db, active_org(principal), company_id)
 
 
 @router.post("/rules")
-def create_rule(payload: RuleIn, background: BackgroundTasks, principal: Principal = Depends(require_role("manager")),
+def create_rule(payload: RuleIn, background: BackgroundTasks, principal: Principal = Depends(require_company_role("manager")),
                 db: Session = Depends(get_db)):
     org = active_org(principal)
     r = rr.create_rule(db, org, payload.model_dump(exclude_unset=True))
@@ -74,7 +74,7 @@ def create_rule(payload: RuleIn, background: BackgroundTasks, principal: Princip
 
 @router.patch("/rules/{rule_id}")
 def update_rule(rule_id: int, payload: RuleIn, background: BackgroundTasks,
-                principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+                principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     org = active_org(principal)
     data = payload.model_dump(exclude_unset=True); data.pop("company_id", None); data.pop("template", None)
     r = rr.update_rule(db, org, rule_id, data)
@@ -83,7 +83,7 @@ def update_rule(rule_id: int, payload: RuleIn, background: BackgroundTasks,
 
 
 @router.delete("/rules/{rule_id}")
-def delete_rule(rule_id: int, background: BackgroundTasks, principal: Principal = Depends(require_role("manager")),
+def delete_rule(rule_id: int, background: BackgroundTasks, principal: Principal = Depends(require_company_role("manager")),
                 db: Session = Depends(get_db)):
     org = active_org(principal)
     out = rr.delete_rule(db, org, rule_id)
@@ -92,7 +92,7 @@ def delete_rule(rule_id: int, background: BackgroundTasks, principal: Principal 
 
 
 @router.post("/rules/test")
-def test_rules(payload: RuleTestIn, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+def test_rules(payload: RuleTestIn, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
     """Thử một câu / một tool với bộ luật của công ty (hoặc của một chức danh) — đúng hàm cổng MCP dùng."""
     from app.models.agent_native import CompanyRule
     from app.services.company_foundation import _company
@@ -105,14 +105,19 @@ def test_rules(payload: RuleTestIn, principal: Principal = Depends(require_role(
 
 
 @router.post("/rules/sync")
-async def sync_rules(principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+async def sync_rules(principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     from app.runtime.factory import get_runtime
     return await rr.push(db, get_runtime())
 
 
 @router.get("/rules/compiled")
-def compiled_rules(principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
-    return rr.compile_all(db, active_org(principal))
+def compiled_rules(company_id: int | None = None, principal: Principal = Depends(require_company_role("manager")),
+                   db: Session = Depends(get_db)):
+    from app.core import company_scope
+    ids = [company_id] if company_id else company_scope.allowed_company_ids(principal)
+    for c in ids or []:
+        company_scope.check(c)
+    return rr.compile_all(db, active_org(principal), company_ids=ids)
 
 
 class ViolationIn(BaseModel):
@@ -170,14 +175,14 @@ def _task_in_org(db: Session, org: int, task_id: int):
 
 @router.get("/contracts")
 def contracts(company_id: int | None = None, include_archived: bool = False,
-              principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+              principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
     from app.services import io_contracts as ioc
     return ioc.list_contracts(db, active_org(principal), company_id, include_archived=include_archived)
 
 
 @router.post("/contracts")
 def create_contract(payload: ContractIn, background: BackgroundTasks,
-                    principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+                    principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     from app.services import io_contracts as ioc
     org = active_org(principal)
     c = ioc.create_contract(db, org, payload.model_dump(exclude_unset=True))
@@ -187,7 +192,7 @@ def create_contract(payload: ContractIn, background: BackgroundTasks,
 
 @router.patch("/contracts/{contract_id}")
 def update_contract(contract_id: int, payload: ContractIn, background: BackgroundTasks,
-                    principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+                    principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     from app.services import io_contracts as ioc
     org = active_org(principal)
     data = payload.model_dump(exclude_unset=True); data.pop("company_id", None); data.pop("template", None)
@@ -198,7 +203,7 @@ def update_contract(contract_id: int, payload: ContractIn, background: Backgroun
 
 @router.delete("/contracts/{contract_id}")
 def archive_contract(contract_id: int, background: BackgroundTasks,
-                     principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+                     principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     from app.services import io_contracts as ioc
     org = active_org(principal)
     out = ioc.archive_contract(db, org, contract_id)
@@ -207,7 +212,7 @@ def archive_contract(contract_id: int, background: BackgroundTasks,
 
 
 @router.post("/contracts/{contract_id}/validate")
-def validate_output(contract_id: int, payload: OutputIn, principal: Principal = Depends(require_role("member")),
+def validate_output(contract_id: int, payload: OutputIn, principal: Principal = Depends(require_company_role("member")),
                     db: Session = Depends(get_db)):
     """Thử một kết quả với hợp đồng — đúng hàm kiểm của company_task_submit_output, không ghi gì."""
     import json as _json
@@ -222,14 +227,14 @@ def validate_output(contract_id: int, payload: OutputIn, principal: Principal = 
 
 
 @router.get("/tasks/{task_id}/contract")
-def task_contract(task_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+def task_contract(task_id: int, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
     from app.services import io_contracts as ioc
     t = _task_in_org(db, active_org(principal), task_id)
     return {"task_id": t.id, "contract": ioc.public_task_contract(db, ioc.task_contract(db, t.id))}
 
 
 @router.post("/tasks/{task_id}/contract")
-def attach_contract(task_id: int, payload: AttachIn, principal: Principal = Depends(require_role("manager")),
+def attach_contract(task_id: int, payload: AttachIn, principal: Principal = Depends(require_company_role("manager")),
                     db: Session = Depends(get_db)):
     from app.services import io_contracts as ioc
     org = active_org(principal)
@@ -238,7 +243,7 @@ def attach_contract(task_id: int, payload: AttachIn, principal: Principal = Depe
 
 
 @router.post("/tasks/{task_id}/output")
-def submit_output(task_id: int, payload: OutputIn, principal: Principal = Depends(require_role("member")),
+def submit_output(task_id: int, payload: OutputIn, principal: Principal = Depends(require_company_role("member")),
                   db: Session = Depends(get_db)):
     """Người nộp (hoặc nộp thay) kết quả theo hợp đồng — cùng đường kiểm với agent."""
     from app.models import Member
@@ -278,40 +283,40 @@ class SlaIn(BaseModel):
 
 
 @router.get("/coverage")
-def coverage(company_id: int | None = None, principal: Principal = Depends(require_role("member")),
+def coverage(company_id: int | None = None, principal: Principal = Depends(require_company_role("member")),
              db: Session = Depends(get_db)):
     from app.services import operating_time as ot
     return ot.coverage(db, active_org(principal), company_id)
 
 
 @router.get("/seats/{member_id}/schedule")
-def seat_schedule(member_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+def seat_schedule(member_id: int, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
     from app.services import operating_time as ot
     return ot.seat_view(db, ot._member(db, active_org(principal), member_id))
 
 
 @router.put("/seats/{member_id}/schedule")
-def save_seat_schedule(member_id: int, payload: ScheduleIn, principal: Principal = Depends(require_role("manager")),
+def save_seat_schedule(member_id: int, payload: ScheduleIn, principal: Principal = Depends(require_company_role("manager")),
                        db: Session = Depends(get_db)):
     from app.services import operating_time as ot
     return ot.save_schedule(db, active_org(principal), member_id, payload.model_dump(exclude_unset=True))
 
 
 @router.post("/seats/{member_id}/leaves")
-def add_leave(member_id: int, payload: LeaveIn, principal: Principal = Depends(require_role("manager")),
+def add_leave(member_id: int, payload: LeaveIn, principal: Principal = Depends(require_company_role("manager")),
               db: Session = Depends(get_db)):
     from app.services import operating_time as ot
     return ot.add_leave(db, active_org(principal), member_id, payload.model_dump())
 
 
 @router.delete("/leaves/{leave_id}")
-def delete_leave(leave_id: int, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def delete_leave(leave_id: int, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     from app.services import operating_time as ot
     return ot.delete_leave(db, active_org(principal), leave_id)
 
 
 @router.get("/sla-policies")
-def sla_policies(company_id: int | None = None, principal: Principal = Depends(require_role("member")),
+def sla_policies(company_id: int | None = None, principal: Principal = Depends(require_company_role("member")),
                  db: Session = Depends(get_db)):
     from app.models.agent_native import SlaPolicy
     from app.services import operating_time as ot
@@ -321,13 +326,13 @@ def sla_policies(company_id: int | None = None, principal: Principal = Depends(r
 
 
 @router.post("/sla-policies")
-def create_sla(payload: SlaIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def create_sla(payload: SlaIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     from app.services import operating_time as ot
     return ot.public_policy(db, ot.create_policy(db, active_org(principal), payload.model_dump(exclude_unset=True)))
 
 
 @router.patch("/sla-policies/{policy_id}")
-def update_sla(policy_id: int, payload: SlaIn, principal: Principal = Depends(require_role("manager")),
+def update_sla(policy_id: int, payload: SlaIn, principal: Principal = Depends(require_company_role("manager")),
                db: Session = Depends(get_db)):
     from app.services import operating_time as ot
     data = payload.model_dump(exclude_unset=True); data.pop("company_id", None)
@@ -335,13 +340,13 @@ def update_sla(policy_id: int, payload: SlaIn, principal: Principal = Depends(re
 
 
 @router.delete("/sla-policies/{policy_id}")
-def delete_sla(policy_id: int, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def delete_sla(policy_id: int, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     from app.services import operating_time as ot
     return ot.delete_policy(db, active_org(principal), policy_id)
 
 
 @router.post("/sla/tick")
-def sla_tick_now(principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+def sla_tick_now(principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     """Chạy ngay một nhịp của beat ``sla.tick`` (beat chạy mỗi 60 giây)."""
     from app.services import operating_time as ot
     return ot.tick(db)
@@ -350,7 +355,7 @@ def sla_tick_now(principal: Principal = Depends(require_role("manager")), db: Se
 # ------------------------------------------------------------------ M2e.5 HR agent
 
 @router.get("/agent-hr")
-def agent_hr_summary(company_id: int | None = None, days: int = 30, principal: Principal = Depends(require_role("member")),
+def agent_hr_summary(company_id: int | None = None, days: int = 30, principal: Principal = Depends(require_company_role("member")),
                      db: Session = Depends(get_db)):
     """Nhân sự agent: tuân thủ luật, đúng hợp đồng dữ liệu, nhất quán, đạt SLA, giờ làm 24/7, chi phí mỗi việc (USD);
     ghế người giữ trường HR thường."""

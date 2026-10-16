@@ -160,6 +160,8 @@ def _rule(db: Session, org_id: int, rid: int) -> CompanyRule:
     r = db.get(CompanyRule, rid)
     if r is None or r.organization_id != org_id:
         raise _err(404, "Không thấy luật này. Tải lại tab Luật cứng.")
+    from app.core import company_scope as _cs
+    _cs.check(r.company_id)  # R1 vai trò theo công ty
     return r
 
 
@@ -310,11 +312,13 @@ def compile_agent(db: Session, member: Member, agent: Agent) -> dict:
             "rules": rules, "allowedCompanyTools": allowed}
 
 
-def compile_all(db: Session, org_id: int | None = None) -> dict:
+def compile_all(db: Session, org_id: int | None = None, company_ids: list[int] | None = None) -> dict:
     q = db.query(Agent, Member).join(Member, Member.id == Agent.member_id).filter(
         Agent.lifecycle.notin_(("retired",)))
     if org_id is not None:
         q = q.filter(Member.organization_id == org_id)
+    if company_ids is not None:   # R1: xem theo công ty
+        q = q.filter(Member.company_id.in_(company_ids or [-1]))
     agents = {}
     for ag, m in q.all():
         c = compile_agent(db, m, ag)

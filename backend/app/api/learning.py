@@ -42,8 +42,8 @@ class DocIn(Scope):
 
 
 @router.get("/docs")
-def docs(principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
-    return {"items": knowledge_hub.list_docs(db, active_org(principal))}
+def docs(company_id: int | None = None, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    return {"items": knowledge_hub.list_docs(db, active_org(principal), company_id=company_id)}
 
 
 @router.post("/docs")

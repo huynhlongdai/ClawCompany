@@ -1,3 +1,4 @@
+import {request} from "./http";
 /* Số đếm cho sidebar + chuông, tên tổ chức và danh sách công ty cho bộ đổi công ty.
 
    Shell nằm trong layout nên chỉ mount một lần; vẫn giữ cache 30 giây ở cấp
@@ -22,12 +23,18 @@ let inflight: Promise<Counts> | null = null;
 const listeners = new Set<(c: Counts) => void>();
 
 async function load(): Promise<Counts> {
-  const [overview, summary] = await Promise.allSettled([apiV17.overview(), apiInboxHub.summary()]);
+  const [overview, summary, mine] = await Promise.allSettled([apiV17.overview(), apiInboxHub.summary(),
+    request<any>(`/team/my-companies`)]);
   const out: Counts = {};
   if (overview.status === "fulfilled") {
     const o: any = overview.value || {};
     Object.assign(out, o.kpis || {});
     org = {name: o.organization?.name || org.name, companies: (o.companies || []).map((c: any) => ({id: c.id, name: c.name, industry: c.industry}))};
+    /* R1: người có vai trò theo công ty chỉ thấy (và chọn) đúng các công ty của mình */
+    if (mine.status === "fulfilled" && (mine.value as any)?.restricted) {
+      const ok = new Set(((mine.value as any).items || []).map((c: any) => c.id));
+      org = {...org, companies: org.companies.filter(c => ok.has(c.id))};
+    }
   }
   /* Số trên chuông = số "cần anh ra tay" của Hộp việc (duyệt + xem) — cùng nguồn với trang. */
   if (summary.status === "fulfilled") out.inbox = Number((summary.value as any)?.need_action ?? 0);

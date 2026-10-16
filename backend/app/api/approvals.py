@@ -44,7 +44,7 @@ async def resolve_approval(approval_id: int, payload: ApprovalResolve, principal
             raise HTTPException(422, "OpenClaw approvals take approved or rejected")
         try:
             await approval_bridge.decide(db, obj, decision="approved" if payload.status == "approved" else "denied",
-                                         note=payload.resolution_note or "", actor_member_id=principal.member_id)
+                                         note=payload.resolution_note or "", actor_member_id=principal.seat_in(obj.company_id))
         except approval_bridge.ApprovalBridgeError as exc:
             raise HTTPException(409, str(exc))
         db.refresh(obj)
@@ -53,7 +53,7 @@ async def resolve_approval(approval_id: int, payload: ApprovalResolve, principal
     plan = strategy.is_strategy(obj)
     if plan and obj.status != "pending":
         raise HTTPException(409, f"Kế hoạch đang {obj.status}")
-    if plan and obj.approver_member_id and principal.member_id != obj.approver_member_id:
+    if plan and obj.approver_member_id and obj.approver_member_id not in principal.member_ids:
         raise HTTPException(403, {"error": "not_the_approver", "approver_member_id": obj.approver_member_id})
     stage = (obj.policy_key or "").startswith("task_stage:")
     if stage:
@@ -62,7 +62,7 @@ async def resolve_approval(approval_id: int, payload: ApprovalResolve, principal
             raise HTTPException(422, "Task stage approvals take approved or rejected")
         if obj.status != "pending":
             raise HTTPException(409, "Approval already resolved")
-        if obj.approver_member_id and principal.member_id != obj.approver_member_id:
+        if obj.approver_member_id and obj.approver_member_id not in principal.member_ids:
             raise HTTPException(403, {"error": "not_the_approver", "approver_member_id": obj.approver_member_id})
     if obj.status != "pending" and payload.status in ("approved", "rejected"):
         # M4b: trước đây quyết lại một hàng đã quyết vẫn 200 và chạy lại hậu quả (đánh thức seat lần hai).
@@ -71,17 +71,17 @@ async def resolve_approval(approval_id: int, payload: ApprovalResolve, principal
     obj.status = payload.status; obj.resolution_note = payload.resolution_note
     db.add(obj); db.commit(); db.refresh(obj)
     from app.services.runtime_stream import _audit
-    _audit(db, obj, "approval.decided", actor_member_id=principal.member_id, actor_name="human",
+    _audit(db, obj, "approval.decided", actor_member_id=principal.seat_in(obj.company_id), actor_name="human",
            result=payload.status, payload={"decision": payload.status, "policy_key": obj.policy_key})
     if stage:
         from app.services import execution_policy
-        execution_policy.on_approval_resolved(db, obj, actor_member_id=principal.member_id)
+        execution_policy.on_approval_resolved(db, obj, actor_member_id=principal.seat_in(obj.company_id))
         db.refresh(obj)
         return obj
     if plan:
         # D3.3: duyệt → plan_apply tạo việc con và giao phòng/seat; từ chối → goal plan_rejected.
         try:
-            strategy.on_resolved(db, obj, actor_member_id=principal.member_id)
+            strategy.on_resolved(db, obj, actor_member_id=principal.seat_in(obj.company_id))
         except strategy.StrategyError as exc:
             raise HTTPException(409, exc.message)
         db.refresh(obj)

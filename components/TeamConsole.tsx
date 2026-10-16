@@ -12,6 +12,7 @@ import {LearningHub} from "./LearningHub";
 import {CompanyProfileTab, PositionsTab, AuthorityTab} from "./CompanyFoundation";
 import {ProcessesTab, KpiTab, RhythmTab, ComplianceTab, ReadinessTab} from "./CompanyOperations";
 import {RulesTab, ContractsTab, CoverageTab, AgentWorkforceTab} from "./AgentNative";
+import {CompanyRolesTab} from "./Rental";
 import {Notice, EmptyState, ErrorBanner} from "./ui/EmptyState";
 import {SkeletonRows} from "./ui/Skeleton";
 import {useToast} from "./ui/Toast";
@@ -20,8 +21,8 @@ import Link from "next/link";
 import {useCompanyId} from "../lib/prefs";
 import {t as tr, lazy} from "../lib/i18n";
 
-type Tab = "chart" | "people" | "departments" | "ai" | "training" | "build" | "profile" | "positions" | "authority" | "processes" | "kpi" | "rhythm" | "compliance" | "readiness" | "rules" | "contracts" | "coverage" | "agenthr";
-const TAB_IDS: Tab[] = ["chart", "people", "departments", "ai", "training", "build", "profile", "positions", "authority", "processes", "kpi", "rhythm", "compliance", "readiness", "rules", "contracts", "coverage", "agenthr"];
+type Tab = "chart" | "people" | "departments" | "ai" | "training" | "build" | "profile" | "positions" | "authority" | "processes" | "kpi" | "rhythm" | "compliance" | "readiness" | "rules" | "contracts" | "coverage" | "agenthr" | "roles";
+const TAB_IDS: Tab[] = ["chart", "people", "departments", "ai", "training", "build", "profile", "positions", "authority", "processes", "kpi", "rhythm", "compliance", "readiness", "rules", "contracts", "coverage", "agenthr", "roles"];
 const ROLE_VI: Record<string, string> = lazy(() => ({guest: tr("team.khach"), member: tr("team.thanh_vien"), manager: tr("team.quan_ly"), admin: tr("team.quan_tri"), owner: tr("team.chu_so_huu")}));
 const CSV_SAMPLE = `tên,loại,chức danh,phòng ban,quản lý,email,trưởng phòng
 Hà,người,Giám đốc,Ban điều hành,,ha@congty.vn,x
@@ -110,6 +111,7 @@ export function TeamConsole() {
     {tab === "contracts" && <ContractsTab companyId={companyId} caps={caps}/>}
     {tab === "coverage" && <CoverageTab companyId={companyId} caps={caps}/>}
     {tab === "agenthr" && <AgentWorkforceTab companyId={companyId} caps={caps}/>}
+    {tab === "roles" && <CompanyRolesTab companyId={companyId} members={members}/>}
     {tab === "build" && <BuildTab chart={chart} caps={caps} busy={busy} act={act} onCompany={(id: number) => { pickCompany(id); setTab("chart"); }}/>}
   </PageFrame>;
 }

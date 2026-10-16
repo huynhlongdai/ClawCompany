@@ -143,7 +143,8 @@
   "luat_cung": "Hard rules",
   "hop_dong_du_lieu": "Data contracts",
   "van_hanh_24_7": "24/7 operations",
-  "nhan_su_agent": "Agent workforce"
+  "nhan_su_agent": "Agent workforce",
+  "vai_tro_cong_ty": "Company roles"
  },
  "shell": {
   "cong_ty": "{p0} · {p1:company|companies}",
@@ -3024,5 +3025,27 @@
   "lvl_probation": "probation",
   "lvl_standard": "standard",
   "lvl_trusted": "trusted"
+ },
+ "rental": {
+  "pick_company": "Pick a company at the top to see its roles.",
+  "role_saved": "Company role saved",
+  "role_removed": "Role removed",
+  "roles_explain": "Company roles: a person with a role here (who is not an org owner/admin) only sees and works inside this company. The company owner is the company's final approver (instead of the org owner); approvers receive approvals from rules set to “Company approver”. One person can hold seats in several companies — one seat per company.",
+  "person": "Person",
+  "role": "Role",
+  "seat": "Seat",
+  "status": "Status",
+  "no_roles": "Nobody has a company-specific role yet — everyone follows their organization role.",
+  "role_owner": "Company owner",
+  "role_manager": "Manager",
+  "role_approver": "Approver",
+  "role_viewer": "Viewer",
+  "active": "Active",
+  "revoked": "Removed",
+  "remove": "Remove",
+  "add_role": "Add / change a role",
+  "email": "Email (already in the organization)",
+  "seat_optional": "Link a seat in this company (optional)",
+  "save_role": "Save role"
  }
 }

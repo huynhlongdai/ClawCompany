@@ -143,7 +143,8 @@
   "luat_cung": "Luật cứng",
   "hop_dong_du_lieu": "Hợp đồng dữ liệu",
   "van_hanh_24_7": "Vận hành 24/7",
-  "nhan_su_agent": "Nhân sự agent"
+  "nhan_su_agent": "Nhân sự agent",
+  "vai_tro_cong_ty": "Vai trò công ty"
  },
  "shell": {
   "cong_ty": "{p0} · {p1} công ty",
@@ -3024,5 +3025,27 @@
   "lvl_probation": "thử việc",
   "lvl_standard": "tiêu chuẩn",
   "lvl_trusted": "tin cậy"
+ },
+ "rental": {
+  "pick_company": "Chọn một công ty ở góc trên để xem vai trò.",
+  "role_saved": "Đã lưu vai trò công ty",
+  "role_removed": "Đã gỡ vai trò",
+  "roles_explain": "Vai trò theo công ty: người có vai trò ở đây (mà không phải owner/admin của tổ chức) chỉ thấy và làm việc trong đúng công ty này. Chủ công ty là người duyệt cuối của công ty (thay chủ tổ chức); người duyệt nhận các phê duyệt theo luật “Người duyệt của công ty”. Một người có thể giữ ghế ở nhiều công ty — mỗi công ty một ghế.",
+  "person": "Người",
+  "role": "Vai trò",
+  "seat": "Ghế",
+  "status": "Trạng thái",
+  "no_roles": "Chưa ai có vai trò riêng ở công ty này — mọi người đang theo vai trò của tổ chức.",
+  "role_owner": "Chủ công ty",
+  "role_manager": "Quản lý",
+  "role_approver": "Người duyệt",
+  "role_viewer": "Người xem",
+  "active": "Đang hiệu lực",
+  "revoked": "Đã gỡ",
+  "remove": "Gỡ",
+  "add_role": "Thêm / đổi vai trò",
+  "email": "Email (đã ở trong tổ chức)",
+  "seat_optional": "Gắn ghế ở công ty này (tuỳ chọn)",
+  "save_role": "Lưu vai trò"
  }
 }
