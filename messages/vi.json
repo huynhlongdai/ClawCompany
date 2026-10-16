@@ -2804,7 +2804,10 @@
   "cf_output": "kết quả B{p0}.{p1}",
   "output": "Kết quả theo hợp đồng",
   "m_output_conformance_rate": "% kết quả đúng hợp đồng dữ liệu",
-  "m_sla_attainment_rate": "% đạt SLA"
+  "m_sla_attainment_rate": "% đạt SLA",
+  "rd_l_documents": "Hồ sơ & tài liệu",
+  "rd_c_required_records": "Hồ sơ bắt buộc đã có (đang hiệu lực)",
+  "rd_c_doc_freshness": "Tài liệu agent dùng còn trong hạn rà soát"
  },
  "market": {
   "load_failed": "Không tải được marketplace",

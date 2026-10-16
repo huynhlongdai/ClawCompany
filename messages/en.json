@@ -2804,7 +2804,10 @@
   "cf_output": "step {p0} output.{p1}",
   "output": "Contract output",
   "m_output_conformance_rate": "% outputs matching the data contract",
-  "m_sla_attainment_rate": "% SLA met"
+  "m_sla_attainment_rate": "% SLA met",
+  "rd_l_documents": "Records & documents",
+  "rd_c_required_records": "Required records in place (in effect)",
+  "rd_c_doc_freshness": "Documents agents use are within their review date"
  },
  "market": {
   "load_failed": "Couldn't load the marketplace",
