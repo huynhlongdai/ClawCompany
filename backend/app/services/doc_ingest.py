@@ -319,12 +319,36 @@ def find_duplicate(db: Session, company_id: int, *, file_sha: str = "", text_has
 
 # ------------------------------------------------------------------ nạp
 
+# Ghi chú nạp được lưu bằng tiếng Việt (cột note, cũng là nội dung lỗi 422); UI cần MÃ để dịch. Ánh xạ theo mẫu câu — chạy
+# được cả với các dòng đã nạp trước khi có mã (VM). Câu không khớp → note_code rỗng, UI hiện nguyên văn.
+NOTE_CODES = [
+    (re.compile(r"^Ảnh scan: máy chủ chưa cài Tesseract"), "image_no_ocr"),
+    (re.compile(r"^OCR chỉ có gói tiếng Anh"), "ocr_eng_only"),
+    (re.compile(r"^PDF không có lớp chữ — đã OCR \(chỉ gói tiếng Anh"), "pdf_ocr_eng"),
+    (re.compile(r"^PDF không có lớp chữ — đã OCR"), "pdf_ocr"),
+    (re.compile(r"^PDF không có lớp chữ \(bản scan\) và máy chủ chưa cài"), "pdf_no_ocr"),
+    (re.compile(r"^Tệp trùng sha256 với (?P<code>\S+)"), "dup_file"),
+    (re.compile(r"^Nội dung trùng với (?P<code>\S+)"), "dup_text"),
+    (re.compile(r"^Không trích được chữ"), "no_text"),
+    (re.compile(r"^Mẫu tham khảo, không phải tư vấn pháp lý"), "template_ref"),
+]
+
+
+def note_code(note: str | None) -> tuple[str, dict]:
+    for rx, code in NOTE_CODES:
+        m = rx.search(note or "")
+        if m:
+            return code, {k: v for k, v in m.groupdict().items() if v}
+    return "", {}
+
+
 def public_import(db: Session, im: DocImport) -> dict:
     doc = db.get(KnowledgeDocument, im.document_id) if im.document_id else None
     dup = db.get(KnowledgeDocument, im.duplicate_of_id) if im.duplicate_of_id else None
     return {"id": im.id, "company_id": im.company_id, "source": im.source, "source_ref": im.source_ref,
             "filename": im.filename, "sha256": im.sha256, "status": im.status, "method": im.method,
             "ocr_used": bool(im.ocr_used), "extracted_chars": im.extracted_chars, "note": im.note,
+            "note_code": note_code(im.note)[0], "note_params": note_code(im.note)[1],
             "suggestions": im.suggestions or {}, "proposals": im.proposals or {}, "proposals_status": im.proposals_status,
             "document": {"id": doc.id, "doc_code": doc.doc_code, "title": doc.title, "status": doc.status} if doc else None,
             "duplicate_of": {"id": dup.id, "doc_code": dup.doc_code, "title": dup.title} if dup else None,

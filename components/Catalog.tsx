@@ -8,7 +8,7 @@ import {SkeletonRows} from "./ui/Skeleton";
 import {StatusPill} from "./ui/StatusPill";
 import {useToast} from "./ui/Toast";
 import {Field, FormRow} from "./ui/Field";
-import {getLocale, t as tr, type Key} from "../lib/i18n";
+import {fmtPrice, getLocale, t as tr, type Key} from "../lib/i18n";
 import {useLoad} from "./CompanyOperations";
 
 const day = (s?: string | null) => s ? new Date(s + (s.endsWith("Z") ? "" : "Z")).toLocaleDateString(getLocale() === "en" ? "en-GB" : "vi-VN") : "—";
@@ -45,9 +45,9 @@ export function CatalogTab({companyId, caps}: {companyId: number | null; caps: a
           <td><code className="doc-code">{x.sku}</code></td>
           <td><code className="doc-code cat-sku-m">{x.sku}</code><b>{x.name}</b>{x.kind === "service" && <> <span className="ui-pill is-outline">{tr("cat.service")}</span></>}{x.category && <><br/><small>{x.category}</small></>}</td>
           <td>{x.unit}</td>
-          <td className="cat-money">{x.current_price ? <b>{x.current_price.display}</b> : <small>{tr("cat.no_price")}</small>}
-            {x.pending_price && <><br/><StatusPill tone="wait">{tr("cat.pending_short", {p0: x.pending_price.display, p1: pct(x.pending_price.change_pct)})}</StatusPill></>}
-            {x.scheduled_price && <><br/><small>{tr("cat.scheduled", {p0: x.scheduled_price.display, p1: day(x.scheduled_price.effective_from)})}</small></>}</td>
+          <td className="cat-money">{x.current_price ? <b>{fmtPrice(x.current_price)}</b> : <small>{tr("cat.no_price")}</small>}
+            {x.pending_price && <><br/><StatusPill tone="wait">{tr("cat.pending_short", {p0: fmtPrice(x.pending_price), p1: pct(x.pending_price.change_pct)})}</StatusPill></>}
+            {x.scheduled_price && <><br/><small>{tr("cat.scheduled", {p0: fmtPrice(x.scheduled_price), p1: day(x.scheduled_price.effective_from)})}</small></>}</td>
           <td><StatusPill tone={ST_TONE[x.status]}>{tr(`cat.st_${x.status}` as Key)}</StatusPill></td>
         </tr>)}</tbody></table></div>
     {sel && <ProductDetail id={sel} can={can} onChanged={reload} onClose={() => setSel(null)}/>}
@@ -118,7 +118,7 @@ function ProductDetail({id, can, onChanged, onClose}: {id: number; can: boolean;
       <button className="ui-btn is-ghost is-sm" onClick={onClose}>{tr("docs.close")}</button></div>
     <p>{p.description}</p>
     <div className="tmRow">
-      <span className="ui-pill">{tr("cat.price_now")}: <b>{p.current_price ? `${p.current_price.display} / ${p.unit}` : tr("cat.no_price")}</b></span>
+      <span className="ui-pill">{tr("cat.price_now")}: <b>{p.current_price ? `${fmtPrice(p.current_price)} / ${p.unit}` : tr("cat.no_price")}</b></span>
       {p.policies.return_days != null && <span className="ui-pill">{tr("cat.return_days")}: <b>{p.policies.return_days}</b></span>}
       {p.policies.warranty_months != null && <span className="ui-pill">{tr("cat.warranty_months")}: <b>{p.policies.warranty_months}</b></span>}
       <span className="ui-pill">{tr("cat.sheet")}: <b>{p.document ? `${p.document.doc_code} v${p.document.version_no}` : "—"}</b></span>
@@ -133,7 +133,7 @@ function ProductDetail({id, can, onChanged, onClose}: {id: number; can: boolean;
         : <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => run(() => apiCatalog.patch(p.id, {status: "active"}), tr("docs.saved"))}>{tr("cat.reactivate")}</button>}
     </div>}
     {pend && <div className="ui-banner" data-testid="cat-pending">
-      <div><b>{tr("cat.pending_title", {p0: pend.display, p1: pct(pend.change_pct)})}</b><br/>
+      <div><b>{tr("cat.pending_title", {p0: fmtPrice(pend), p1: pct(pend.change_pct)})}</b><br/>
         <small>{tr("cat.pending_detail", {p0: day(pend.effective_from), p1: tr(pend.risk === "high" ? "cat.risk_high" : "cat.risk_normal")})}{pend.note ? ` · ${pend.note}` : ""}</small>
         <div className="tmRow">
           <input className="ui-input" placeholder={tr("cat.decide_note")} value={note} onChange={e => setNote(e.target.value)}/>
@@ -154,7 +154,7 @@ function ProductDetail({id, can, onChanged, onClose}: {id: number; can: boolean;
     <div className="ui-panel"><table className="ui-table" data-testid="cat-history"><thead><tr>
       <th>{tr("cat.price")}</th><th>{tr("cat.change")}</th><th>{tr("cat.window")}</th><th>{tr("cat.status")}</th><th>{tr("cat.who")}</th></tr></thead>
       <tbody>{p.history.map((h: any) => <tr key={h.id} className={h.in_effect ? "is-selected" : ""}>
-        <td className="cat-money"><b>{h.display}</b>{h.channel !== "default" && <><br/><small>{h.channel}</small></>}</td>
+        <td className="cat-money"><b>{fmtPrice(h)}</b>{h.channel !== "default" && <><br/><small>{h.channel}</small></>}</td>
         <td>{pct(h.change_pct)}</td>
         <td>{day(h.effective_from)} → {h.effective_to ? day(h.effective_to) : "…"}</td>
         <td><StatusPill tone={PR_TONE[h.status]}>{tr(`cat.ps_${h.status}` as Key)}</StatusPill>
@@ -176,7 +176,7 @@ function AgentPreview({companyId}: {companyId: number}) {
       <button className="ui-btn is-ghost is-sm" disabled={!q.trim()} onClick={go} data-testid="cat-preview-go">{tr("cat.preview_go")}</button>
     </div>
     {res && (res.products.length === 0 ? <p><small>{res.note}</small></p> : <ul className="cat-preview" data-testid="cat-preview-out">
-      {res.products.map((x: any) => <li key={x.sku}><code className="doc-code">{x.sku}</code> <b>{x.name}</b> — {x.price ? <b>{x.price.display} / {x.price.per}</b> : <StatusPill tone="risk">{tr("cat.no_price")}</StatusPill>}
+      {res.products.map((x: any) => <li key={x.sku}><code className="doc-code">{x.sku}</code> <b>{x.name}</b> — {x.price ? <b>{fmtPrice(x.price)} / {x.price.per}</b> : <StatusPill tone="risk">{tr("cat.no_price")}</StatusPill>}
         {x.warning && <><br/><small>{x.warning}</small></>}
         {Object.keys(x.policies || {}).length > 0 && <><br/><small>{Object.entries(x.policies).map(([k, v]: any) => `${k}: ${typeof v === "object" ? `${v.value} (${v.source})` : v}`).join(" · ")}</small></>}</li>)}
     </ul>)}

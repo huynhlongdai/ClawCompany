@@ -7,7 +7,19 @@ import {ErrorBanner} from "./ui/EmptyState";
 import {SkeletonRows} from "./ui/Skeleton";
 import {useToast} from "./ui/Toast";
 import {Field, FormRow} from "./ui/Field";
-import {t as tr, type Key} from "../lib/i18n";
+import {fmtUsd, t as tr, type Key} from "../lib/i18n";
+
+/** Điều khoản thuê ghép theo ngôn ngữ từ số liệu (USD), không hiện câu tiếng Việt backend ghép sẵn. */
+export function termsLine(t: any): string {
+  if (!t) return "";
+  const parts: string[] = [];
+  if (t.price_per_task_usd) parts.push(tr("rental.t_task", {p0: fmtUsd(t.price_per_task_usd)}));
+  if (t.price_per_hour_usd) parts.push(tr("rental.t_hour", {p0: fmtUsd(t.price_per_hour_usd)}));
+  if (t.price_per_month_usd) parts.push(tr("rental.t_month", {p0: fmtUsd(t.price_per_month_usd)}));
+  parts.push(tr("rental.t_markup", {p0: t.markup_pct || 0}));
+  if (t.monthly_cost_cap_usd) parts.push(tr("rental.t_cap", {p0: fmtUsd(t.monthly_cost_cap_usd)}));
+  return parts.join(" · ");
+}
 import {useLoad} from "./CompanyOperations";
 
 export const usd = (v: number | null | undefined) => v == null ? "—" : `$${(Math.round(v * 10000) / 10000).toLocaleString("en-US")}`;
@@ -173,7 +185,7 @@ export function LeaseOutTab({companyId, caps}: {companyId: number | null; caps: 
           <td>{ls.renter.company ? <>{ls.renter.company}<br/><small>{ls.renter.organization}</small></>
             : ls.offer_code ? <><code data-testid={`offer-code-${ls.id}`}>{ls.offer_code}</code><br/><small>{tr("rental.share_code")} · {tr("rental.expires")} {dt(ls.offer_expires_at)}</small></> : "—"}</td>
           <td><LeaseStatus s={ls.status}/>{ls.status_reason ? <><br/><small>{ls.status_reason}</small></> : null}</td>
-          <td><small>{ls.terms.line}</small></td>
+          <td><small>{termsLine(ls.terms)}</small></td>
           <td><CostBar used={ls.usage.month.billed_usd} cap={ls.terms.monthly_cost_cap_usd}/>
             <small>{ls.usage.task_runs} {tr("rental.runs")} · {Object.entries(ls.usage.by_channel || {}).map(([k, v]: any) => `${k} ${v.calls}`).join(" · ")}</small>
             <ChangeRequests ls={ls} side="provider" busy={busy} act={act}/></td>
@@ -225,7 +237,7 @@ export function LeasedTab({companyId, caps}: {companyId: number | null; caps: an
         <Field label={tr("rental.position")}><select className="ui-input" value={pos} onChange={e => setPos(e.target.value)} data-testid="accept-position">
           <option value="">—</option>{posItems.map((p: any) => <option key={p.id} value={p.id}>{p.title}</option>)}</select></Field>
       </FormRow>
-      {pv && <p data-testid="accept-preview"><b>{pv.agent_name}</b> · {pv.provider_company}<br/><small>{pv.terms}</small>
+      {pv && <p data-testid="accept-preview"><b>{pv.agent_name}</b> · {pv.provider_company}<br/><small>{pv.terms_detail ? termsLine(pv.terms_detail) : pv.terms}</small>
         {pv.allowed_tools?.length ? <><br/><small>{tr("rental.tools")}: {pv.allowed_tools.join(", ")}</small></> : null}</p>}
       <button className="ui-btn" disabled={busy || !code.trim()} onClick={preview} data-testid="accept-preview-btn">{tr("rental.preview")}</button>{" "}
       <button className="ui-btn is-primary" disabled={busy || !pv || !pos} onClick={accept} data-testid="accept-save">{tr("rental.accept")}</button>
@@ -238,7 +250,7 @@ export function LeasedTab({companyId, caps}: {companyId: number | null; caps: an
           <td><b>{ls.provider.agent_name}</b><br/><small>#{ls.id} · {tr("rental.until")} {dt(ls.ends_at)}</small></td>
           <td>{ls.provider.company}<br/><small>{ls.provider.organization}</small></td>
           <td><LeaseStatus s={ls.status}/>{ls.block_reason ? <><br/><small>{ls.block_reason}</small></> : null}</td>
-          <td><small>{ls.terms.line}</small><br/><small>{tr("rental.approvals_line")}</small></td>
+          <td><small>{termsLine(ls.terms)}</small><br/><small>{tr("rental.approvals_line")}</small></td>
           <td><CostBar used={ls.usage.month.billed_usd} cap={ls.terms.monthly_cost_cap_usd}/>
             <small>{tr("rental.billed_total")} {usd(ls.usage.billed_usd)} · {ls.usage.task_runs} {tr("rental.runs")}</small>
             <ChangeRequests ls={ls} side="renter" busy={busy} act={act}/>

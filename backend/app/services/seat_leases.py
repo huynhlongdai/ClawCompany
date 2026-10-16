@@ -550,6 +550,13 @@ async def accept(db: Session, org_id: int, principal, runtime: Any, data: dict) 
             "agents_md": regen.get("AGENTS.md"), "rules_push": pushed}
 
 
+def terms_of(ls: SeatLease) -> dict:
+    """Điều khoản dạng số (USD — tiền nền tảng) để UI tự ghép theo ngôn ngữ; ``terms_line`` (tiếng Việt) giữ cho Hộp việc."""
+    return {"price_per_task_usd": ls.price_per_task_usd, "price_per_hour_usd": ls.price_per_hour_usd,
+            "price_per_month_usd": ls.price_per_month_usd, "markup_pct": ls.markup_pct,
+            "monthly_cost_cap_usd": ls.monthly_cost_cap_usd}
+
+
 def terms_line(ls: SeatLease) -> str:
     parts = []
     if ls.price_per_task_usd:
@@ -826,7 +833,7 @@ def preview_offer(db: Session, code: str) -> dict:
     src = db.get(Member, ls.provider_member_id)
     pco = db.get(Company, ls.provider_company_id)
     return {"id": ls.id, "name": ls.name, "agent_name": src.name if src else "", "agent_role": src.role if src else "",
-            "provider_company": pco.name if pco else "", "terms": terms_line(ls),
+            "provider_company": pco.name if pco else "", "terms": terms_line(ls), "terms_detail": terms_of(ls),
             "ends_at": ls.ends_at, "offer_expires_at": ls.offer_expires_at,
             "allowed_tools": provider_allowed_tools(db, ls), "approval_policy": _policy(ls)}
 

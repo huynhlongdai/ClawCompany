@@ -329,9 +329,9 @@ export function RecordsTab({companyId, caps}: {companyId: number | null; caps: a
               {i.needs_review && <> <StatusPill tone="wait">{tr("docs.req_to_verify")}</StatusPill></>}
               {i.source === "custom" && <> <StatusPill tone="neutral">{tr("docs.req_custom")}</StatusPill></>}
               <small className="req-basis-m">{i.legal_basis}</small></td>
-            <td><StatusPill tone={REQ_TONE[i.status]}>{tr(statusKey(i.status))}</StatusPill>{i.why && <><br/><small>{i.why}</small></>}</td>
+            <td><StatusPill tone={REQ_TONE[i.status]}>{tr(statusKey(i.status))}</StatusPill>{(i.why_code || i.why) && <><br/><small>{i.why_code ? tr(("docs.why_" + i.why_code) as Key, i.why_params || {}) : i.why}</small></>}</td>
             <td><small>{i.legal_basis}</small></td>
-            <td>{i.documents.map((x: any) => <div key={x.doc_code}><code className="doc-code">{x.doc_code}</code> <small>{x.title}</small></div>)}
+            <td>{i.documents.map((x: any) => <div key={x.doc_code}><code className="doc-code">{x.doc_code}</code> <small>{x.title_key ? tr(("docs." + x.title_key) as Key) : x.title}</small></div>)}
               {can && i.status === "missing" && <div className="tmRow">
                 <select className="ui-input" value={pick[i.id] || ""} onChange={e => setPick({...pick, [i.id]: e.target.value})} data-testid={"req-pick-" + i.key}>
                   <option value="">{tr("docs.req_attach_pick")}</option>

@@ -3142,7 +3142,12 @@
   "cr_new": "Request change",
   "cr_send": "Send request",
   "cr_sent": "Request sent to the provider",
-  "note": "Note"
+  "note": "Note",
+  "t_task": "{p0}/task",
+  "t_hour": "{p0}/hour",
+  "t_month": "{p0}/month",
+  "t_markup": "actual model cost + {p0}%",
+  "t_cap": "cap {p0}/month"
  },
  "company2": {
   "list_title": "Companies you can see",
@@ -3335,7 +3340,14 @@
   "ret_due": "Due for disposal",
   "ret_dispose": "Dispose",
   "ret_confirm": "Dispose of this record's content? Only metadata and hash remain — this cannot be undone.",
-  "ret_disposed": "Record disposed"
+  "ret_disposed": "Record disposed",
+  "why_entity_type": "not applicable to entity type {entity_type}",
+  "why_below_min_humans": "{humans} human employees (< {min}; agents don't count)",
+  "why_above_max_humans": "{humans} human employees (> {max})",
+  "why_no_personal_data": "the company declared it processes no personal data",
+  "why_other_industry": "not this item's industry",
+  "why_disabled": "turned off",
+  "catalog_priced": "Product catalogue with prices"
  },
  "cat": {
   "explain": "The company's products/services and price list — the ONLY price source for agents (tool company_product_lookup, not document text). Prices default to VND. A price change adds a new history row and goes through the authority matrix: under {p0}% → department head, {p0}% or more, or a first price → owner. Agents only see prices in effect.",
@@ -3486,7 +3498,16 @@
   "reason_phrase": "contains “{p0}”",
   "reason_default": "default",
   "reason_source": "from the source",
-  "pii": "{p0} ID numbers, {p1} phones, {p2} emails → personal data, hidden from agents"
+  "pii": "{p0} ID numbers, {p1} phones, {p2} emails → personal data, hidden from agents",
+  "note_image_no_ocr": "Scanned image: Tesseract isn't installed on the server, so no text was read — stored as a record.",
+  "note_ocr_eng_only": "OCR has only the English pack — Vietnamese diacritics may be wrong; please proofread.",
+  "note_pdf_ocr": "PDF had no text layer — OCR applied",
+  "note_pdf_ocr_eng": "PDF had no text layer — OCR applied (English pack only, check diacritics)",
+  "note_pdf_no_ocr": "PDF has no text layer (scan) and the server has no Tesseract/pdftoppm for OCR.",
+  "note_dup_file": "Same file (sha256) as {code}",
+  "note_dup_text": "Same content as {code}",
+  "note_no_text": "No text could be extracted",
+  "note_template_ref": "Reference template, not legal advice — fill in the '……' blanks before submitting for approval"
  },
  "learn": {
   "explain": "Documents improve from operations: agent flags, questions agents/customers couldn't find answers to (clustered from {p0} asks), approved lessons and agent proposals → one DRAFT on the document. A draft only takes effect after the owner edits it, submits it and it is approved through the authority matrix. Once published, the source flags and gaps close and the retrieval eval re-runs to compare before / after. Customer personal data (names, phone, email, ID numbers) is removed before it reaches a draft.",

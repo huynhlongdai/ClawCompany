@@ -3142,7 +3142,12 @@
   "cr_new": "Xin đổi",
   "cr_send": "Gửi yêu cầu",
   "cr_sent": "Đã gửi yêu cầu cho bên cho thuê",
-  "note": "Ghi chú"
+  "note": "Ghi chú",
+  "t_task": "{p0}/việc",
+  "t_hour": "{p0}/giờ",
+  "t_month": "{p0}/tháng",
+  "t_markup": "chi phí model thật + {p0}%",
+  "t_cap": "trần {p0}/tháng"
  },
  "company2": {
   "list_title": "Công ty anh xem được",
@@ -3335,7 +3340,14 @@
   "ret_due": "Tới hạn huỷ",
   "ret_dispose": "Huỷ hồ sơ",
   "ret_confirm": "Huỷ nội dung hồ sơ này? Chỉ còn lại siêu dữ liệu và mã băm — không khôi phục được.",
-  "ret_disposed": "Đã huỷ hồ sơ"
+  "ret_disposed": "Đã huỷ hồ sơ",
+  "why_entity_type": "không áp dụng cho loại hình {entity_type}",
+  "why_below_min_humans": "{humans} người lao động (< {min}; agent không tính)",
+  "why_above_max_humans": "{humans} người lao động (> {max})",
+  "why_no_personal_data": "công ty khai không xử lý dữ liệu cá nhân",
+  "why_other_industry": "không thuộc ngành của mục này",
+  "why_disabled": "đã tắt",
+  "catalog_priced": "Danh mục sản phẩm có giá"
  },
  "cat": {
   "explain": "Danh mục sản phẩm/dịch vụ của công ty và bảng giá — nguồn giá DUY NHẤT cho agent (tool company_product_lookup, không phải đoạn văn tài liệu). Giá mặc định VND. Đổi giá tạo một dòng lịch sử mới và đi qua ma trận phân quyền: dưới {p0}% → trưởng phòng, từ {p0}% hoặc sản phẩm chưa có giá → chủ duyệt. Agent chỉ thấy giá đang hiệu lực.",
@@ -3486,7 +3498,16 @@
   "reason_phrase": "có cụm “{p0}”",
   "reason_default": "mặc định",
   "reason_source": "theo nguồn",
-  "pii": "có {p0} số CCCD, {p1} SĐT, {p2} email → dữ liệu cá nhân, agent không đọc"
+  "pii": "có {p0} số CCCD, {p1} SĐT, {p2} email → dữ liệu cá nhân, agent không đọc",
+  "note_image_no_ocr": "Ảnh scan: máy chủ chưa cài Tesseract nên chưa đọc được chữ — lưu như hồ sơ (record).",
+  "note_ocr_eng_only": "OCR chỉ có gói tiếng Anh — dấu tiếng Việt có thể sai, cần soát lại.",
+  "note_pdf_ocr": "PDF không có lớp chữ — đã OCR",
+  "note_pdf_ocr_eng": "PDF không có lớp chữ — đã OCR (chỉ gói tiếng Anh, cần soát dấu)",
+  "note_pdf_no_ocr": "PDF không có lớp chữ (bản scan) và máy chủ chưa cài Tesseract/pdftoppm để OCR.",
+  "note_dup_file": "Tệp trùng sha256 với {code}",
+  "note_dup_text": "Nội dung trùng với {code}",
+  "note_no_text": "Không trích được chữ",
+  "note_template_ref": "Mẫu tham khảo, không phải tư vấn pháp lý — điền các chỗ '……' trước khi gửi duyệt"
  },
  "learn": {
   "explain": "Tài liệu tự tốt lên từ vận hành: cờ agent đánh dấu, câu hỏi agent/khách tra không ra (gom cụm từ {p0} lượt), bài học đã duyệt và đề xuất của agent → một bản NHÁP trên tài liệu. Nháp chỉ có hiệu lực khi người phụ trách sửa, gửi duyệt và được duyệt theo ma trận. Ban hành xong: cờ và lỗ hổng nguồn được đóng, bộ eval truy hồi chạy lại để so trước / sau. Thông tin cá nhân của khách (tên, SĐT, email, CCCD) được gỡ trước khi vào nháp.",

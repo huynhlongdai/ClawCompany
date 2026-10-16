@@ -160,19 +160,32 @@ def facts_of(db: Session, co: Company) -> dict:
             "personal_data": bool(s.get("personal_data", True)), "templates": templates}
 
 
-def applies(r: DocumentRequirement, f: dict) -> tuple[bool, str]:
+WHY_VI = {"entity_type": "không áp dụng cho loại hình {entity_type}",
+          "below_min_humans": "{humans} người lao động (< {min}; agent không tính)",
+          "above_max_humans": "{humans} người lao động (> {max})",
+          "no_personal_data": "công ty khai không xử lý dữ liệu cá nhân",
+          "other_industry": "không thuộc ngành của mục này", "disabled": "đã tắt"}
+
+
+def applies_code(r: DocumentRequirement, f: dict) -> tuple[bool, str, dict]:
+    """(áp dụng?, mã lý do, tham số) — UI dịch mã (docs.why_<mã>), không hiện câu tiếng Việt ghép sẵn ở bản EN."""
     c = r.condition or {}
     if c.get("entity_types") and f["entity_type"] and f["entity_type"] not in c["entity_types"]:
-        return False, f"không áp dụng cho loại hình {f['entity_type']}"
+        return False, "entity_type", {"entity_type": f["entity_type"]}
     if c.get("min_humans") is not None and f["humans"] < int(c["min_humans"]):
-        return False, f"{f['humans']} người lao động (< {c['min_humans']}; agent không tính)"
+        return False, "below_min_humans", {"humans": f["humans"], "min": int(c["min_humans"])}
     if c.get("max_humans") is not None and f["humans"] > int(c["max_humans"]):
-        return False, f"{f['humans']} người lao động (> {c['max_humans']})"
+        return False, "above_max_humans", {"humans": f["humans"], "max": int(c["max_humans"])}
     if c.get("personal_data") and not f["personal_data"]:
-        return False, "công ty khai không xử lý dữ liệu cá nhân"
+        return False, "no_personal_data", {}
     if c.get("templates") and not set(c["templates"]) & set(f["templates"]):
-        return False, "không thuộc ngành của mục này"
-    return True, ""
+        return False, "other_industry", {}
+    return True, "", {}
+
+
+def applies(r: DocumentRequirement, f: dict) -> tuple[bool, str]:
+    ok, code, params = applies_code(r, f)
+    return ok, (WHY_VI[code].format(**params) if code else "")
 
 
 def _live(doc: KnowledgeDocument, now: datetime) -> bool:
@@ -194,9 +207,10 @@ def evaluate(db: Session, org_id: int, company_id: int | None, *, principal=None
     by_id = {d.id: d for d in docs}
     items = []
     for r in db.query(DocumentRequirement).filter(DocumentRequirement.company_id == co.id).order_by(DocumentRequirement.id):
-        ok_apply, why = applies(r, f)
+        ok_apply, why_code, why_params = applies_code(r, f)
         if not r.enabled:
-            ok_apply, why = False, "đã tắt"
+            ok_apply, why_code, why_params = False, "disabled", {}
+        why = WHY_VI[why_code].format(**why_params) if why_code else ""
         matched = [d for d in docs if d.doc_type in (r.doc_types or []) and _live(d, now)]
         matched += [by_id[i] for i in links.get(r.id, []) if i in by_id and _live(by_id[i], now) and by_id[i] not in matched]
         if r.key == "shop_price_list" and not matched:
@@ -210,9 +224,10 @@ def evaluate(db: Session, org_id: int, company_id: int | None, *, principal=None
         items.append({"id": r.id, "key": r.key, "name": r.name, "name_en": r.name_en or r.name, "pack": r.pack, "level": r.level,
                       "legal_basis": r.legal_basis, "needs_review": bool(r.needs_review), "enabled": bool(r.enabled),
                       "doc_types": r.doc_types or [], "condition": r.condition or {}, "source": r.source, "status": status,
-                      "why": why, "note": r.note,
+                      "why": why, "why_code": why_code, "why_params": why_params, "note": r.note,
                       "documents": [{"id": d.id, "doc_code": d.doc_code, "title": d.title} if not isinstance(d, str)
-                                    else {"id": None, "doc_code": "CATALOG", "title": "Danh mục sản phẩm có giá"} for d in matched][:5]})
+                                    else {"id": None, "doc_code": "CATALOG", "title": "Danh mục sản phẩm có giá", "title_key": "catalog_priced"}
+                                    for d in matched][:5]})
     req = [i for i in items if i["status"] != "na" and i["level"] == "required"]
     return {"company_id": co.id, "facts": f, "items": items, "disclaimer_vi": DISCLAIMER_VI, "disclaimer_en": DISCLAIMER_EN,
             "required_total": len(req), "required_ok": sum(1 for i in req if i["status"] == "ok"),

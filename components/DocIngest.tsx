@@ -9,13 +9,13 @@ import {SkeletonRows} from "./ui/Skeleton";
 import {StatusPill} from "./ui/StatusPill";
 import {useToast} from "./ui/Toast";
 import {Field, FormRow} from "./ui/Field";
-import {getLocale, t as tr, type Key} from "../lib/i18n";
+import {fmtMoney, getLocale, t as tr, type Key} from "../lib/i18n";
 import {useLoad} from "./CompanyOperations";
 
 const IM_TONE: Record<string, any> = {done: "ok", duplicate: "wait", empty: "risk", error: "risk"};
 const SRC_TONE: Record<string, any> = {active: "ok", needs_account: "wait", error: "risk", paused: "neutral"};
 const PROFILE_FIELDS = ["legal_name", "tax_code", "founded_on", "legal_representative", "registered_address", "charter_capital_vnd"];
-const vnd = (n: number) => new Intl.NumberFormat(getLocale() === "en" ? "en-US" : "vi-VN").format(n) + " ₫";
+const vnd = (n: number) => fmtMoney(n, "VND");
 const when = (s?: string | null) => s ? new Date(s + (s.endsWith("Z") ? "" : "Z")).toLocaleString(getLocale() === "en" ? "en-GB" : "vi-VN") : "—";
 
 export function DocIngestTab({companyId, caps}: {companyId: number | null; caps: any}) {
@@ -123,7 +123,7 @@ function ImportCard({im, title, onDecide, canApply}: {im: any; title?: string; o
       {im.document && <span className="ui-pill"><code>{im.document.doc_code}</code> {im.document.title} · {tr(`docs.st_${im.document.status}` as Key)}</span>}
       {im.duplicate_of && <span className="ui-pill is-wait">{tr("ingest.dup_of")} <code>{im.duplicate_of.doc_code}</code></span>}
     </div>
-    {im.note && <p><small>{im.note}</small></p>}
+    {im.note && <p><small>{im.note_code ? tr(("ingest.note_" + im.note_code) as Key, im.note_params || {}) : im.note}</small></p>}
     {s.doc_type && <p><small>{tr("ingest.suggest", {p0: (getLocale() === "en" ? s.doc_type_en : s.doc_type_vi) || s.doc_type,
       p1: s.doc_type_reason === "phrase" ? tr("ingest.reason_phrase", {p0: s.doc_type_hit}) : tr(`ingest.reason_${s.doc_type_reason || "default"}` as Key),
       p2: tr(`docs.sens_${s.sensitivity}` as Key), p3: tr(`docs.use_${s.agent_use}` as Key)})}

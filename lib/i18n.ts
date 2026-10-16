@@ -88,6 +88,16 @@ export function fmtNum(n?: number | null, opts?: Intl.NumberFormatOptions) {
 export function fmtUsd(n?: number | null, digits = 2) {
   return n == null || isNaN(Number(n)) ? "—" : Number(n).toLocaleString(intlLocale(), {style: "currency", currency: "USD", minimumFractionDigits: digits, maximumFractionDigits: Math.max(digits, 2)});
 }
+/** Tiền theo đơn vị của bản ghi (VND cho khách VN, USD cho nền tảng), cách viết số theo locale: vi "1.950.000 ₫",
+ *  en "₫1,950,000". Backend vẫn trả ``display`` (định dạng VN) cho agent/MCP; UI dùng hàm này thay vì hiện chuỗi đó. */
+export function fmtMoney(amount?: number | string | null, currency = "VND") {
+  if (amount == null || amount === "" || isNaN(Number(amount))) return "—";
+  const zero = currency === "VND";
+  try { return Number(amount).toLocaleString(intlLocale(), {style: "currency", currency, minimumFractionDigits: zero ? 0 : 2, maximumFractionDigits: zero ? 0 : 2}); }
+  catch { return `${Number(amount).toLocaleString(intlLocale())} ${currency}`; }
+}
+export const fmtPrice = (p?: {amount?: number; currency?: string; display?: string} | null) =>
+  p ? (p.amount != null ? fmtMoney(p.amount, p.currency || "VND") : p.display || "—") : "—";
 export function fmtRelative(s?: string | number | Date | null) {
   if (s == null || s === "") return "—";
   const d = toDate(s); if (isNaN(d.getTime())) return String(s);
