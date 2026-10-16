@@ -147,6 +147,25 @@ async def wire_gateway(payload: WireIn, principal: Principal = Depends(require_r
                                              **payload.model_dump())
 
 
+@router.get("/gateway/isolation")
+async def gateway_isolation(principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
+    """W0: gateway đang cách ly phiên giữa agent tới đâu (đọc-chỉ, không ghi)."""
+    from app.services import agent_hr, seat_provision
+    from app.services.openclaw_config import ConfigRegistry
+    runtime = get_runtime()
+    if not agent_hr._has_rpc(runtime):
+        return {"skipped": "runtime không phải gateway thật"}
+    snap = await ConfigRegistry(runtime).snapshot()
+    return seat_provision.session_isolation_report(snap["config"] or {}, seat_provision.company_seat_rids(db))
+
+
+@router.post("/gateway/isolation")
+async def gateway_isolation_apply(principal: Principal = Depends(require_role("admin")), db: Session = Depends(get_db)):
+    """W0: đặt visibility=self, agentToAgent tắt, sub-agent chỉ chính ghế — chỉ phần lệch."""
+    from app.services import seat_provision
+    return await seat_provision.ensure_session_isolation(db, get_runtime())
+
+
 @router.post("/provision-all")
 async def provision_all(payload: WireIn, principal: Principal = Depends(require_role("admin")),
                         db: Session = Depends(get_db)):

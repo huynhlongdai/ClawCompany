@@ -24,6 +24,10 @@ Hai việc, tách nhau vì phạm vi khác nhau:
     * ``memory.search``: embedding ``text-embedding-3-small`` qua cùng endpoint
       và cùng SecretRef với provider chat (B9 — trước đó provider là ``openai``
       không có key nên index "dirty", vector search "paused").
+    * W0 cách ly phiên (``session_isolation_values``): ``tools.sessions.visibility``
+      = ``self``, ``tools.agentToAgent.enabled`` = ``false`` (hai khoá TOÀN gateway
+      trên 9.8 — không có bản theo agent) và ``agents.entries.<ghế>.subagents.
+      allowAgents`` = ``[<ghế>]``.
 """
 from __future__ import annotations
 
@@ -222,6 +226,106 @@ def _merge_models(existing: list, wanted: list) -> list:
     return list(by_id.values())
 
 
+# --------------------------------------------------------------- W0 cách ly phiên
+
+# Đo trên gateway thật 2026.9.8 (config.schema.lookup, 17/10/2026 — docs/work-module-review.md §W0):
+#   tools.sessions.visibility  enum self|tree|agent|all, mặc định "all" = mọi phiên trên gateway, kể cả agent khác;
+#   tools.agentToAgent.enabled mặc định true, allow rỗng = mọi cặp agent;
+#   agents.entries.*.subagents.allowAgents  mặc định "chỉ chính agent đó" (docs sessions-and-subagents).
+# Hai khoá đầu chỉ có ở gốc ``tools`` (agents.entries.*.tools không có ``sessions``/``agentToAgent``) nên đặt cho
+# cả gateway: bên cho thuê và bên thuê ghế (R2) dùng chung gateway không đọc/nhắn được phiên của nhau. Mọi trao
+# đổi giữa nhân sự đi qua task/bàn giao/A2A của ClawCompany (có chủ, có sổ, có chi phí). Cả ba khoá reloadKind=hot.
+SESSION_VISIBILITY = "self"
+ISOLATION_GLOBAL: dict[tuple, Any] = {
+    ("tools", "sessions", "visibility"): SESSION_VISIBILITY,
+    ("tools", "agentToAgent", "enabled"): False,
+}
+
+
+def _get_path(config: dict, path: tuple) -> Any:
+    cur: Any = config
+    for k in path:
+        if not isinstance(cur, dict) or k not in cur:
+            return None
+        cur = cur[k]
+    return cur
+
+
+def session_isolation_values(config: dict, rids: list[str]) -> tuple[dict[tuple, Any], list[tuple]]:
+    """Các giá trị cần ghi (chỉ phần đang lệch) + replace_paths cho mảng allowAgents. Không có gì lệch → ({}, [])."""
+    values: dict[tuple, Any] = {}
+    replace: list[tuple] = []
+    for path, want in ISOLATION_GLOBAL.items():
+        if _get_path(config or {}, path) != want:
+            values[path] = want
+    for rid in sorted(set(r for r in rids if r)):
+        path = ("agents", "entries", rid, "subagents", "allowAgents")
+        if _get_path(config or {}, path) != [rid]:
+            values[path] = [rid]
+            replace.append(path)
+    return values, replace
+
+
+def session_isolation_report(config: dict, rids: list[str]) -> dict:
+    """Đọc-chỉ: gateway đang ở đâu so với mức an toàn (giá trị None = chưa đặt → mặc định mở của OpenClaw)."""
+    values, _ = session_isolation_values(config, rids)
+    drift = [{"path": ".".join(p), "current": _get_path(config or {}, p), "want": v} for p, v in values.items()]
+    return {"ok": not drift, "drift": drift,
+            "visibility": _get_path(config or {}, ("tools", "sessions", "visibility")),
+            "agent_to_agent_enabled": _get_path(config or {}, ("tools", "agentToAgent", "enabled")),
+            "seats": len(set(r for r in rids if r))}
+
+
+def company_seat_rids(db: Session, org_id: int | None = None) -> list[str]:
+    q = select(Agent.runtime_agent_id).join(Member, Agent.member_id == Member.id).where(
+        Agent.runtime_agent_id.isnot(None), Agent.runtime_agent_id != "", Agent.lifecycle != "retired")
+    if org_id is not None:
+        q = q.where(Member.organization_id == org_id)
+    return sorted({r for (r,) in db.execute(q).all() if r})
+
+
+async def ensure_session_isolation(db: Session, runtime: Any, *, dry_run: bool = False) -> dict:
+    """Đặt ba khoá cách ly cho mọi ghế ClawCompany đang có trên gateway (mọi tổ chức — khoá gốc là toàn gateway).
+
+    Idempotent: chỉ patch phần lệch; đã đúng → không gọi config.patch."""
+    if not agent_hr._has_rpc(runtime):
+        return {"skipped": "runtime không phải gateway thật"}
+    registry = ConfigRegistry(runtime)
+    snap = await registry.snapshot()
+    config = snap["config"] or {}
+    try:
+        roster = {agent_hr._rid_of(a) for a in await runtime.list_agents()}
+    except Exception:  # noqa: BLE001 — không đọc được roster thì chỉ đặt khoá gốc
+        roster = set()
+    rids = [r for r in company_seat_rids(db) if r in roster]
+    values, replace = session_isolation_values(config, rids)
+    if not values:
+        return {"changed": [], **session_isolation_report(config, rids)}
+    result = await registry.patch(values, base_hash=snap["hash"] or None, replace_paths=replace,
+                                  note="ClawCompany W0 · cách ly phiên giữa agent", dry_run=dry_run)
+    return {"changed": [".".join(p) for p in values], "dry_run": dry_run,
+            "changed_paths": result.get("changed_paths"), "seats": len(rids)}
+
+
+def schedule_session_isolation() -> None:
+    """Chạy nền khi API khởi động (native): gateway mới dựng/khôi phục cũng về mức an toàn mà không cần ai bấm."""
+    import asyncio
+    import logging
+    from app.db.session import SessionLocal
+    from app.runtime.factory import get_runtime
+    runtime = get_runtime()
+    if not agent_hr._has_rpc(runtime):
+        return
+    db = SessionLocal()
+    try:
+        out = asyncio.run(ensure_session_isolation(db, runtime))
+        logging.getLogger(__name__).info("W0 session isolation: %s", out)
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).exception("W0: không đặt được cách ly phiên trên gateway")
+    finally:
+        db.close()
+
+
 async def wire_gateway(db: Session, principal, org_id: int, runtime: Any, *, mcp_url: str | None = None,
                        models: bool = True, memory: bool = True, mcp: bool = True,
                        seat_models: bool = True, allow_restart: bool = False,
@@ -310,6 +414,12 @@ async def wire_gateway(db: Session, principal, org_id: int, runtime: Any, *, mcp
                 replace.append(("agents", "entries", rid, "model", "fallbacks"))
             if not dry_run:
                 agent.model = cfg["model"]["primary"]; db.add(agent)
+
+    # W0: mỗi lần nối dây cũng kéo gateway về mức cách ly phiên (chỉ phần lệch).
+    iso_values, iso_replace = session_isolation_values(config, [a.runtime_agent_id for a, _ in seats])
+    values.update(iso_values)
+    replace += iso_replace
+    summary["session_isolation"] = [".".join(p) for p in iso_values] or "đã đúng, không đổi"
 
     if not values:
         raise HTTPException(422, "Không có gì để ghi")

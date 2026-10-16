@@ -269,6 +269,20 @@ async def start_routines_tick() -> None:
 
 
 @app.on_event("startup")
+async def enforce_session_isolation() -> None:
+    """W0: gateway dùng chung giữa tổ chức/bên thuê — phiên của agent này không được agent khác đọc/nhắn."""
+    if settings.openclaw_mode not in ("native", "gateway") or not settings.openclaw_enforce_session_isolation:
+        return
+    import asyncio
+
+    from app.services import seat_provision
+    try:
+        asyncio.get_running_loop().run_in_executor(None, seat_provision.schedule_session_isolation)
+    except Exception as exc:  # noqa: BLE001 - never block startup
+        print(f"[W0] session isolation not scheduled: {exc}")
+
+
+@app.on_event("startup")
 async def start_approval_listener() -> None:
     """Gate M4b: socket thường trực nhận thẻ duyệt exec của gateway (chỉ khi đã xin quyền duyệt)."""
     if settings.openclaw_mode not in ("native", "gateway") or not settings.openclaw_request_approvals_scope:

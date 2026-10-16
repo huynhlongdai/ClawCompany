@@ -48,7 +48,7 @@ SCOPED_ENDPOINTS = {
 # endpoint cấp tổ chức trong module đã lọc → đóng với người bị giới hạn
 ORG_ONLY = {
     ("app.api.tasks", "cost_reconciliation"), ("app.api.tasks", "list_wakeups"), ("app.api.tasks", "drain_wakeups"),
-    ("app.api.agents", "wire_gateway"), ("app.api.agents", "provision_all"), ("app.api.agents", "model_tier_report"),
+    ("app.api.agents", "wire_gateway"), ("app.api.agents", "gateway_isolation"), ("app.api.agents", "gateway_isolation_apply"), ("app.api.agents", "provision_all"), ("app.api.agents", "model_tier_report"),
     ("app.api.agents", "runtime_health"), ("app.api.companies", "create_company"),
     ("app.api.inbox", "create_budget"),
 }
