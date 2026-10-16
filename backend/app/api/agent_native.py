@@ -250,3 +250,98 @@ def submit_output(task_id: int, payload: OutputIn, principal: Principal = Depend
         return ioc.submit(db, t, member, payload.output, via="api")
     except ioc.SubmitError as exc:
         raise HTTPException(exc.status, exc.message) from exc
+
+
+# ------------------------------------------------------------------ M2e.4 vận hành 24/7
+
+class ScheduleIn(BaseModel):
+    weekly: dict | None = None
+    timezone: str | None = None
+    observe_holidays: bool | None = None
+
+
+class LeaveIn(BaseModel):
+    start_date: str
+    end_date: str | None = None
+    kind: str = "annual"
+    note: str = ""
+
+
+class SlaIn(BaseModel):
+    company_id: int | None = None
+    name: str | None = None
+    position_id: int | None = None
+    process_step_id: int | None = None
+    first_response_minutes: int | None = None
+    resolution_minutes: int | None = None
+    enabled: bool | None = None
+
+
+@router.get("/coverage")
+def coverage(company_id: int | None = None, principal: Principal = Depends(require_role("member")),
+             db: Session = Depends(get_db)):
+    from app.services import operating_time as ot
+    return ot.coverage(db, active_org(principal), company_id)
+
+
+@router.get("/seats/{member_id}/schedule")
+def seat_schedule(member_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+    from app.services import operating_time as ot
+    return ot.seat_view(db, ot._member(db, active_org(principal), member_id))
+
+
+@router.put("/seats/{member_id}/schedule")
+def save_seat_schedule(member_id: int, payload: ScheduleIn, principal: Principal = Depends(require_role("manager")),
+                       db: Session = Depends(get_db)):
+    from app.services import operating_time as ot
+    return ot.save_schedule(db, active_org(principal), member_id, payload.model_dump(exclude_unset=True))
+
+
+@router.post("/seats/{member_id}/leaves")
+def add_leave(member_id: int, payload: LeaveIn, principal: Principal = Depends(require_role("manager")),
+              db: Session = Depends(get_db)):
+    from app.services import operating_time as ot
+    return ot.add_leave(db, active_org(principal), member_id, payload.model_dump())
+
+
+@router.delete("/leaves/{leave_id}")
+def delete_leave(leave_id: int, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    from app.services import operating_time as ot
+    return ot.delete_leave(db, active_org(principal), leave_id)
+
+
+@router.get("/sla-policies")
+def sla_policies(company_id: int | None = None, principal: Principal = Depends(require_role("member")),
+                 db: Session = Depends(get_db)):
+    from app.models.agent_native import SlaPolicy
+    from app.services import operating_time as ot
+    from app.services.company_foundation import _company
+    co = _company(db, active_org(principal), company_id)
+    return {"items": [ot.public_policy(db, p) for p in db.query(SlaPolicy).filter(SlaPolicy.company_id == co.id).all()]}
+
+
+@router.post("/sla-policies")
+def create_sla(payload: SlaIn, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    from app.services import operating_time as ot
+    return ot.public_policy(db, ot.create_policy(db, active_org(principal), payload.model_dump(exclude_unset=True)))
+
+
+@router.patch("/sla-policies/{policy_id}")
+def update_sla(policy_id: int, payload: SlaIn, principal: Principal = Depends(require_role("manager")),
+               db: Session = Depends(get_db)):
+    from app.services import operating_time as ot
+    data = payload.model_dump(exclude_unset=True); data.pop("company_id", None)
+    return ot.public_policy(db, ot.update_policy(db, active_org(principal), policy_id, data))
+
+
+@router.delete("/sla-policies/{policy_id}")
+def delete_sla(policy_id: int, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    from app.services import operating_time as ot
+    return ot.delete_policy(db, active_org(principal), policy_id)
+
+
+@router.post("/sla/tick")
+def sla_tick_now(principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    """Chạy ngay một nhịp của beat ``sla.tick`` (beat chạy mỗi 60 giây)."""
+    from app.services import operating_time as ot
+    return ot.tick(db)

@@ -42,6 +42,8 @@ CORE_BEAT_SCHEDULE = {
     "tick-compliance-calendar": {"task": "compliance.tick", "schedule": 3600.0},
     # M2d.2: lịch sử KPI — chụp số kỳ hiện tại + đóng băng kỳ vừa qua.
     "snapshot-kpis": {"task": "kpi.snapshot", "schedule": 3600.0},
+    # M2e.4: đồng hồ SLA (quá hạn → leo thang) + việc tới ngoài giờ của người → agent cùng chức danh / xếp hàng.
+    "tick-sla": {"task": "sla.tick", "schedule": 60.0},
 }
 
 

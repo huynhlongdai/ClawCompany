@@ -338,3 +338,133 @@ export function ContractsTab({companyId, caps}: {companyId: number | null; caps:
           {!o.valid && <div><small>{o.errors.slice(0, 3).map((e: any) => `${e.path}: ${e.message}`).join("; ")}</small></div>}</td></tr>)}</tbody></table></div>}
   </section>;
 }
+
+// ===================================================================== M2e.4 vận hành 24/7
+const DAYS = [0, 1, 2, 3, 4, 5, 6];
+const rangesText = (r: string[][] | undefined) => (r || []).map(x => `${x[0]}-${x[1]}`).join(", ");
+const parseRanges = (s: string) => s.split(",").map(x => x.trim()).filter(Boolean).map(x => x.split("-").map(y => y.trim()));
+const localTime = (iso: string | null) => iso ? new Date(iso + "Z").toLocaleString(intlLocale(), {timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit"}) : "—";
+
+function Grid({grid}: {grid: any[][]}) {
+  return <table className="cov-grid" aria-label="7x24"><thead><tr><th></th>{Array.from({length: 24}, (_, h) => <th key={h}>{h % 3 === 0 ? h : ""}</th>)}</tr></thead>
+    <tbody>{DAYS.map(d => <tr key={d}><th>{tr(`native.dow_${d}` as Key)}</th>{grid[d].map((c: any, h: number) => {
+      const cls = c.agents && c.humans ? "is-both" : c.agents ? "is-agent" : c.humans ? "is-human" : "is-gap";
+      return <td key={h} className={cls} title={`${tr(`native.dow_${d}` as Key)} ${h}:00 — ${tr("native.cov_cell", {p0: c.agents, p1: c.humans})}`}/>;
+    })}</tr>)}</tbody></table>;
+}
+
+export function CoverageTab({companyId, caps}: {companyId: number | null; caps: any}) {
+  const {data, error, reload, setError} = useLoad(() => apiNative.coverage(companyId), [companyId]);
+  const [busy, setBusy] = useState(false), [sla, setSla] = useState<any>(null), [sched, setSched] = useState<any>(null);
+  const [leave, setLeave] = useState<any>({start_date: "", end_date: "", kind: "annual"});
+  const toast = useToast();
+  const can = !!caps?.invite || !!caps?.manage_roles;
+  if (error && !data) return <ErrorBanner error={error} onRetry={reload} testId="coverage-error"/>;
+  if (!data) return <SkeletonRows n={4} h={44}/>;
+  const d: any = data;
+  async function run(fn: () => Promise<any>, ok: string, after?: () => void) {
+    setBusy(true); setError(null);
+    try { await fn(); toast(ok); after?.(); await reload(); } catch (e) { setError(e); } finally { setBusy(false); }
+  }
+  const saveSla = () => run(() => sla.id ? apiNative.updateSla(sla.id, sla) : apiNative.createSla({...sla, company_id: companyId ?? d.company_id}),
+    tr("native.sla_saved"), () => setSla(null));
+  const openSched = (h: any) => setSched({member_id: h.member_id, name: h.name, observe_holidays: h.observe_holidays,
+    days: Object.fromEntries(DAYS.map(x => [x, rangesText(h.weekly?.[String(x)])]))});
+  const saveSched = () => run(() => apiNative.saveSchedule(sched.member_id, {observe_holidays: sched.observe_holidays,
+    weekly: Object.fromEntries(DAYS.map(x => [String(x), parseRanges(sched.days[x] || "")]))}), tr("native.sched_saved"), () => setSched(null));
+  const sr = d.sla || {};
+  return <section className="ui-section" data-testid="coverage">
+    {error ? <ErrorBanner error={error} onClose={() => setError(null)}/> : null}
+    <p className="tmGuide">{tr("native.coverage_explain")}</p>
+    <div className="ui-grid is-4">{[[tr("native.cov_rate"), pct(d.coverage_rate)], [tr("native.sla_rate"), pct(sr.rate)],
+      [tr("native.queue"), d.queue], [tr("native.breached_open"), d.breached_open]].map(([l, v], i) =>
+      <section key={i} className="ui-panel tm-card"><small>{l}</small><div className="ops-big"><b className="ui-num">{v}</b></div></section>)}</div>
+    <small className="tmGuide">{tr("native.sla_split", {p0: pct(sr.agent), p1: pct(sr.human), p2: sr.closed ?? 0})}</small>
+    <div className="cov-legend"><span className="is-agent"/> {tr("native.leg_agent")} <span className="is-human"/> {tr("native.leg_human")}
+      <span className="is-both"/> {tr("native.leg_both")} <span className="is-gap"/> {tr("native.leg_gap")}</div>
+
+    {d.positions.map((p: any) => <section key={p.position_id} className="ui-panel tm-card" data-testid={`cov-pos-${p.position_id}`}>
+      <div className="tm-card-head"><div><b>{p.title}</b>
+        <span>{tr("native.cov_hours", {p0: p.covered_hours, p1: p.agent_hours, p2: p.human_hours})} · {tr("native.queue")}: {p.queue}
+          {p.sla ? ` · SLA: ${p.sla.first_response_minutes ? tr("native.sla_fr", {p0: p.sla.first_response_minutes}) : ""} ${p.sla.resolution_minutes ? tr("native.sla_res", {p0: p.sla.resolution_minutes}) : ""}` : ""}</span></div>
+        {p.covered_hours < 168 && p.seats.length > 0 && <span className="ui-pill is-wait">{tr("native.cov_gap", {p0: 168 - p.covered_hours})}</span>}</div>
+      {p.seats.length === 0 ? <small>{tr("native.cov_no_seats")}</small> : <>
+        <Grid grid={p.grid}/>
+        <ul className="cov-seats">{p.seats.map((s: any) => <li key={s.member_id}>
+          <b>{s.name}</b> <span className={"ui-pill " + (s.on_duty ? "is-ok" : "is-mid")}>{s.always_on ? tr("native.always_on") : s.on_duty ? tr("native.on_duty") : tr("native.off_duty")}</span>
+          {!s.on_duty && s.next_on_duty_local && <small> {tr("native.back_at", {p0: s.next_on_duty_local})}</small>}
+          {s.off_today && <small> · {s.off_today}</small>}
+        </li>)}</ul></>}
+      {p.queued_after_hours.length > 0 && <ul className="ops-issues">{p.queued_after_hours.map((q: any) => <li key={q.task_id}>
+        • <a href={`/app/tasks/${q.task_id}`}>#{q.task_id}</a> — {q.reason}</li>)}</ul>}
+    </section>)}
+
+    <h3 className="ops-cat">{tr("native.sla_title")}</h3>
+    <div className="tmRow">{can && <button className="ui-btn is-primary is-sm" onClick={() => setSla({name: "", position_id: null, process_step_id: null,
+      first_response_minutes: 15, resolution_minutes: 240})} data-testid="sla-new">{tr("native.sla_new")}</button>}</div>
+    {sla && <section className="ui-panel tm-card" data-testid="sla-form"><fieldset className="ui-form cf-form" disabled={busy}>
+      <FormRow>
+        <Field label={tr("native.f_name")}><input value={sla.name || ""} onChange={e => setSla({...sla, name: e.target.value})}/></Field>
+        <Field label={tr("native.sla_scope_pos")}><select value={sla.position_id ?? ""} data-testid="sla-pos"
+          onChange={e => setSla({...sla, position_id: e.target.value ? Number(e.target.value) : null, process_step_id: null})}>
+          <option value="">—</option>{d.positions.map((p: any) => <option key={p.position_id} value={p.position_id}>{p.title}</option>)}</select></Field>
+        <Field label={tr("native.sla_scope_step")}><select value={sla.process_step_id ?? ""} data-testid="sla-step"
+          onChange={e => setSla({...sla, process_step_id: e.target.value ? Number(e.target.value) : null, position_id: null})}>
+          <option value="">—</option>{d.steps.map((s: any) => <option key={s.id} value={s.id}>{s.label}</option>)}</select></Field>
+      </FormRow>
+      <FormRow>
+        <Field label={tr("native.sla_fr_min")}><input inputMode="numeric" value={sla.first_response_minutes ?? ""}
+          onChange={e => setSla({...sla, first_response_minutes: e.target.value ? Number(e.target.value) : null})} data-testid="sla-fr"/></Field>
+        <Field label={tr("native.sla_res_min")}><input inputMode="numeric" value={sla.resolution_minutes ?? ""}
+          onChange={e => setSla({...sla, resolution_minutes: e.target.value ? Number(e.target.value) : null})} data-testid="sla-res"/></Field>
+      </FormRow></fieldset>
+      <small className="tmGuide">{tr("native.sla_hint")}</small>
+      <div className="tmRow"><button className="ui-btn is-primary" disabled={busy} onClick={saveSla} data-testid="sla-save">{tr("native.save")}</button>
+        <button className="ui-btn is-ghost" onClick={() => setSla(null)}>{tr("native.cancel")}</button></div></section>}
+    {d.policies.length === 0 ? <p><small>{tr("native.sla_empty")}</small></p>
+      : <div className="ui-panel"><table className="ui-table" data-testid="sla-table"><thead><tr><th>{tr("native.f_name")}</th><th>{tr("native.sla_scope")}</th>
+        <th>{tr("native.sla_fr_min")}</th><th>{tr("native.sla_res_min")}</th><th></th></tr></thead>
+        <tbody>{d.policies.map((p: any) => <tr key={p.id} className={p.enabled ? "" : "is-muted"}><td>{p.name || "—"}</td><td>{p.step || p.position}</td>
+          <td className="ui-num">{p.first_response_minutes ?? "—"}</td><td className="ui-num">{p.resolution_minutes ?? "—"}</td>
+          <td style={{textAlign: "right"}}>{can && <><button className="ui-btn is-ghost is-sm" onClick={() => setSla({...p})}>{tr("native.edit")}</button>
+            <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => run(() => apiNative.deleteSla(p.id), tr("native.rule_deleted"))}>{tr("native.delete")}</button></>}</td></tr>)}</tbody></table></div>}
+
+    <h3 className="ops-cat">{tr("native.human_hours")}</h3>
+    <div className="ui-panel"><table className="ui-table" data-testid="human-hours"><thead><tr><th>{tr("native.seat")}</th><th>{tr("native.week_hours")}</th>
+      <th>{tr("native.now")}</th><th>{tr("native.leaves")}</th><th></th></tr></thead>
+      <tbody>{d.humans.map((h: any) => <tr key={h.member_id}><td>{h.name}{h.default_schedule ? <small> · {tr("native.default_sched")}</small> : null}</td>
+        <td className="ui-num">{h.weekly_hours}</td>
+        <td>{h.on_duty ? tr("native.on_duty") : `${tr("native.off_duty")}${h.next_on_duty_local ? " · " + tr("native.back_at", {p0: h.next_on_duty_local}) : ""}`}</td>
+        <td>{h.leaves.map((l: any) => <span key={l.id} className="ui-pill is-outline">{l.start_date}{l.end_date !== l.start_date ? ` → ${l.end_date}` : ""} {tr(`native.leave_${l.kind}` as Key)}
+          {can && <button className="ui-btn is-ghost is-sm" aria-label={tr("native.delete")} onClick={() => run(() => apiNative.deleteLeave(l.id), tr("native.sched_saved"))}>✕</button>}</span>)}</td>
+        <td style={{textAlign: "right"}}>{can && <button className="ui-btn is-ghost is-sm" onClick={() => openSched(h)} data-testid={`sched-${h.member_id}`}>{tr("native.edit_hours")}</button>}</td></tr>)}</tbody></table></div>
+    {sched && <section className="ui-panel tm-card" data-testid="sched-form">
+      <div className="tm-card-head"><div><b>{sched.name}</b><span>{tr("native.sched_hint")}</span></div></div>
+      <div className="cov-days">{DAYS.map(x => <label key={x} className="tmInline">{tr(`native.dow_${x}` as Key)}
+        <input value={sched.days[x]} placeholder="08:00-12:00, 13:30-17:30" onChange={e => setSched({...sched, days: {...sched.days, [x]: e.target.value}})}/></label>)}</div>
+      <label className="tmInline"><input type="checkbox" checked={sched.observe_holidays} onChange={e => setSched({...sched, observe_holidays: e.target.checked})}/> {tr("native.observe_holidays")}</label>
+      <div className="tmRow"><button className="ui-btn is-primary" disabled={busy} onClick={saveSched}>{tr("native.save")}</button>
+        <button className="ui-btn is-ghost" onClick={() => setSched(null)}>{tr("native.cancel")}</button></div>
+      <div className="tmRow"><b>{tr("native.add_leave")}</b>
+        <input type="date" value={leave.start_date} onChange={e => setLeave({...leave, start_date: e.target.value})} aria-label={tr("native.leave_from")}/>
+        <input type="date" value={leave.end_date} onChange={e => setLeave({...leave, end_date: e.target.value})} aria-label={tr("native.leave_to")}/>
+        <select value={leave.kind} onChange={e => setLeave({...leave, kind: e.target.value})}>{["annual", "sick", "other"].map(k =>
+          <option key={k} value={k}>{tr(`native.leave_${k}` as Key)}</option>)}</select>
+        <button className="ui-btn is-ghost is-sm" disabled={busy || !leave.start_date} onClick={() => run(() => apiNative.addLeave(sched.member_id,
+          {...leave, end_date: leave.end_date || leave.start_date}), tr("native.sched_saved"))}>{tr("native.add")}</button></div>
+    </section>}
+
+    <h3 className="ops-cat">{tr("native.sla_timers")}</h3>
+    {d.timers.length === 0 ? <p><small>{tr("native.no_timers")}</small></p>
+      : <div className="ui-panel"><table className="ui-table" data-testid="sla-timers"><tbody>{d.timers.map((t: any) => <tr key={t.id}>
+        <td><a href={`/app/tasks/${t.task_id}`}>#{t.task_id}</a> · {tr(`native.sk_${t.kind}` as Key)}</td>
+        <td>{t.seat || "—"}{t.seat_type === "agent" ? " · AI" : ""}</td>
+        <td>{tr("native.due", {p0: localTime(t.due_at)})} ({t.minutes} {tr("native.min")})</td>
+        <td><span className={"ui-pill " + (t.status === "met" ? "is-ok" : t.status === "breached" ? "is-risk" : "is-wait")}>{tr(`native.ts_${t.status}` as Key)}</span>
+          {t.escalated_to && <small> → {t.escalated_to}</small>}</td></tr>)}</tbody></table></div>}
+    {d.routes.length > 0 && <><h3 className="ops-cat">{tr("native.routes")}</h3>
+      <div className="ui-panel"><table className="ui-table" data-testid="after-hours"><tbody>{d.routes.map((r: any) => <tr key={r.id}>
+        <td>{localTime(r.created_at)}</td><td><a href={`/app/tasks/${r.task_id}`}>#{r.task_id}</a></td>
+        <td><span className="ui-pill is-info">{tr(`native.ra_${r.action}` as Key)}</span></td><td><small>{r.reason}</small></td></tr>)}</tbody></table></div></>}
+  </section>;
+}

@@ -42,3 +42,15 @@ def kpi_snapshot():
         return kpi_cascade.tick(db)
     finally:
         db.close()
+
+
+@celery_app.task(name="sla.tick")
+def sla_tick():
+    """M2e.4: bật đồng hồ SLA còn thiếu, quá hạn → leo thang, việc ngoài giờ của người → agent / xếp hàng."""
+    from app.db.session import SessionLocal
+    from app.services import operating_time
+    db = SessionLocal()
+    try:
+        return operating_time.tick(db)
+    finally:
+        db.close()

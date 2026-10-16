@@ -160,7 +160,20 @@ def collect(db: Session, company_id: int, department_id: int | None, kind: str, 
                                                      "health": k["health"]} for k in watch[:6]]},
             "approvals": {"pending": len(pend), "oldest_hours": round(oldest, 1) if oldest is not None else None},
             "costs": {"usd": cost, "runs": len(runs)},
-            "exceptions": {"failed_runs": len(failed)}}
+            "exceptions": {"failed_runs": len(failed)},
+            # M2e.4: ca đêm của agent (18:00–08:00) + việc chờ người ngoài giờ
+            "overnight": _overnight(db, company_id, now, members if department_id else None) if kind == "standup" else None}
+
+
+def _overnight(db: Session, company_id: int, now: datetime, members: list[int] | None) -> dict | None:
+    try:
+        from app.services import operating_time
+        o = operating_time.overnight(db, company_id, now, department_members=members)
+        o["queued_next"] = [x.isoformat() for x in o.get("queued_next") or []]
+        return o
+    except Exception as exc:  # noqa: BLE001
+        db.rollback(); print(f"[m2e.4] overnight: {exc}")
+        return None
 
 
 def _list(items: list[str]) -> str:
@@ -192,6 +205,13 @@ def summarize(title: str, d: dict) -> str:
     else:
         lines.append(f"**KPI:** {k['total']} KPI, không có KPI chậm" if k["total"] else "**KPI:** chưa đặt KPI cho phạm vi này")
     lines.append(f"**Chờ duyệt:** {a['pending']}" + (f" (lâu nhất {a['oldest_hours']} giờ)" if a["oldest_hours"] else ""))
+    o = d.get("overnight")
+    if o:
+        lines.append(f"**Ca đêm của agent ({o['window']}):** {o['done']} việc xong, {o['runs']} lượt chạy, ${o['cost_usd']:.2f}"
+                     + (f" — {_list(o['done_titles'])}" if o["done_titles"] else "")
+                     + (f" · {o['rerouted']} việc tới ngoài giờ đã chuyển cho agent" if o["rerouted"] else ""))
+        if o["queued"]:
+            lines.append(f"**Việc chờ người (tới ngoài giờ, không có agent cùng chức danh):** {o['queued']}")
     lines.append(f"**Chi phí AI ({span}):** ${d['costs']['usd']:.2f} cho {d['costs']['runs']} lượt chạy")
     lines.append(f"**Ngoại lệ:** {d['exceptions']['failed_runs']} lượt chạy lỗi" if d["exceptions"]["failed_runs"] else "**Ngoại lệ:** không có")
     return "\n".join(lines)

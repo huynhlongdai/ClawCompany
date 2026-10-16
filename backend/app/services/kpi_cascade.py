@@ -48,6 +48,8 @@ METRICS = {
     "approval_turnaround_hours": {"vi": "Thời gian duyệt TB (giờ)", "en": "Avg approval time (h)", "unit": "giờ", "direction": "down"},
     # M2e.3: % lần nộp kết quả đúng hợp đồng dữ liệu (gồm lượt chạy kết thúc mà chưa nộp)
     "output_conformance_rate": {"vi": "% kết quả đúng hợp đồng dữ liệu", "en": "% outputs matching the data contract", "unit": "%", "direction": "up"},
+    # M2e.4: % đồng hồ SLA (phản hồi đầu + xử lý xong) đóng đúng hạn
+    "sla_attainment_rate": {"vi": "% đạt SLA", "en": "% SLA met", "unit": "%", "direction": "up"},
 }
 OPEN_TASK = ("backlog", "todo", "in_progress", "review", "blocked")
 
@@ -158,6 +160,10 @@ def compute(db: Session, k: KpiDefinition, now: datetime | None = None) -> float
                 reviewed += 1
                 first += hist[0]["decision"] == "approve"
         return round(100 * first / reviewed, 1) if reviewed else None
+    if m == "sla_attainment_rate":
+        from app.services import operating_time
+        a = operating_time.attainment(db, company_id=k.company_id, member_ids=members, start=start, end=end)
+        return round(100 * a["rate"], 1) if a["rate"] is not None else None
     if m == "output_conformance_rate":
         from app.services import io_contracts
         c = io_contracts.conformance(db, member_ids=members, company_id=k.company_id, start=start, end=end)

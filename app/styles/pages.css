@@ -663,3 +663,16 @@ textarea.ops-json{width:100%}
 .cf-fields input,.cf-fields select{width:100%;min-width:0}
 .cf-fields td{padding:4px 6px}
 .cf-acc{gap:6px;margin-bottom:4px;flex-wrap:wrap}
+/* M2e.4 độ phủ 7×24 */
+.cov-grid{border-collapse:separate;border-spacing:2px;font-size:10px;margin:6px 0;width:100%;max-width:760px}
+.cov-grid th{font-weight:500;color:var(--text-muted);text-align:left;padding:0 4px 0 0}
+.cov-grid td{height:14px;border-radius:3px;min-width:12px}
+.cov-grid .is-agent,.cov-legend .is-agent{background:var(--accent)}
+.cov-grid .is-human,.cov-legend .is-human{background:var(--ok)}
+.cov-grid .is-both,.cov-legend .is-both{background:linear-gradient(135deg,var(--accent) 50%,var(--ok) 50%)}
+.cov-grid .is-gap,.cov-legend .is-gap{background:var(--surface-2);outline:1px dashed var(--border)}
+.cov-legend{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);margin:4px 0 10px;flex-wrap:wrap}
+.cov-legend span{display:inline-block;width:12px;height:12px;border-radius:3px;margin-left:8px}
+.cov-seats{list-style:none;padding:0;margin:4px 0;display:flex;gap:14px;flex-wrap:wrap;font-size:13px}
+.cov-days{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;margin:6px 0}
+.cov-days input{width:100%}

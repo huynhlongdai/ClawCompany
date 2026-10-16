@@ -2,9 +2,9 @@
 
 M2e.2 luật cứng: ``company_rules`` (luật cưỡng chế theo công ty / chức danh) + ``rule_violations`` (nhật ký vi phạm
 do guard plugin trên gateway hoặc cổng MCP báo về)."""
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -124,3 +124,87 @@ class TaskOutput(Base):
     run_id: Mapped[str] = mapped_column(String(120), default="")
     session_key: Mapped[str] = mapped_column(String(240), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+# ------------------------------------------------------------------ M2e.4 vận hành 24/7
+
+class SeatSchedule(Base):
+    """Giờ làm của một ghế NGƯỜI (ghế agent không có hàng ở đây: luôn trực 24/7, không nghỉ lễ).
+    ``weekly`` = {"0": [["08:00", "17:30"]], …} — 0 = thứ Hai … 6 = Chủ nhật, giờ địa phương ``timezone``."""
+    __tablename__ = "seat_schedules"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), unique=True)
+    timezone: Mapped[str] = mapped_column(String(64), default="Asia/Ho_Chi_Minh")
+    weekly: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    observe_holidays: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class SeatLeave(Base):
+    """Ngày nghỉ của ghế người (cả ngày, theo giờ địa phương; ``end_date`` tính cả ngày đó)."""
+    __tablename__ = "seat_leaves"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), index=True)
+    start_date: Mapped[date] = mapped_column(Date)
+    end_date: Mapped[date] = mapped_column(Date)
+    kind: Mapped[str] = mapped_column(String(16), default="annual")       # annual | sick | other
+    note: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SlaPolicy(Base):
+    """SLA cho việc của một bước quy trình (``process_step_id``) hoặc mọi việc giao cho ghế của một chức danh
+    (``position_id``). Bước thắng chức danh. Phút tính theo giờ trực của ghế nhận việc: ghế agent = đồng hồ thật 24/7,
+    ghế người = chỉ phút trong giờ làm (ngoài giờ, ngày nghỉ, lễ không tính)."""
+    __tablename__ = "sla_policies"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    position_id: Mapped[int | None] = mapped_column(ForeignKey("positions.id"), nullable=True, index=True)
+    process_step_id: Mapped[int | None] = mapped_column(ForeignKey("process_steps.id"), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(200), default="")
+    first_response_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    resolution_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class SlaTimer(Base):
+    """Một đồng hồ SLA của một việc. kind: first_response (tới lúc bắt tay làm / ghi sổ đầu tiên) | resolution (tới lúc
+    xong). status: running | met | breached | cancelled. Quá hạn → leo thang (một lần) + Hộp việc ``sla_breach``."""
+    __tablename__ = "sla_timers"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id"), index=True)
+    policy_id: Mapped[int | None] = mapped_column(ForeignKey("sla_policies.id"), nullable=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    position_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    seat_type: Mapped[str] = mapped_column(String(8), default="")        # agent | human (lúc bắt đầu đồng hồ)
+    minutes: Mapped[int] = mapped_column(Integer)
+    started_at: Mapped[datetime] = mapped_column(DateTime)
+    due_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    met_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    breached_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    escalated_to_member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="running", index=True)
+
+
+class AfterHoursRoute(Base):
+    """Việc tới cho ghế người lúc người đó ngoài giờ. action: ``rerouted`` (chuyển ghế agent cùng chức danh) |
+    ``queued`` (không có agent: giữ người, ghi giờ người đó trực lại ``next_available_at``). status open | done."""
+    __tablename__ = "after_hours_routes"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id"), index=True)
+    from_member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    to_member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    position_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    action: Mapped[str] = mapped_column(String(16))
+    next_available_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reason: Mapped[str] = mapped_column(String(300), default="")
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

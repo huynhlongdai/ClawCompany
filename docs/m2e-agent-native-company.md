@@ -87,3 +87,33 @@ Công ty agent: mỗi chức danh / bước quy trình có **hợp đồng dữ 
   (bảng trường ↔ JSON, tiêu chí, thử kết quả, tỷ lệ theo ghế/chức danh, lần nộp gần đây); Quy trình: chọn hợp đồng cho bước,
   điều kiện theo trường kết quả, lần chạy hiện kết quả + trạng thái hợp đồng.
 - Giới hạn thật: kiểm cấu trúc + tiêu chí có field; chất lượng câu chữ (lịch sự, đúng chính sách) vẫn do review đọc.
+
+## M2e.4 — Vận hành 24/7
+
+- Ghế **agent** luôn trực: không giờ làm, không nghỉ phép, không lễ (không có hàng lịch; API sửa lịch/nghỉ của agent → 422).
+- Ghế **người** (migration 0050): `seat_schedules` (giờ theo tuần `{"0": [["08:00","17:30"]], …}` 0 = thứ Hai, múi giờ
+  mặc định Asia/Ho_Chi_Minh, `observe_holidays`), mặc định T2–T6 08:00–17:30, T7 08:00–12:00; `seat_leaves` (nghỉ theo
+  ngày: phép năm / ốm / khác); lễ lấy `public_holidays` của tổ chức (ngày làm bù = làm như thứ Hai).
+- **SLA** `sla_policies`: gắn đúng một nơi — bước quy trình (thắng) hoặc chức danh; `first_response_minutes`
+  (việc chuyển Đang làm) và/hoặc `resolution_minutes` (Xong). `sla_timers`: hạn = phút **trực** của ghế nhận việc
+  (`add_working_minutes`: agent = đồng hồ thật, người = chỉ phút trong giờ làm, bỏ nghỉ phép/lễ). Đồng hồ bật khi bước
+  tới lượt (process_map) hoặc beat thấy việc mở của ghế có SLA chức danh; `task_lifecycle.transition` đóng đồng hồ.
+- Beat `sla.tick` mỗi 60 giây: bật đồng hồ còn thiếu; quá hạn → `breached` + leo thang một lần tới NGƯỜI đầu tiên của
+  `escalation.chain` + Hộp việc `sla_breach` (ưu tiên cao) + ghi sổ; việc chưa bắt tay mà người nhận ngoài giờ → chuyển
+  agent cùng chức danh. `POST /api/team/sla/tick` chạy ngay một nhịp.
+- **Ngoài giờ** (`after_hours_routes`): việc bước quy trình / có SLA, trạng thái Cần làm, giao người đang ngoài giờ →
+  có agent cùng chức danh: chuyển (`rerouted`, đồng hồ SLA tính lại theo agent, Hộp việc `after_hours` báo người, đánh thức
+  agent); không có: giữ người, `queued` + "người xử lý lúc HH:MM" (sổ việc + Hộp việc); người trực lại → hàng chờ đóng.
+  Chọn ghế cho bước quy trình: ghế đang trực trước, rồi ít việc mở nhất.
+- **Độ phủ** `GET /api/team/coverage`: lưới 7×24 mỗi chức danh (ô = số agent / số người trực ≥ 30 phút trong giờ đó),
+  giờ có người trực / 168, ghế (trong giờ / ngoài giờ / trực lại lúc), hàng chờ (việc chưa bắt tay + việc xếp hàng ngoài
+  giờ), tỷ lệ đạt SLA 30 ngày (tách agent / người), đồng hồ gần đây, việc tới ngoài giờ.
+- KPI `sla_attainment_rate` (% đồng hồ đóng đúng hạn; quá hạn rồi mới xong vẫn tính trễ).
+- **Giao ban sáng** có mục "Ca đêm của agent (18:00 hôm trước → 08:00)": việc agent xong, lượt chạy, chi phí USD, số việc
+  ngoài giờ đã chuyển cho agent, số việc đang chờ người.
+- API: `GET /api/team/coverage`, `GET/PUT /api/team/seats/{id}/schedule`, `POST /api/team/seats/{id}/leaves`,
+  `DELETE /api/team/leaves/{id}`, `GET/POST /api/team/sla-policies`, `PATCH/DELETE /api/team/sla-policies/{id}`,
+  `POST /api/team/sla/tick`. UI: Đội ngũ → tab "Vận hành 24/7".
+- Giới hạn thật: lưới độ phủ dựa trên lịch tuần mẫu (nghỉ phép/lễ hiện ở danh sách ghế, không trừ vào lưới); "phản hồi
+  đầu" đo bằng trạng thái việc, không đo tin nhắn đầu tiên gửi khách trên kênh chat; `sla/tick` thủ công chạy cho mọi công
+  ty trên máy (giống beat).

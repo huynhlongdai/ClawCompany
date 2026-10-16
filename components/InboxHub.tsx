@@ -4,7 +4,9 @@ import {kindLabel, deadlineText} from "@/lib/approvalText";
 import {actLabel, bandText, whoLabel} from "./CompanyFoundation";
 import {t as tk, type Key as TKey} from "../lib/i18n";
 /* M2c: loại mục mới (giao ban, báo cáo tuần, hạn tuân thủ) có nhãn theo ngôn ngữ; loại cũ giữ nhãn máy chủ. */
-const KIND_KEY: Record<string, TKey> = {standup: "inbox.kind_standup", weekly_report: "inbox.kind_weekly", compliance_due: "inbox.kind_compliance"};
+const KIND_KEY: Record<string, TKey> = {standup: "inbox.kind_standup", weekly_report: "inbox.kind_weekly", compliance_due: "inbox.kind_compliance",
+  rule_violation: "inbox.kind_rule_violation", output_rework: "inbox.kind_output_rework", output_escalated: "inbox.kind_output_escalated",
+  sla_breach: "inbox.kind_sla_breach", after_hours: "inbox.kind_after_hours"};
 const kindsText = (c: any) => (c.kinds || []).map((k: string, i: number) => KIND_KEY[k] ? tk(KIND_KEY[k]) : (c.kinds_vi || [])[i] || k).join(" · ");
 import Link from "next/link";
 import {useCallback, useEffect, useState} from "react";

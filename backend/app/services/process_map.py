@@ -473,7 +473,9 @@ def pick_assignee(db: Session, org_id: int, company_id: int, position_id: int | 
     if position_id:
         seats = [m for m in seats_of(db, position_id) if m.status in ("active", "onboarding")]
         if seats:
-            best = min(seats, key=lambda m: (_open_load(db, m.id), m.id))
+            # M2e.4: ghế đang trực trước (agent luôn trực; người ngoài giờ / nghỉ phép xếp sau), rồi ít việc mở nhất
+            from app.services.operating_time import on_duty
+            best = min(seats, key=lambda m: (0 if on_duty(db, m) else 1, _open_load(db, m.id), m.id))
             return best.id, ""
         pos = db.get(Position, position_id)
         dept = db.get(Department, pos.department_id) if pos and pos.department_id else None
@@ -722,6 +724,13 @@ def _settle(db: Session, inst: ProcessInstance, now: datetime, *, wake_roots: bo
             lifecycle.transition(db, t, "todo", reason=f"quy trình lần chạy #{inst.id}: bước {r.seq} tới lượt",
                                  via="process", system=True, organization_id=inst.organization_id,
                                  company_id=inst.company_id)
+        try:   # M2e.4: bước tới lượt → bật đồng hồ SLA; người nhận đang ngoài giờ → chuyển agent cùng chức danh / xếp hàng
+            from app.services import operating_time
+            operating_time.start_timers(db, t)
+            operating_time.route(db, t)
+            db.refresh(t)
+        except Exception as exc:  # noqa: BLE001 — SLA/ngoài giờ không được làm kẹt quy trình
+            db.rollback(); print(f"[m2e.4] step task #{t.id}: {exc}")
         # bước gốc (lúc bắt đầu) được đánh thức ở đây; bước sau được ``wake_unblocked`` đánh thức khi blocker đóng
         if wake_roots and not _deps(r):
             wakeup.enqueue_for_task(db, t, "assigned", dedupe_key=f"process:i{inst.id}:s{r.seq}",

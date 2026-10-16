@@ -792,6 +792,13 @@ export const apiNative = {
   validateOutput: (id: number, output: string) => request<any>(`/team/contracts/${id}/validate`, {method: "POST", body: JSON.stringify({output})}),
   taskContract: (taskId: number) => request<any>(`/team/tasks/${taskId}/contract`),
   submitOutput: (taskId: number, output: any) => request<any>(`/team/tasks/${taskId}/output`, {method: "POST", body: JSON.stringify({output})}),
+  coverage: (companyId?: number | null) => request<any>(`/team/coverage${cq(companyId)}`),
+  saveSchedule: (memberId: number, body: any) => request<any>(`/team/seats/${memberId}/schedule`, {method: "PUT", body: JSON.stringify(body)}),
+  addLeave: (memberId: number, body: any) => request<any>(`/team/seats/${memberId}/leaves`, {method: "POST", body: JSON.stringify(body)}),
+  deleteLeave: (id: number) => request<any>(`/team/leaves/${id}`, {method: "DELETE"}),
+  createSla: (body: any) => request<any>(`/team/sla-policies`, {method: "POST", body: JSON.stringify(body)}),
+  updateSla: (id: number, body: any) => request<any>(`/team/sla-policies/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  deleteSla: (id: number) => request<any>(`/team/sla-policies/${id}`, {method: "DELETE"}),
 };
 
 export const apiOps = {
