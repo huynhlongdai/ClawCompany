@@ -7,7 +7,7 @@ import {TodayOverview} from "@/components/overview/TodayOverview";
 /* Tổng quan. Link cũ /app/os?tab=… (UI v6) chuyển về chỗ mới trong 8 mục menu. */
 const MOVED: Record<string, string> = {
   projects: "/app/work?view=projects", tasks: "/app/work", agents: "/app/team?tab=ai", people: "/app/team?tab=people",
-  companies: "/app/team", knowledge: "/app/knowledge-mesh",
+  companies: "/app/company", knowledge: "/app/knowledge-mesh",
 };
 
 export default function Page() {

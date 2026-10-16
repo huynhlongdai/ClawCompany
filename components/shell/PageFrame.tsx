@@ -3,7 +3,8 @@ import {ReactNode, useEffect} from "react";
 import {usePathname, useSearchParams} from "next/navigation";
 import {LinkTabs} from "../ui/Tabs";
 import {StatusPill} from "../ui/StatusPill";
-import {activeTab, isLabPath, pageFor, sectionFor} from "../../lib/nav";
+import {activeGroup, activeTab, isLabPath, pageFor, sectionFor} from "../../lib/nav";
+import Link from "next/link";
 import {t as tr} from "../../lib/i18n";
 
 /* Khung một trang: tiêu đề + mô tả + nút + tab của mục + (tuỳ chọn) cột phải.
@@ -30,7 +31,8 @@ export function PageFrame({title = "", subtitle = "", action, actions, rail, chi
     window.dispatchEvent(new CustomEvent("cc:title", {detail: detail ? h1 : page ? page.label : tab && tab !== section?.tabs[0] ? tab.label : section ? "" : h1}));
   }, [h1, detail, page, tab, section]);
 
-  const tabs = !detail && section && section.tabs.length > 1 ? section.tabs : null;
+  const group = !detail ? activeGroup(section, tab) : undefined;
+  const tabs = !detail && section && !section.groups && section.tabs.length > 1 ? section.tabs : null;
   const body = <div className="ui-page-body">{children}</div>;
   return <>
     {!hideHead && <div className="ui-pagehead">
@@ -39,6 +41,13 @@ export function PageFrame({title = "", subtitle = "", action, actions, rail, chi
     </div>}
     {tabs && <div className="ui-page-tabs"><LinkTabs label={tr("shell.cac_phan_cua", {p0: section!.label})} active={tab?.href}
       tabs={tabs.map(t => ({href: t.href, label: t.label}))}/></div>}
+    {group && section?.groups && <div className="ui-page-tabs" data-testid="group-tabs">
+      <LinkTabs label={tr("shell.cac_phan_cua", {p0: section.label})} active={group.tabs[0].href}
+        tabs={section.groups.map(g => ({href: g.tabs[0].href, label: g.label}))}/>
+      {group.tabs.length > 1 && <nav className="ui-seg ui-subtabs" aria-label={group.label} data-testid="sub-tabs">
+        {group.tabs.map(t => <Link key={t.href} href={t.href} scroll={false} aria-current={t.href === tab?.href ? "page" : undefined}>{t.label}</Link>)}
+      </nav>}
+    </div>}
     {rail ? <div className={"ui-with-rail" + (wide ? " is-wide" : "")}>{body}<aside aria-label={tr("shell.thong_tin_ben")}>{rail}</aside></div> : body}
   </>;
 }

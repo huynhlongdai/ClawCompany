@@ -551,7 +551,7 @@ export function ComplianceTab({companyId, caps}: {companyId: number | null; caps
       <section className="ui-panel tm-card">
         <div className="tm-card-head"><div><b>{tr("ops.cmp_settings")}</b>
           <span>{tr("ops.cmp_entity")}: {f.entity_type ? tr(`company.et_${f.entity_type}` as Key) : tr("ops.cmp_no_entity")}
-            {" · "}<Link href={`/app/team?tab=profile${cid ? `&company=${cid}` : ""}`}>{tr("ops.cmp_edit_profile")}</Link></span></div></div>
+            {" · "}<Link href={`/app/company?tab=profile${cid ? `&company=${cid}` : ""}`}>{tr("ops.cmp_edit_profile")}</Link></span></div></div>
         <fieldset disabled={!isAdmin || busy} className="ui-form cf-form">
           <FormRow>
             <Field label={tr("ops.cmp_vat")}><select value={f.vat_period} onChange={e => set("vat_period", e.target.value)} data-testid="cmp-vat">

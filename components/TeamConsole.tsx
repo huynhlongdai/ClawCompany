@@ -9,10 +9,6 @@ import {PageFrame} from "./shell/PageFrame";
 import {apiTeam, errorText} from "../lib/api";
 import {AgentHRTab} from "./AgentHR";
 import {LearningHub} from "./LearningHub";
-import {CompanyProfileTab, PositionsTab, AuthorityTab} from "./CompanyFoundation";
-import {ProcessesTab, KpiTab, RhythmTab, ComplianceTab, ReadinessTab} from "./CompanyOperations";
-import {RulesTab, ContractsTab, CoverageTab, AgentWorkforceTab} from "./AgentNative";
-import {CompanyRolesTab, LeaseOutTab, LeasedTab} from "./Rental";
 import {Notice, EmptyState, ErrorBanner} from "./ui/EmptyState";
 import {SkeletonRows} from "./ui/Skeleton";
 import {useToast} from "./ui/Toast";
@@ -20,16 +16,19 @@ import {Icon} from "./Icon";
 import Link from "next/link";
 import {useCompanyId} from "../lib/prefs";
 import {t as tr, lazy} from "../lib/i18n";
+import {COMPANY_TAB_IDS} from "../lib/nav";
 
-type Tab = "chart" | "people" | "departments" | "ai" | "training" | "build" | "profile" | "positions" | "authority" | "processes" | "kpi" | "rhythm" | "compliance" | "readiness" | "rules" | "contracts" | "coverage" | "agenthr" | "roles" | "leaseout" | "leased";
-const TAB_IDS: Tab[] = ["chart", "people", "departments", "ai", "training", "build", "profile", "positions", "authority", "processes", "kpi", "rhythm", "compliance", "readiness", "rules", "contracts", "coverage", "agenthr", "roles", "leaseout", "leased"];
-const ROLE_VI: Record<string, string> = lazy(() => ({guest: tr("team.khach"), member: tr("team.thanh_vien"), manager: tr("team.quan_ly"), admin: tr("team.quan_tri"), owner: tr("team.chu_so_huu")}));
+/* Đội ngũ = người & agent. Các tab cấp công ty (hồ sơ, chức danh, thẩm quyền, quy trình,
+   KPI, cho thuê…) đã sang mục Công ty (/app/company) từ 2026-10-16; URL cũ chuyển hướng. */
+type Tab = "chart" | "people" | "ai" | "training";
+const TAB_IDS: Tab[] = ["chart", "people", "ai", "training"];
+export const ROLE_VI: Record<string, string> = lazy(() => ({guest: tr("team.khach"), member: tr("team.thanh_vien"), manager: tr("team.quan_ly"), admin: tr("team.quan_tri"), owner: tr("team.chu_so_huu")}));
 const CSV_SAMPLE = `tên,loại,chức danh,phòng ban,quản lý,email,trưởng phòng
 Hà,người,Giám đốc,Ban điều hành,,ha@congty.vn,x
 Minh,người,Trưởng kho,Kho,Hà,minh@congty.vn,x
 Bot đóng gói,agent,Đóng gói đơn,Kho,Minh,,`;
 
-function Node({n}: {n: any}) {
+export function Node({n}: {n: any}) {
   const pending = n.status === "pending_runtime" || n.lifecycle === "runtime_missing";
   const agent = n.type === "agent";
   const inner = <>
@@ -46,7 +45,7 @@ function Node({n}: {n: any}) {
   </li>;
 }
 
-function flatten(tree: any[]): any[] {
+export function flatten(tree: any[]): any[] {
   const out: any[] = []; const walk = (ns: any[]) => ns.forEach(n => { out.push(n); walk(n.children || []); });
   walk(tree || []); return out;
 }
@@ -54,6 +53,10 @@ function flatten(tree: any[]): any[] {
 export function TeamConsole() {
   const router = useRouter(); const params = useSearchParams();
   const raw = params.get("tab") as Tab;
+  const moved = raw && (COMPANY_TAB_IDS as readonly string[]).includes(raw);
+  /* Link cũ (Inbox, fix_href của readiness ở backend, đánh dấu) → trang mới trong mục Công ty */
+  useEffect(() => { if (moved) { const q = new URLSearchParams(params.toString()); router.replace(`/app/company?${q.toString()}`); } // eslint-disable-next-line
+  }, [moved]);
   const tab: Tab = TAB_IDS.includes(raw) ? raw : "chart";
   const [pref, setPref] = useCompanyId();
   const [companyId, setCompanyId] = useState<number | null>(Number(params.get("company")) || pref || null);
@@ -79,7 +82,6 @@ export function TeamConsole() {
     catch (e: any) { setError(e); } finally { setBusy(false); }
   }
   const pickCompany = (v: number) => { setCompanyId(v); setPref(v); load(v); };
-  const setTab = (t: Tab) => router.replace(`/app/team?tab=${t}${companyId ? `&company=${companyId}` : ""}`);
 
   const members = useMemo(() => flatten(chart?.tree || []), [chart]);
   return <PageFrame actions={chart?.companies?.length > 1 ? <label className="tmInline">{tr("team.cong_ty")}
@@ -94,27 +96,12 @@ export function TeamConsole() {
     </Notice>}
     {error ? <ErrorBanner error={error} onClose={() => setError(null)} onRetry={() => load()} testId="team-error"/> : null}
 
-    {tab === "chart" && <ChartTab chart={chart} onBuild={() => setTab("build")}/>}
+    {moved ? <SkeletonRows n={4}/> : <>
+    {tab === "chart" && <ChartTab chart={chart} onBuild={() => router.push("/app/company?tab=build")}/>}
     {tab === "people" && <PeopleTab me={me} people={people} chart={chart} busy={busy} act={act}/>}
-    {tab === "departments" && <DepartmentsTab chart={chart} members={members} caps={caps} busy={busy} act={act}/>}
     {tab === "ai" && <AgentHRTab companyId={companyId} caps={caps}/>}
     {tab === "training" && <TrainingTab/>}
-    {tab === "profile" && <CompanyProfileTab companyId={companyId} caps={caps}/>}
-    {tab === "positions" && <PositionsTab companyId={companyId} chart={chart} caps={caps}/>}
-    {tab === "authority" && <AuthorityTab companyId={companyId} chart={chart} caps={caps}/>}
-    {tab === "processes" && <ProcessesTab companyId={companyId} caps={caps}/>}
-    {tab === "kpi" && <KpiTab companyId={companyId} caps={caps}/>}
-    {tab === "rhythm" && <RhythmTab companyId={companyId} caps={caps}/>}
-    {tab === "compliance" && <ComplianceTab companyId={companyId} caps={caps}/>}
-    {tab === "readiness" && <ReadinessTab companyId={companyId} caps={caps}/>}
-    {tab === "rules" && <RulesTab companyId={companyId} caps={caps}/>}
-    {tab === "contracts" && <ContractsTab companyId={companyId} caps={caps}/>}
-    {tab === "coverage" && <CoverageTab companyId={companyId} caps={caps}/>}
-    {tab === "agenthr" && <AgentWorkforceTab companyId={companyId} caps={caps}/>}
-    {tab === "roles" && <CompanyRolesTab companyId={companyId} members={members}/>}
-    {tab === "leaseout" && <LeaseOutTab companyId={companyId} caps={caps}/>}
-    {tab === "leased" && <LeasedTab companyId={companyId} caps={caps}/>}
-    {tab === "build" && <BuildTab chart={chart} caps={caps} busy={busy} act={act} onCompany={(id: number) => { pickCompany(id); setTab("chart"); }}/>}
+    </>}
   </PageFrame>;
 }
 
@@ -216,7 +203,7 @@ function PeopleTab({me, people, chart, busy, act}: any) {
   </div>;
 }
 
-function DepartmentsTab({chart, members, caps, busy, act}: any) {
+export function DepartmentsTab({chart, members, caps, busy, act}: any) {
   if (!chart?.company) return <EmptyState compact mood="chao" title={tr("team.chua_co_cong_ty")}>{tr("team.dung_cong_ty_o_tab")}</EmptyState>;
   const can = !!caps.edit_org_chart;
   return <div className="tmDepts" data-testid="dept-list">
@@ -250,7 +237,7 @@ function DepartmentsTab({chart, members, caps, busy, act}: any) {
   </div>;
 }
 
-function BuildTab({chart, caps, busy, act, onCompany}: any) {
+export function BuildTab({chart, caps, busy, act, onCompany}: any) {
   const [templates, setTemplates] = useState<any[]>([]), [name, setName] = useState<Record<string, string>>({});
   const [result, setResult] = useState<any>(null), [csv, setCsv] = useState(CSV_SAMPLE), [report, setReport] = useState<any>(null);
   useEffect(() => { apiTeam.templates().then(setTemplates).catch(() => {}); }, []);

@@ -1,8 +1,8 @@
-/* Sổ đăng ký điều hướng — nguồn duy nhất cho sidebar (8 mục), tab của từng
+/* Sổ đăng ký điều hướng — nguồn duy nhất cho sidebar (9 mục), tab của từng
    mục, thanh dưới trên điện thoại, ⌘K, tiêu đề trang và Phòng thí nghiệm.
 
-   Theo plan-v2 §5: đúng 8 mục menu. Mỗi mục có các tab là route thật (link đổi
-   URL, chia sẻ được). Trang không thuộc 8 mục chia hai nhóm:
+   Theo plan-v2 §5: 8 mục menu (+ Công ty từ 2026-10-16 = 9). Mỗi mục có các tab là route thật (link đổi
+   URL, chia sẻ được). Trang không thuộc menu chia hai nhóm:
    - MORE: trang còn dùng nhưng không đáng một chỗ trên menu — vào bằng ⌘K hoặc
      từ trang cha (vd. Phòng họp, Nhật ký sự kiện).
    - LAB:  27 trang ít dùng của plan §2 (giao phần mềm v11–v15 + điều hành v9/v10).
@@ -12,13 +12,43 @@ import type {IconName} from "../components/Icon";
 import {t as tr, lazy} from "./i18n";
 
 export type NavTab = {href: string; label: string; desc?: string};
+export type NavGroup = {key: string; label: string; tabs: NavTab[]};
 export type NavSection = {
   key: string; href: string; label: string; icon: IconName; desc: string; keywords: string;
   countKey?: string; tabs: NavTab[];
+  /** Mục nhiều trang (Công ty): tab chia nhóm — hàng trên là nhóm, hàng dưới là trang trong nhóm. `tabs` = các nhóm trải phẳng. */
+  groups?: NavGroup[];
   /** Tiền tố đường dẫn thuộc về mục này (kể cả trang chi tiết). */
   owns: string[];
 };
 export type NavPage = {href: string; label: string; icon: IconName; desc: string; keywords?: string; area: string; kind: "more" | "lab"};
+
+/* Mục "Công ty" (2026-10-16, tách khỏi Đội ngũ): mọi thứ ở cấp công ty — pháp nhân,
+   cơ cấu, vận hành, hiệu quả, cho thuê. Đội ngũ chỉ còn người & agent.
+   Tab cũ /app/team?tab=<x> chuyển hướng sang /app/company?tab=<x> (TeamConsole). */
+export const COMPANY_TAB_IDS = ["overview", "readiness", "build", "profile", "roles", "authority", "rules", "departments", "positions",
+  "processes", "contracts", "rhythm", "coverage", "compliance", "kpi", "agenthr", "leaseout", "leased"] as const;
+export type CompanyTab = typeof COMPANY_TAB_IDS[number];
+const ct = (tab: string, label: string): NavTab => ({href: tab === "overview" ? "/app/company" : `/app/company?tab=${tab}`, label});
+function companySection(): NavSection {
+  const groups: NavGroup[] = [
+    {key: "overview", label: tr("nav.co_tong_quan"), tabs: [ct("overview", tr("nav.co_cong_ty_cua_anh")), ct("readiness", tr("nav.san_sang")), ct("build", tr("nav.co_tao_nhap"))]},
+    {key: "governance", label: tr("nav.co_phap_nhan_quan_tri"), tabs: [ct("profile", tr("nav.co_ho_so_hien_chuong")), ct("roles", tr("nav.vai_tro_cong_ty")), ct("authority", tr("nav.co_ma_tran_tham_quyen")), ct("rules", tr("nav.luat_cung"))]},
+    {key: "structure", label: tr("nav.co_co_cau"), tabs: [ct("departments", tr("nav.phong_ban")), ct("positions", tr("nav.chuc_danh"))]},
+    {key: "operations", label: tr("nav.van_hanh"), tabs: [ct("processes", tr("nav.quy_trinh_cty")), ct("contracts", tr("nav.hop_dong_du_lieu")), ct("rhythm", tr("nav.giao_ban")), ct("coverage", tr("nav.co_phu_24_7_sla")), ct("compliance", tr("nav.tuan_thu"))]},
+    {key: "performance", label: tr("nav.co_hieu_qua"), tabs: [ct("kpi", tr("nav.kpi")), ct("agenthr", tr("nav.nhan_su_agent"))]},
+    {key: "rental", label: tr("nav.co_cho_thue"), tabs: [ct("leaseout", tr("nav.cho_thue_agent")), ct("leased", tr("nav.agent_di_thue"))]},
+  ];
+  return {key: "company", href: "/app/company", label: tr("nav.co_cong_ty"), icon: "building",
+    desc: tr("nav.co_desc"), keywords: tr("nav.co_keywords"),
+    owns: ["/app/company"], groups, tabs: groups.flatMap(g => g.tabs)};
+}
+
+/** Nhóm chứa tab đang chọn (mục có `groups`). */
+export function activeGroup(section: NavSection | undefined, tab: NavTab | undefined): NavGroup | undefined {
+  if (!section?.groups) return undefined;
+  return section.groups.find(g => g.tabs.some(t => t.href === tab?.href)) || section.groups[0];
+}
 
 export const SECTIONS: NavSection[] = lazy(() => ([
   {key: "inbox", href: "/app/inbox", label: tr("nav.hop_viec"), icon: "inbox", countKey: "inbox",
@@ -39,25 +69,12 @@ export const SECTIONS: NavSection[] = lazy(() => ([
    owns: ["/app/goals", "/app/strategy", "/app/nina"],
    tabs: [{href: "/app/goals", label: tr("nav.muc_tieu")}, {href: "/app/strategy", label: tr("nav.ke_hoach_cho_duyet")}, {href: "/app/nina", label: tr("nav.nina_lap_nhanh")}]},
   {key: "team", href: "/app/team", label: tr("nav.doi_ngu"), icon: "users",
-   desc: tr("nav.so_do_to_chuc_agent"),
+   desc: tr("nav.doi_ngu_desc"),
    keywords: tr("nav.team_org_chart_so_do"),
    owns: ["/app/team", "/app/agents/"],
    tabs: [{href: "/app/team", label: tr("nav.so_do")}, {href: "/app/team?tab=ai", label: "Agent"}, {href: "/app/team?tab=people", label: tr("nav.nguoi_quyen")},
-          {href: "/app/team?tab=departments", label: tr("nav.phong_ban")}, {href: "/app/team?tab=positions", label: tr("nav.chuc_danh")},
-          {href: "/app/team?tab=authority", label: tr("nav.phan_quyen")}, {href: "/app/team?tab=profile", label: tr("nav.ho_so_cong_ty")},
-          {href: "/app/team?tab=processes", label: tr("nav.quy_trinh_cty")},
-          {href: "/app/team?tab=kpi", label: tr("nav.kpi")},
-          {href: "/app/team?tab=rhythm", label: tr("nav.giao_ban")},
-          {href: "/app/team?tab=compliance", label: tr("nav.tuan_thu")},
-          {href: "/app/team?tab=readiness", label: tr("nav.san_sang")},
-          {href: "/app/team?tab=rules", label: tr("nav.luat_cung")},
-          {href: "/app/team?tab=contracts", label: tr("nav.hop_dong_du_lieu")},
-          {href: "/app/team?tab=coverage", label: tr("nav.van_hanh_24_7")},
-          {href: "/app/team?tab=agenthr", label: tr("nav.nhan_su_agent")},
-          {href: "/app/team?tab=roles", label: tr("nav.vai_tro_cong_ty")},
-          {href: "/app/team?tab=leaseout", label: tr("nav.cho_thue_agent")},
-          {href: "/app/team?tab=leased", label: tr("nav.agent_di_thue")},
-          {href: "/app/team?tab=training", label: tr("nav.dao_tao")}, {href: "/app/team?tab=build", label: tr("nav.dung_cong_ty")}]},
+          {href: "/app/team?tab=training", label: tr("nav.dao_tao")}]},
+  companySection(),
   {key: "routines", href: "/app/routines", label: tr("nav.viec_dinh_ky"), icon: "zap",
    desc: tr("nav.viec_lap_theo_lich_hoac"),
    keywords: tr("nav.routine_cron_lich_webhook_dinh"),

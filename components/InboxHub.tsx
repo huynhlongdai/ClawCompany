@@ -190,7 +190,7 @@ function ItemDetail({det, err}: {det: any; err: string}) {
 /* M2b: luật nào của ma trận phân quyền sinh ra yêu cầu duyệt này. */
 function AuthorityRuleLine({au, id}: {au: any; id: number}) {
   return <p className="ibx-rule" data-testid={`ibx-rule-${id}`}><Icon name="shield" size={13}/>
-    <Link href="/app/team?tab=authority">{t("inbox.theo_luat", {p0: au.rule_id})}</Link>
+    <Link href="/app/company?tab=authority">{t("inbox.theo_luat", {p0: au.rule_id})}</Link>
     <span>{actLabel(au.action_type)} · {bandText(au.min_amount_usd, au.max_amount_usd)} → {au.approver_name || whoLabel(au.approver_kind)}</span></p>;
 }
 

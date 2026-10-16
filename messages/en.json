@@ -146,7 +146,21 @@
   "nhan_su_agent": "Agent workforce",
   "vai_tro_cong_ty": "Company roles",
   "cho_thue_agent": "Lease out agents",
-  "agent_di_thue": "Leased agents"
+  "agent_di_thue": "Leased agents",
+  "doi_ngu_desc": "Reporting chart, agents, people & access, training",
+  "co_cong_ty": "Company",
+  "co_desc": "Legal entity, structure, operations, performance and agent rental for each company",
+  "co_keywords": "company công ty legal charter position authority process kpi compliance hard rules data contract coverage 24/7 sla lease rental department",
+  "co_tong_quan": "Overview",
+  "co_cong_ty_cua_anh": "Your companies",
+  "co_tao_nhap": "Create & import",
+  "co_phap_nhan_quan_tri": "Legal & governance",
+  "co_ho_so_hien_chuong": "Profile & charter",
+  "co_ma_tran_tham_quyen": "Authority matrix",
+  "co_co_cau": "Structure",
+  "co_phu_24_7_sla": "24/7 coverage & SLA",
+  "co_hieu_qua": "Performance",
+  "co_cho_thue": "Rental"
  },
  "shell": {
   "cong_ty": "{p0} · {p1:company|companies}",
@@ -3119,5 +3133,25 @@
   "cr_send": "Send request",
   "cr_sent": "Request sent to the provider",
   "note": "Note"
+ },
+ "company2": {
+  "list_title": "Companies you can see",
+  "list_desc": "Every active company in the organisation. Pick one and every page in this section shows its data.",
+  "list_restricted": "You only see companies where you were given a role. The role decides what you can change in each.",
+  "create": "New company",
+  "viewing": "Viewing",
+  "your_role": "Your role",
+  "view": "View this company",
+  "archive": "Archive",
+  "cancel": "Cancel",
+  "archive_q": "Archive “{p0}”?",
+  "archive_counts": "Archived along with it: {p0} departments · {p1} members · {p2} agents · {p3} open projects.",
+  "archive_blocked": "Cannot archive yet: members hold live OpenClaw sessions. Stop those sessions first.",
+  "archive_note": "Can be restored later. Agents registered on the gateway are not removed automatically.",
+  "archived": "Archived {p0}",
+  "tools_title": "Company-level shortcuts",
+  "tools_desc": "Readiness, create from template, import a chart and the older organisation-data pages.",
+  "readiness_meta": "Pilot-readiness score per layer, with where to fix it",
+  "build_meta": "Build a company from a template, import a chart from CSV"
  }
 }

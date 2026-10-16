@@ -138,6 +138,11 @@ a.ui-row:hover,button.ui-row:hover{background:var(--hover)}
   color:var(--text-muted);font-size:var(--fs-13);font-weight:var(--fw-medium);white-space:nowrap}
 .ui-seg button:hover{color:var(--text)}
 .ui-seg button[aria-pressed="true"],.ui-seg button[aria-selected="true"],.ui-seg button[aria-checked="true"]{background:var(--surface);color:var(--text);box-shadow:var(--shadow-1)}
+/* Hàng trang con trong một nhóm tab (mục Công ty) */
+.ui-subtabs{display:flex;width:max-content;margin-top:10px}
+.ui-subtabs a{display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:6px;color:var(--text-muted);font-size:var(--fs-13);font-weight:var(--fw-medium);white-space:nowrap;text-decoration:none}
+.ui-subtabs a:hover{color:var(--text)}
+.ui-subtabs a[aria-current="page"]{background:var(--surface);color:var(--text);box-shadow:var(--shadow-1)}
 .ui-chips{display:flex;flex-wrap:wrap;gap:6px}
 .ui-chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:var(--radius-full);border:1px solid var(--border-strong);
   background:var(--surface);color:var(--text);font-size:var(--fs-13);font-weight:var(--fw-medium);white-space:nowrap}

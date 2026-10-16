@@ -146,7 +146,21 @@
   "nhan_su_agent": "Nhân sự agent",
   "vai_tro_cong_ty": "Vai trò công ty",
   "cho_thue_agent": "Cho thuê agent",
-  "agent_di_thue": "Agent đi thuê"
+  "agent_di_thue": "Agent đi thuê",
+  "doi_ngu_desc": "Sơ đồ quản lý, agent, người và quyền, đào tạo",
+  "co_cong_ty": "Công ty",
+  "co_desc": "Pháp nhân, cơ cấu, vận hành, hiệu quả và cho thuê agent của từng công ty",
+  "co_keywords": "company công ty pháp nhân hiến chương charter chức danh position thẩm quyền authority quy trình process kpi tuân thủ compliance luật cứng rules hợp đồng dữ liệu contract 24/7 sla cho thuê lease phòng ban department",
+  "co_tong_quan": "Tổng quan",
+  "co_cong_ty_cua_anh": "Công ty của anh",
+  "co_tao_nhap": "Tạo & nhập",
+  "co_phap_nhan_quan_tri": "Pháp nhân & quản trị",
+  "co_ho_so_hien_chuong": "Hồ sơ & hiến chương",
+  "co_ma_tran_tham_quyen": "Ma trận thẩm quyền",
+  "co_co_cau": "Cơ cấu",
+  "co_phu_24_7_sla": "Phủ 24/7 & SLA",
+  "co_hieu_qua": "Hiệu quả",
+  "co_cho_thue": "Cho thuê"
  },
  "shell": {
   "cong_ty": "{p0} · {p1} công ty",
@@ -3119,5 +3133,25 @@
   "cr_send": "Gửi yêu cầu",
   "cr_sent": "Đã gửi yêu cầu cho bên cho thuê",
   "note": "Ghi chú"
+ },
+ "company2": {
+  "list_title": "Công ty anh xem được",
+  "list_desc": "Mọi công ty đang hoạt động trong tổ chức. Chọn một công ty để mọi trang trong mục này hiện dữ liệu của nó.",
+  "list_restricted": "Anh chỉ thấy những công ty được cấp vai. Vai quyết định anh sửa được gì ở từng công ty.",
+  "create": "Tạo công ty",
+  "viewing": "Đang xem",
+  "your_role": "Vai của anh",
+  "view": "Xem công ty này",
+  "archive": "Lưu trữ",
+  "cancel": "Huỷ",
+  "archive_q": "Lưu trữ “{p0}”?",
+  "archive_counts": "Sẽ lưu trữ cùng: {p0} phòng ban · {p1} thành viên · {p2} agent · {p3} dự án đang mở.",
+  "archive_blocked": "Chưa lưu trữ được: có thành viên đang giữ phiên OpenClaw chạy dở. Dừng các phiên đó trước.",
+  "archive_note": "Khôi phục được sau. Agent đã đăng ký trên gateway không tự bị xoá.",
+  "archived": "Đã lưu trữ {p0}",
+  "tools_title": "Lối tắt cấp công ty",
+  "tools_desc": "Mức sẵn sàng, tạo từ mẫu, nhập sơ đồ và các trang sửa dữ liệu tổ chức đời cũ.",
+  "readiness_meta": "Điểm sẵn sàng thí điểm theo từng lớp, kèm chỗ sửa",
+  "build_meta": "Dựng công ty từ mẫu, nhập sơ đồ từ CSV"
  }
 }

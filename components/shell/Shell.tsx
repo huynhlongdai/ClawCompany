@@ -20,7 +20,7 @@ import {t, lazy} from "../../lib/i18n";
    lần cho mọi route /app/* (trước v2: mỗi trang tự bọc vỏ, 11 bản V*AppShell,
    chuyển trang là dựng lại sidebar + bắn lại request đếm).
 
-   Gồm: bộ đổi công ty · ô ⌘K · đúng 8 mục menu (lib/nav.ts) · tài khoản + giao
+   Gồm: bộ đổi công ty · ô ⌘K · 9 mục menu (lib/nav.ts; Công ty tách khỏi Đội ngũ 2026-10-16) · tài khoản + giao
    diện sáng/tối · topbar có breadcrumb + chuông · thanh dưới 5 nút ở ≤900px. */
 
 const AskNina = dynamic(() => import("./AskNina").then(m => m.AskNina), {ssr: false});
