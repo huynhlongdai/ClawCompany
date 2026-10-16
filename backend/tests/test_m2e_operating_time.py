@@ -178,6 +178,8 @@ def test_coverage_grid_and_standup_overnight(E):
     E.db.add(t); E.db.commit()
     o = ot.overnight(E.db, E.co.id, vn(2026, 10, 20, 8, 30))
     assert o["done"] == 1 and o["done_titles"] == ["Trả lời khách lúc 2 giờ sáng"] and o["window"].startswith("18:00 19/10")
+    early = ot.overnight(E.db, E.co.id, vn(2026, 10, 20, 7, 30))          # giao ban trước 08:00: tới bây giờ
+    assert early["window"] == "18:00 19/10–07:30 20/10" and early["done"] == 1
     from app.services import operating_rhythm
     d = operating_rhythm.collect(E.db, E.co.id, None, "standup", vn(2026, 10, 20, 8, 30))
     assert d["overnight"]["done"] == 1

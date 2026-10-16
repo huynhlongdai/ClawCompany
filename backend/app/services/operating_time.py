@@ -638,10 +638,9 @@ def overnight(db: Session, company_id: int, now: datetime, *, tz: str = TZ, depa
     from app.models.work_graph import TaskRun
     z = ZoneInfo(tz)
     loc = now.replace(tzinfo=UTC).astimezone(z)
-    end_l = loc.replace(hour=8, minute=0, second=0, microsecond=0)
-    if loc < end_l:
-        end_l -= timedelta(days=1)
-    start_l = (end_l - timedelta(days=1)).replace(hour=18)
+    # đêm gần nhất: 18:00 hôm trước → 08:00 hôm nay; giao ban sớm hơn 08:00 → tới thời điểm hiện tại
+    end_l = min(loc, loc.replace(hour=8, minute=0, second=0, microsecond=0))
+    start_l = (end_l - timedelta(days=1)).replace(hour=18, minute=0, second=0, microsecond=0)
     a, b = (x.astimezone(UTC).replace(tzinfo=None) for x in (start_l, end_l))
     agents = [m.id for m in db.query(Member).filter(Member.company_id == company_id, Member.member_type == "agent").all()
               if department_members is None or m.id in department_members]
