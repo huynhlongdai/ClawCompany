@@ -304,7 +304,8 @@ def compile_agent(db: Session, member: Member, agent: Agent) -> dict:
     for r in rules:
         r["regex"] = [src for _l, src in regex_of(r)]
         r["tools"] = tools_of(r) if r["kind"] in ("tool", "approval") else []
-    allowed = sorted(pos.allowed_tools or []) if pos is not None and pos.allowed_tools else None
+    from app.services.tool_permissions import ALWAYS_ALLOWED
+    allowed = sorted(set(pos.allowed_tools) | set(ALWAYS_ALLOWED)) if pos is not None and pos.allowed_tools else None
     return {"seat": member.id, "company": member.company_id, "position": pos.id if pos else None,
             "rules": rules, "allowedCompanyTools": allowed}
 

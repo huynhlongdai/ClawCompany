@@ -174,7 +174,12 @@ def scorecard(db: Session, org_id: int, agent_id: int, *, days: int = 30) -> dic
     from app.services import kpi_cascade   # M2c D5: KPI của seat (chia từ chức danh) vào scorecard
     kpis = kpi_cascade.seat_kpis(db, m.id)
     scored = [k["progress"] for k in kpis if k["progress"] is not None]
+    from app.services import io_contracts, runtime_rules   # M2e.3 hợp đồng dữ liệu, M2e.2 luật cứng
+    conf = io_contracts.conformance(db, member_ids=[m.id], days=days)
+    rules = runtime_rules.compliance(db, m, days=days)
     return {"agent_id": ag.id, "name": m.name, "days": days,
+            "output_conformance": conf, "output_conformance_rate": conf["rate"],
+            "rule_compliance_rate": rules["rate"], "rule_violations": rules["violations"],
             "kpis": kpis, "kpi_attainment": round(sum(scored) / len(scored), 1) if scored else None,
             "level": spec.get("career_level") or "standard", "level_vi": LEVEL_VI[spec.get("career_level") or "standard"],
             "tasks_touched": len(tasks), "tasks_done": len(done),

@@ -263,6 +263,7 @@ def _task_get(ctx: ToolContext, args: dict) -> dict:
             "goal_line": task_graph.goal_line(ctx.db, task),
             "open_blockers": [_brief(t) for t in task_graph.open_blockers(ctx.db, task.id)],
             "checked_out_by_run": task.checkout_run_id,
+            "contract": _contract_view(ctx, task),
             "journal": [{"seq": e.seq, "kind": e.kind, "summary": e.summary,
                          "created_at": e.created_at.isoformat() if e.created_at else None}
                         for e in entries]}
@@ -278,6 +279,10 @@ def _task_status(ctx: ToolContext, args: dict) -> dict:
     if task.assignee_member_id != ctx.member.id:
         raise ToolError("forbidden", "Chỉ người nhận việc mới đổi được trạng thái")
     before = task.status
+    from app.services import io_contracts   # M2e.3: việc có hợp đồng chưa đạt chuẩn không tự sang Chờ duyệt/Xong
+    gate = io_contracts.gate_transition(ctx.db, task, _str(args, "status", limit=32))
+    if gate:
+        raise ToolError("contract_output_required", gate)
     try:
         lifecycle.transition(ctx.db, task, _str(args, "status", limit=32), via="mcp",
                              reason=_str(args, "reason", limit=500),
@@ -287,6 +292,59 @@ def _task_status(ctx: ToolContext, args: dict) -> dict:
         raise ToolError("conflict" if exc.status_code == 409 else "invalid_argument",
                         str(detail)) from exc
     return {"task_id": task.id, "from": before, "to": task.status}
+
+
+def _contract_view(ctx: ToolContext, task: Task) -> dict | None:
+    from app.services import io_contracts
+    tc = io_contracts.task_contract(ctx.db, task.id)
+    if tc is None:
+        return None
+    return {"name": tc.name, "status": tc.status, "attempts": tc.attempts, "max_attempts": tc.max_attempts,
+            "fields": io_contracts.describe_fields(tc.output_schema, limit=1500), "output_schema": tc.output_schema,
+            "acceptance": [a.get("text") for a in tc.acceptance or [] if a.get("text")],
+            "input": tc.input_json, "last_errors": tc.last_errors or []}
+
+
+@tool("company_task_submit_output", "work",
+      "Nộp KẾT QUẢ CHUẨN của một việc có hợp đồng dữ liệu (xem company_task_get → contract). output là một đối tượng "
+      "JSON đúng schema. Hệ thống kiểm ngay: đạt → ghi sổ và việc tự sang Chờ duyệt; sai → trả danh sách lỗi, sửa rồi "
+      "nộp lại (quá số lần cho phép thì việc chuyển cho người xử lý).", "company.tasks:write",
+      {"task_id": {"type": "integer"}, "output": {"type": "object", "description": "Kết quả theo schema hợp đồng"}},
+      ("task_id", "output"), writes=True)
+def _task_submit_output(ctx: ToolContext, args: dict) -> dict:
+    from app.services import io_contracts
+    task = _task_or_404(ctx, _int(args, "task_id"))
+    if task.assignee_member_id != ctx.member.id:
+        raise ToolError("forbidden", "Chỉ người nhận việc mới nộp kết quả")
+    try:
+        return io_contracts.submit(ctx.db, task, ctx.member, args.get("output"), via="mcp",
+                                   run_id=ctx.run.runtime_run_id if ctx.run else "", session_key=ctx.session_key)
+    except io_contracts.SubmitError as exc:
+        raise ToolError(exc.code, exc.message) from exc
+
+
+@tool("company_process_step_outcome", "work",
+      "Ghi KẾT QUẢ BƯỚC của việc thuộc một quy trình (ví dụ \"approve\", \"hàng lỗi do vận chuyển\"). Các bước sau "
+      "rẽ nhánh theo giá trị này (điều kiện step<N>.outcome). Chỉ người nhận việc ghi được.", "company.tasks:write",
+      {"task_id": {"type": "integer"}, "outcome": {"type": "string"}}, ("task_id", "outcome"), writes=True)
+def _process_step_outcome(ctx: ToolContext, args: dict) -> dict:
+    from app.models.company_ops import ProcessStepRun
+    from app.services import process_map
+    task = _task_or_404(ctx, _int(args, "task_id"))
+    if task.assignee_member_id != ctx.member.id:
+        raise ToolError("forbidden", "Chỉ người nhận việc mới ghi kết quả bước")
+    run = ctx.db.query(ProcessStepRun).filter(ProcessStepRun.task_id == task.id).first()
+    if run is None:
+        raise ToolError("not_process_step", f"Việc #{task.id} không thuộc quy trình nào")
+    try:
+        inst = process_map.set_outcome(ctx.db, ctx.org, run.id, _str(args, "outcome", limit=200))
+    except HTTPException as exc:
+        raise ToolError("conflict" if exc.status_code == 409 else "invalid_argument", str(exc.detail)) from exc
+    emit_event(ctx.db, organization_id=ctx.org, event_type="process.step.outcome", source=SOURCE,
+               company_id=ctx.member.company_id, aggregate_type="process_step_run", aggregate_id=str(run.id),
+               actor_member_id=ctx.member.id, payload={"task_id": task.id, "outcome": run.outcome, "via": "mcp"})
+    step = next((x for x in inst["steps"] if x["id"] == run.id), {})
+    return {"task_id": task.id, "step": run.seq, "outcome": step.get("outcome"), "instance_id": inst["id"]}
 
 
 @tool("company_task_comment", "work", "Ghi một dòng vào sổ của việc (tiến độ, kết quả, vướng). "

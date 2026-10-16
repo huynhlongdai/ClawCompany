@@ -50,6 +50,8 @@ class ProcessStep(Base):
     depends_on: Mapped[list | None] = mapped_column(JSON, nullable=True)
     condition: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     branch: Mapped[str] = mapped_column(String(60), default="")
+    # M2e.3 (0049): hợp đồng dữ liệu của bước — việc sinh ra mang dữ liệu vào + phải nộp kết quả đúng schema
+    contract_id: Mapped[int | None] = mapped_column(ForeignKey("io_contracts.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -94,6 +96,7 @@ class ProcessStepRun(Base):
     branch: Mapped[str] = mapped_column(String(60), default="")
     outcome: Mapped[str] = mapped_column(String(200), default="")
     skip_reason: Mapped[str] = mapped_column(String(300), default="")
+    output_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)    # M2e.3: kết quả đạt hợp đồng của bước
     activated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

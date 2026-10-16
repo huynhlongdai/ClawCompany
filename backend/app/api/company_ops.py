@@ -1,6 +1,6 @@
 """M2c — vận hành công ty dưới tiền tố /api/team (cùng chỗ với M2b): bản đồ quy trình (D4).
 Spec: docs/m2c-company-operations.md."""
-from fastapi import HTTPException, APIRouter, Depends
+from fastapi import HTTPException, APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -26,6 +26,7 @@ class StepIn(BaseModel):
     depends_on: list[int] | None = None      # v2: seq các bước đứng trước; vắng = nối tiếp bước trước
     condition: dict | None = None             # v2: {field, op, value}
     branch: str = Field(default="", max_length=60)
+    contract_id: int | None = None            # M2e.3: hợp đồng dữ liệu của bước
 
 
 class OutcomeIn(BaseModel):
@@ -73,10 +74,13 @@ def create_process(payload: ProcessIn, principal: Principal = Depends(require_ro
 
 
 @router.patch("/processes/{process_id}")
-def update_process(process_id: int, payload: ProcessIn, principal: Principal = Depends(require_role("manager")),
-                   db: Session = Depends(get_db)):
+def update_process(process_id: int, payload: ProcessIn, background: BackgroundTasks,
+                   principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
     data, fields = _dump(payload)
     p = pm.update_process(db, active_org(principal), process_id, data, fields)
+    if any(s.get("contract_id") for s in data.get("steps") or []):   # M2e.3: hợp đồng của bước → AGENTS.md chức danh
+        from app.api.team import _resync
+        _resync(background, principal, active_org(principal), None)
     return pm.public_process(db, p)
 
 

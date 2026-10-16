@@ -26,8 +26,8 @@ const COND_OPS = ["==", "!=", ">", ">=", "<", "<=", "empty", "not_empty"];
 // v2: điều kiện của bước → câu đọc được ("Số tiền ≥ 50")
 export function condText(c: any): string {
   if (!c) return "";
-  const m = /^step(\d+)\.outcome$/.exec(c.field || "");
-  const f = c.field === "amount_usd" ? tr("ops.cf_amount") : m ? tr("ops.cf_outcome", {p0: m[1]})
+  const m = /^step(\d+)\.outcome$/.exec(c.field || ""), o = /^step(\d+)\.output\.(.+)$/.exec(c.field || "");
+  const f = c.field === "amount_usd" ? tr("ops.cf_amount") : m ? tr("ops.cf_outcome", {p0: m[1]}) : o ? tr("ops.cf_output", {p0: o[1], p1: o[2]})
     : (c.field || "").startsWith("input.") ? tr("ops.cf_input", {p0: c.field.slice(6)}) : c.field;
   if (c.op === "empty") return tr("ops.cond_empty", {p0: f});
   if (c.op === "not_empty") return tr("ops.cond_not_empty", {p0: f});
@@ -96,6 +96,7 @@ export function ProcessesTab({companyId, caps}: {companyId: number | null; caps:
                 {s.avg_minutes != null ? ` · ${tr("ops.avg")} ${mins(s.avg_minutes)}` : ""}</span>
               {s.action_type && <span className="ui-pill is-mid" title={tr("ops.action_hint")}>{actLabel(s.action_type)}</span>}
               {s.branch && <span className="ui-pill is-info">{tr("ops.branch")}: {s.branch}</span>}
+              {s.contract && <span className="ui-pill is-ok" title={tr("ops.contract")}>⇄ {s.contract}</span>}
               {!linearDeps(s) && <span className="ui-pill is-outline" data-testid={`proc-deps-${s.id}`}>{s.depends_on.length
                 ? tr("ops.after_steps", {p0: s.depends_on.map((x: number) => "B" + x).join(", ")}) : tr("ops.at_start")}</span>}
               {s.condition && <span className="ui-pill is-wait" data-testid={`proc-cond-${s.id}`}>{tr("ops.only_if", {p0: condText(s.condition)})}</span>}
@@ -144,6 +145,8 @@ function Instances({items, can, busy, onCancel, onOutcome}: any) {
         {s.condition && <div><small>{tr("ops.only_if", {p0: condText(s.condition)})}</small></div>}
         {s.skip_reason && <div><small className="is-warn">{s.skip_reason}</small></div>}
         {s.outcome && s.status !== "active" && <div><small>{tr("ops.outcome")}: <b>{s.outcome}</b></small></div>}
+        {s.contract && <div><small>⇄ {s.contract.name}: {tr(`native.tc_${s.contract.status}` as Key)} ({s.contract.attempts}/{s.contract.max_attempts})</small></div>}
+        {s.output && <details><summary><small>{tr("ops.output")}</small></summary><pre className="ops-json">{JSON.stringify(s.output, null, 1)}</pre></details>}
         {i.status === "running" && s.status === "active" && onOutcome && <Outcome s={s} busy={busy} onOutcome={onOutcome}/>}</td>
       <td>{s.assignee || "—"}{s.approval_required && <div><small>{tr("ops.approval_by", {p0: s.approver || "?", p1: s.authority_rule_id || "?"})}</small></div>}</td>
       <td><span className={"ui-pill " + (STEP_STATUS[s.status] || "")}>{tr(`ops.ss_${s.status}` as Key)}</span>{s.late && <span className="ui-pill is-risk">{tr("ops.late")}</span>}</td>
@@ -179,8 +182,8 @@ function ProcessForm({d, edit, busy, onCancel, onSave}: any) {
   const deps = (s: any, i: number) => s.depends_on ?? (i > 0 ? [i] : []);
   const renumber = (steps: any[], map: (n: number) => number | null) => steps.map((s: any, i: number) => {
     const d = deps(s, i).map(map).filter((n: number | null) => n != null && n >= 1 && n <= i) as number[];
-    const c = s.condition; const m = c ? /^step(\d+)\.outcome$/.exec(c.field || "") : null;
-    const nc = m ? (map(Number(m[1])) && (map(Number(m[1])) as number) <= i ? {...c, field: `step${map(Number(m[1]))}.outcome`} : null) : c;
+    const c = s.condition; const m = c ? /^step(\d+)\.(outcome|output\..+)$/.exec(c.field || "") : null;
+    const nc = m ? (map(Number(m[1])) && (map(Number(m[1])) as number) <= i ? {...c, field: `step${map(Number(m[1]))}.${m[2]}`} : null) : c;
     return {...s, depends_on: Array.from(new Set(d)).sort((a, b) => a - b), condition: nc};
   });
   const move = (i: number, dir: number) => {
@@ -229,6 +232,9 @@ function ProcessForm({d, edit, busy, onCancel, onSave}: any) {
             {ACTIONS.map(a => <option key={a} value={a}>{a ? actLabel(a) : tr("ops.no_approval")}</option>)}</select>
           <select value={s.sop_id ?? ""} onChange={e => setStep(i, "sop_id", num(e.target.value))} aria-label="SOP">
             <option value="">SOP…</option>{d.sops.map((x: any) => <option key={x.id} value={x.id}>{x.title}</option>)}</select>
+          <select value={s.contract_id ?? ""} onChange={e => setStep(i, "contract_id", num(e.target.value))} aria-label={tr("ops.contract")}
+            data-testid={`pf-contract-${i}`}>
+            <option value="">{tr("ops.contract")}…</option>{(d.contracts || []).map((x: any) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
           <button className="ui-btn is-ghost is-sm" onClick={() => move(i, -1)} aria-label="↑">↑</button>
           <button className="ui-btn is-ghost is-sm" onClick={() => move(i, 1)} aria-label="↓">↓</button>
           <button className="ui-btn is-ghost is-sm" onClick={() => remove(i)} aria-label={tr("ops.remove")}>✕</button>
@@ -248,6 +254,8 @@ function ProcessForm({d, edit, busy, onCancel, onSave}: any) {
               <option value="amount_usd">{tr("ops.cf_amount")}</option>
               <option value="input.">{tr("ops.cf_input_any")}</option>
               {Array.from({length: i}, (_, k) => k + 1).map(n => <option key={n} value={`step${n}.outcome`}>{tr("ops.cf_outcome", {p0: n})}</option>)}
+              {Array.from({length: i}, (_, k) => k + 1).flatMap(n => ((d.contracts || []).find((x: any) => x.id === f.steps[n - 1]?.contract_id)?.fields || [])
+                .map((fl: string) => <option key={`${n}-${fl}`} value={`step${n}.output.${fl}`}>{tr("ops.cf_output", {p0: n, p1: fl})}</option>))}
             </select>
             {s.condition?.field?.startsWith("input.") && <input className="ops-branch" value={s.condition.field.slice(6)} aria-label={tr("ops.cf_input_key")}
               onChange={e => setCond(i, "field", "input." + e.target.value.replace(/[^A-Za-z0-9_-]/g, ""))}/>}
@@ -264,7 +272,7 @@ function ProcessForm({d, edit, busy, onCancel, onSave}: any) {
         name: f.name, category: f.category, description: f.description || "", owner_position_id: f.owner_position_id ?? null,
         steps: compact().map((s: any) => ({id: s.id, name: s.name, position_id: s.position_id ?? null,
           sop_id: s.sop_id ?? null, expected_minutes: s.expected_minutes ?? null, action_type: s.action_type || "", risk: s.risk || "",
-          instructions: s.instructions || "", depends_on: s.depends_on, branch: s.branch || "",
+          instructions: s.instructions || "", depends_on: s.depends_on, branch: s.branch || "", contract_id: s.contract_id ?? null,
           condition: s.condition && s.condition.field ? {...s.condition,
             value: [">", ">=", "<", "<="].includes(s.condition.op) ? Number(s.condition.value) : s.condition.value} : null}))})}>{tr("ops.save")}</button>
         <button className="ui-btn is-ghost" onClick={onCancel}>{tr("ops.cancel")}</button></div>

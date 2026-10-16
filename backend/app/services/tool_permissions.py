@@ -140,6 +140,10 @@ def _authority_floor(db: Session, member: Member, action_class: str) -> tuple[st
         return None
 
 
+# M2e.3: nộp kết quả theo hợp đồng / ghi kết quả bước là cách giao việc — không danh sách công cụ nào tắt được
+ALWAYS_ALLOWED = ("company_task_submit_output", "company_process_step_outcome")
+
+
 def _position_gate(db: Session, member: Member, tool: str) -> tuple[str, str] | None:
     """M2b: chức danh có danh sách công cụ → tool công ty ngoài danh sách bị tắt cho người ngồi ghế đó."""
     if not tool.startswith("company_") or not getattr(member, "position_id", None):
@@ -147,7 +151,7 @@ def _position_gate(db: Session, member: Member, tool: str) -> tuple[str, str] | 
     from app.models.company_foundation import Position
     p = db.get(Position, member.position_id)
     allowed = (p.allowed_tools or []) if p is not None and p.status != "archived" else []
-    if allowed and tool not in allowed:
+    if allowed and tool not in allowed and tool not in ALWAYS_ALLOWED:
         return "off", f"position:{p.id}"
     return None
 

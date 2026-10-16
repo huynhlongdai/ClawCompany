@@ -657,3 +657,9 @@ a.org-node:hover{border-color:var(--text-muted);box-shadow:var(--shadow-2)}
 .ops-check li.is-ok .ops-tick{color:var(--ok)}
 .ops-lh{font-size:16px;margin:4px 0}
 .ops-lh-list{color:var(--text-muted)}
+/* M2e.3 hợp đồng dữ liệu */
+.ops-json{font-family:var(--font-mono, ui-monospace, monospace);font-size:12px;white-space:pre-wrap;max-height:260px;overflow:auto;background:var(--surface-2, rgba(0,0,0,.03));border-radius:8px;padding:8px;margin:4px 0}
+textarea.ops-json{width:100%}
+.cf-fields input,.cf-fields select{width:100%;min-width:0}
+.cf-fields td{padding:4px 6px}
+.cf-acc{gap:6px;margin-bottom:4px;flex-wrap:wrap}

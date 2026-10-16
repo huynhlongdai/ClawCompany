@@ -46,6 +46,8 @@ METRICS = {
     "first_pass_rate": {"vi": "% qua review lần đầu", "en": "% first-pass reviews", "unit": "%", "direction": "up"},
     "approvals_pending": {"vi": "Phê duyệt đang chờ", "en": "Pending approvals", "unit": "", "direction": "down"},
     "approval_turnaround_hours": {"vi": "Thời gian duyệt TB (giờ)", "en": "Avg approval time (h)", "unit": "giờ", "direction": "down"},
+    # M2e.3: % lần nộp kết quả đúng hợp đồng dữ liệu (gồm lượt chạy kết thúc mà chưa nộp)
+    "output_conformance_rate": {"vi": "% kết quả đúng hợp đồng dữ liệu", "en": "% outputs matching the data contract", "unit": "%", "direction": "up"},
 }
 OPEN_TASK = ("backlog", "todo", "in_progress", "review", "blocked")
 
@@ -156,6 +158,10 @@ def compute(db: Session, k: KpiDefinition, now: datetime | None = None) -> float
                 reviewed += 1
                 first += hist[0]["decision"] == "approve"
         return round(100 * first / reviewed, 1) if reviewed else None
+    if m == "output_conformance_rate":
+        from app.services import io_contracts
+        c = io_contracts.conformance(db, member_ids=members, company_id=k.company_id, start=start, end=end)
+        return round(100 * c["rate"], 1) if c["rate"] is not None else None
     if m in ("approvals_pending", "approval_turnaround_hours"):
         all_members = [x.id for x in db.query(Member).filter(Member.company_id == k.company_id).all()]
         req = members if members is not None else all_members

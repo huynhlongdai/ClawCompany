@@ -435,7 +435,17 @@ def brief_of(db: Session, p: Position | None) -> dict | None:
     return {"title": p.title, "job_description": p.job_description or "", "responsibilities": p.responsibilities or [],
             "kpis": p.kpis or [], "allowed_tools": p.allowed_tools or [], "allowed_skills": p.allowed_skills or [],
             "headcount": p.headcount or 0, "reports_to": boss.title if boss else "",
-            "rules": _rules_lines(db, p)}
+            "rules": _rules_lines(db, p), "contracts": _contract_lines(db, p)}
+
+
+def _contract_lines(db: Session, p: Position) -> list[str]:
+    try:
+        from app.services.io_contracts import agents_md_lines
+        return agents_md_lines(db, p.id)
+    except Exception as exc:  # noqa: BLE001 — AGENTS.md vẫn sinh được khi bảng hợp đồng chưa có
+        db.rollback()
+        print(f"[m2e.3] contract lines: {exc}")
+        return []
 
 
 def _rules_lines(db: Session, p: Position) -> list[str]:

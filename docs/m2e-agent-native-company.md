@@ -48,3 +48,42 @@ Mỗi gói: migration riêng (0047…), test hành vi, i18n vi+en, deploy + ki�
   `POST /api/team/rules/sync`, `GET /api/team/rules/compiled`. UI: Đội ngũ → tab "Luật cứng".
 - Giới hạn thật: phát hiện bằng mẫu chữ, không hiểu nghĩa (câu hứa hoàn tiền viết khác mẫu sẽ lọt); `revise` tối đa 1
   lần mỗi lượt (sau đó plugin không chặn tiếp ở finalize — lớp `message_sending` vẫn chạy cho tin ra kênh).
+
+## M2e.3 — Hợp đồng dữ liệu vào/ra chuẩn
+
+Bài toán: người làm mỗi lần một kiểu (thiếu trường, sai định dạng, quên lý do) → bước sau phải đọc văn bản và đoán.
+Công ty agent: mỗi chức danh / bước quy trình có **hợp đồng dữ liệu**; kết quả sai schema bị trả về tự động.
+
+- Bảng `io_contracts` (migration 0049): theo công ty, `position_id` tuỳ chọn (đầu ra chuẩn của ghế → AGENTS.md),
+  gắn bước quy trình bằng `process_steps.contract_id`. `input_schema` / `output_schema` = **tập con JSON Schema**
+  (type, properties, required, enum, minimum/maximum, minLength/maxLength, pattern, format email|date|date-time|uri,
+  items, minItems/maxItems, additionalProperties, description) — khoá khác bị từ chối khi lưu (422) thay vì bỏ qua
+  im lặng. `acceptance` = [{text, field?, op?, value?}]: có field/op thì máy kiểm (cùng phép so sánh với điều kiện bước),
+  chỉ có text thì reviewer đọc. `max_attempts` (1–10, mặc định 3), `outcome_field` (trường thành kết quả bước),
+  `version` tăng khi schema/tiêu chí/số lần đổi. Mẫu: Đơn hoàn tiền {order_id, amount_usd, reason, decision,
+  customer_message}, Xác nhận đơn hàng, Bài đăng sản phẩm, Báo cáo ngày.
+- `task_contracts`: hợp đồng của một việc — **ảnh chụp** schema/tiêu chí lúc giao (sửa hợp đồng không đổi luật của việc
+  đang chạy), `input_json` + `input_errors`, `attempts`, `status` open|accepted|escalated. `task_outputs`: mỗi lần nộp
+  (hợp lệ hay không, lỗi, via mcp|api|runtime). `process_step_runs.output_json`: kết quả đạt chuẩn của bước.
+- Việc sinh từ bước có hợp đồng: bước gốc nhận ngay đầu vào lần chạy; bước sau nhận lúc **tới lượt** = đầu vào lần
+  chạy + kết quả các bước đứng trước. Mô tả việc có mục "## Hợp đồng dữ liệu" (trường, tiêu chí, dữ liệu vào).
+- MCP `company_task_submit_output(task_id, output)` (tool 32): sai → `{valid:false, status:rework, errors:[{path,
+  message}], attempts_left}`; việc đang Chờ duyệt/Xong bị trả về Đang làm; nộp từ ngoài lượt chạy → đánh thức ghế
+  (`changes_requested`). Hết lượt → `escalated`: việc Bị chặn + Hộp việc `output_escalated` cho **người** đầu tiên trong
+  chuỗi `services/escalation.py` (chức danh cấp trên → quản lý → trưởng phòng → chủ). Đạt → ghi sổ `result`, ghi bước,
+  `outcome_field` → `step<N>.outcome`.
+- MCP `company_process_step_outcome(task_id, outcome)` (tool 33): agent ghi kết quả bước để rẽ nhánh.
+- Cưỡng chế: agent gọi `company_task_status` sang review/done khi chưa đạt → `contract_output_required`. Lượt chạy kết
+  thúc (complete → review) mà chưa đạt → một lần nộp hỏng "chưa nộp kết quả": còn lượt → việc về Cần làm + đánh thức
+  lại; hết lượt → Bị chặn + leo thang. Người (UI/API) vẫn chuyển trạng thái được — quyết định của người thắng máy.
+  Hai tool giao kết quả không bị danh sách công cụ của chức danh tắt (`tool_permissions.ALWAYS_ALLOWED`).
+- Điều kiện bước: thêm `step<N>.output.<trường>` (UI: chọn trường của hợp đồng bước trước).
+- Tỷ lệ đúng chuẩn = lần nộp hợp lệ / tổng lần nộp (gồm "chưa nộp") theo ghế / chức danh / hợp đồng + tỷ lệ đạt ngay
+  lần đầu → KPI `output_conformance_rate` (%), scorecard (`output_conformance_rate`, `rule_compliance_rate`).
+- AGENTS.md: mục "## Hợp đồng dữ liệu (đầu ra chuẩn…)" của chức danh (hợp đồng gắn chức danh + hợp đồng các bước do
+  chức danh làm); sinh lại khi tạo/sửa/lưu trữ hợp đồng hoặc khi lưu quy trình có bước gắn hợp đồng.
+- API: `GET/POST /api/team/contracts`, `PATCH/DELETE /api/team/contracts/{id}`, `POST /api/team/contracts/{id}/validate`,
+  `GET/POST /api/team/tasks/{id}/contract`, `POST /api/team/tasks/{id}/output`. UI: Đội ngũ → tab "Hợp đồng dữ liệu"
+  (bảng trường ↔ JSON, tiêu chí, thử kết quả, tỷ lệ theo ghế/chức danh, lần nộp gần đây); Quy trình: chọn hợp đồng cho bước,
+  điều kiện theo trường kết quả, lần chạy hiện kết quả + trạng thái hợp đồng.
+- Giới hạn thật: kiểm cấu trúc + tiêu chí có field; chất lượng câu chữ (lịch sự, đúng chính sách) vẫn do review đọc.

@@ -785,6 +785,13 @@ export const apiNative = {
   deleteRule: (id: number) => request<any>(`/team/rules/${id}`, {method: "DELETE"}),
   testRules: (body: any) => request<any>(`/team/rules/test`, {method: "POST", body: JSON.stringify(body)}),
   syncRules: () => request<any>(`/team/rules/sync`, {method: "POST"}),
+  contracts: (companyId?: number | null) => request<any>(`/team/contracts${cq(companyId)}`),
+  createContract: (body: any) => request<any>(`/team/contracts`, {method: "POST", body: JSON.stringify(body)}),
+  updateContract: (id: number, body: any) => request<any>(`/team/contracts/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  archiveContract: (id: number) => request<any>(`/team/contracts/${id}`, {method: "DELETE"}),
+  validateOutput: (id: number, output: string) => request<any>(`/team/contracts/${id}/validate`, {method: "POST", body: JSON.stringify({output})}),
+  taskContract: (taskId: number) => request<any>(`/team/tasks/${taskId}/contract`),
+  submitOutput: (taskId: number, output: any) => request<any>(`/team/tasks/${taskId}/output`, {method: "POST", body: JSON.stringify({output})}),
 };
 
 export const apiOps = {

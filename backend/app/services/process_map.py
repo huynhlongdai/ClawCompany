@@ -155,7 +155,16 @@ def public_step(db: Session, s: ProcessStep, avg: dict | None = None) -> dict:
             "sop_id": s.sop_id, "sop": sop.title if sop else None, "expected_minutes": s.expected_minutes,
             "action_type": s.action_type or "", "risk": s.risk or "",
             "depends_on": _deps(s), "condition": s.condition or None, "branch": s.branch or "",
+            "contract_id": s.contract_id, "contract": _contract_name(db, s.contract_id),
             "avg_minutes": (avg or {}).get(s.id)}
+
+
+def _contract_name(db: Session, cid: int | None) -> str | None:
+    if not cid:
+        return None
+    from app.models.agent_native import IoContract
+    c = db.get(IoContract, cid)
+    return c.name if c else None
 
 
 def public_process(db: Session, p: Process, *, with_stats: bool = True) -> dict:
@@ -204,6 +213,13 @@ def issues(db: Session, p: Process, steps: list[ProcessStep] | None = None) -> l
     return out
 
 
+def _contracts_for_editor(db: Session, company_id: int) -> list[dict]:
+    from app.models.agent_native import IoContract
+    return [{"id": c.id, "name": c.name, "fields": list(((c.output_schema or {}).get("properties") or {}).keys())}
+            for c in db.query(IoContract).filter(IoContract.company_id == company_id, IoContract.status == "active")
+            .order_by(IoContract.id).all()]
+
+
 def list_processes(db: Session, org_id: int, company_id: int | None, *, include_archived: bool = False) -> dict:
     co = _company(db, org_id, company_id)
     q = db.query(Process).filter(Process.company_id == co.id)
@@ -216,6 +232,7 @@ def list_processes(db: Session, org_id: int, company_id: int | None, *, include_
             "categories": [{"key": k, "vi": vi, "en": en} for k, vi, en in CATEGORIES],
             "used_categories": used, "items": items,
             "templates": sorted(TEMPLATES),
+            "contracts": _contracts_for_editor(db, co.id),
             "positions": [{"id": x.id, "title": x.title} for x in db.query(Position).filter(
                 Position.company_id == co.id, Position.status != "archived").order_by(Position.id).all()],
             "sops": [{"id": s.id, "title": s.title} for s in db.query(SOP).filter(
@@ -285,14 +302,14 @@ def _clean_condition(i: int, c, deps: list[int]) -> dict | None:
     if op_ not in CONDITION_OPS:
         raise _err(422, f"Bước {i}: phép so sánh \"{op_}\" không hợp lệ. Dùng một trong: {', '.join(CONDITION_OPS)}.")
     import re
-    m = re.fullmatch(r"step(\d+)\.outcome", field)
+    m = re.fullmatch(r"step(\d+)\.(?:outcome|output\.[A-Za-z0-9_\-]{1,60})", field)
     if m:
         n = int(m.group(1))
         if n < 1 or n >= i:
             raise _err(422, f"Bước {i}: điều kiện chỉ xét được kết quả của bước đứng trước (1 tới {i - 1}).")
     elif field != "amount_usd" and not re.fullmatch(r"input\.[A-Za-z0-9_\-]{1,60}", field):
-        raise _err(422, f"Bước {i}: trường điều kiện \"{field}\" không hợp lệ. Dùng amount_usd, input.<tên trường> "
-                        f"hoặc step<N>.outcome.")
+        raise _err(422, f"Bước {i}: trường điều kiện \"{field}\" không hợp lệ. Dùng amount_usd, input.<tên trường>, "
+                        f"step<N>.outcome hoặc step<N>.output.<trường> (M2e.3: trường kết quả theo hợp đồng dữ liệu).")
     value = c.get("value")
     if op_ in (">", ">=", "<", "<=") and not isinstance(value, (int, float)):
         try:
@@ -336,6 +353,8 @@ def _context(inst: ProcessInstance, runs: list[ProcessStepRun]) -> dict:
         ctx[f"input.{k}"] = v
     for r in runs:
         ctx[f"step{r.seq}.outcome"] = r.outcome or None
+        for k, v in (r.output_json or {}).items():     # M2e.3: kết quả đạt hợp đồng của bước
+            ctx[f"step{r.seq}.output.{k}"] = v
     return ctx
 
 
@@ -348,7 +367,7 @@ def describe_condition(cond: dict | None) -> str:
 
 
 def save_steps(db: Session, org_id: int, p: Process, steps: list[dict]) -> None:
-    from app.services import authority
+    from app.services import authority, io_contracts
     co = db.get(Company, p.company_id)
     if len(steps) > MAX_STEPS:
         raise _err(422, f"Tối đa {MAX_STEPS} bước. Gộp các bước nhỏ hoặc tách thành quy trình con.")
@@ -381,7 +400,8 @@ def save_steps(db: Session, org_id: int, p: Process, steps: list[dict]) -> None:
                           sop_id=sop_id or None, expected_minutes=em,
                           action_type=authority.normalize_action(at) or "" if at else "", risk=risk,
                           depends_on=deps, condition=_clean_condition(i, s.get("condition"), deps),
-                          branch=(s.get("branch") or "").strip()[:60]))
+                          branch=(s.get("branch") or "").strip()[:60],
+                          contract_id=io_contracts.check_step_contract(db, p.company_id, s.get("contract_id"))))
     keep_ids = {s.get("id") for s in steps if s.get("id")}
     old = steps_of(db, p.id)
     by_id = {s.id: s for s in old}
@@ -548,6 +568,8 @@ def start(db: Session, org_id: int, pid: int, *, title: str = "", amount_usd: fl
                 db.add(TaskDependency(task_id=task.id, blocked_by_task_id=task_of[d].id,
                                       created_by_member_id=actor_member_id))
         db.add(run); db.commit(); db.refresh(run)
+        if s.contract_id:   # M2e.3: việc mang hợp đồng dữ liệu; bước gốc nhận ngay dữ liệu vào của lần chạy
+            _attach_contract(db, task, s.contract_id, run, inst.input_json if not _deps(s) else None)
         out_runs.append(run)
         task_of[s.seq] = task
     _settle(db, inst, now, wake_roots=True)
@@ -555,6 +577,34 @@ def start(db: Session, org_id: int, pid: int, *, title: str = "", amount_usd: fl
                aggregate_type="process_instance", aggregate_id=str(inst.id), actor_member_id=actor_member_id,
                payload={"process_id": p.id, "instance_id": inst.id, "tasks": [r.task_id for r in out_runs]})
     return public_instance(db, inst)
+
+
+def _attach_contract(db: Session, task: Task, contract_id: int, run: ProcessStepRun, input_data: dict | None) -> None:
+    from app.models.agent_native import IoContract
+    from app.services import io_contracts
+    c = db.get(IoContract, contract_id)
+    if c is None or c.status == "archived":
+        return
+    tc = io_contracts.attach(db, task, c, input_data=input_data, step_run_id=run.id)
+    _write_contract_brief(db, task, tc)
+
+
+def _write_contract_brief(db: Session, task: Task, tc) -> None:
+    from app.services import io_contracts
+    marker = "\n\n## Hợp đồng dữ liệu: "
+    desc = task.description or ""
+    task.description = (desc.split(marker)[0] if marker in desc else desc) + "\n\n" + io_contracts.contract_brief(tc)
+    db.commit()
+
+
+def _step_input(inst: ProcessInstance, r: ProcessStepRun, by_seq: dict) -> dict:
+    """Dữ liệu vào của một bước khi tới lượt = đầu vào lần chạy + kết quả (đạt hợp đồng) của các bước đứng trước."""
+    data = dict(inst.input_json or {})
+    for d in _deps(r):
+        prev = by_seq.get(d)
+        if prev is not None and prev.output_json:
+            data.update(prev.output_json)
+    return data
 
 
 def _close_instance(db: Session, inst: ProcessInstance, status: str, now: datetime) -> None:
@@ -648,10 +698,17 @@ def _settle(db: Session, inst: ProcessInstance, now: datetime, *, wake_roots: bo
             break   # trạng thái đã đổi → đọc lại từ đầu
         if not changed:
             break
+    by_seq_all = {x.seq: x for x in db.query(ProcessStepRun).filter(ProcessStepRun.instance_id == inst.id).all()}
     for r in activated:
         t = db.get(Task, r.task_id) if r.task_id else None
         if t is None:
             continue
+        if _deps(r):   # M2e.3: bước sau nhận dữ liệu vào lúc tới lượt
+            from app.services import io_contracts
+            tc = io_contracts.task_contract(db, t.id)
+            if tc is not None and tc.status == "open":
+                io_contracts.set_input(db, tc, None, _step_input(inst, r, by_seq_all))
+                _write_contract_brief(db, t, tc)
         if t.status == "backlog":
             lifecycle.transition(db, t, "todo", reason=f"quy trình lần chạy #{inst.id}: bước {r.seq} tới lượt",
                                  via="process", system=True, organization_id=inst.organization_id,
@@ -726,11 +783,20 @@ def public_instance(db: Session, inst: ProcessInstance) -> dict:
                        "expected_minutes": r.expected_minutes, "note": r.note,
                        "depends_on": _deps(r), "condition": r.condition or None, "branch": r.branch or "",
                        "outcome": r.outcome or "", "skip_reason": r.skip_reason or "",
+                       "output": r.output_json, "contract": _run_contract(db, r),
                        "cycle_minutes": _fmt_minutes(r.cycle_seconds),
                        "late": bool(r.status == "active" and r.expected_minutes and r.activated_at
                                     and (now - r.activated_at).total_seconds() > r.expected_minutes * 60),
                        "activated_at": r.activated_at.isoformat() if r.activated_at else None,
                        "finished_at": r.finished_at.isoformat() if r.finished_at else None} for r in runs]}
+
+
+def _run_contract(db: Session, r: ProcessStepRun) -> dict | None:
+    if not r.task_id:
+        return None
+    from app.services import io_contracts
+    tc = io_contracts.task_contract(db, r.task_id)
+    return {"name": tc.name, "status": tc.status, "attempts": tc.attempts, "max_attempts": tc.max_attempts} if tc else None
 
 
 def instances(db: Session, org_id: int, pid: int, *, limit: int = 30) -> dict:

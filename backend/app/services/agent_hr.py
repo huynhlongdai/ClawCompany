@@ -164,7 +164,13 @@ def render_files(*, name: str, role: str, company: str, department: str, manager
                         + (f"- Kỹ năng: {skills}\n" if skills else "") + "\n" if tools or skills else "")
                      + ("## Luật cứng (hệ thống cưỡng chế, không phải lời khuyên)\n" + "\n".join(position["rules"])
                         + "\nVi phạm bị chặn hoặc bắt viết lại tự động và được ghi vào hồ sơ tuân thủ của ghế.\n\n"
-                        if position.get("rules") else ""))
+                        if position.get("rules") else "")
+                     + ("## Hợp đồng dữ liệu (đầu ra chuẩn — hệ thống kiểm, sai thì trả làm lại)\n"
+                        + "\n".join(position["contracts"])
+                        + "\nViệc có hợp đồng: đọc company_task_get → contract, nộp đúng các trường (* = bắt buộc) bằng "
+                          "company_task_submit_output; sai chuẩn → sửa theo lỗi và nộp lại; quá số lần → chuyển người. "
+                          "Bước quy trình có rẽ nhánh: ghi kết quả bước bằng company_process_step_outcome.\n\n"
+                        if position.get("contracts") else ""))
     else:
         duties = own
     duties = duties or (f"- Làm các việc được giao cho vị trí {role} trên bảng công việc.\n"

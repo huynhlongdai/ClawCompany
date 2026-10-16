@@ -154,7 +154,9 @@ def test_compiled_rules_reach_agents_md_and_gateway_config(E):
     assert "## Luật cứng" in md and "Không hứa hoàn tiền ngoài chính sách" in md and "số điện thoại" in md
     data = rr.compile_all(E.db, E.org.id)
     seat = data["agents"][ag.runtime_agent_id]
-    assert seat["allowedCompanyTools"] == ["company_context", "company_knowledge_search"]
+    # M2e.3: hai tool giao kết quả (nộp theo hợp đồng, ghi kết quả bước) luôn được phép — đổi theo thiết kế mới
+    assert seat["allowedCompanyTools"] == ["company_context", "company_knowledge_search", "company_process_step_outcome",
+                                           "company_task_submit_output"]
     assert {r["kind"] for r in seat["rules"]} == {"pii", "regex"} and all(r["regex"] for r in seat["rules"])
     patched = {}
 

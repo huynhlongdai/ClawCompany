@@ -498,14 +498,27 @@ def apply_terminal_state(db: Session, task: Task, state: ConsumerState, event: d
         if execution_policy.requires_report(task) and not execution_policy.has_report(db, task, holder):
             new_status, reason = "blocked", "missing_report"
             execution_policy.flag_missing_report(db, task, holder)
+        if reason != "missing_report":
+            # M2e.3: việc có hợp đồng dữ liệu mà lượt chạy chưa nộp kết quả đạt chuẩn → một lần nộp hỏng:
+            # còn lượt → về "Cần làm" + đánh thức lại; hết lượt → "Bị chặn" + leo thang tới người.
+            from app.services import io_contracts
+            gate = io_contracts.on_run_end(db, task, holder.member_id if holder is not None else task.assignee_member_id,
+                                           run_id=holder.runtime_run_id if holder is not None else "",
+                                           session_key=state.session_key)
+            if gate is not None:
+                new_status, reason = gate
     if holder is not None:
         lifecycle.finish_run(db, holder, RUN_OUTCOME.get(new_status, "completed")
-                             if reason != "missing_report" else "completed",
+                             if reason not in ("missing_report", "contract_missing_output", "contract_escalated") else "completed",
                              error_reason=str(event.get("errorMessage") or "")
                              or ("missing_report" if reason == "missing_report" else ""), commit=False)
     lifecycle.transition(db, task, new_status, system=True, via="runtime",
                          reason=reason, commit=True, emit=False)
-    if new_status == "blocked":
+    if reason == "contract_missing_output":
+        from app.services import wakeup
+        wakeup.enqueue_for_task(db, task, "changes_requested", dedupe_key=f"contract:t{task.id}:run-end:{holder.id if holder else 0}",
+                                payload={"reason": "contract_missing_output"})
+    if new_status == "blocked" and reason != "contract_escalated":
         # D3.5: run lỗi / thiếu báo cáo → quản lý (người) của người làm nhận báo.
         from app.services import inbox
         inbox.run_failed(db, task, str(event.get("errorMessage") or reason),

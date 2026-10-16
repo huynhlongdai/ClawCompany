@@ -1,4 +1,4 @@
-"""M2e — công ty agent-native: luật cứng (M2e.2) … Spec docs/m2e-agent-native-company.md."""
+"""M2e — công ty agent-native: luật cứng (M2e.2), hợp đồng dữ liệu (M2e.3) … Spec docs/m2e-agent-native-company.md."""
 import hmac
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException
@@ -131,3 +131,122 @@ def guard_violation(payload: ViolationIn, x_guard_token: str = Header(default=""
     if not x_guard_token or not hmac.compare_digest(x_guard_token, rr.report_token()):
         raise HTTPException(401, "guard token sai")
     return rr.record_from_plugin(db, payload.model_dump())
+
+
+# ------------------------------------------------------------------ M2e.3 hợp đồng dữ liệu
+
+class ContractIn(BaseModel):
+    company_id: int | None = None
+    template: str | None = None
+    name: str | None = None
+    description: str | None = None
+    input_schema: dict | str | None = None
+    output_schema: dict | str | None = None
+    acceptance: list | None = None
+    max_attempts: int | None = None
+    outcome_field: str | None = None
+    position_id: int | None = None
+    status: str | None = None
+
+
+class OutputIn(BaseModel):
+    output: dict | str | None = None
+
+
+class AttachIn(BaseModel):
+    contract_id: int
+    input: dict | None = None
+
+
+def _task_in_org(db: Session, org: int, task_id: int):
+    from app.models import Company, Project, Task
+    t = db.get(Task, task_id)
+    pr = db.get(Project, t.project_id) if t is not None and t.project_id else None
+    co = db.get(Company, pr.company_id) if pr else None
+    if t is None or co is None or co.organization_id != org:
+        raise HTTPException(404, "Không thấy việc này.")
+    return t
+
+
+@router.get("/contracts")
+def contracts(company_id: int | None = None, include_archived: bool = False,
+              principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+    from app.services import io_contracts as ioc
+    return ioc.list_contracts(db, active_org(principal), company_id, include_archived=include_archived)
+
+
+@router.post("/contracts")
+def create_contract(payload: ContractIn, background: BackgroundTasks,
+                    principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    from app.services import io_contracts as ioc
+    org = active_org(principal)
+    c = ioc.create_contract(db, org, payload.model_dump(exclude_unset=True))
+    resync_agents_later(background, principal, org)
+    return ioc.public_contract(db, c)
+
+
+@router.patch("/contracts/{contract_id}")
+def update_contract(contract_id: int, payload: ContractIn, background: BackgroundTasks,
+                    principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    from app.services import io_contracts as ioc
+    org = active_org(principal)
+    data = payload.model_dump(exclude_unset=True); data.pop("company_id", None); data.pop("template", None)
+    c = ioc.update_contract(db, org, contract_id, data)
+    resync_agents_later(background, principal, org)
+    return ioc.public_contract(db, c)
+
+
+@router.delete("/contracts/{contract_id}")
+def archive_contract(contract_id: int, background: BackgroundTasks,
+                     principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
+    from app.services import io_contracts as ioc
+    org = active_org(principal)
+    out = ioc.archive_contract(db, org, contract_id)
+    resync_agents_later(background, principal, org)
+    return out
+
+
+@router.post("/contracts/{contract_id}/validate")
+def validate_output(contract_id: int, payload: OutputIn, principal: Principal = Depends(require_role("member")),
+                    db: Session = Depends(get_db)):
+    """Thử một kết quả với hợp đồng — đúng hàm kiểm của company_task_submit_output, không ghi gì."""
+    import json as _json
+    from app.services import io_contracts as ioc
+    out = payload.output
+    if isinstance(out, str):
+        try:
+            out = _json.loads(out)
+        except ValueError:
+            return {"valid": False, "errors": [{"path": "(gốc)", "message": "không phải JSON hợp lệ"}]}
+    return ioc.try_output(db, active_org(principal), contract_id, out)
+
+
+@router.get("/tasks/{task_id}/contract")
+def task_contract(task_id: int, principal: Principal = Depends(require_role("member")), db: Session = Depends(get_db)):
+    from app.services import io_contracts as ioc
+    t = _task_in_org(db, active_org(principal), task_id)
+    return {"task_id": t.id, "contract": ioc.public_task_contract(db, ioc.task_contract(db, t.id))}
+
+
+@router.post("/tasks/{task_id}/contract")
+def attach_contract(task_id: int, payload: AttachIn, principal: Principal = Depends(require_role("manager")),
+                    db: Session = Depends(get_db)):
+    from app.services import io_contracts as ioc
+    org = active_org(principal)
+    t = _task_in_org(db, org, task_id)
+    return ioc.attach_by_id(db, org, t, payload.contract_id, payload.input)
+
+
+@router.post("/tasks/{task_id}/output")
+def submit_output(task_id: int, payload: OutputIn, principal: Principal = Depends(require_role("member")),
+                  db: Session = Depends(get_db)):
+    """Người nộp (hoặc nộp thay) kết quả theo hợp đồng — cùng đường kiểm với agent."""
+    from app.models import Member
+    from app.services import io_contracts as ioc
+    org = active_org(principal)
+    t = _task_in_org(db, org, task_id)
+    member = db.get(Member, principal.member_id) if getattr(principal, "member_id", None) else None
+    try:
+        return ioc.submit(db, t, member, payload.output, via="api")
+    except ioc.SubmitError as exc:
+        raise HTTPException(exc.status, exc.message) from exc
