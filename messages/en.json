@@ -3419,7 +3419,15 @@
   "preview": "What will agents see?",
   "preview_hint": "Type a customer question — this is exactly what company_product_lookup returns to agents (no model call).",
   "preview_ph": "e.g. how much is the blue glaze bowl?",
-  "preview_go": "Try it"
+  "preview_go": "Try it",
+  "thr_line": "Price changes of {p0}% or more (up or down), or a first price → owner approves; under {p0}% → department head.",
+  "thr_edit": "Change threshold",
+  "thr_label": "Owner-approval threshold",
+  "thr_save": "Save threshold",
+  "thr_default": "Reset to default (10%)",
+  "thr_saved": "Threshold saved: {p0}%",
+  "cancel_edit": "Cancel",
+  "thr_hint": "1 to 100%. Applies to price proposals from now on; pending proposals keep the routing they were sent with."
  },
  "ingest": {
   "explain": "Bring existing documents into the library: files (PDF, scans, Word, Excel, PowerPoint…), web pages, ready-made templates, or sync from Google Drive / Notion. Everything imported lands as a draft — agents only read it after approval. Classification and extracted facts are suggestions only.",

@@ -22,7 +22,57 @@ from app.models import Approval, KnowledgeDocument, Member
 from app.models.catalog import CatalogPrice, CatalogProduct, PRODUCT_STATUSES
 
 CURRENCIES = ("VND", "USD")
-HIGH_PCT = 10            # đổi giá từ 10% trở lên (tăng hoặc giảm) = rủi ro cao → chủ duyệt
+HIGH_PCT = 10            # MẶC ĐỊNH: đổi giá từ 10% trở lên (tăng hoặc giảm) = rủi ro cao → chủ duyệt; mỗi công ty đổi được
+HIGH_PCT_MIN, HIGH_PCT_MAX = 1, 100   # (company_profiles.price_change_high_pct, tab Sản phẩm & giá › Cài đặt duyệt giá)
+
+
+def high_pct(db: Session, company_id: int | None) -> int:
+    from app.services.company_foundation import profile_row
+    p = profile_row(db, company_id) if company_id else None
+    v = getattr(p, "price_change_high_pct", None) if p is not None else None
+    return int(v) if v else HIGH_PCT
+
+
+def settings(db: Session, org_id: int, company_id: int | None) -> dict:
+    co = _company(db, org_id, company_id)
+    from app.services.company_foundation import profile_row
+    p = profile_row(db, co.id)
+    custom = getattr(p, "price_change_high_pct", None) if p is not None else None
+    return {"company_id": co.id, "high_pct": high_pct(db, co.id), "default_high_pct": HIGH_PCT, "custom": custom is not None,
+            "min": HIGH_PCT_MIN, "max": HIGH_PCT_MAX}
+
+
+def save_settings(db: Session, org_id: int, principal, company_id: int | None, data: dict) -> dict:
+    """Chỉ quản trị công ty đổi ngưỡng (đây là luật phân quyền, như ma trận thẩm quyền). Không hồi tố: đề xuất giá
+    đang chờ giữ mức rủi ro lúc gửi."""
+    co = _company(db, org_id, company_id, write=True)
+    from app.core import company_scope
+    company_scope.check(co.id, min_role="admin")
+    raw = data.get("high_pct")
+    if raw is None or raw == "":
+        val = None
+    else:
+        try:
+            val = int(raw)
+        except (TypeError, ValueError):
+            raise HTTPException(422, {"error": "invalid_threshold", "message": "Ngưỡng phải là số nguyên"})
+        if not HIGH_PCT_MIN <= val <= HIGH_PCT_MAX:
+            raise HTTPException(422, {"error": "threshold_range", "min": HIGH_PCT_MIN, "max": HIGH_PCT_MAX,
+                                      "message": f"Ngưỡng phải từ {HIGH_PCT_MIN} đến {HIGH_PCT_MAX}%"})
+    from app.models.company_foundation import CompanyProfile
+    from app.services.company_foundation import profile_row
+    p = profile_row(db, co.id)
+    if p is None:
+        p = CompanyProfile(organization_id=org_id, company_id=co.id, charter_version=0); db.add(p)
+    before = p.price_change_high_pct
+    p.price_change_high_pct = val
+    db.add(p); db.flush()
+    from app.services.company_event_bus import emit_event
+    emit_event(db, organization_id=org_id, company_id=co.id, event_type="catalog.settings_changed", source="catalog",
+               aggregate_type="company", aggregate_id=str(co.id), actor_member_id=_seat(principal, co.id),
+               payload={"price_change_high_pct": {"from": before, "to": val}})
+    db.commit()
+    return settings(db, org_id, co.id)
 KINDS = ("product", "service")
 SKU_RE = re.compile(r"^[A-Z0-9][A-Z0-9._-]{0,63}$")
 POLICY_KEYS = {"return_days": int, "warranty_months": int, "note": str}
@@ -161,7 +211,7 @@ def listing(db: Session, org_id: int, company_id: int | None, *, q: str = "", st
         uq = _u(q)
         items = [i for i in items if uq in _u(f"{i['sku']} {i['name']} {i['category']}")]
     return {"company_id": co.id, "items": items, "currencies": list(CURRENCIES), "kinds": list(KINDS), "statuses": list(PRODUCT_STATUSES),
-            "high_pct": HIGH_PCT, "counts": {"total": len(items), "priced": sum(1 for i in items if i["current_price"]),
+            "high_pct": high_pct(db, co.id), "counts": {"total": len(items), "priced": sum(1 for i in items if i["current_price"]),
                                              "pending": sum(1 for i in items if i["pending_price"])}}
 
 
@@ -281,7 +331,7 @@ def propose_price(db: Session, org_id: int, principal, pid: int, data: dict, *, 
     pct = None
     if base is not None and base.currency == cur_code and Decimal(str(base.amount)) > 0:
         pct = (amount - Decimal(str(base.amount))) / Decimal(str(base.amount)) * 100
-    risk = "high" if pct is None or abs(pct) >= HIGH_PCT else "normal"
+    risk = "high" if pct is None or abs(pct) >= high_pct(db, p.company_id) else "normal"
     seat = requester.id if requester is not None else _seat(principal, p.company_id)
     req_m = requester or (db.get(Member, seat) if seat else None)
     from app.services import authority

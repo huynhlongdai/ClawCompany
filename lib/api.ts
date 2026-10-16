@@ -1036,6 +1036,8 @@ export const apiCatalog = {
   decide: (priceId: number, decision: "approved" | "rejected", note = "") =>
     request<any>(`/team/catalog/prices/${priceId}/decide`, {method: "POST", body: JSON.stringify({decision, note})}),
   cancel: (priceId: number) => request<any>(`/team/catalog/prices/${priceId}/cancel`, {method: "POST"}),
+  settings: (companyId: number) => request<any>(`/team/catalog/settings?company_id=${companyId}`),
+  saveSettings: (body: {company_id: number; high_pct: number | null}) => request<any>(`/team/catalog/settings`, {method: "PUT", body: JSON.stringify(body)}),
   lookup: (companyId: number, query: string) => request<any>(`/team/catalog/lookup`, {method: "POST", body: JSON.stringify({company_id: companyId, query})}),
 };
 

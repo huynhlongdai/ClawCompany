@@ -3419,7 +3419,15 @@
   "preview": "Agent sẽ thấy gì?",
   "preview_hint": "Gõ câu khách hay hỏi — đây đúng là kết quả tool company_product_lookup trả cho agent (không gọi model).",
   "preview_ph": "vd: bát men lam giá bao nhiêu?",
-  "preview_go": "Tra thử"
+  "preview_go": "Tra thử",
+  "thr_line": "Đổi giá từ {p0}% trở lên (tăng hoặc giảm) hoặc giá đầu tiên → chủ duyệt; dưới {p0}% → trưởng phòng.",
+  "thr_edit": "Đổi ngưỡng",
+  "thr_label": "Ngưỡng cần chủ duyệt",
+  "thr_save": "Lưu ngưỡng",
+  "thr_default": "Về mặc định (10%)",
+  "thr_saved": "Đã lưu ngưỡng {p0}%",
+  "cancel_edit": "Huỷ",
+  "thr_hint": "Từ 1 đến 100%. Áp dụng cho đề xuất giá gửi từ bây giờ; đề xuất đang chờ giữ mức duyệt lúc gửi."
  },
  "ingest": {
   "explain": "Đưa tài liệu có sẵn vào thư viện: tệp (PDF, ảnh scan, Word, Excel, PowerPoint…), trang web, mẫu soạn sẵn, hoặc đồng bộ từ Google Drive / Notion. Mọi tài liệu nạp vào là bản nháp — agent chỉ đọc sau khi được duyệt. Phân loại và thông tin trích ra chỉ là đề xuất.",

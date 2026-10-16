@@ -518,6 +518,21 @@ def catalog_list(company_id: int | None = None, q: str = "", status: str = "",
     return catalog.listing(db, active_org(principal), company_id, q=q, status=status)
 
 
+@router.get("/catalog/settings")
+def catalog_settings(company_id: int | None = None, principal: Principal = Depends(require_company_role("member")),
+                     db: Session = Depends(get_db)):
+    from app.services import catalog
+    return catalog.settings(db, active_org(principal), company_id)
+
+
+@router.put("/catalog/settings")
+def catalog_settings_save(payload: dict, principal: Principal = Depends(require_company_role("admin")),
+                          db: Session = Depends(get_db)):
+    """Ngưỡng % đổi giá cần chủ duyệt (price_change), theo công ty. {company_id, high_pct: 1..100 | null = mặc định 10}."""
+    from app.services import catalog
+    return catalog.save_settings(db, active_org(principal), principal, payload.get("company_id"), payload)
+
+
 @router.post("/catalog/products")
 def catalog_create(payload: ProductIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     from app.services import catalog

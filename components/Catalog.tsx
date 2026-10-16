@@ -34,6 +34,7 @@ export function CatalogTab({companyId, caps}: {companyId: number | null; caps: a
       <span className="ui-grow"/>
       {can && <button className="ui-btn is-primary is-sm" onClick={() => { setAdding(!adding); setSel(null); }} data-testid="cat-new">{tr("cat.new")}</button>}
     </div>
+    {!!caps?.manage_roles && <ThresholdSetting companyId={companyId} current={d.high_pct} setError={setError} onSaved={reload}/>}
     {adding && <NewProduct companyId={companyId} setError={setError} onDone={(p: any) => { setAdding(false); reload(); setSel(p.id); }} onCancel={() => setAdding(false)}/>}
     <div className="tmRow">
       <input className="ui-input" placeholder={tr("cat.search")} value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === "Enter" && reload()} data-testid="cat-q"/>
@@ -180,5 +181,26 @@ function AgentPreview({companyId}: {companyId: number}) {
         {x.warning && <><br/><small>{x.warning}</small></>}
         {Object.keys(x.policies || {}).length > 0 && <><br/><small>{Object.entries(x.policies).map(([k, v]: any) => `${k}: ${typeof v === "object" ? `${v.value} (${v.source})` : v}`).join(" · ")}</small></>}</li>)}
     </ul>)}
+  </div>;
+}
+
+/** Ngưỡng % đổi giá cần chủ duyệt — cài đặt theo công ty (chỉ quản trị công ty). Không hồi tố đề xuất đang chờ. */
+function ThresholdSetting({companyId, current, setError, onSaved}: {companyId: number; current: number; setError: (e: any) => void; onSaved: () => void}) {
+  const [open, setOpen] = useState(false), [v, setV] = useState(String(current)), [busy, setBusy] = useState(false);
+  const toast = useToast();
+  async function save(val: number | null) {
+    setBusy(true); setError(null);
+    try { const r = await apiCatalog.saveSettings({company_id: companyId, high_pct: val}); toast(tr("cat.thr_saved", {p0: r.high_pct})); setOpen(false); onSaved(); }
+    catch (e) { setError(e); } finally { setBusy(false); }
+  }
+  if (!open) return <p data-testid="cat-threshold"><small>{tr("cat.thr_line", {p0: current})}</small>{" "}
+    <button className="ui-btn is-ghost is-sm" onClick={() => { setV(String(current)); setOpen(true); }} data-testid="cat-threshold-edit">{tr("cat.thr_edit")}</button></p>;
+  return <div className="ui-panel tmRow" data-testid="cat-threshold-form" style={{flexWrap: "wrap", gap: 8, padding: "10px 12px"}}>
+    <label><small>{tr("cat.thr_label")}</small>{" "}
+      <input className="ui-input" type="number" min={1} max={100} value={v} onChange={e => setV(e.target.value)} style={{width: 90}} data-testid="cat-threshold-input"/> %</label>
+    <button className="ui-btn is-primary is-sm" disabled={busy || !v} onClick={() => save(Number(v))} data-testid="cat-threshold-save">{tr("cat.thr_save")}</button>
+    <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => save(null)}>{tr("cat.thr_default")}</button>
+    <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => setOpen(false)}>{tr("cat.cancel_edit")}</button>
+    <small style={{flexBasis: "100%"}}>{tr("cat.thr_hint")}</small>
   </div>;
 }
