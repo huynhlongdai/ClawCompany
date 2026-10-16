@@ -257,6 +257,76 @@ def del_fact(fact_id: int, principal: Principal = Depends(require_company_role("
     return company_facts.remove_manual(db, active_org(principal), fact_id)
 
 
+# ------------------------------------------------------------------ M3d hồ sơ bắt buộc & lưu trữ
+
+class RequirementIn(BaseModel):
+    company_id: int | None = None
+    name: str | None = None
+    name_en: str | None = None
+    level: str | None = None
+    doc_types: list[str] | None = None
+    condition: dict | None = None
+    legal_basis: str | None = None
+    note: str | None = None
+    needs_review: bool | None = None
+    enabled: bool | None = None
+
+
+class AttachIn(BaseModel):
+    document_id: int
+
+
+class DisposeIn(BaseModel):
+    reason: str = ""
+
+
+@router.get("/doc-requirements")
+def requirements(company_id: int | None = None, principal: Principal = Depends(require_company_role("member")),
+                 db: Session = Depends(get_db)):
+    from app.services import doc_requirements
+    return doc_requirements.evaluate(db, active_org(principal), company_id, principal=principal)
+
+
+@router.post("/doc-requirements")
+def add_requirement(payload: RequirementIn, principal: Principal = Depends(require_company_role("manager")),
+                    db: Session = Depends(get_db)):
+    from app.services import doc_requirements
+    return doc_requirements.upsert(db, active_org(principal), payload.model_dump(exclude_none=True))
+
+
+@router.patch("/doc-requirements/{rid}")
+def edit_requirement(rid: int, payload: RequirementIn, principal: Principal = Depends(require_company_role("manager")),
+                     db: Session = Depends(get_db)):
+    from app.services import doc_requirements
+    return doc_requirements.upsert(db, active_org(principal), payload.model_dump(exclude_none=True), rid)
+
+
+@router.post("/doc-requirements/reseed")
+def reseed_requirements(company_id: int | None = None, principal: Principal = Depends(require_company_role("manager")),
+                        db: Session = Depends(get_db)):
+    """Gieo lại mục mặc định còn thiếu (không động tới mục tự thêm)."""
+    from app.services import doc_requirements
+    co = doc_requirements._company(db, active_org(principal), company_id, write=True)
+    return doc_requirements.seed_defaults(db, active_org(principal), co.id)
+
+
+@router.post("/doc-requirements/{rid}/attach")
+def attach_requirement(rid: int, payload: AttachIn, principal: Principal = Depends(require_company_role("manager")),
+                       db: Session = Depends(get_db)):
+    """Gắn thẳng một tài liệu vào mục (dùng cho mục không có loại tài liệu cố định, vd. quy trình DLCN)."""
+    from app.services import doc_requirements
+    doc_requirements._req(db, active_org(principal), rid)
+    return lib.add_link(db, active_org(principal), payload.document_id, "requirement", rid, "M3d")
+
+
+@router.post("/docs/{doc_id}/dispose")
+def dispose(doc_id: int, payload: DisposeIn, principal: Principal = Depends(require_company_role("manager")),
+            db: Session = Depends(get_db)):
+    """Huỷ hồ sơ đã hết hạn lưu: chỉ chủ (owner); giữ siêu dữ liệu + hash. Trước hạn / giữ pháp lý → 409."""
+    from app.services import doc_requirements
+    return doc_requirements.dispose(db, active_org(principal), principal, doc_id, payload.reason)
+
+
 @router.post("/docs/tick")
 def tick(principal: Principal = Depends(require_company_role("owner")), db: Session = Depends(get_db)):
     """Chạy nhịp thư viện ngay (beat docs.tick mỗi giờ). Chỉ owner — dùng khi kiểm chứng."""

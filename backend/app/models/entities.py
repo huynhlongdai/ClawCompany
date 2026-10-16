@@ -173,6 +173,10 @@ class KnowledgeDocument(Base, TimestampMixin):
     # M3b (0054): bản tóm tắt cốt lõi (biên dịch vào AGENTS.md thay vì cắt cụt nội dung)
     core_summary: Mapped[str] = mapped_column(Text, default="", server_default="")
     flag_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # M3d (0055): huỷ hồ sơ hết hạn lưu (chỉ còn siêu dữ liệu + hash) + nhắc huỷ đúng một lần
+    disposal_notified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    disposed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    disposed_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 class Approval(Base, TimestampMixin):
     __tablename__ = "approvals"

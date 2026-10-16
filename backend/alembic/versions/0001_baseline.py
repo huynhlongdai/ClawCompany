@@ -111,7 +111,8 @@ COLUMNS_OWNED_BY_LATER_MIGRATIONS = {
                             "review_due_at", "review_notified_at", "last_reviewed_at", "last_reviewed_by", "supersedes_id",
                             "source_of_truth", "file_id", "retention_class", "retain_until", "legal_hold", "reuse_count",
                             "last_used_at",
-                            "core_summary", "flag_count"],                         # 0054_doc_retrieval
+                            "core_summary", "flag_count",                          # 0054_doc_retrieval
+                            "disposal_notified_at", "disposed_at", "disposed_by"],  # 0055_document_requirements
     "knowledge_chunks": ["section", "section_no", "search_text"],                    # 0054_doc_retrieval
 }
 

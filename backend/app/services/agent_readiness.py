@@ -40,6 +40,7 @@ LAYERS = [  # khoá, nhãn, trọng số, tab để sửa
     ("process", "Quy trình", 20, "processes"),
     ("kpi", "Mục tiêu & KPI", 10, "kpi"),
     ("knowledge", "Tri thức", 15, "training"),
+    ("documents", "Hồ sơ & tài liệu", 10, "records"),     # M3d: hồ sơ bắt buộc + độ tươi tài liệu
     ("rhythm", "Nhịp vận hành", 5, "rhythm"),
     ("compliance", "Tuân thủ", 10, "compliance"),
     ("operations", "Mức sẵn sàng vận hành (bảng hỏi)", 10, "readiness"),
@@ -116,6 +117,9 @@ def checks(db: Session, co: Company, answers: dict) -> list[dict]:
     sop = sum(1 for s in steps if s.sop_id)
     out.append(_check(cid, "knowledge", "sop_steps", "Bước quy trình có SOP", (sop / len(steps)) if steps else 0.0,
                       f"{sop}/{len(steps)} bước có SOP", "processes"))
+    from app.services import doc_requirements
+    for key, label, val, detail in doc_requirements.readiness_checks(db, co):
+        out.append(_check(cid, "documents", key, label, val, detail, "records"))
     rc = db.query(RhythmConfig).filter(RhythmConfig.company_id == cid).first()
     out.append(_check(cid, "rhythm", "rhythm", "Bật giao ban sáng / báo cáo tuần tự động",
                       1.0 if rc and (rc.standup_enabled or rc.weekly_enabled) else 0.0, "đang bật" if rc else "chưa bật", "rhythm"))

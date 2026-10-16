@@ -280,3 +280,84 @@ export function FactsTab({companyId, caps}: {companyId: number | null; caps: any
       <button className="ui-btn is-primary" disabled={busy || !f.value} onClick={() => run(() => apiDocs.putFact({company_id: companyId, ...f}), tr("docs.saved"))} data-testid="fact-save">{tr("docs.fact_save")}</button></>}
   </section>;
 }
+
+/* M3d — Hồ sơ bắt buộc & lưu trữ: danh mục theo điều kiện công ty (loại hình, số lao động là người, DLCN, ngành) với căn cứ
+   + "cần kiểm tra"; hạn lưu trữ tự tính, huỷ hồ sơ hết hạn (chỉ chủ, giữ hash). Lịch tham khảo, không phải tư vấn pháp lý. */
+const REQ_TONE: Record<string, any> = {ok: "ok", missing: "risk", na: "neutral"};
+const PACKS = ["all", "employees", "personal_data", "shop", "agency", "ketoan"] as const;
+export function RecordsTab({companyId, caps}: {companyId: number | null; caps: any}) {
+  const {data, error, reload, setError} = useLoad(() => companyId
+    ? Promise.all([apiDocs.requirements(companyId), apiDocs.list(companyId, {status: "published"})]) : Promise.resolve(null), [companyId]);
+  const [nf, setNf] = useState({name: "", level: "required", legal_basis: ""}), [pick, setPick] = useState<Record<number, string>>({});
+  const [busy, setBusy] = useState(false), [showNa, setShowNa] = useState(false);
+  const toast = useToast();
+  const can = !!caps?.invite || !!caps?.manage_roles;
+  if (!companyId) return <p><small>{tr("docs.pick_company")}</small></p>;
+  if (error && !data) return <ErrorBanner error={error} onRetry={reload} testId="records-error"/>;
+  if (!data) return <SkeletonRows n={6} h={36}/>;
+  const [ev, lib]: any = data;
+  const en = getLocale() === "en";
+  async function run(fn: () => Promise<any>, ok: string) {
+    setBusy(true); setError(null);
+    try { await fn(); toast(ok); await reload(); } catch (e) { setError(e); } finally { setBusy(false); }
+  }
+  const f = ev.facts, items: any[] = ev.items.filter((i: any) => showNa || i.status !== "na");
+  const statusKey = (s: string) => ("docs.req_" + s) as Key;
+  return <section className="ui-section" data-testid="records">
+    {error ? <ErrorBanner error={error} onClose={() => setError(null)} testId="records-save-error"/> : null}
+    <div className="ui-banner" data-testid="records-disclaimer">⚖ {en ? ev.disclaimer_en : ev.disclaimer_vi}</div>
+    <p className="tmGuide">{tr("docs.req_explain")}</p>
+    <div className="tmRow" data-testid="records-stats">
+      <span className={"ui-pill" + (ev.required_ok === ev.required_total ? " is-ok" : " is-risk")}>{tr("docs.req_required")}: <b>{ev.required_ok}/{ev.required_total}</b></span>
+      <span className="ui-pill">{tr("docs.req_humans")}: <b>{f.humans}</b></span>
+      <span className="ui-pill">{tr("docs.req_entity")}: <b>{f.entity_type || "—"}</b></span>
+      <span className="ui-pill">{tr("docs.req_pd")}: <b>{f.personal_data ? tr("docs.yes") : tr("docs.no")}</b></span>
+      {f.templates.length > 0 && <span className="ui-pill">{tr("docs.req_industry")}: <b>{f.templates.join(", ")}</b></span>}
+      <label className="tmRow" style={{gap: 6}}><input type="checkbox" checked={showNa} onChange={e => setShowNa(e.target.checked)} data-testid="records-show-na"/> {tr("docs.req_show_na")}</label>
+    </div>
+    {PACKS.map(pk => {
+      const rows = items.filter(i => i.pack === pk);
+      if (!rows.length) return null;
+      return <div key={pk} className="ui-panel"><h3 className="ops-cat">{tr(("docs.pack_" + pk) as Key)}</h3>
+        <table className="ui-table" data-testid={"records-" + pk}><thead><tr>
+          <th>{tr("docs.req_item")}</th><th>{tr("docs.req_status")}</th><th>{tr("docs.req_basis")}</th><th>{tr("docs.req_docs")}</th></tr></thead>
+          <tbody>{rows.map(i => <tr key={i.id} data-testid={"req-" + i.key} className={i.status === "missing" && i.level === "required" ? "is-warn" : ""}>
+            <td><b>{en ? i.name_en : i.name}</b><br/>
+              <StatusPill tone={i.level === "required" ? "wait" : "neutral"}>{tr(i.level === "required" ? "docs.req_level_required" : "docs.req_level_recommended")}</StatusPill>
+              {i.needs_review && <> <StatusPill tone="wait">{tr("docs.req_to_verify")}</StatusPill></>}
+              {i.source === "custom" && <> <StatusPill tone="neutral">{tr("docs.req_custom")}</StatusPill></>}</td>
+            <td><StatusPill tone={REQ_TONE[i.status]}>{tr(statusKey(i.status))}</StatusPill>{i.why && <><br/><small>{i.why}</small></>}</td>
+            <td><small>{i.legal_basis}</small></td>
+            <td>{i.documents.map((x: any) => <div key={x.doc_code}><code className="doc-code">{x.doc_code}</code> <small>{x.title}</small></div>)}
+              {can && i.status === "missing" && <div className="tmRow">
+                <select className="ui-input" value={pick[i.id] || ""} onChange={e => setPick({...pick, [i.id]: e.target.value})} data-testid={"req-pick-" + i.key}>
+                  <option value="">{tr("docs.req_attach_pick")}</option>
+                  {lib.items.map((x: any) => <option key={x.id} value={x.id}>{x.doc_code} · {x.title}</option>)}</select>
+                <button className="ui-btn is-ghost is-sm" disabled={busy || !pick[i.id]} onClick={() => run(() => apiDocs.attachRequirement(i.id, Number(pick[i.id])), tr("docs.saved"))}>{tr("docs.req_attach")}</button>
+              </div>}
+              {can && <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => run(() => apiDocs.editRequirement(i.id, {enabled: !i.enabled}), tr("docs.saved"))}>
+                {tr(i.enabled ? "docs.req_disable" : "docs.req_enable")}</button>}</td>
+          </tr>)}</tbody></table></div>;
+    })}
+    {can && <><h3 className="ops-cat">{tr("docs.req_add")}</h3>
+      <FormRow>
+        <Field label={tr("docs.req_item")}><input className="ui-input" value={nf.name} onChange={e => setNf({...nf, name: e.target.value})} data-testid="req-new-name"/></Field>
+        <Field label={tr("docs.req_level")}><select className="ui-input" value={nf.level} onChange={e => setNf({...nf, level: e.target.value})}>
+          <option value="required">{tr("docs.req_level_required")}</option><option value="recommended">{tr("docs.req_level_recommended")}</option></select></Field>
+        <Field label={tr("docs.req_basis")}><input className="ui-input" value={nf.legal_basis} onChange={e => setNf({...nf, legal_basis: e.target.value})}/></Field>
+      </FormRow>
+      <button className="ui-btn is-primary" disabled={busy || !nf.name.trim()} data-testid="req-new-save"
+        onClick={() => run(() => apiDocs.addRequirement({company_id: companyId, ...nf, needs_review: true}), tr("docs.saved")).then(() => setNf({name: "", level: "required", legal_basis: ""}))}>{tr("docs.req_add_btn")}</button></>}
+    <h3 className="ops-cat">{tr("docs.ret_title")}</h3>
+    <p className="tmGuide">{tr("docs.ret_explain")}</p>
+    <div className="ui-panel"><table className="ui-table" data-testid="retention-table"><thead><tr>
+      <th>{tr("docs.code")}</th><th>{tr("docs.title")}</th><th>{tr("docs.retention")}</th><th>{tr("docs.ret_until")}</th><th/></tr></thead>
+      <tbody>{ev.retention.items.length === 0 ? <tr><td colSpan={5}><small>{tr("docs.ret_empty")}</small></td></tr>
+        : ev.retention.items.map((x: any) => <tr key={x.id} className={x.due ? "is-warn" : ""}>
+          <td><code className="doc-code">{x.doc_code}</code></td><td>{x.title}</td><td><small>{x.retention_class}</small></td>
+          <td>{day(x.retain_until)}{x.legal_hold && <> <StatusPill tone="wait">{tr("docs.legal_hold")}</StatusPill></>}{x.due && <> <StatusPill tone="risk">{tr("docs.ret_due")}</StatusPill></>}</td>
+          <td>{can && x.due && <button className="ui-btn is-danger is-sm" disabled={busy} data-testid={"dispose-" + x.id}
+            onClick={() => { if (window.confirm(tr("docs.ret_confirm"))) run(() => apiDocs.dispose(x.id, "UI"), tr("docs.ret_disposed")); }}>{tr("docs.ret_dispose")}</button>}</td>
+        </tr>)}</tbody></table></div>
+  </section>;
+}

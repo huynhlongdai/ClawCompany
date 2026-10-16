@@ -101,4 +101,28 @@ class DocumentFlag(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
-__all__ = ["DocumentVersion", "DocumentLink", "DocumentFile", "CompanyFact", "DocumentFlag", "VERSION_STATUSES"]
+class DocumentRequirement(Base):
+    """M3d — danh mục hồ sơ/tài liệu bắt buộc hoặc nên có, là DỮ LIỆU sửa được theo công ty (giống compliance_rules):
+    điều kiện áp dụng (loại hình, số lao động là NGƯỜI, có xử lý dữ liệu cá nhân, ngành), mức, căn cứ pháp lý, cờ
+    ``needs_review`` cho mục chưa đối chiếu văn bản gốc ("cần kiểm tra")."""
+    __tablename__ = "document_requirements"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    key: Mapped[str] = mapped_column(String(64), default="")
+    name: Mapped[str] = mapped_column(String(240))
+    name_en: Mapped[str] = mapped_column(String(240), default="")
+    pack: Mapped[str] = mapped_column(String(24), default="all")       # all | employees | personal_data | shop | agency | ketoan
+    doc_types: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    condition: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # {entity_types, min_humans, max_humans, personal_data, templates}
+    level: Mapped[str] = mapped_column(String(16), default="required")  # required | recommended
+    legal_basis: Mapped[str] = mapped_column(Text, default="")
+    note: Mapped[str] = mapped_column(Text, default="")
+    needs_review: Mapped[bool] = mapped_column(default=False)
+    enabled: Mapped[bool] = mapped_column(default=True)
+    source: Mapped[str] = mapped_column(String(16), default="default")  # default | custom
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+__all__ = ["DocumentRequirement", "DocumentVersion", "DocumentLink", "DocumentFile", "CompanyFact", "DocumentFlag", "VERSION_STATUSES"]

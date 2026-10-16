@@ -59,6 +59,7 @@ DOC_TYPES = {
     "resolution": _T("legal", "record", "retrieve", None, "company_life", "internal", "Nghị quyết / quyết định", "Resolution / decision"),
     "authority_policy": _T("legal", "document", "retrieve", 365, "superseded_10y", "internal", "Văn bản phân quyền", "Delegation of authority", "high"),
     "board_report": _T("legal", "record", "none", None, "company_life", "confidential", "Báo cáo HĐQT / chủ sở hữu", "Board report"),
+    "dpia": _T("legal", "document", "none", 365, "superseded_10y", "confidential", "Đánh giá tác động xử lý DLCN", "Data protection impact assessment", "high"),
     "audit_conclusion": _T("legal", "record", "none", None, "company_life", "confidential", "Kết luận kiểm toán / thanh tra", "Audit conclusion"),
     "strategy_plan": _T("legal", "document", "retrieve", 180, "acct_10y", "confidential", "Kế hoạch chiến lược / OKR", "Strategy / OKR plan"),
     "policy": _T("policy", "document", "core", 180, "superseded_10y", "internal", "Chính sách", "Policy", "high"),
@@ -107,7 +108,7 @@ SENSITIVITY = ("public", "internal", "confidential", "restricted", "personal_dat
 SENS_RANK = {s: i for i, s in enumerate(SENSITIVITY)}
 AGENT_USE = ("core", "retrieve", "tool_only", "none")
 STALE_AFTER_DAYS = 30          # quá hạn rà soát 30 ngày → nhãn "cần rà soát" cho agent
-LINK_TYPES = ("process", "process_step", "position", "sop", "io_contract", "company_rule", "product")
+LINK_TYPES = ("process", "process_step", "position", "sop", "io_contract", "company_rule", "product", "requirement")
 MAX_FILE = 20_000_000
 
 
@@ -436,8 +437,14 @@ def create(db: Session, org_id: int, principal, data: dict, *, file: DocumentFil
         v.approved_by_member_id, v.approved_at = seat, now
         _publish(db, doc, v, now=now)
         if supersedes is not None and supersedes.status == "published":
-            supersedes.status = "superseded"; db.add(supersedes)
+            supersedes.status = "superseded"
+            from app.services import doc_requirements
+            doc_requirements.refresh_retention(db, supersedes)
+            db.add(supersedes)
     db.commit(); db.refresh(doc)
+    if doc.doc_type == "license":
+        from app.services import doc_requirements
+        doc_requirements.sync_license_deadline(db, doc)
     return public(db, doc, principal=principal, detail=True)
 
 
@@ -455,13 +462,24 @@ def update_meta(db: Session, org_id: int, principal, doc_id: int, data: dict) ->
         if bad:
             raise HTTPException(409, f"Hồ sơ đã khoá — không sửa được: {', '.join(bad)}")
     before = (doc.agent_use, doc.sensitivity, doc.status, repr(doc.audience), doc.title)
+    if data.get("legal_hold") is False and doc.legal_hold:
+        from app.core import company_scope   # gỡ giữ pháp lý: chỉ chủ
+        role = company_scope.role_in(doc.company_id, principal) if company_scope.restricted(principal) else getattr(principal, "role", "")
+        if role != "owner":
+            raise HTTPException(403, "Gỡ 'giữ theo yêu cầu pháp lý' cần chủ doanh nghiệp")
     _apply_meta(db, doc, data)
+    if "retention_class" in data or "effective_to" in data:
+        from app.services import doc_requirements
+        doc_requirements.refresh_retention(db, doc)
     from app.services.company_event_bus import emit_event
     emit_event(db, organization_id=org_id, company_id=doc.company_id, event_type="document.meta_changed", source="doc_library",
                aggregate_type="document", aggregate_id=str(doc.id), actor_member_id=_seat(db, principal, doc.company_id),
                payload={k: v for k, v in data.items() if k != "content"})
     db.add(doc); db.commit(); db.refresh(doc)
     after = (doc.agent_use, doc.sensitivity, doc.status, repr(doc.audience), doc.title)
+    if doc.doc_type == "license" and "effective_to" in data:
+        from app.services import doc_requirements
+        doc_requirements.sync_license_deadline(db, doc)
     affects = doc.status == "published" and before != after and "core" in (before[0], after[0])
     return public(db, doc, principal=principal, detail=True), affects
 
@@ -653,6 +671,8 @@ def _publish(db: Session, doc: KnowledgeDocument, v: DocumentVersion, *, now: da
         doc.file_id = v.file_id
     doc.core_summary = v.core_summary or ""
     doc.last_reviewed_at, doc.review_notified_at = now, None
+    from app.services import doc_requirements
+    doc.retain_until = doc_requirements.compute_retain_until(doc, now=now)
     doc.review_due_at = now + timedelta(days=doc.review_interval_days) if doc.review_interval_days else None
     doc.synced_at = now
     db.add(v); db.add(doc); db.flush()
@@ -686,8 +706,9 @@ def archive(db: Session, org_id: int, principal, doc_id: int, reason: str = "") 
         raise HTTPException(409, f"Tài liệu đã {doc.status}")
     was_core = doc.status == "published" and doc.agent_use == "core"
     doc.status = "archived"
-    from app.services import company_facts
+    from app.services import company_facts, doc_requirements
     company_facts.retire_doc(db, doc)
+    doc_requirements.refresh_retention(db, doc)
     for v in db.query(DocumentVersion).filter(DocumentVersion.document_id == doc.id, DocumentVersion.status.in_(OPEN_VERSION)):
         v.status = "rejected"; v.review_note = "Tài liệu đã lưu trữ"; db.add(v)
     from app.services.company_event_bus import emit_event
@@ -764,7 +785,9 @@ def add_link(db: Session, org_id: int, doc_id: int, target_type: str, target_id:
     from app.models.company_foundation import Position
     from app.models.company_ops import Process, ProcessStep
     from app.models.extended import SOP
-    model = {"position": Position, "process": Process, "process_step": ProcessStep, "sop": SOP}.get(target_type)
+    from app.models.documents import DocumentRequirement
+    model = {"position": Position, "process": Process, "process_step": ProcessStep, "sop": SOP,
+             "requirement": DocumentRequirement}.get(target_type)
     if model is not None:
         row = db.get(model, int(target_id))
         cid = getattr(row, "company_id", None)
@@ -953,6 +976,8 @@ def tick(db: Session, now: datetime | None = None, org_id: int | None = None) ->
         doc.review_notified_at = now
         db.add(doc); out["review_due"] += 1
     db.commit()
+    from app.services import doc_requirements
+    out["disposal_due"] = doc_requirements.disposal_tick(db, now=now, org_id=org_id)
     out["core_orgs"] = sorted(core_orgs)
     return out
 

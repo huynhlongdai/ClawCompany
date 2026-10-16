@@ -1049,6 +1049,13 @@ export const apiDocs = {
   facts: (companyId: number | null) => request<any>(`/team/facts?${dq({company_id: companyId})}`),
   putFact: (body: any) => request<any>(`/team/facts`, {method: "PUT", body: JSON.stringify(body)}),
   delFact: (id: number) => request<any>(`/team/facts/${id}`, {method: "DELETE"}),
+  // M3d hồ sơ bắt buộc & lưu trữ
+  requirements: (companyId: number | null) => request<any>(`/team/doc-requirements?${dq({company_id: companyId})}`),
+  addRequirement: (body: any) => request<any>(`/team/doc-requirements`, {method: "POST", body: JSON.stringify(body)}),
+  editRequirement: (id: number, body: any) => request<any>(`/team/doc-requirements/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  attachRequirement: (id: number, documentId: number) =>
+    request<any>(`/team/doc-requirements/${id}/attach`, {method: "POST", body: JSON.stringify({document_id: documentId})}),
+  dispose: (id: number, reason = "") => request<any>(`/team/docs/${id}/dispose`, {method: "POST", body: JSON.stringify({reason})}),
   diff: (id: number, a?: number, b?: number) => request<any>(`/team/docs/${id}/diff?${dq({a, b})}`),
   review: (id: number, note = "") => request<any>(`/team/docs/${id}/review`, {method: "POST", body: JSON.stringify({note})}),
   archive: (id: number, reason = "") => request<any>(`/team/docs/${id}/archive`, {method: "POST", body: JSON.stringify({reason})}),

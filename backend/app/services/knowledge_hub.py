@@ -309,11 +309,17 @@ def get(db: Session, org_id: int, doc_id: int) -> KnowledgeDocument:
 
 def delete(db: Session, org_id: int, doc_id: int) -> dict:
     doc = get(db, org_id, doc_id)
+    from app.services import doc_requirements     # M3d: hồ sơ / còn hạn lưu / giữ pháp lý → 409
+    doc_requirements.can_delete(doc)
     old = [c.id for c in db.query(KnowledgeChunk.id).filter(KnowledgeChunk.document_id == doc.id).all()]
     if old:
         db.query(KnowledgeVector).filter(KnowledgeVector.chunk_id.in_(old)).delete(synchronize_session=False)
     db.query(KnowledgeChunk).filter(KnowledgeChunk.document_id == doc.id).delete(synchronize_session=False)
     db.query(KnowledgeGap).filter(KnowledgeGap.resolved_document_id == doc.id).update({KnowledgeGap.resolved_document_id: None})
+    from app.models.documents import CompanyFact, DocumentFlag, DocumentLink, DocumentVersion
+    for m in (DocumentVersion, DocumentLink, DocumentFlag):
+        db.query(m).filter(m.document_id == doc.id).delete(synchronize_session=False)
+    db.query(CompanyFact).filter(CompanyFact.source_doc_id == doc.id).delete(synchronize_session=False)
     db.delete(doc); db.commit()
     return {"deleted": doc_id}
 
