@@ -117,6 +117,8 @@ def test_license_expiry_becomes_compliance_deadline_and_readiness_layer(E):
     assert "mục bắt buộc" in chk["required_records"]["detail"]
     # lưu trữ giấy phép → nghĩa vụ gia hạn tắt
     assert E.c.post(f"/api/team/docs/{lic['id']}/archive", json={"reason": "đổi giấy"}, headers=E.tok("manager")).status_code == 200
+    E.db.expire_all()
+    assert E.db.get(ComplianceDeadline, mine[0].id).status == "skipped"
 
 
 def test_custom_requirement_attach_and_isolation(E):

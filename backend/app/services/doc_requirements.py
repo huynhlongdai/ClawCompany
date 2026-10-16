@@ -334,10 +334,20 @@ def sync_license_deadline(db: Session, doc: KnowledgeDocument) -> int | None:
     from app.services import compliance_calendar
     key = f"doc_license:{doc.id}"
     r = db.query(ComplianceRule).filter(ComplianceRule.company_id == doc.company_id, ComplianceRule.key == key).first()
+    from app.models.company_ops import ComplianceDeadline
+
+    def _skip_open(keep: date | None = None) -> None:
+        # hạn đã sinh nhưng không còn đúng (giấy phép lưu trữ / gia hạn sang ngày khác) → bỏ, để không nhắc nhầm
+        if r is None or r.id is None:
+            return
+        for dl in db.query(ComplianceDeadline).filter(ComplianceDeadline.rule_id == r.id, ComplianceDeadline.status == "upcoming"):
+            if keep is None or dl.statutory_date != keep:
+                dl.status = "skipped"; db.add(dl)
     if not doc.effective_to or doc.status in ("archived", "disposed", "superseded"):
         if r is not None:
-            r.enabled = False; db.add(r); db.commit()
+            r.enabled = False; db.add(r); _skip_open(); db.commit()
         return None
+    _skip_open(doc.effective_to.date())
     if r is None:
         r = ComplianceRule(organization_id=doc.organization_id, company_id=doc.company_id, key=key, category="license", source="custom")
     r.name = f"Gia hạn {doc.title} ({doc.doc_code})"[:200]
