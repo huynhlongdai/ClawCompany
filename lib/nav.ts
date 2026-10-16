@@ -28,14 +28,14 @@ export type NavPage = {href: string; label: string; icon: IconName; desc: string
    Tab cũ /app/team?tab=<x> chuyển hướng sang /app/company?tab=<x> (TeamConsole). */
 export const COMPANY_TAB_IDS = ["overview", "readiness", "build", "profile", "roles", "authority", "rules", "departments", "positions",
   "processes", "contracts", "rhythm", "coverage", "compliance", "kpi", "agenthr", "leaseout", "leased",
-  "docs", "facts", "records"] as const;
+  "docs", "facts", "records", "catalog"] as const;
 export type CompanyTab = typeof COMPANY_TAB_IDS[number];
 const ct = (tab: string, label: string): NavTab => ({href: tab === "overview" ? "/app/company" : `/app/company?tab=${tab}`, label});
 function companySection(): NavSection {
   const groups: NavGroup[] = [
     {key: "overview", label: tr("nav.co_tong_quan"), tabs: [ct("overview", tr("nav.co_cong_ty_cua_anh")), ct("readiness", tr("nav.san_sang")), ct("build", tr("nav.co_tao_nhap"))]},
     {key: "governance", label: tr("nav.co_phap_nhan_quan_tri"), tabs: [ct("profile", tr("nav.co_ho_so_hien_chuong")), ct("roles", tr("nav.vai_tro_cong_ty")), ct("authority", tr("nav.co_ma_tran_tham_quyen")), ct("rules", tr("nav.luat_cung"))]},
-    {key: "knowledge", label: tr("nav.co_tai_lieu"), tabs: [ct("docs", tr("nav.co_thu_vien")), ct("facts", tr("nav.co_su_kien")), ct("records", tr("nav.co_ho_so_bat_buoc"))]},
+    {key: "knowledge", label: tr("nav.co_tai_lieu"), tabs: [ct("docs", tr("nav.co_thu_vien")), ct("facts", tr("nav.co_su_kien")), ct("records", tr("nav.co_ho_so_bat_buoc")), ct("catalog", tr("nav.co_san_pham_gia"))]},
     {key: "structure", label: tr("nav.co_co_cau"), tabs: [ct("departments", tr("nav.phong_ban")), ct("positions", tr("nav.chuc_danh"))]},
     {key: "operations", label: tr("nav.van_hanh"), tabs: [ct("processes", tr("nav.quy_trinh_cty")), ct("contracts", tr("nav.hop_dong_du_lieu")), ct("rhythm", tr("nav.giao_ban")), ct("coverage", tr("nav.co_phu_24_7_sla")), ct("compliance", tr("nav.tuan_thu"))]},
     {key: "performance", label: tr("nav.co_hieu_qua"), tabs: [ct("kpi", tr("nav.kpi")), ct("agenthr", tr("nav.nhan_su_agent"))]},

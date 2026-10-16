@@ -428,6 +428,15 @@ def after_decision(db: Session, a: Approval, actor_member_id: int | None) -> dic
         except strategy.StrategyError as exc:
             raise WorkError(409, "plan_error", exc.message) from exc
         return {"effect": "plan"}
+    if key.startswith("doc_publish:"):
+        # M3a/M3f: duyệt từ Hộp việc trước đây rơi xuống "đánh thức người xin" → phiên bản không được ban hành.
+        from app.services import doc_library
+        doc_library.on_approval_resolved(db, a, None, actor_member_id=actor_member_id)
+        return {"effect": "doc_publish"}
+    if key.startswith("price_change:"):
+        from app.services import catalog
+        catalog.on_approval_resolved(db, a, actor_member_id=actor_member_id)
+        return {"effect": "price_change"}
     if key.startswith("skill:"):
         return {"effect": "skill"}   # áp lên gateway là việc async → decide() làm tiếp
     if key.startswith("lesson:"):

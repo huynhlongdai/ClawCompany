@@ -65,6 +65,22 @@ async def resolve_approval(approval_id: int, payload: ApprovalResolve, principal
         doc_library.on_approval_resolved(db, obj, principal)
         db.refresh(obj)
         return obj
+    if (obj.policy_key or "").startswith("price_change:"):
+        # M3f: đổi giá bán — đúng người duyệt theo ma trận price_change (hoặc owner tổ chức), người đề xuất không tự duyệt.
+        if payload.status not in ("approved", "rejected"):
+            raise HTTPException(422, "Price approvals take approved or rejected")
+        if obj.status != "pending":
+            raise HTTPException(409, "Approval already resolved")
+        if obj.approver_member_id and obj.approver_member_id not in principal.member_ids and principal.role != "owner":
+            raise HTTPException(403, {"error": "not_the_approver", "approver_member_id": obj.approver_member_id})
+        if obj.requester_member_id and obj.requester_member_id in principal.member_ids and obj.approver_member_id != obj.requester_member_id:
+            raise HTTPException(403, "Người đề xuất không tự duyệt giá của mình")
+        obj.status = payload.status; obj.resolution_note = payload.resolution_note
+        db.add(obj); db.commit(); db.refresh(obj)
+        from app.services import catalog
+        catalog.on_approval_resolved(db, obj, actor_member_id=principal.seat_in(obj.company_id))
+        db.refresh(obj)
+        return obj
     from app.services import strategy
     plan = strategy.is_strategy(obj)
     if plan and obj.status != "pending":

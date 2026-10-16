@@ -445,6 +445,8 @@ def create(db: Session, org_id: int, principal, data: dict, *, file: DocumentFil
     if doc.doc_type == "license":
         from app.services import doc_requirements
         doc_requirements.sync_license_deadline(db, doc)
+        if supersedes is not None and supersedes.doc_type == "license":
+            doc_requirements.sync_license_deadline(db, supersedes)   # giấy cũ bị thay → bỏ nhắc gia hạn giấy cũ
     return public(db, doc, principal=principal, detail=True)
 
 
@@ -642,8 +644,8 @@ def decide(db: Session, org_id: int, principal, doc_id: int, vid: int, decision:
     return _decide_version(db, doc, v, decision, actor, note=note)
 
 
-def on_approval_resolved(db: Session, a: Approval, principal) -> None:
-    """Approval duyệt từ Hộp việc chung (/api/approvals/{id}/resolve)."""
+def on_approval_resolved(db: Session, a: Approval, principal, *, actor_member_id: int | None = None) -> None:
+    """Approval duyệt từ /api/approvals/{id}/resolve hoặc Hộp việc (inbox_hub.after_decision, truyền actor_member_id)."""
     try:
         _, did, vid = (a.policy_key or "").split(":")
         doc, v = db.get(KnowledgeDocument, int(did)), db.get(DocumentVersion, int(vid))
@@ -651,8 +653,11 @@ def on_approval_resolved(db: Session, a: Approval, principal) -> None:
         return
     if doc is None or v is None or v.status != "in_review":
         return
-    me = set(getattr(principal, "member_ids", []) or [])
-    actor = v.approver_member_id if v.approver_member_id in me else _seat(db, principal, doc.company_id)
+    if principal is None:
+        actor = actor_member_id
+    else:
+        me = set(getattr(principal, "member_ids", []) or [])
+        actor = v.approver_member_id if v.approver_member_id in me else _seat(db, principal, doc.company_id)
     _decide_version(db, doc, v, "approved" if a.status == "approved" else "rejected", actor, note=a.resolution_note or "")
 
 
@@ -716,6 +721,8 @@ def archive(db: Session, org_id: int, principal, doc_id: int, reason: str = "") 
                aggregate_type="document", aggregate_id=str(doc.id), actor_member_id=_seat(db, principal, doc.company_id),
                payload={"reason": reason[:300]})
     db.add(doc); db.commit()
+    if doc.doc_type == "license":      # M3d: giấy phép lưu trữ → tắt nghĩa vụ gia hạn, bỏ hạn đã sinh
+        doc_requirements.sync_license_deadline(db, doc)
     return {**public(db, doc, principal=principal, detail=True), "core_changed": was_core}
 
 
@@ -785,9 +792,10 @@ def add_link(db: Session, org_id: int, doc_id: int, target_type: str, target_id:
     from app.models.company_foundation import Position
     from app.models.company_ops import Process, ProcessStep
     from app.models.extended import SOP
+    from app.models.catalog import CatalogProduct
     from app.models.documents import DocumentRequirement
     model = {"position": Position, "process": Process, "process_step": ProcessStep, "sop": SOP,
-             "requirement": DocumentRequirement}.get(target_type)
+             "requirement": DocumentRequirement, "product": CatalogProduct}.get(target_type)
     if model is not None:
         row = db.get(model, int(target_id))
         cid = getattr(row, "company_id", None)

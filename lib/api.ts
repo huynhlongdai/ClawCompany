@@ -1026,6 +1026,19 @@ export const apiRental = {
     request<any>(`/leases/${id}/change-requests/${crId}/decide`, {method: "POST", body: JSON.stringify({decision})}),
 };
 
+// M3f — sản phẩm & bảng giá (/api/team/catalog…)
+export const apiCatalog = {
+  list: (companyId: number | null, f: Record<string, any> = {}) => request<any>(`/team/catalog?${qs({company_id: companyId, ...f}).slice(1)}`),
+  get: (id: number) => request<any>(`/team/catalog/products/${id}`),
+  create: (body: any) => request<any>(`/team/catalog/products`, {method: "POST", body: JSON.stringify(body)}),
+  patch: (id: number, body: any) => request<any>(`/team/catalog/products/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  propose: (id: number, body: any) => request<any>(`/team/catalog/products/${id}/prices`, {method: "POST", body: JSON.stringify(body)}),
+  decide: (priceId: number, decision: "approved" | "rejected", note = "") =>
+    request<any>(`/team/catalog/prices/${priceId}/decide`, {method: "POST", body: JSON.stringify({decision, note})}),
+  cancel: (priceId: number) => request<any>(`/team/catalog/prices/${priceId}/cancel`, {method: "POST"}),
+  lookup: (companyId: number, query: string) => request<any>(`/team/catalog/lookup`, {method: "POST", body: JSON.stringify({company_id: companyId, query})}),
+};
+
 // M3 — thư viện tài liệu & tri thức công ty (/api/team/docs…)
 const dq = (o: Record<string, any>) => qs(o).slice(1);
 export const apiDocs = {

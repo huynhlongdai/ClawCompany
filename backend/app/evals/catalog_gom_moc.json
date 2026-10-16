@@ -1,0 +1,36 @@
+{
+  "about": "M3f — bộ eval tra giá cho agent CSKH Tiệm Gốm Mộc: 9 sản phẩm (1 giá đã hết hiệu lực, 1 ngừng bán, 1 chỉ có giá chờ duyệt, 1 có giá hẹn ngày mai), 20 câu hỏi. Đạt khi giá trả về đúng giá đang hiệu lực và 0 giá bịa (sản phẩm không có giá đang hiệu lực → price=null).",
+  "products": [
+    {"sku": "BAT-MEN-LAM", "name": "Bát men lam vẽ tay", "category": "Bát đĩa", "unit": "cái", "price": 185000, "policies": {"return_days": 7}},
+    {"sku": "DIA-HOA-SEN", "name": "Đĩa hoa sen 24cm", "category": "Bát đĩa", "unit": "cái", "price": 240000},
+    {"sku": "AM-TRA-TU-SA", "name": "Ấm trà tử sa 250ml", "category": "Ấm chén", "unit": "bộ", "price": 1250000, "policies": {"warranty_months": 6}},
+    {"sku": "CHEN-QUAN-TU", "name": "Bộ chén quân tử 6 chiếc", "category": "Ấm chén", "unit": "bộ", "price": 420000},
+    {"sku": "BINH-HOA-RAN", "name": "Bình hoa men rạn cao 30cm", "category": "Trang trí", "unit": "cái", "price": 690000},
+    {"sku": "LY-SU-TRANG", "name": "Ly sứ trắng khắc tên", "category": "Quà tặng", "unit": "cái", "price": 95000, "expired": true},
+    {"sku": "DIA-MEN-HOA-BIEN", "name": "Đĩa men hoả biến 27cm", "category": "Bát đĩa", "unit": "cái", "price": 520000, "discontinued": true},
+    {"sku": "LO-HUONG-GOM", "name": "Lọ hương gốm Bát Tràng", "category": "Trang trí", "unit": "cái", "pending_only": 310000},
+    {"sku": "KHOA-HOC-NAN", "name": "Khoá học nặn gốm 3 buổi", "category": "Dịch vụ", "unit": "khoá", "kind": "service", "price": 1800000, "scheduled": 1950000}
+  ],
+  "questions": [
+    {"q": "Bát men lam giá bao nhiêu vậy shop?", "sku": "BAT-MEN-LAM", "display": "185.000 ₫"},
+    {"q": "bat men lam bao nhieu tien", "sku": "BAT-MEN-LAM", "display": "185.000 ₫"},
+    {"q": "Cho em hỏi giá đĩa hoa sen", "sku": "DIA-HOA-SEN", "display": "240.000 ₫"},
+    {"q": "dia hoa sen 24cm", "sku": "DIA-HOA-SEN", "display": "240.000 ₫"},
+    {"q": "Ấm trà tử sa giá sao ạ?", "sku": "AM-TRA-TU-SA", "display": "1.250.000 ₫"},
+    {"q": "am tu sa", "sku": "AM-TRA-TU-SA", "display": "1.250.000 ₫"},
+    {"q": "Bộ chén quân tử bao nhiêu một bộ?", "sku": "CHEN-QUAN-TU", "display": "420.000 ₫"},
+    {"q": "chen quan tu 6 chiec", "sku": "CHEN-QUAN-TU", "display": "420.000 ₫"},
+    {"q": "Bình hoa men rạn giá nhiêu?", "sku": "BINH-HOA-RAN", "display": "690.000 ₫"},
+    {"q": "binh hoa ran 30cm", "sku": "BINH-HOA-RAN", "display": "690.000 ₫"},
+    {"q": "Ly sứ trắng khắc tên còn bán không, giá bao nhiêu?", "sku": "LY-SU-TRANG", "display": null},
+    {"q": "ly su khac ten", "sku": "LY-SU-TRANG", "display": null},
+    {"q": "Đĩa men hoả biến giá bao nhiêu?", "sku": "DIA-MEN-HOA-BIEN", "display": null},
+    {"q": "dia hoa bien", "sku": "DIA-MEN-HOA-BIEN", "display": null},
+    {"q": "Lọ hương gốm Bát Tràng giá thế nào?", "sku": "LO-HUONG-GOM", "display": null},
+    {"q": "lo huong bat trang", "sku": "LO-HUONG-GOM", "display": null},
+    {"q": "Khoá học nặn gốm bao nhiêu tiền?", "sku": "KHOA-HOC-NAN", "display": "1.800.000 ₫"},
+    {"q": "khoa hoc nan gom 3 buoi", "sku": "KHOA-HOC-NAN", "display": "1.800.000 ₫"},
+    {"sku_lookup": "AM-TRA-TU-SA", "sku": "AM-TRA-TU-SA", "display": "1.250.000 ₫"},
+    {"sku_lookup": "LY-SU-TRANG", "sku": "LY-SU-TRANG", "display": null}
+  ]
+}

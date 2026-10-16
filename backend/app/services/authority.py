@@ -44,8 +44,9 @@ ACTION_TYPES = {
     "goal_execute": {"vi": "Chạy kế hoạch tự động", "en": "Auto-run a plan", "money": True},
     # M3a: ban hành tài liệu công ty (rủi ro theo loại: chính sách gửi khách / nội quy / quy chế = cao)
     "doc_publish": {"vi": "Ban hành tài liệu", "en": "Publish a document", "money": False},
-    # M3f: đổi giá bán (số tiền = mức thay đổi tính theo VND quy đổi? KHÔNG — ma trận tiền là USD; giá VND
-    # được xét theo % thay đổi qua risk, xem services/catalog.py)
+    # M3f: đổi giá bán. Không xét theo dải tiền: ma trận tiền tính USD (chi phí nền tảng), còn giá bán là tiền kinh
+    # doanh của công ty (mặc định VND). Mức duyệt đi theo % thay đổi so với giá đang áp dụng, truyền qua ``risk``:
+    # dưới 10% → thường (trưởng phòng); từ 10% hoặc sản phẩm chưa có giá → high (chủ). Xem services/catalog.py.
     "price_change": {"vi": "Đổi giá bán", "en": "Change a selling price", "money": False},
 }
 # Từ đồng nghĩa agent hay dùng khi gọi company_approval_request(action=…)

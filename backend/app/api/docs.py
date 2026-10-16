@@ -327,6 +327,102 @@ def dispose(doc_id: int, payload: DisposeIn, principal: Principal = Depends(requ
     return doc_requirements.dispose(db, active_org(principal), principal, doc_id, payload.reason)
 
 
+# ------------------------------------------------------------------ M3f sản phẩm & bảng giá
+
+class ProductIn(BaseModel):
+    company_id: int | None = None
+    sku: str | None = None
+    name: str | None = None
+    description: str | None = None
+    kind: str | None = None
+    category: str | None = None
+    unit: str | None = None
+    status: str | None = None
+    policies: dict | None = None
+    document_id: int | None = None
+    price: str | float | None = None
+    currency: str | None = None
+    effective_from: str | None = None
+    price_note: str | None = None
+
+
+class PriceIn(BaseModel):
+    amount: str | float
+    currency: str = "VND"
+    channel: str = "default"
+    effective_from: str | None = None
+    effective_to: str | None = None
+    note: str = ""
+
+
+class PriceDecideIn(BaseModel):
+    decision: str
+    note: str = ""
+
+
+class LookupIn(BaseModel):
+    company_id: int | None = None
+    query: str = ""
+    sku: str = ""
+
+
+@router.get("/catalog")
+def catalog_list(company_id: int | None = None, q: str = "", status: str = "",
+                 principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
+    from app.services import catalog
+    return catalog.listing(db, active_org(principal), company_id, q=q, status=status)
+
+
+@router.post("/catalog/products")
+def catalog_create(payload: ProductIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import catalog
+    return catalog.create_product(db, active_org(principal), principal, payload.model_dump(exclude_none=True))
+
+
+@router.get("/catalog/products/{pid}")
+def catalog_get(pid: int, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
+    from app.services import catalog
+    return catalog.get_product(db, active_org(principal), pid)
+
+
+@router.patch("/catalog/products/{pid}")
+def catalog_patch(pid: int, payload: ProductIn, principal: Principal = Depends(require_company_role("manager")),
+                  db: Session = Depends(get_db)):
+    from app.services import catalog
+    data = payload.model_dump(exclude_unset=True)
+    data.pop("company_id", None)
+    return catalog.update_product(db, active_org(principal), principal, pid, data)
+
+
+@router.post("/catalog/products/{pid}/prices")
+def catalog_propose(pid: int, payload: PriceIn, principal: Principal = Depends(require_company_role("manager")),
+                    db: Session = Depends(get_db)):
+    """Đề xuất giá mới → ma trận price_change (người đề xuất có quyền → áp dụng ngay)."""
+    from app.services import catalog
+    return catalog.propose_price(db, active_org(principal), principal, pid, payload.model_dump())
+
+
+@router.post("/catalog/prices/{price_id}/decide")
+def catalog_decide(price_id: int, payload: PriceDecideIn, principal: Principal = Depends(require_company_role("member")),
+                   db: Session = Depends(get_db)):
+    from app.services import catalog
+    return catalog.decide_price(db, active_org(principal), principal, price_id, payload.decision, payload.note)
+
+
+@router.post("/catalog/prices/{price_id}/cancel")
+def catalog_cancel(price_id: int, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import catalog
+    return catalog.cancel_price(db, active_org(principal), principal, price_id)
+
+
+@router.post("/catalog/lookup")
+def catalog_lookup(payload: LookupIn, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
+    """Xem trước đúng thứ agent nhận từ MCP company_product_lookup."""
+    from app.services import catalog
+    co = catalog._company(db, active_org(principal), payload.company_id)
+    return catalog.lookup(db, co.id, query=payload.query, sku=payload.sku)
+
+
 @router.post("/docs/tick")
 def tick(principal: Principal = Depends(require_company_role("owner")), db: Session = Depends(get_db)):
     """Chạy nhịp thư viện ngay (beat docs.tick mỗi giờ). Chỉ owner — dùng khi kiểm chứng."""

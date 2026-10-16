@@ -703,3 +703,7 @@ textarea.ops-json{width:100%}
 .doc-main>.tmRow{flex-wrap:nowrap}
 .doc-main>.tmRow .ui-input:first-child{flex:1;min-width:0}
 .doc-main>.tmRow select.ui-input{width:auto;flex:0 0 auto}
+/* M3f sản phẩm & giá */
+.doc-code{white-space:nowrap}
+.cat-money{white-space:nowrap;font-variant-numeric:tabular-nums}
+.cat-preview{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
