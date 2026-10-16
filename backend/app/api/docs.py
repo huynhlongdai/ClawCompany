@@ -128,6 +128,106 @@ async def upload_doc(file: UploadFile = File(...), company_id: int = Form(...), 
     return lib.create(db, org, principal, {k: v for k, v in body.items() if v is not None}, file=f)
 
 
+# ------------------------------------------------------------------ M3c nạp & phân loại
+
+class ImportUrlIn(BaseModel):
+    company_id: int
+    url: str
+    title: str | None = None
+    doc_type: str | None = None
+
+
+class TemplateIn(BaseModel):
+    company_id: int
+    key: str
+    title: str = ""
+
+
+class ProposalIn(BaseModel):
+    action: str
+    keys: list[str] | None = None
+
+
+class SourceIn(BaseModel):
+    company_id: int | None = None
+    kind: str | None = None
+    name: str | None = None
+    config: dict | None = None
+    credential: str | None = None       # chỉ ghi — không bao giờ trả ra
+    default_doc_type: str | None = None
+    interval_minutes: int | None = None
+    paused: bool | None = None
+
+
+@router.get("/doc-imports")
+def doc_imports(company_id: int, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
+    from app.services import doc_ingest
+    return doc_ingest.list_imports(db, active_org(principal), company_id)
+
+
+@router.post("/doc-imports/file")
+async def import_file(file: UploadFile = File(...), company_id: int = Form(...), title: str = Form(default=""),
+                      doc_type: str = Form(default=""), doc_class: str = Form(default=""),
+                      principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    """Nạp tệp (PDF có/không lớp chữ, ảnh scan, DOCX, XLSX, PPTX, MD/TXT/CSV/HTML, tệp xuất từ Drive/Notion) → nháp +
+    đề xuất phân loại. 409 trùng sha256, 422 không có chữ."""
+    from app.services import doc_ingest
+    data = await file.read()
+    return doc_ingest.ingest(db, active_org(principal), principal, company_id, source="upload", title=title,
+                             filename=file.filename or "", data=data, mime=file.content_type or "",
+                             overrides={"doc_type": doc_type, "doc_class": doc_class})
+
+
+@router.post("/doc-imports/url")
+def import_url(payload: ImportUrlIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import doc_ingest
+    return doc_ingest.ingest_url(db, active_org(principal), principal, payload.company_id, payload.url,
+                                 {"title": payload.title, "doc_type": payload.doc_type})
+
+
+@router.post("/doc-imports/template")
+def import_template(payload: TemplateIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import doc_ingest
+    return doc_ingest.from_template(db, active_org(principal), principal, payload.company_id, payload.key, payload.title)
+
+
+@router.post("/doc-imports/{import_id}/proposals")
+def import_proposals(import_id: int, payload: ProposalIn, background: BackgroundTasks,
+                     principal: Principal = Depends(require_company_role("admin")), db: Session = Depends(get_db)):
+    """Áp dụng / bỏ qua đề xuất hồ sơ pháp nhân trích từ GCN ĐKDN (chỉ admin/chủ công ty — như form hồ sơ)."""
+    from app.services import doc_ingest
+    org = active_org(principal)
+    out, changed = doc_ingest.decide_proposals(db, org, principal, import_id, payload.action, payload.keys)
+    if changed:
+        from app.api.team import _resync
+        _resync(background, principal, org, None)
+    return {**out, "core_sync": changed}
+
+
+@router.post("/doc-sources")
+def create_source(payload: SourceIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import doc_ingest
+    return doc_ingest.save_source(db, active_org(principal), principal, payload.model_dump(exclude_none=True))
+
+
+@router.patch("/doc-sources/{source_id}")
+def patch_source(source_id: int, payload: SourceIn, principal: Principal = Depends(require_company_role("manager")),
+                 db: Session = Depends(get_db)):
+    from app.services import doc_ingest
+    return doc_ingest.save_source(db, active_org(principal), principal, payload.model_dump(exclude_none=True), source_id)
+
+
+@router.post("/doc-sources/{source_id}/sync")
+def sync_source(source_id: int, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import doc_ingest
+    from app.models.doc_ingest import DocSource
+    s = db.get(DocSource, source_id)
+    if s is None or s.organization_id != active_org(principal):
+        raise HTTPException(404, "Không thấy nguồn này")
+    lib._company(db, s.organization_id, s.company_id, write=True)
+    return doc_ingest.sync_source(db, s, principal=principal)
+
+
 @router.post("/docs/import-sops")
 def import_sops(company_id: int, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     return lib.import_sops(db, active_org(principal), principal, company_id)

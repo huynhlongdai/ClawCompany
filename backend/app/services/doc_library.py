@@ -387,7 +387,8 @@ def _apply_meta(db: Session, doc: KnowledgeDocument, data: dict) -> None:
         doc.doc_code = code
 
 
-def create(db: Session, org_id: int, principal, data: dict, *, file: DocumentFile | None = None) -> dict:
+def create(db: Session, org_id: int, principal, data: dict, *, file: DocumentFile | None = None,
+           force_draft: bool = False) -> dict:
     co = _company(db, org_id, data.get("company_id"), write=True)
     t = data.get("doc_type") or "other"
     if t not in DOC_TYPES:
@@ -432,7 +433,8 @@ def create(db: Session, org_id: int, principal, data: dict, *, file: DocumentFil
     emit_event(db, organization_id=org_id, company_id=co.id, event_type="document.created", source="doc_library",
                aggregate_type="document", aggregate_id=str(doc.id), actor_member_id=seat,
                payload={"doc_code": doc.doc_code, "doc_type": t, "doc_class": cls})
-    if cls == "record":
+    if cls == "record" and not force_draft:
+        # M3c: tài liệu NẠP (tệp/URL/Drive/Notion/mẫu) luôn vào nháp chờ duyệt, kể cả hồ sơ — force_draft=True.
         # Hồ sơ: lưu là khoá — ban hành ngay, không nháp/duyệt (ISO 7.5.3 "bảo vệ khỏi sửa đổi ngoài ý muốn").
         v.approved_by_member_id, v.approved_at = seat, now
         _publish(db, doc, v, now=now)

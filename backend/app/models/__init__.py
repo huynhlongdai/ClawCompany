@@ -42,3 +42,4 @@ from .company_access import *  # noqa: E402,F401,F403  (R1 vai trò theo công t
 from .leases import *  # noqa: E402,F401,F403  (R2 cho thuê agent)
 from .documents import *  # noqa: E402,F401,F403  (M3a thư viện tài liệu)
 from .catalog import *  # noqa: E402,F401,F403  (M3f sản phẩm & bảng giá)
+from .doc_ingest import *  # noqa: E402,F401,F403  (M3c nạp tài liệu)

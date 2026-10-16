@@ -1041,6 +1041,23 @@ export const apiCatalog = {
 
 // M3 — thư viện tài liệu & tri thức công ty (/api/team/docs…)
 const dq = (o: Record<string, any>) => qs(o).slice(1);
+// M3c nạp & phân loại tài liệu
+export const apiIngest = {
+  list: (companyId: number) => request<any>(`/team/doc-imports?company_id=${companyId}`),
+  file: (file: File, fields: Record<string, any>) => {
+    const fd = new FormData(); fd.append("file", file);
+    Object.entries(fields).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== "") fd.append(k, String(v)); });
+    return request<any>(`/team/doc-imports/file`, {method: "POST", body: fd});
+  },
+  url: (body: any) => request<any>(`/team/doc-imports/url`, {method: "POST", body: JSON.stringify(body)}),
+  template: (body: any) => request<any>(`/team/doc-imports/template`, {method: "POST", body: JSON.stringify(body)}),
+  proposals: (id: number, action: string, keys?: string[]) =>
+    request<any>(`/team/doc-imports/${id}/proposals`, {method: "POST", body: JSON.stringify({action, keys})}),
+  addSource: (body: any) => request<any>(`/team/doc-sources`, {method: "POST", body: JSON.stringify(body)}),
+  patchSource: (id: number, body: any) => request<any>(`/team/doc-sources/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  syncSource: (id: number) => request<any>(`/team/doc-sources/${id}/sync`, {method: "POST"}),
+};
+
 export const apiDocs = {
   list: (companyId: number | null, f: Record<string, any> = {}) => request<any>(`/team/docs?${dq({company_id: companyId, ...f})}`),
   get: (id: number) => request<any>(`/team/docs/${id}`),

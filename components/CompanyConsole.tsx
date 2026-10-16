@@ -15,6 +15,7 @@ import {RulesTab, ContractsTab, CoverageTab, AgentWorkforceTab} from "./AgentNat
 import {CompanyRolesTab, LeaseOutTab, LeasedTab} from "./Rental";
 import {DocLibraryTab, FactsTab, RecordsTab} from "./DocLibrary";
 import {CatalogTab} from "./Catalog";
+import {DocIngestTab} from "./DocIngest";
 import {DepartmentsTab, BuildTab, flatten} from "./TeamConsole";
 import {ErrorBanner, EmptyState} from "./ui/EmptyState";
 import {SkeletonRows} from "./ui/Skeleton";
@@ -82,6 +83,7 @@ export function CompanyConsole() {
       {tab === "leaseout" && <LeaseOutTab companyId={companyId} caps={caps}/>}
       {tab === "leased" && <LeasedTab companyId={companyId} caps={caps}/>}
       {tab === "docs" && <DocLibraryTab companyId={companyId} caps={caps}/>}
+      {tab === "ingest" && <DocIngestTab companyId={companyId} caps={caps}/>}
       {tab === "facts" && <FactsTab companyId={companyId} caps={caps}/>}
       {tab === "records" && <RecordsTab companyId={companyId} caps={caps}/>}
       {tab === "catalog" && <CatalogTab companyId={companyId} caps={caps}/>}

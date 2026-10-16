@@ -718,3 +718,18 @@ textarea.ops-json{width:100%}
   .req-table th:nth-child(3),.req-table td:nth-child(3){display:none}
   .req-basis-m{display:block;margin-top:4px;color:var(--text-muted)}
 }
+
+/* M3c nạp tài liệu */
+.ingest-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.ingest-grid>div{display:flex;flex-direction:column;gap:8px;min-width:0}
+.ingest-grid h4,.ingest-card h4{margin:0}
+.ingest-tpls{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:16px}
+.ingest-tpl{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ingest-tpl small{color:var(--text-muted);overflow-wrap:anywhere}
+.ingest-card{margin-top:12px;min-width:0}
+.ingest-card .tmRow{flex-wrap:wrap;gap:8px}
+.ingest-card small,.ingest-card b{overflow-wrap:anywhere}
+.ingest-prop{margin-top:8px;padding:10px;border-radius:var(--radius-sm);background:var(--surface-2)}
+.ingest-dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px 16px;margin:8px 0}
+.ingest-dl dt{font-size:var(--fs-12);color:var(--text-muted)}
+.ingest-dl dd{margin:0;overflow-wrap:anywhere}

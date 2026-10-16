@@ -81,6 +81,11 @@ def docs_tick():
     db = SessionLocal()
     try:
         out = doc_library.tick(db)
+        try:   # M3c: nguồn đồng bộ (URL / Google Drive / Notion) tới hạn → bản nháp mới khi nguồn đổi
+            from app.services import doc_ingest
+            out["sources"] = doc_ingest.sync_due(db)
+        except Exception as exc:  # noqa: BLE001 — một nguồn hỏng không được chặn nhịp tài liệu
+            out["sources_error"] = str(exc)[:300]
         for org in out.get("core_orgs") or []:
             out.setdefault("regen", {})[org] = asyncio.run(doc_library.regen_agents(db, get_runtime(), org))
         return out
