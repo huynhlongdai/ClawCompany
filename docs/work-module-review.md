@@ -1,6 +1,8 @@
 # Module Công việc (Work) — rà soát hiện trạng, đối chiếu và kế hoạch
 
 > Ngày 16/10/2026 · nhánh `ui-v2` @ `c237970` · migration head `0063_business_ledger`.
+> **Cập nhật 17/10/2026:** anh đã chốt mô hình lãnh đạo (người + agent trợ lý + agent trưởng nhóm có quyền điều phối/
+> tuyển) — xem §5; W0 đã làm (đo mặc định thật của gateway 9.8, biên dịch cách ly phiên, dọn 3 cặp job trùng) — xem §4.3a.
 > Chỉ đọc code + báo cáo + docs upstream; **không đổi code**. Nhãn trạng thái theo nguyên tắc HANDOFF §7
 > "kiểm chứng, đừng suy ra": ✅ **VM thật** = có báo cáo chạy trên VM/gateway OpenClaw thật · 🟡 **VM tất định** =
 > chạy trên VM nhưng không gọi model (quota CometAPI rỗng) · 🧪 **chỉ test** = pytest/mock · ⚠️ **có mà chưa nối** ·
@@ -200,19 +202,49 @@ Cột **Kiểm** : 🟢 tất định (SQLite + Postgres VM, runtime giả hoặ
 
 | Gói | Nội dung | Migration | Định nghĩa xong (acceptance) | Kiểm |
 |---|---|---|---|---|
-| **W0 · An toàn & dọn trùng** | (1) `config.schema.lookup` trên 9.8 cho `tools.sessions.visibility`, `tools.agentToAgent.*`, `agents.entries.*.subagents.allowAgents`, `tools.agentToAgent.send`; biên dịch: visibility `self`, agentToAgent tắt hoặc allow-list trong cùng công ty, allowAgents = chính ghế; thêm vào `openclaw_alignment` để phát hiện lệch. (2) Tắt `operations.tick_cycles`, `events.monitor_sla`, `operations.scan_recurring` khỏi CORE (chuyển vào Lab), `orchestration.create_goal/goal_execute` đi qua `strategy` | — | `config.get` trên VM: mọi ghế có khoá đúng; test hai tổ chức: ghế tổ chức B không nằm trong allow-list của A; beat lõi không còn 3 job trùng; test G5 cũ vẫn xanh | 🟢 (hành vi model đọc phiên người khác: 🔴 1 lượt xác nhận) |
+| **W0 · An toàn & dọn trùng** ✅ 17/10 | (1) đo trên 9.8 bằng `config.schema.lookup` + `config.get`; biên dịch `tools.sessions.visibility=self`, `tools.agentToAgent.enabled=false` (khoá **toàn gateway** — 9.8 không có bản theo agent), `agents.entries.<ghế>.subagents.allowAgents=[<ghế>]`; đặt trong `wire_gateway`, khi API khởi động (native) và `POST /api/agents/gateway/isolation`; `GET` cùng path báo lệch. (2) bỏ `operations.tick_cycles`, `events.monitor_sla`, `operations.scan_recurring` khỏi beat; chủ duy nhất: strategy (mục tiêu), `sla.tick` (SLA mới + hồ sơ SLAProfile cũ cho việc chưa có đồng hồ), `routines.tick` (routine + việc định kỳ cũ, claim CAS) | — | xem §4.3a | 🟢 xong · 🔴 1 lượt model thật thử đọc phiên người khác vẫn nên chạy khi có quota |
 | **W1 · Chờ không giữ ghế + đồng thời ghế** | việc `blocked` có `wait_kind` ∈ `human|children|external|budget` + `wait_ref`; lượt kết thúc khi xin duyệt → ghế rảnh; kết quả duyệt → wakeup `approval_resolved` **cùng phiên việc**. `agents.max_parallel_runs` (mặc định 1, tối đa theo `agents.defaults.maxConcurrent`), `skip_reason` đếm lượt mở thay vì "có lượt" | `0064_work_wait_parallel` (tasks.wait_kind/wait_ref/wait_since; agents.max_parallel_runs) | việc A chờ duyệt, việc B của cùng ghế chạy ngay; duyệt A → A tiếp tục đúng session key; ghế `max_parallel_runs=2` chạy 2 việc 2 phiên, việc thứ 3 `seat_busy`; Hộp việc hiện "chờ anh" kèm phút chờ | 🟢 mock · 🔴 1 lượt thật |
 | **W2 · Trần, thử lại, việc chết** | `tasks.max_cost_usd`, `max_runs`, `max_revisions` (mặc định theo công ty); `budget_scope.gate` cộng phạm vi `task`; vòng SỬA thứ N+1 → leo thang người; lỗi tạm (mạng/429/gateway restart/`runtime_error`) → retry 1′/5′/30′ qua `wakeups.not_before`; hết lượt → `work_dead_letters` + 1 thẻ Hộp việc | `0065_work_limits` (cột tasks + bảng work_dead_letters + wakeups.not_before) | vượt `max_runs` → blocked `run_cap` + đúng 1 thẻ; lỗi tạm thử lại đúng lịch rồi vào dead-letter; nút chạy lại/giao người khác/huỷ; review SỬA lần 4 (max 3) → người | 🟢 |
-| **W3 · Giao việc giữa agent + fan-in** | MCP `company_task_delegate` (tiêu đề, mô tả, người nhận/phòng, hợp đồng, hạn, lát ngân sách, reviewer mặc định = người giao) và `company_task_children`; quyền theo `authority` (`task_delegate`: trong phòng = quản lý/trưởng phòng; ngoài phòng → yêu cầu tới trưởng phòng kia); cha `wait_kind=children`, đánh thức **một lần** khi con đóng hết, khối mới "Kết quả việc con" trong gói ngữ cảnh; trần độ sâu 3, fan-out 8; `tasks.accountable_member_id` (người chịu trách nhiệm) | `0066_task_delegation` (tasks.accountable_member_id, delegated_by_member_id, origin; authority seed `task_delegate`) | agent trưởng phòng giao 3 việc con song song cho 3 ghế → cha thức dậy 1 lần với 3 kết quả; nhân viên giao sang phòng khác → thành yêu cầu cho trưởng phòng đó, không giao thẳng; vượt độ sâu/fan-out → lỗi tiếng Việt; con có hợp đồng nộp sai → làm lại như M2e.3 | 🟢 · 🔴 agent tự phân việc |
+| **W3 · Agent trưởng nhóm điều phối + fan-in** | Theo quyết định 17/10 (§5 Q1): agent **cấp trưởng nhóm** (`seat_tier=lead`, trưởng phòng/quản lý theo chức danh M2b) có **quyền điều phối**: gọi agent trong nhóm, tạo/quản lý/giao việc. MCP `company_task_delegate` (tiêu đề, mô tả, người nhận/phòng, hợp đồng, hạn, lát ngân sách, reviewer mặc định = người giao), `company_task_children`, `company_task_manage` (đổi hạn/ưu tiên/người nhận, huỷ, mở lại việc con của mình); quyền theo `authority` (`task_delegate`: trong phòng = trưởng nhóm tự làm; ngoài phòng → *yêu cầu* tới trưởng nhóm kia); cha `wait_kind=children`, đánh thức **một lần** khi con đóng hết, khối "Kết quả việc con" trong gói ngữ cảnh; trần độ sâu 3, fan-out 8 (mặc định, chưa chốt); `tasks.accountable_member_id` = **lãnh đạo người** chịu trách nhiệm (mặc định quản lý người của ghế). Agent thừa hành **không** giao việc; agent trợ lý chỉ *đề xuất* (§5 vai trò trợ lý) | `0066_task_delegation` (tasks.accountable_member_id, delegated_by_member_id, origin; authority seed `task_delegate`) | agent trưởng nhóm giao 3 việc con song song cho 3 ghế → cha thức dậy 1 lần với 3 kết quả; nhân viên/trợ lý gọi delegate → 403 + gợi ý đường đề xuất; giao sang phòng khác → thành yêu cầu cho trưởng nhóm đó; vượt độ sâu/fan-out → lỗi tiếng Việt; con có hợp đồng nộp sai → làm lại như M2e.3 | 🟢 · 🔴 agent tự phân việc |
+| **W3b · Agent trưởng nhóm tuyển agent** | Agent trưởng nhóm được **tạo agent mới** (mở ghế theo chức danh có sẵn → `agent_hr.hire` + `seat_provision`) hoặc **thêm agent từ chợ agent** (thuê ghế — dùng lại R2 `seat_leases`: offer/accept, sàn bên cho thuê, trần, đo phí). MCP `company_seat_request` {position_id, cách: `create`\|`lease`, offer_code?, lý do, ngân sách tháng}. **Mặc định:** còn chỉ tiêu (`positions.headcount` M2b > số ghế đang có) **và** trong ngân sách (phòng/công ty, `budget_scope`; phí thuê ước tính tháng ≤ phần còn lại) → agent trưởng nhóm tự làm, ghi audit + báo lãnh đạo người (thẻ thông tin). **Vượt** chỉ tiêu hoặc ngân sách, hoặc chức danh chưa có → Approval theo ma trận thẩm quyền (`hire_agent` M2b; thêm `lease_agent`), người duyệt là lãnh đạo người. Ghế mới luôn ở `probation` (career M5b), quản lý người = lãnh đạo của nhóm; cách ly phiên W0 áp ngay khi tạo. Không tự nới chính sách/quyền công cụ của ghế mới quá sàn chức danh | `0066b`/`0067` tuỳ thứ tự (authority seed `lease_agent`; `agent_hires` nhật ký: ai đề xuất, cách, lease_id, approval_id) | trong chỉ tiêu + ngân sách → ghế mới có trên gateway (AGENTS.md theo chức danh, `subagents.allowAgents=[chính nó]`), không thẻ duyệt; chỉ tiêu đầy → đúng 1 Approval cho lãnh đạo người, duyệt → tạo, từ chối → không tạo; thuê từ chợ → lease active với sàn bên cho thuê, vượt ngân sách → Approval; agent thừa hành/trợ lý gọi → 403; tạo trùng (gọi 2 lần) → 1 ghế | 🟢 · 🔴 agent tự quyết tuyển |
 | **W4 · Sổ chung mục tiêu/dự án + đếm kẹt** | `work_ledger_entries` (phạm vi goal/project, loại fact/decision/question/risk/plan, tác giả, `supersedes_id`); MCP `company_ledger_read/note`; `decision` chỉ chủ mục tiêu/chủ toạ ghi; `question` → wakeup chủ; ≤2 000 ký tự vào khối 3; mỗi giờ: mục tiêu không có việc đóng/ghi sổ mới trong N giờ → `stall_count++`, quá ngưỡng → việc "Lập lại kế hoạch" cho seat chiến lược | `0067_work_ledger` | 2 agent cùng mục tiêu thấy quyết định của nhau ở lượt sau; agent thường ghi `decision` → 403; câu hỏi mở đánh thức chủ; kẹt 2 nhịp → 1 việc lập lại kế hoạch, không đôi | 🟢 |
 | **W5 · Danh mục dịch vụ nội bộ** | `service_catalog` (phòng cung cấp, tên, hợp đồng đầu vào/ra, SLA policy, người duyệt, ai được gọi, công khai cho agent); MCP `company_service_list/request` → việc giao phòng cung cấp + định tuyến D3.1 + SLA timer; UI Công ty › Vận hành › Dịch vụ nội bộ | `0068_service_catalog` | Kinh doanh yêu cầu "Xuất kho" thiếu trường → 422 lỗi tiếng Việt; hợp lệ → việc ở phòng Kho, SLA chạy; quá SLA → trưởng phòng Kho + thẻ báo bên yêu cầu; bên yêu cầu thấy trạng thái | 🟢 |
 | **W6 · Trace & chỉ số làm việc** | `trace_id` (mục tiêu hoặc việc gốc) lan sang việc con, task_runs, approvals, handoffs, lượt A2A, phòng review; API dòng thời gian mục tiêu (cây việc, chi phí, phút chờ người, điểm kẹt); chỉ số mới vào `career.scorecard` + trọng số `dispatch_policy` khi đủ mẫu | `0069_work_trace` | một mục tiêu 1 cha + 3 con + 1 review + 1 duyệt → dòng thời gian đủ 6 nhánh, tổng chi phí = tổng các lượt; scorecard có `escalation_rate`, `human_wait_minutes`, `dead_letter_rate` | 🟢 |
 | **W7 · A2A bất đồng bộ** | ánh xạ trạng thái việc ↔ A2A (`input-required` ↔ chờ người, `rejected`); `tasks/get`, push notification về webhook đã ký; agent ngoài làm "người nhận" của việc qua ghế proxy có trần như ghế thuê | `0070_a2a_tasks` | việc dài với agent ngoài trả `working` rồi push `completed`; `input-required` thành thẻ Hộp việc; chi phí ngoài ghi vào trace | 🟢 với agent giả · 🔴 với seat thật |
 | **W8 · Gate thật làm nhóm (= G5)** | kịch bản "Ra mắt bộ sưu tập hè, $20": Nina lập kế hoạch → người duyệt → 3 phòng song song qua W3 → bàn giao có hợp đồng → review → fan-in → người bị ping ≤2 lần → chi phí khớp `sessions.usage` ±5% | — | `tools/gate_work.py` xanh 3 lần liên tiếp, 0 lỗi 500/console | 🔴 (ước ~1–2 USD/lần với T1/T2) |
 
-**Thứ tự đề xuất:** `W0 → W1 → W2 → W3 → W4 → W6 → W5 → W8 → W7`.
+**Thứ tự đề xuất:** `W0 ✅ → W1 → W2 → W3 → W3b → W4 → W6 → W5 → W8 → W7`.
 W0–W2 là nền an toàn (không làm thì làm nhóm chỉ nhân rủi ro). W3 là thứ mở khoá kiểu 2b. W6 đi trước W5 vì dịch vụ liên
 phòng cần trace để đo SLA giữa bên. W8 chạy ngay khi có quota — có thể kéo lên sau W3 nếu anh nạp CometAPI sớm.
+
+### 4.3a Kết quả W0 (17/10/2026)
+
+**Mặc định thật của gateway OpenClaw 2026.9.8 trên VM** (`config.schema.lookup` + `config.get`, script
+`work/w0/vm_w0_schema.py`; docs đóng gói trong image `/app/docs/gateway/config-tools/sessions-and-subagents.md`):
+
+| Khoá | Mặc định 9.8 | Trên VM trước W0 | Phạm vi |
+|---|---|---|---|
+| `tools.sessions.visibility` | `all` — "any session on the Gateway, including other agents and users" (enum `self\|tree\|agent\|all`) | chưa đặt → `all` | chỉ gốc `tools` (không có `agents.entries.*.tools.sessions`) |
+| `tools.agentToAgent.enabled` | `true`; `allow` rỗng = mọi cặp agent | chưa đặt → bật | chỉ gốc `tools` |
+| `agents.*.subagents.allowAgents` | "same agent only" khi không đặt | chưa đặt (defaults chỉ có `maxConcurrent 8`, `archiveAfterMinutes 60`) | defaults + từng entry |
+| `tools.agentToAgent.send` | không tồn tại trên 9.8 (docs cũ nhắc) | — | — |
+
+**Bằng chứng rò thật trước khi sửa** (`work/w0/vm_w0_probe.py`, gọi `POST /tools/invoke` của gateway = đúng chuỗi chính
+sách tool của agent, không gọi model): từ phiên `agent:shop-a407-cskh:company-task-48`, `sessions_list` thấy phiên của
+`shop-a407-truong-kho`, `sessions_history` đọc được transcript "Báo cáo tuần" của Trưởng kho (HTTP 200).
+
+**Đã đổi:** `seat_provision.session_isolation_values/ensure_session_isolation` (visibility `self`, agentToAgent tắt,
+`allowAgents=[ghế]`), gộp vào `wire_gateway`, chạy khi API khởi động (`OPENCLAW_ENFORCE_SESSION_ISOLATION`, mặc định bật),
+`GET/POST /api/agents/gateway/isolation` (admin tổ chức, ORG_ONLY). Chọn `self` thay vì `agent`: cùng một ghế có phiên A2A/
+cổng khách của nhiều khách — `agent` vẫn cho phiên khách này đọc phiên khách kia. Hệ quả chấp nhận: agent không tự đọc
+phiên việc khác của chính mình (ngữ cảnh đã có gói 7 khối + sổ việc do backend dựng).
+
+**Job trùng → một chủ:** mục tiêu = strategy/Nina (`strategy.owns_goal`: có việc lập kế hoạch → `create_cycle` từ chối,
+`tick_cycle` không phát việc; việc định kỳ `nina_goal` không dựng chu kỳ cũ); SLA = `sla.tick` (đồng hồ giành bằng CAS
+`running→breaching`; hồ sơ SLAProfile cũ chạy trong cùng tick, bỏ việc đã có đồng hồ); định kỳ = `routines.tick` →
+`routines.tick_all` (routine + `RecurringOperation` giành bằng CAS trên `next_run_at`). Phát hiện trên VM: việc định kỳ cũ
+"Daily growth & risk review" (org 1) mỗi 08:00 tạo một mục tiêu + chu kỳ cũ; 2 chu kỳ (#1, #2) đang `running` mãi với 1
+assignment `failed` + 3 `queued` — sau W0 không còn beat nào tick chúng (chạy tay qua `/api/v9/cycles/{id}/tick`).
 
 ### 4.3 Kiểm được gì khi chưa có quota
 
@@ -224,15 +256,37 @@ phòng cần trace để đo SLA giữa bên. W8 chạy ngay khi có quota — c
 
 ---
 
-## 5. Quyết định anh cần chốt
+## 5. Quyết định (anh chốt 17/10/2026) và mặc định còn mở
 
-| # | Câu hỏi | Lựa chọn | Hark đề xuất mặc định |
-|---|---|---|---|
-| D1 | Agent có được **tự giao việc** cho agent khác không? | (a) chỉ quản lý/trưởng phòng theo ma trận · (b) ai cũng giao trong phòng · (c) chỉ Nina | **(a)** — ngoài phòng thì thành *yêu cầu* tới trưởng phòng kia; độ sâu ≤3, fan-out ≤8 |
-| D2 | Mỗi agent làm **mấy việc cùng lúc**? | 1 · 2 · theo chức danh | **1 mặc định, cho phép 2–3 theo ghế**; quan trọng hơn là W1 "chờ không giữ ghế" (bật luôn) |
-| D3 | **Trần mặc định theo việc** | tiền / số lượt / vòng SỬA | **$0,50 · 6 lượt · 3 vòng SỬA** mỗi việc; vượt → hỏi người quản lý (một thẻ), không tự nới |
-| D4 | Agent ở **công ty/tổ chức khác nhau có được nói chuyện trực tiếp** (OpenClaw `agentToAgent`)? | mở trong công ty · chỉ qua task/A2A · mở hết | **Chỉ qua task/A2A của ClawCompany**; `agentToAgent` tắt, `sessions.visibility=self`, sub-agent chỉ chính mình — để mọi trao đổi đều có chủ, có sổ, có chi phí |
-| D5 | Việc agent làm có **người chịu trách nhiệm** riêng (kiểu Linear)? | không · quản lý người của ghế · người tạo việc | **Quản lý người của ghế**, đổi được trên việc; Hộp việc và leo thang dùng người này trước chuỗi chức danh |
+### 5.1 Mô hình lãnh đạo — **đã chốt**
+
+| # | Quyết định | Nội dung |
+|---|---|---|
+| Q1 | Lãnh đạo công ty | Mỗi công ty có **lãnh đạo là NGƯỜI** + **1–2 agent cấp TRỢ LÝ** phục vụ lãnh đạo |
+| Q2 | Agent trưởng nhóm có quyền điều phối | Agent **cấp trưởng nhóm** (team-lead) được gọi agent, tạo/quản lý/giao việc, và **tạo agent mới hoặc thêm agent từ chợ agent** (thuê — dùng lại R2 `seat_leases`) → W3 + W3b |
+| Q3 | Ranh giới tự quyết | **Trong chỉ tiêu chức danh (headcount M2b) và trong ngân sách** → agent trưởng nhóm tự làm (có audit + thẻ thông tin cho lãnh đạo). **Vượt** → lãnh đạo người duyệt theo **ma trận thẩm quyền** |
+
+### 5.2 Vai trò agent trợ lý (assistant) — định nghĩa
+
+| Mặt | Định nghĩa |
+|---|---|
+| Phục vụ ai | Đúng **một lãnh đạo người** (`members.manager_id` của ghế trợ lý = lãnh đạo đó); công ty có 1–2 trợ lý |
+| Làm gì | **Phân loại Hộp việc** của lãnh đạo (gom, ưu tiên, tóm tắt thẻ, gợi ý quyết định — không tự bấm duyệt); **soạn nháp** (email, tin nhắn, biên bản, tài liệu, kế hoạch) để lãnh đạo duyệt; **xếp lịch** (đề xuất giờ họp, nhắc hạn, chuẩn bị tài liệu họp M3i) |
+| Được *yêu cầu* | Tạo đề xuất việc/yêu cầu gửi trưởng nhóm, đề xuất tuyển agent, đề xuất đổi tài liệu (M3e) — mọi thứ đi dưới dạng **đề xuất chờ người hoặc trưởng nhóm quyết** |
+| **Không** được | Ghi đè quyết định của lãnh đạo hay trưởng nhóm; giao việc thẳng cho agent khác (`company_task_delegate` 403); duyệt Approval thay người; tuyển/thuê agent; gửi ra ngoài khi chưa được duyệt (action:send theo cấp career) |
+| Kỹ thuật | `seat_tier=assistant` (mới, cạnh `lead`/`executor`), quyền tool mặc định: đọc Hộp việc của lãnh đạo mình (`inbox.read:principal`), nháp (`action:draft`), lịch; `subagents.allowAgents=[chính nó]` như mọi ghế; người chịu trách nhiệm = lãnh đạo được phục vụ |
+
+### 5.3 Mặc định còn mở — **default, chưa chốt**
+
+| # | Câu hỏi | Mặc định đang dùng (chưa chốt) |
+|---|---|---|
+| D2 | Mỗi agent làm mấy việc cùng lúc | **1, cho phép 2–3 theo ghế** (default, chưa chốt); W1 "chờ không giữ ghế" bật luôn |
+| D3 | Trần mặc định theo việc | **$0,50 · 6 lượt · 3 vòng SỬA** mỗi việc; vượt → một thẻ cho người chịu trách nhiệm (default, chưa chốt) |
+| D4 | Agent nói chuyện trực tiếp qua OpenClaw | **Không** — `agentToAgent` tắt, `sessions.visibility=self`, sub-agent chỉ chính mình; mọi trao đổi qua task/bàn giao/A2A (default, chưa chốt — **đã biên dịch ở W0** vì là chặn rò giữa tổ chức trên gateway dùng chung; nới cần anh quyết) |
+| D5 | Người chịu trách nhiệm việc agent làm | **Quản lý người của ghế** (= lãnh đạo người của nhóm), đổi được trên việc (default, chưa chốt) |
+| D6 | Độ sâu / fan-out giao việc của trưởng nhóm | **3 / 8** (default, chưa chốt) |
+
+(D1 cũ "ai được giao việc" đã thay bằng Q2: agent trưởng nhóm; thừa hành không; trợ lý chỉ đề xuất.)
 
 ---
 
