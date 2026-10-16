@@ -38,12 +38,12 @@ export function CatalogTab({companyId, caps}: {companyId: number | null; caps: a
     <div className="tmRow">
       <input className="ui-input" placeholder={tr("cat.search")} value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === "Enter" && reload()} data-testid="cat-q"/>
     </div>
-    <div className="ui-panel"><table className="ui-table" data-testid="cat-table"><thead><tr>
+    <div className="ui-panel"><table className="ui-table cat-table" data-testid="cat-table"><thead><tr>
       <th>{tr("cat.sku")}</th><th>{tr("cat.name")}</th><th>{tr("cat.unit")}</th><th>{tr("cat.price_now")}</th><th>{tr("cat.status")}</th></tr></thead>
       <tbody>{d.items.length === 0 ? <tr><td colSpan={5}><EmptyState compact mood="chao" title={tr("cat.empty")}>{tr("cat.empty_hint")}</EmptyState></td></tr>
         : d.items.map((x: any) => <tr key={x.id} className={sel === x.id ? "is-selected" : ""} style={{cursor: "pointer"}} onClick={() => { setSel(x.id); setAdding(false); }} data-testid={`cat-row-${x.sku}`}>
           <td><code className="doc-code">{x.sku}</code></td>
-          <td><b>{x.name}</b>{x.kind === "service" && <> <span className="ui-pill is-outline">{tr("cat.service")}</span></>}{x.category && <><br/><small>{x.category}</small></>}</td>
+          <td><code className="doc-code cat-sku-m">{x.sku}</code><b>{x.name}</b>{x.kind === "service" && <> <span className="ui-pill is-outline">{tr("cat.service")}</span></>}{x.category && <><br/><small>{x.category}</small></>}</td>
           <td>{x.unit}</td>
           <td className="cat-money">{x.current_price ? <b>{x.current_price.display}</b> : <small>{tr("cat.no_price")}</small>}
             {x.pending_price && <><br/><StatusPill tone="wait">{tr("cat.pending_short", {p0: x.pending_price.display, p1: pct(x.pending_price.change_pct)})}</StatusPill></>}

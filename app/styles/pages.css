@@ -707,3 +707,8 @@ textarea.ops-json{width:100%}
 .doc-code{white-space:nowrap}
 .cat-money{white-space:nowrap;font-variant-numeric:tabular-nums}
 .cat-preview{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.cat-sku-m{display:none}
+@media (max-width:760px){
+  .cat-table th:nth-child(1),.cat-table td:nth-child(1),.cat-table th:nth-child(3),.cat-table td:nth-child(3){display:none}
+  .cat-sku-m{display:block;font-size:var(--fs-12);color:var(--text-muted)}
+}

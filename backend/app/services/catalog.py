@@ -417,6 +417,9 @@ def lookup(db: Session, company_id: int | None, *, query: str = "", sku: str = "
     else:
         words = [w for w in _u(query).split() if w not in {"gia", "bao", "nhieu", "tien", "cai", "cua", "la", "con", "khong", "ban"}]
         hits = sorted(((s, p) for p in rows.all() if (s := _score(p, words)) > 0), key=lambda x: (-x[0], x[1].sku)) if words else []
+        if hits:     # bỏ khớp yếu (chỉ trùng nhóm / một từ chung) để agent không nhầm sản phẩm
+            top = hits[0][0]
+            hits = [h for h in hits if h[0] >= max(0.34, top * 0.6)]
     from app.services import company_facts
     facts = {f["key"]: f for f in company_facts.for_agent(db, company_id).get("facts", [])}
     out = []
