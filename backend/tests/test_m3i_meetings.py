@@ -107,3 +107,22 @@ def test_decisions_authority_supersede_and_agent_reads_latest_in_effect(E):
     assert company_mcp.call(ctx, "company_decision_log", {"query": "Vận chuyển"})[1]["decisions"] == []
     lst = E.c.get(f"/api/team/meetings?company_id={E.co.id}", headers=E.tok("member")).json()
     assert lst["counts"]["decisions_in_effect"] == 1 and len(lst["decisions"]) == 3      # d1 thay thế, d2 huỷ, "Lương thưởng" còn hiệu lực; công ty khác không
+
+
+def test_org_level_seat_can_chair_and_decide_but_other_company_member_cannot(E):
+    """Lỗi thật thấy trên VM: chủ tổ chức ngồi ghế cấp tổ chức (members.company_id NULL) — trước bản sửa bị 404 khi làm
+    người quyết / chủ toạ ở công ty con. Thành viên của công ty KHÁC vẫn bị chặn."""
+    _seats(E)
+    from app.models import Company
+    org_seat = Member(organization_id=E.org.id, company_id=None, name="Chủ tổ chức", member_type="human", role="Owner")
+    other = Company(organization_id=E.org.id, name="Công ty khác", status="active"); E.db.add_all([org_seat, other]); E.db.commit()
+    stranger = Member(organization_id=E.org.id, company_id=other.id, name="Người công ty khác", member_type="human")
+    E.db.add(stranger); E.db.commit()
+    base = {"company_id": E.co.id, "title": "Mở cửa hàng thứ hai", "body": "Mở chi nhánh Q3.", "authority_basis": "Chủ sở hữu quyết"}
+    r = E.c.post("/api/team/decision-log", json={**base, "decided_by_member_id": org_seat.id}, headers=E.tok("manager"))
+    assert r.status_code == 200, r.text
+    assert E.c.post("/api/team/decision-log", json={**base, "decided_by_member_id": stranger.id}, headers=E.tok("manager")).status_code == 404
+    m = E.c.post("/api/team/meetings", json={"company_id": E.co.id, "title": "Họp chủ sở hữu", "chair_member_id": org_seat.id,
+                                            "attendee_ids": [org_seat.id]}, headers=E.tok("manager"))
+    assert m.status_code == 200 and m.json()["chair"] == "Chủ tổ chức"
+    assert any(x["id"] == org_seat.id for x in E.c.get(f"/api/team/meetings?company_id={E.co.id}", headers=E.tok("member")).json()["members"])

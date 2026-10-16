@@ -312,7 +312,7 @@ def _apply(db, c: BizContract, data: dict) -> None:
         v = data["owner_member_id"]
         if v:
             m = db.get(Member, int(v))
-            if m is None or m.company_id != c.company_id:
+            if m is None or m.organization_id != c.organization_id or m.company_id not in (None, c.company_id):
                 raise _err(404, "not_found", "Người phụ trách không thuộc công ty này")
         c.owner_member_id = int(v) if v else None
     if "document_id" in data:

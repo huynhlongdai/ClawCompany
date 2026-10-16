@@ -246,7 +246,8 @@ def _clean_contact(db: Session, c: CrmContact, data: dict) -> None:
             if v:
                 from app.models import Department
                 obj = db.get(Member if k == "owner_member_id" else Department, int(v))
-                if obj is None or obj.company_id != c.company_id:
+                ok_null = k == "owner_member_id" and obj is not None and obj.organization_id == c.organization_id and obj.company_id is None
+                if obj is None or (obj.company_id != c.company_id and not ok_null):
                     raise _err(404, "not_found", "Người / phòng phụ trách không thuộc công ty này")
             setattr(c, k, int(v) if v else None)
     if not (c.name or "").strip():

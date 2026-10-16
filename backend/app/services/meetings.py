@@ -69,8 +69,11 @@ def _event(db, company_id, org_id, kind, agg, aid, actor, payload):
 
 
 def _member_in(db, mid, company_id) -> Member:
+    """Thành viên của công ty — kể cả ghế cấp tổ chức (company_id NULL, vd. chủ tổ chức ngồi mọi công ty) cùng tổ chức."""
     m = db.get(Member, int(mid))
-    if m is None or m.company_id != company_id:
+    from app.models import Company
+    co = db.get(Company, company_id)
+    if m is None or co is None or m.organization_id != co.organization_id or m.company_id not in (None, company_id):
         raise _err(404, "not_found", "Thành viên không thuộc công ty này")
     return m
 
@@ -135,7 +138,9 @@ def listing(db, org_id, company_id) -> dict:
     return {"company_id": co.id, "meetings": [public_meeting(db, m) for m in ms], "decisions": [public_decision(db, d) for d in ds],
             "kinds": list(MEETING_KINDS), "rhythm_reports": reports, "action_types": list(authority.ACTION_TYPES),
             "members": [{"id": x.id, "name": x.name, "type": x.member_type} for x in
-                        db.query(Member).filter(Member.company_id == co.id, Member.status != "archived").order_by(Member.name)],
+                        db.query(Member).filter(Member.organization_id == org_id, Member.status != "archived",
+                                                (Member.company_id == co.id) | ((Member.company_id.is_(None)) & (Member.member_type == "human")))
+                        .order_by(Member.name)],
             "counts": {"meetings": len(ms), "decisions_in_effect": sum(1 for d in ds if public_decision(db, d)["in_effect"]),
                        "open_actions": len(open_actions), "pending_minutes": sum(1 for m in ms if m.status == "in_review")}}
 
