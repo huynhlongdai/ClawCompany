@@ -102,11 +102,16 @@ class DecisionIn(BaseModel):
 def meta(principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
     """Bộ chọn cho bộ lọc / tạo việc: dự án, người & agent đang làm, phòng ban, trạng thái."""
     org = active_org(principal)
-    companies = db.query(Company).filter(Company.organization_id == org).order_by(Company.id).all()
+    from app.core import company_scope  # P0: người bị giới hạn công ty chỉ thấy bộ chọn của công ty mình
+    allowed = company_scope.allowed_company_ids(principal)
+    companies = [c for c in db.query(Company).filter(Company.organization_id == org).order_by(Company.id).all()
+                 if allowed is None or c.id in allowed]
     cids = [c.id for c in companies]
     projects = db.query(Project).filter(Project.company_id.in_(cids)).order_by(Project.id.desc()).all() if cids else []
     members = (db.query(Member).filter(Member.organization_id == org, Member.status.in_(("active", "onboarding")))
                .order_by(Member.member_type, Member.name).all())
+    if allowed is not None:
+        members = [m for m in members if m.company_id in allowed]
     agents = {a.member_id: a for a in db.query(Agent).filter(Agent.member_id.in_([m.id for m in members])).all()}
     depts = db.query(Department).filter(Department.company_id.in_(cids)).order_by(Department.id).all() if cids else []
     return {
@@ -123,8 +128,11 @@ def meta(principal: Principal = Depends(require_human()), db: Session = Depends(
         "statuses": svc.statuses(),
         "priorities": [{"key": k, "label": v} for k, v in svc.PRIORITY_VI.items()],
         "me": principal.member_id,
-        "caps": {"create": ROLE_ORDER.get(principal.role, -1) >= ROLE_ORDER["member"],
-                 "set_reviewers": _is_manager(principal)},
+        "caps": ({"create": ROLE_ORDER.get(principal.role, -1) >= ROLE_ORDER["member"],
+                  "set_reviewers": _is_manager(principal)} if allowed is None else
+                 # vai trò công ty: tạo/sửa việc cần manager trở lên ở công ty đó (viewer/approver chỉ đọc)
+                 {"create": any(r in ("manager", "owner") for r in (principal.company_roles or {}).values()),
+                  "set_reviewers": any(r in ("manager", "owner") for r in (principal.company_roles or {}).values())}),
     }
 
 

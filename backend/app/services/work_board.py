@@ -57,8 +57,10 @@ def _who(m: Member | None, agents: dict[int, Agent] | None = None) -> dict | Non
 
 
 def _scope(db: Session, org_id: int):
-    return (db.query(Task).join(Project, Project.id == Task.project_id)
-            .join(Company, Company.id == Project.company_id).filter(Company.organization_id == org_id))
+    from app.core import company_scope  # P0: người bị giới hạn công ty → chỉ việc của công ty mình
+    q = (db.query(Task).join(Project, Project.id == Task.project_id)
+         .join(Company, Company.id == Project.company_id).filter(Company.organization_id == org_id))
+    return company_scope.scope_filter(q, Project.company_id, include_null=False)
 
 
 def revision(task: Task) -> str:

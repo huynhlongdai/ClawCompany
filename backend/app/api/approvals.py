@@ -13,6 +13,8 @@ def list_approvals(status: str | None = None, principal: Principal = Depends(req
     org_id = active_org(principal)
     q = db.query(Approval).filter(Approval.organization_id == org_id)
     if status: q = q.filter(Approval.status == status)
+    from app.core import company_scope  # P0
+    q = company_scope.scope_filter(q, Approval.company_id, include_null=False)
     return q.order_by(Approval.id.desc()).all()
 
 @router.post("", response_model=ApprovalOut)
@@ -38,6 +40,8 @@ async def resolve_approval(approval_id: int, payload: ApprovalResolve, principal
     obj = db.get(Approval, approval_id)
     if not obj: raise HTTPException(404, "Approval not found")
     enforce_org(obj.organization_id, principal)
+    from app.core import company_scope  # P0: quyết phê duyệt công ty khác → 403 (approver của công ty quyết được)
+    company_scope.check(obj.company_id, min_role="member")
     if (obj.policy_key or "").startswith("openclaw:"):
         from app.services import approval_bridge
         if payload.status not in ("approved", "rejected", "denied"):

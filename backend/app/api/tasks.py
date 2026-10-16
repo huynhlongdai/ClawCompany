@@ -26,6 +26,8 @@ def list_tasks(project_id: int | None = None, goal_id: int | None = None, princi
         ensure_project(db, project_id, principal); q = q.filter(Task.project_id == project_id)
     if goal_id is not None:
         q = q.filter(Task.goal_id == goal_id)
+    from app.core import company_scope  # P0: người bị giới hạn công ty → chỉ việc của công ty mình
+    q = company_scope.scope_filter(q, Project.company_id, include_null=False)
     return q.order_by(Task.id.desc()).all()
 
 @router.post("", response_model=TaskOut)

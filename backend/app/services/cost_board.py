@@ -72,6 +72,8 @@ def list_budgets(db: Session, organization_id: int, include_archived: bool = Fal
     q = db.query(BudgetEnvelope).filter(BudgetEnvelope.organization_id == organization_id)
     if not include_archived:
         q = q.filter(BudgetEnvelope.status != "archived")
+    from app.core import company_scope  # P0: người bị giới hạn công ty → chỉ ngân sách của công ty mình
+    q = company_scope.scope_filter(q, BudgetEnvelope.company_id, include_null=False)
     order = {"exhausted": 0, "soft_stopped": 1, "warned": 2, "ok": 3}
     rows = [budget_row(db, e) for e in q.order_by(BudgetEnvelope.id).all()]
     return sorted(rows, key=lambda r: (order.get(r["threshold_state"], 4), -r["pct"], r["id"]))
@@ -90,6 +92,14 @@ def overview(db: Session, organization_id: int, *, days: int = 30, now: datetime
     rows = _usage_rows(db, organization_id, now - timedelta(days=days))
     agents = {a.id: a for a in db.query(Agent).filter(Agent.id.in_({r.agent_id for r in rows if r.agent_id} or {-1})).all()}
     members = {m.id: m for m in db.query(Member).filter(Member.organization_id == organization_id).all()}
+    from app.core import company_scope  # P0: người bị giới hạn công ty → chỉ chi phí của agent thuộc công ty mình
+    allowed = company_scope.allowed_company_ids()
+    if allowed is not None:
+        def _co(r):
+            a = agents.get(r.agent_id) if r.agent_id else None
+            m = members.get(a.member_id) if a else None
+            return m.company_id if m else None
+        rows = [r for r in rows if _co(r) in allowed]
     depts = {d.id: d.name for d in db.query(Department).all()} if rows else {}
     comps = {c.id: c.name for c in db.query(Company).filter(Company.organization_id == organization_id).all()}
     by_agent: dict[str, float] = {}

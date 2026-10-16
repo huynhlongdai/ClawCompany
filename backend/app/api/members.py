@@ -16,6 +16,8 @@ def list_members(company_id: int | None = None, member_type: str | None = None, 
         ensure_company(db, company_id, principal); q = q.filter(Member.company_id == company_id)
     if member_type:
         q = q.filter(Member.member_type == member_type)
+    from app.core import company_scope  # P0
+    q = company_scope.scope_filter(q, Member.company_id, include_null=False)
     return q.order_by(Member.id).all()
 
 @router.post("", response_model=MemberOut)

@@ -15,6 +15,8 @@ def ensure_company(db: Session, company_id: int, principal: Principal) -> Compan
     if not item:
         raise HTTPException(404, "Company not found")
     enforce_org(item.organization_id, principal)
+    from app.core import company_scope  # P0: người bị giới hạn công ty chỉ chạm công ty của mình
+    company_scope.check(item.id, principal=principal)
     return item
 
 
@@ -31,6 +33,9 @@ def ensure_member(db: Session, member_id: int, principal: Principal) -> Member:
     if not item:
         raise HTTPException(404, "Member not found")
     enforce_org(item.organization_id, principal)
+    if item.company_id is not None:
+        from app.core import company_scope  # P0
+        company_scope.check(item.company_id, principal=principal)
     return item
 
 

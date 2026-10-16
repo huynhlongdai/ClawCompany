@@ -14,6 +14,8 @@ def list_projects(company_id: int | None = None, principal: Principal = Depends(
     q = db.query(Project).join(Company, Company.id == Project.company_id).filter(Company.organization_id == org_id)
     if company_id is not None:
         ensure_company(db, company_id, principal); q = q.filter(Project.company_id == company_id)
+    from app.core import company_scope  # P0
+    q = company_scope.scope_filter(q, Project.company_id, include_null=False)
     return q.order_by(Project.id.desc()).all()
 
 @router.post("", response_model=ProjectOut)

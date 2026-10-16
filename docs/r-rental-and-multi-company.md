@@ -60,10 +60,15 @@ Ngày 2026-10-16 · nhánh `ui-v2`. Backlog gốc: `_reports/multi-company-and-r
 
 ### Giới hạn còn lại (nói thẳng)
 
-- Các trang/route cũ cấp tổ chức (`/api/work`, `/api/tasks`, chi phí, tổng quan, v7–v36) **chưa** lọc theo vai trò công ty:
-  người bị giới hạn vẫn đọc được dữ liệu cả org ở đó nếu vai trò org cho phép. Cách an toàn hiện tại: cấp vai trò org
-  `guest` cho người chỉ làm ở một công ty.
-- Danh sách agent (`/api/agents`) chưa lọc theo vai trò công ty.
+- ~~Route cũ cấp tổ chức chưa lọc theo vai trò công ty~~ — **đã đóng ở P0 (2026-10-16, `app/core/company_guard.py`)**:
+  với người bị giới hạn công ty, `/api/work`, `/api/tasks`, `/api/agents` (+ roster, hire/options), `/api/costs`,
+  `/api/companies|members|projects|departments|approvals`, `/api/dashboard/summary`, `/v17/workspace/overview` và
+  `/team/org-chart` chỉ trả công ty của họ; đối tượng theo id (task/agent/member/project/department/approval/budget)
+  kiểm công ty (GET ≥ viewer, ghi ≥ manager); mọi module khác (v7–v36, a2a, routines, strategy, shared-memory,
+  knowledge, jobs, realtime…) **mặc định đóng 403** `org_level_route`. Test `tests/test_p0_company_scope_legacy.py` quét
+  mọi route GET không tham số.
+- Còn lại: khách hàng (`customers`) chưa có `company_id` → không đếm cho người bị giới hạn; UI chưa ẩn mục menu cấp tổ
+  chức với người bị giới hạn (bấm vào thấy thông báo 403 rõ ràng thay vì dữ liệu cả org).
 
 ---
 

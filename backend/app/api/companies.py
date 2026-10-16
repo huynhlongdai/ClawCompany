@@ -13,7 +13,12 @@ def list_companies(organization_id: int | None = None, principal: Principal = De
     org_id = active_org(principal)
     if organization_id is not None:
         enforce_org(organization_id, principal)
-    return db.query(Company).filter(Company.organization_id == org_id).order_by(Company.id).all()
+    from app.core import company_scope  # P0
+    ids = company_scope.allowed_company_ids(principal)
+    q = db.query(Company).filter(Company.organization_id == org_id)
+    if ids is not None:
+        q = q.filter(Company.id.in_(ids or [-1]))
+    return q.order_by(Company.id).all()
 
 @router.post("", response_model=CompanyOut)
 def create_company(payload: CompanyCreate, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):

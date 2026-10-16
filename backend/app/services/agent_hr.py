@@ -343,13 +343,16 @@ async def _agents_update(db: Session, runtime: Any, agent: Agent, upd: dict, use
 # --------------------------------------------------------------------- tuỳ chọn & danh sách
 
 async def hire_options(db: Session, org_id: int, runtime: Any) -> dict:
-    companies = db.query(Company).filter(Company.organization_id == org_id).order_by(Company.id).all()
+    from app.core import company_scope  # P0: người bị giới hạn công ty chỉ tuyển vào công ty mình
+    allowed = company_scope.allowed_company_ids()
+    companies = [c for c in db.query(Company).filter(Company.organization_id == org_id).order_by(Company.id).all()
+                 if allowed is None or c.id in allowed]
     cids = [c.id for c in companies]
     depts = (db.query(Department).filter(Department.company_id.in_(cids)).order_by(Department.id).all()
              if cids else [])
-    members = (db.query(Member).filter(Member.organization_id == org_id,
-                                       Member.status.notin_(("retired", "removed")))
-               .order_by(Member.name).all())
+    members = [m for m in db.query(Member).filter(Member.organization_id == org_id,
+                                                  Member.status.notin_(("retired", "removed")))
+               .order_by(Member.name).all() if allowed is None or m.company_id in allowed]
     models, model_error = [], ""
     if _has_rpc(runtime):
         try:
@@ -386,6 +389,8 @@ async def roster(db: Session, org_id: int, runtime: Any, company_id: int | None 
          .filter(Member.organization_id == org_id))
     if company_id:
         q = q.filter(Member.company_id == company_id)
+    from app.core import company_scope  # P0: người bị giới hạn công ty
+    q = company_scope.scope_filter(q, Member.company_id, include_null=False)
     rows = q.order_by(Member.company_id, Member.department_id, Member.name).all()
     gw: dict[str, dict] = {}
     gw_error = ""

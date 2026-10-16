@@ -161,20 +161,25 @@ def budgets(include_archived: bool = False, principal: Principal = Depends(requi
     from app.models import Company, Department
     from app.models.v16 import AgentTeam
     org = active_org(principal)
-    cids = [c.id for c in db.query(Company).filter(Company.organization_id == org).all()]
+    from app.core import company_scope  # P0: người bị giới hạn công ty
+    allowed = company_scope.allowed_company_ids(principal)
+    cos = [c for c in db.query(Company).filter(Company.organization_id == org).order_by(Company.id).all()
+           if allowed is None or c.id in allowed]
+    cids = [c.id for c in cos]
     return {"budgets": cost_board.list_budgets(db, org, include_archived),
-            "caps": {"manage": inbox_hub.is_manager(principal)},
+            "caps": {"manage": inbox_hub.is_manager(principal) and allowed is None},
             "scopes": {
-                "company": [{"id": c.id, "name": c.name} for c in
-                            db.query(Company).filter(Company.organization_id == org).order_by(Company.id)],
+                "company": [{"id": c.id, "name": c.name} for c in cos],
                 "department": [{"id": d.id, "name": d.name, "company_id": d.company_id} for d in
                                (db.query(Department).filter(Department.company_id.in_(cids)).order_by(Department.id)
                                 if cids else [])],
                 "team": [{"id": t.id, "name": t.name} for t in
-                         db.query(AgentTeam).filter(AgentTeam.organization_id == org).order_by(AgentTeam.id)],
+                         db.query(AgentTeam).filter(AgentTeam.organization_id == org).order_by(AgentTeam.id)]
+                if allowed is None else [],
                 "member": [{"id": m.id, "name": m.name} for m in
                            db.query(Member).filter(Member.organization_id == org, Member.member_type == "agent",
-                                                   Member.status != "retired").order_by(Member.name)]}}
+                                                   Member.status != "retired").order_by(Member.name)
+                           if allowed is None or m.company_id in allowed]}}
 
 
 @costs_router.post("/budgets", status_code=201)

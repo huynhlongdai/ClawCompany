@@ -15,6 +15,8 @@ def list_departments(company_id: int | None = None, principal: Principal = Depen
     if company_id is not None:
         ensure_company(db, company_id, principal)
         q = q.filter(Department.company_id == company_id)
+    from app.core import company_scope  # P0
+    q = company_scope.scope_filter(q, Department.company_id, include_null=False)
     return q.order_by(Department.id).all()
 
 @router.post("", response_model=DepartmentOut)

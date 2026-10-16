@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.db.session import get_db
@@ -69,6 +69,7 @@ def get_principal(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
     db: Session = Depends(get_db),
+    request: Request = None,
 ) -> Principal:
     if x_api_key:
         prefix = x_api_key[:12]
@@ -113,6 +114,10 @@ def get_principal(
         _load_company_scope(db, p, user)
     from app.core import company_scope
     company_scope.remember(p)
+    if request is not None and p.company_roles is not None:
+        # P0: route cũ cấp tổ chức — đóng hoặc kiểm công ty theo đối tượng (core/company_guard.py)
+        from app.core import company_guard
+        company_guard.enforce(request, p, db)
     return p
 
 

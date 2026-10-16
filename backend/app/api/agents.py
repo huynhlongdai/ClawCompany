@@ -15,7 +15,9 @@ router = APIRouter(prefix="/agents", tags=["agents"])
 @router.get("", response_model=list[AgentOut])
 def list_agents(principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
     org_id = active_org(principal)
-    return db.query(Agent).join(Member, Member.id == Agent.member_id).filter(Member.organization_id == org_id).order_by(Agent.id).all()
+    from app.core import company_scope  # P0
+    q = db.query(Agent).join(Member, Member.id == Agent.member_id).filter(Member.organization_id == org_id)
+    return company_scope.scope_filter(q, Member.company_id, include_null=False).order_by(Agent.id).all()
 
 @router.post("", response_model=AgentOut)
 async def create_agent(payload: AgentCreate, principal: Principal = Depends(require_role("manager")), db: Session = Depends(get_db)):
@@ -197,6 +199,8 @@ async def hr_hire_options(principal: Principal = Depends(require_role("manager")
 async def hr_hire(payload: HireIn, principal: Principal = Depends(require_role("manager")),
                   db: Session = Depends(get_db)):
     """Tuyển: tạo seat + agents.create + ghi đủ 5 file + lưu bản ClawCompany."""
+    from app.core import company_scope  # P0: tuyển vào công ty khác → 403
+    company_scope.check(payload.company_id, min_role="manager")
     return await agent_hr.hire(db, principal, active_org(principal), get_runtime(), payload.model_dump())
 
 

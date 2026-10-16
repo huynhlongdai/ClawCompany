@@ -49,6 +49,9 @@ def org_overview(db: Session, organization_id: int) -> dict:
             "projects": project_counts.get(company.id, 0),
         })
 
+    restricted = _restricted_view(db, organization_id, companies, org)
+    if restricted is not None:
+        return restricted
     total_members = db.query(Member).filter(Member.organization_id == organization_id).count()
     total_agents = db.query(Member).filter(Member.organization_id == organization_id,
                                            Member.member_type == "agent").count()
@@ -70,6 +73,34 @@ def org_overview(db: Session, organization_id: int) -> dict:
                 KnowledgeDocument.organization_id == organization_id).count(),
         },
         "companies": companies,
+    }
+
+
+def _restricted_view(db: Session, organization_id: int, companies: list[dict], org=None) -> dict | None:
+    """P0: người bị giới hạn công ty — chỉ công ty của mình, KPI cộng lại từ các công ty đó (không lộ số cả org)."""
+    from app.core import company_scope
+    ids = company_scope.allowed_company_ids()
+    if ids is None:
+        return None
+    mine = [c for c in companies if c["id"] in ids]
+    members = sum(c["members"] for c in mine)
+    agents = sum(c["agents"] for c in mine)
+    cids = [c["id"] for c in mine] or [-1]
+    return {
+        "organization": {"id": organization_id, "name": org.name if org else "", "slug": org.slug if org else ""},
+        "kpis": {
+            "companies": len(mine), "members": members, "humans": members - agents, "agents": agents,
+            "projects_total": sum(c["projects"] for c in mine),
+            "projects_active": db.query(Project).filter(Project.company_id.in_(cids),
+                                                        Project.status.in_(ACTIVE_PROJECT_STATUSES)).count(),
+            "customers": db.query(Customer).filter(Customer.company_id.in_(cids)).count()
+            if hasattr(Customer, "company_id") else 0,
+            "approvals_pending": db.query(Approval).filter(Approval.company_id.in_(cids),
+                                                           Approval.status == "pending").count(),
+            "knowledge_documents": db.query(KnowledgeDocument).filter(KnowledgeDocument.company_id.in_(cids)).count(),
+        },
+        "companies": mine,
+        "restricted": True,
     }
 
 

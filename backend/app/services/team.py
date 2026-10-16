@@ -362,6 +362,12 @@ def would_cycle(db: Session, member_id: int, manager_id: int | None) -> bool:
 
 def org_chart(db: Session, org_id: int, company_id: int | None = None) -> dict:
     companies = db.query(Company).filter(Company.organization_id == org_id, Company.status != "archived").order_by(Company.id).all()
+    from app.core import company_scope  # P0: trước đây không có company_id → công ty đầu tiên của org, kể cả công ty người này không có quyền
+    allowed = company_scope.allowed_company_ids()
+    if allowed is not None:
+        if company_id:
+            company_scope.check(company_id)
+        companies = [c for c in companies if c.id in allowed]
     if not companies:
         return {"companies": [], "company": None, "departments": [], "tree": [], "stats": {}}
     company = next((c for c in companies if c.id == company_id), None) if company_id else companies[0]
