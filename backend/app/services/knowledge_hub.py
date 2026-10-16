@@ -377,6 +377,45 @@ SYNONYMS = {
 }
 
 
+# M3e: cụm hỏi (bao nhiêu, bao lâu, là gì…) là Ý ĐỊNH câu hỏi, không phải chủ đề — bỏ khỏi từ khoá (như từ dừng) và
+# chuyển thành "loại câu trả lời mong đợi": hỏi số tiền → đoạn có số tiền; hỏi số điện thoại → đoạn có số điện thoại;
+# hỏi thời lượng → đoạn có "n ngày/giờ". Kỹ thuật QA cổ điển (expected answer type), không gắn với câu nào của bộ eval.
+QUESTION_PHRASES = ("bao nhieu tien", "bao nhieu", "bao lau", "la gi", "nhu the nao", "the nao", "o dau", "khi nao",
+                    "may ngay", "co duoc khong", "duoc khong", "the nao")
+ANSWER_TYPES = {
+    "amount": (re.compile(r"\b(bao nhieu tien|gia bao nhieu|phi bao nhieu|muc phi|het bao nhieu|tu bao nhieu|bao nhieu thi)"),
+               re.compile(r"\d[\d.,]*\s*(?:d|dong|vnd|k|nghin|trieu)\b")),
+    "phone": (re.compile(r"\b(hotline|so dien thoai|sdt|so lien he|goi so|so zalo)\b"),
+              re.compile(r"(?:\+?84|\b0)\d(?:[\s.]?\d){8,9}\b")),
+    "duration": (re.compile(r"\b(bao lau|may ngay|bao nhieu ngay|mat bao lau|trong bao lau)\b"),
+                 re.compile(r"\b\d+\s*(?:[-–]\s*\d+\s*)?(?:ngay|gio|tuan|thang|phut)\b")),
+}
+ANSWER_TYPE_BONUS = 0.1
+
+
+def answer_types(query: str) -> list[str]:
+    q = " " + re.sub(r"\s+", " ", unaccent((query or "").lower())) + " "
+    return [k for k, (ask, _has) in ANSWER_TYPES.items() if ask.search(q)]
+
+
+def strip_question_phrases(query: str) -> str:
+    q = " " + re.sub(r"\s+", " ", unaccent((query or "").lower())) + " "
+    for ph in sorted(set(QUESTION_PHRASES), key=len, reverse=True):
+        q = q.replace(f" {ph} ", " ")
+    # "số" trước hotline / điện thoại / zalo là danh từ chỉ loại ("số hotline" = cái số) — thuộc loại câu trả lời
+    # (đã thành answer type "phone"), không phải chủ đề: để lại thì nó khớp mọi đoạn có chữ "số điện thoại".
+    q = re.sub(r" so (?=(?:hotline|dien thoai|zalo|lien he|lien lac|dt|sdt)\b)", " ", q)
+    # Cụm chỉ "số để gọi" về một từ chuẩn: "điện thoại"/"sđt" → "hotline" (nhóm đồng nghĩa hotline vẫn khớp đoạn ghi
+    # "số điện thoại"). Không gộp thì "điện"+"thoại" thành HAI từ khoá, nặng gấp đôi chủ đề thật, và đoạn quy trình
+    # "xin số điện thoại đặt hàng" thắng đoạn có số hotline (đo: "cho minh xin so dien thoai cua shop").
+    q = re.sub(r" (?:dien thoai|sdt|dt) ", " hotline ", q)
+    # Lời xin lịch sự + đại từ người hỏi ("cho mình xin", "em muốn hỏi", "shop ơi") là cách hỏi, không phải chủ đề:
+    # để lại thì "xin" khớp đoạn quy trình "Xin khách ảnh…" (đo trên cùng câu trên).
+    q = re.sub(r" (?:cho )?(?:minh|em|toi|to|anh|chi|ban) (?:xin|muon hoi|hoi) | cho xin | xin ", " ", q)
+    q = re.sub(r" (?:minh|em|toi|to) (?=\S)", " ", " " + q.strip() + " ")
+    return q.strip()
+
+
 def _tokens(text: str) -> list[str]:
     """Token không dấu (khớp cả "doi tra" với "đổi trả"), bỏ từ dừng."""
     return [t for t in TOKEN_RE.findall(unaccent((text or "").lower())) if len(t) > 1 and t not in STOP_U]
@@ -474,14 +513,16 @@ def search(db: Session, org_id: int, query: str, *, member: Member | None = None
     import json as _json
     from app.services import doc_library
     query = (query or "").strip()
-    qt = set(_tokens(query))
+    qt = set(_tokens(strip_question_phrases(query))) or set(_tokens(query))
+    want_types = answer_types(query)
     groups = [(t, [f" {a} " for a in (SYNONYMS.get(t, ()) if expand else ())]) for t in qt]
     lex_terms = set(qt) | {w for _t, alts in groups for a in alts for w in a.split()}
     docs = {d.id: d for d in visible_docs_query(db, org_id, member, agent).all() if agent_ok(d, member)}
     hits = []
     if qt and docs:
         from app.services import embeddings
-        qemb = hash384_embedding(query)
+        # vector băm trên câu hỏi ĐÃ mở rộng đồng nghĩa (cùng mở rộng như nhánh từ khoá); embedding thật dùng câu gốc
+        qemb = hash384_embedding(" ".join([query] + [a.strip() for _t, alts in groups for a in alts]))
         prov = embeddings.provider_name()
         real_q = (embeddings.embed([query]) or [None])[0] if prov != "hash384" else None
         rows = (db.query(KnowledgeChunk, KnowledgeVector)
@@ -493,6 +534,7 @@ def search(db: Session, org_id: int, query: str, *, member: Member | None = None
         cand = []
         # IDF theo nhóm từ khoá trên các đoạn được phép (kiểu BM25): từ hiếm ("freeship") nặng hơn từ phổ biến ("đơn")
         toks = {ch.id: set(_tokens(ch.search_text or ch.content)) for ch, _kv in rows}
+        alt_bigrams = {" ".join(w[i:i + 2]) for _t, alts in groups for a in alts for w in [a.split()] for i in range(len(w) - 1)}
         flat = {ch.id: " " + " ".join(re.findall(r"[0-9a-z]+", ch.search_text or unaccent((ch.content or "").lower()))) + " "
                 for ch, _kv in rows}
         cur: dict = {}
@@ -511,6 +553,10 @@ def search(db: Session, org_id: int, query: str, *, member: Member | None = None
             cur["flat"] = flat[ch.id]
             cover = sum(w for (t, alts), w in zip(groups, idf) if hit(t, alts, ct)) / idf_sum
             title_bonus = 0.1 if qt & set(_tokens(docs[ch.document_id].title)) else 0.0
+            if not title_bonus and alt_bigrams:
+                # cụm đồng nghĩa trùng tiêu đề tài liệu / đề mục ("freeship" ↔ "Chính sách vận chuyển › Phí vận chuyển")
+                head = " " + " ".join(_tokens(docs[ch.document_id].title + " " + (ch.section or ""))) + " "
+                title_bonus = 0.1 if any(f" {bg} " in head for bg in alt_bigrams) else 0.0
             try:
                 emb = _json.loads(kv.embedding_json) if kv else []
             except Exception:  # noqa: BLE001
@@ -519,7 +565,8 @@ def search(db: Session, org_id: int, query: str, *, member: Member | None = None
                 sem = embeddings.semantic(cosine(real_q, emb))
                 s = 0.45 * cover + 0.55 * sem + title_bonus
                 if cover > 0 or sem >= 0.35:
-                    cand.append({"ch": ch, "s": s, "lex": fts.get(ch.id, cover), "vec": sem})
+                    at = ANSWER_TYPE_BONUS if want_types and any(ANSWER_TYPES[k][1].search(flat[ch.id]) for k in want_types) else 0.0
+                    cand.append({"ch": ch, "s": s + at, "lex": fts.get(ch.id, cover) + at + title_bonus, "vec": sem})
                 continue
             if ch.id in pvec:
                 vec = max(0.0, pvec[ch.id])
@@ -529,11 +576,16 @@ def search(db: Session, org_id: int, query: str, *, member: Member | None = None
                 vec = max(0.0, cosine(qemb, emb))
             s = 0.7 * cover + 0.3 * vec + title_bonus
             if cover > 0:
-                cand.append({"ch": ch, "s": s, "lex": fts.get(ch.id, 0.0) + cover, "vec": vec})
+                at = ANSWER_TYPE_BONUS if want_types and any(ANSWER_TYPES[k][1].search(flat[ch.id]) for k in want_types) else 0.0
+                cand.append({"ch": ch, "s": s + at, "lex": fts.get(ch.id, 0.0) + cover + at + title_bonus, "vec": vec})
         # RRF: hạng từ khoá + hạng vector (k=60), hoà → điểm tuyệt đối
-        for key in ("lex", "vec"):
+        # M3e: vector BĂM (hash384, khi chưa có embedding thật) không mang nghĩa — chỉ là từ khoá thứ hai ồn hơn. RRF chỉ
+        # dùng HẠNG nên một hạng vector ồn đủ đẩy đoạn đúng (điểm 0.9) xuống hạng 4–5 (đo trên câu "freeship"). Khi băm:
+        # vector chỉ còn trong điểm tuyệt đối (0.3·vec), không vào RRF; embedding thật (hoặc pgvector) thì RRF đủ hai nhánh.
+        vec_w = 1.0 if (real_q is not None or pvec) else 0.0
+        for key, w in (("lex", 1.0), ("vec", vec_w)):
             for rank, c in enumerate(sorted(cand, key=lambda c: -c[key])):
-                c["rrf"] = c.get("rrf", 0.0) + 1.0 / (RRF_K + rank + 1)
+                c["rrf"] = c.get("rrf", 0.0) + w / (RRF_K + rank + 1)
         cand.sort(key=lambda c: (-c["rrf"], -c["s"]))
         seen_docs: set[int] = set()
         for c in cand[:limit]:

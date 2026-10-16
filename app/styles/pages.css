@@ -733,3 +733,14 @@ textarea.ops-json{width:100%}
 .ingest-dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px 16px;margin:8px 0}
 .ingest-dl dt{font-size:var(--fs-12);color:var(--text-muted)}
 .ingest-dl dd{margin:0;overflow-wrap:anywhere}
+/* M3e vòng học tài liệu */
+.learn-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:12px 0}
+.learn-kpi{display:flex;flex-direction:column;gap:4px;min-width:0}
+.learn-kpi b{font-size:1.6rem;line-height:1.1}
+.learn-prop{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;min-width:0}
+.learn-prop .tmRow{flex-wrap:wrap;gap:8px}
+.learn-qs{margin:0;padding-left:18px}
+.learn-eval small b{font-variant-numeric:tabular-nums}
+.ui-text-ok{color:var(--ok, #2e7d32)}
+.ui-text-risk{color:var(--risk, #c62828)}
+@media (max-width:760px){.learn-hide-sm{display:none}}

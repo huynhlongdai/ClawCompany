@@ -86,6 +86,11 @@ def docs_tick():
             out["sources"] = doc_ingest.sync_due(db)
         except Exception as exc:  # noqa: BLE001 — một nguồn hỏng không được chặn nhịp tài liệu
             out["sources_error"] = str(exc)[:300]
+        try:   # M3e vòng học: cờ → đề xuất, cụm lỗ hổng → đề xuất, đã ban hành → chạy lại eval
+            from app.services import doc_feedback
+            out["learning"] = doc_feedback.tick(db)
+        except Exception as exc:  # noqa: BLE001
+            db.rollback(); out["learning_error"] = str(exc)[:300]
         for org in out.get("core_orgs") or []:
             out.setdefault("regen", {})[org] = asyncio.run(doc_library.regen_agents(db, get_runtime(), org))
         return out

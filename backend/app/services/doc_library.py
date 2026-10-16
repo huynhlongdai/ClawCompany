@@ -616,6 +616,8 @@ def _decide_version(db: Session, doc: KnowledgeDocument, v: DocumentVersion, dec
     v.status = "rejected"
     if doc.status == "in_review" and not doc.current_version_id:
         doc.status = "draft"
+    from app.services import doc_feedback   # M3e: đề xuất gắn phiên bản này → bị từ chối
+    doc_feedback.on_version_decided(db, doc, v, "rejected")
     db.add(v); db.add(doc); db.commit()
     return {**public(db, doc, detail=True), "published": False}
 
@@ -688,6 +690,8 @@ def _publish(db: Session, doc: KnowledgeDocument, v: DocumentVersion, *, now: da
     stale = knowledge_hub.mark_courses_stale(db, doc) if prev and changed else 0
     from app.services import company_facts
     facts = company_facts.upsert_from_doc(db, doc)
+    from app.services import doc_feedback   # M3e: đề xuất của phiên bản này → đóng cờ/lỗ hổng nguồn, chờ chạy lại eval
+    doc_feedback.on_published(db, doc, v)
     from app.services.company_event_bus import emit_event
     emit_event(db, organization_id=doc.organization_id, company_id=doc.company_id, event_type="document.published",
                source="doc_library", aggregate_type="document", aggregate_id=str(doc.id), actor_member_id=v.approved_by_member_id,

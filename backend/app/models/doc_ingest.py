@@ -8,7 +8,7 @@ không bao giờ trả ra API. ``doc_source_items``: mục ngoài ↔ tài liệ
 last_edited_time / sha256) để biết khi nào cần một bản nháp mới."""
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -71,3 +71,42 @@ class DocSourceItem(Base):
     sha256: Mapped[str] = mapped_column(String(64), default="")
     document_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class DocProposal(Base):
+    """M3e — đề xuất sửa tài liệu (vòng học): nguồn là cờ của agent, cụm lỗ hổng kiến thức, câu eval trượt, bài học, hoặc
+    agent đề xuất trực tiếp (MCP company_doc_propose). Mỗi đề xuất gắn một PHIÊN BẢN NHÁP (hoặc tài liệu nháp mới) và đi
+    đúng đường duyệt M3a; ban hành → đóng cờ/lỗ hổng nguồn + chạy lại eval (eval_after)."""
+    __tablename__ = "doc_proposals"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    document_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    version_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    new_document: Mapped[bool] = mapped_column(Boolean, default=False)
+    kind: Mapped[str] = mapped_column(String(16))                  # flag | gap | eval | lesson | agent
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)  # open | published | rejected | dismissed
+    title: Mapped[str] = mapped_column(String(300), default="")
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    source_refs: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # {flags:[], gaps:[], questions:[], lesson_id}
+    eval_before: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    eval_after: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    eval_pending: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by_member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class RetrievalEvalRun(Base):
+    """M3e — lần chạy bộ eval truy hồi theo công ty (để bảng vòng học thấy xu hướng, trước/sau mỗi lần ban hành)."""
+    __tablename__ = "retrieval_eval_runs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    trigger: Mapped[str] = mapped_column(String(24), default="manual")   # manual | publish | tick
+    questions: Mapped[int] = mapped_column(Integer, default=0)
+    recall: Mapped[float] = mapped_column(Float, default=0.0)
+    top1: Mapped[float] = mapped_column(Float, default=0.0)
+    section_recall: Mapped[float] = mapped_column(Float, default=0.0)
+    misses: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

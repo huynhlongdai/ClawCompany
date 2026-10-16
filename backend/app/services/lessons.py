@@ -135,7 +135,15 @@ async def apply(db: Session, a: Approval, principal, runtime: Any, *, edited_tex
         a.payload = {**(a.payload or {}), "applied": True, "applied_text": text[:MAX_LESSON],
                      "applied_at": datetime.utcnow().isoformat(), "memory_hash": out.get("hash")}
         db.add(a); db.commit()
-        return {"applied": True, "memory_hash": out.get("hash")}
+        try:   # M3e: bài học nhắc mã tài liệu → đề xuất sửa tài liệu của công ty (không chỉ MEMORY.md của một agent)
+            from app.models import Agent, Member
+            from app.services import doc_feedback
+            ag = db.get(Agent, agent_id)
+            mem = db.get(Member, ag.member_id) if ag else None
+            prop = doc_feedback.propose_from_lesson(db, member=mem, text=text, lesson_ref=a.id) if mem else None
+        except Exception:  # noqa: BLE001 — đề xuất tài liệu hỏng không được làm mất bài học đã ghi
+            db.rollback(); prop = None
+        return {"applied": True, "memory_hash": out.get("hash"), "doc_proposal_id": prop.id if prop else None}
     except HTTPException as exc:
         msg = str(exc.detail)
     except Exception as exc:  # noqa: BLE001

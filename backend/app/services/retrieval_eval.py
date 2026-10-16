@@ -56,7 +56,7 @@ def run(db: Session, org_id: int, member: Member, *, titles: dict[str, str] | No
         if m:
             id_of[key] = m[-1].id
     rows, old_doc = [], 0
-    new_doc = new_sec = cite_cur = noexp = 0
+    new_doc = new_sec = cite_cur = noexp = top1 = 0
     for q in data["questions"]:
         want = id_of.get(q["doc"])
         old = legacy_rank(visible, q["q"], k)
@@ -70,11 +70,14 @@ def run(db: Session, org_id: int, member: Member, *, titles: dict[str, str] | No
         top = hits[0] if hits else None
         cur = bool(top and top["doc_code"] and re.search(rf"v{top['version_no']} ", top["cite"] + " "))
         old_doc += ok_old; new_doc += ok_new; new_sec += ok_sec; cite_cur += cur
+        top1 += bool(top and top["document_id"] == want)
         rows.append({"q": q["q"], "want": q["doc"], "old": ok_old, "new": ok_new, "section": ok_sec,
+                     "top1": bool(top and top["document_id"] == want),
                      "top": (top or {}).get("cite"), "top_section": (top or {}).get("section")})
     n = len(data["questions"])
     return {"name": data["name"], "questions": n, "k": k, "docs_found": len(id_of), "docs_expected": len(by_title),
             "recall_old": round(old_doc / n, 3), "recall_new": round(new_doc / n, 3),
             "section_recall_new": round(new_sec / n, 3), "recall_new_without_synonyms": round(noexp / n, 3), "top_cites_current_version": round(cite_cur / n, 3),
+            "top1_new": round(top1 / n, 3),
             "delta_points": round(100 * (new_doc - old_doc) / n, 1), "rows": rows,
             "dialect": db.get_bind().dialect.name}

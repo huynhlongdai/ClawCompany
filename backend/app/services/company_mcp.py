@@ -724,6 +724,23 @@ def _doc_flag(ctx: ToolContext, args: dict) -> dict:
                             task_id=task_id)
 
 
+@tool("company_doc_propose", "knowledge",
+      "Đề xuất NỘI DUNG MỚI ĐẦY ĐỦ cho một tài liệu công ty (theo mã) khi bạn chắc nó sai/thiếu và biết cách sửa. Tạo bản "
+      "NHÁP chờ người phụ trách duyệt — chưa có hiệu lực, trong lúc chờ vẫn dùng bản hiện hành. Mỗi tài liệu một đề xuất "
+      "mở; chỉ muốn báo lỗi thì dùng company_doc_flag.",
+      "company.knowledge:read", {"doc_code": {"type": "string"}, "content": {"type": "string"}, "note": {"type": "string"}},
+      ("doc_code", "content", "note"), writes=True)
+def _doc_propose(ctx: ToolContext, args: dict) -> dict:
+    from fastapi import HTTPException
+    from app.services import doc_feedback
+    try:
+        return doc_feedback.agent_propose(ctx.db, member=ctx.member, code=_str(args, "doc_code", limit=40),
+                                          content=_str(args, "content", limit=60000), note=_str(args, "note", limit=2000))
+    except HTTPException as exc:
+        code = {404: "not_found", 403: "forbidden", 409: "conflict"}.get(exc.status_code, "invalid_argument")
+        raise ToolError(code, str(exc.detail))
+
+
 @tool("company_fact_get", "knowledge",
       "Tra số liệu chính thức của công ty (số ngày đổi trả, thời gian hoàn tiền, bảo hành, ngưỡng miễn phí vận chuyển, giờ "
       "mở cửa, hotline…) kèm nguồn. conflict=true: các nguồn đang ghi khác nhau — đừng tự chọn, báo người phụ trách.",

@@ -37,7 +37,8 @@ KINDS = ("approval_pending", "approval_escalated", "run_failed", "task_review", 
          "lesson_proposal",   # M5 sẽ ghi: agent đề xuất bài học → người duyệt → MEMORY.md
          "standup", "weekly_report", "compliance_due",   # M2c D6 giao ban/báo cáo tuần, D7 hạn tuân thủ
          "rule_violation", "output_rework", "output_escalated", "sla_breach", "after_hours",   # M2e
-         "doc_review_due", "doc_expired", "doc_flagged", "doc_conflict", "record_disposal_due")   # M3
+         "doc_review_due", "doc_expired", "doc_flagged", "doc_conflict", "record_disposal_due",   # M3
+         "doc_proposal")   # M3e vòng học: đề xuất sửa tài liệu
 KIND_VI = {
     "rule_violation": "Vi phạm luật cứng", "output_rework": "Kết quả sai chuẩn — trả làm lại",
     "output_escalated": "Kết quả sai chuẩn quá số lần — cần người", "sla_breach": "Quá hạn SLA — leo thang",
@@ -45,6 +46,7 @@ KIND_VI = {
     "doc_review_due": "Tài liệu đến hạn rà soát", "doc_expired": "Tài liệu hết hiệu lực",
     "doc_flagged": "Agent đánh dấu tài liệu sai/cũ", "doc_conflict": "Tài liệu mâu thuẫn",
     "record_disposal_due": "Hồ sơ hết hạn lưu trữ — chờ duyệt huỷ",
+    "doc_proposal": "Đề xuất sửa tài liệu (vòng học)",
     "approval_pending": "Chờ duyệt", "approval_escalated": "Duyệt quá hạn — chuyển lên anh",
     "run_failed": "Run lỗi", "task_review": "Vào review", "mention": "Được nhắc tên",
     "budget_warned": "Ngân sách chạm nấc cảnh báo", "budget_exhausted": "Hết ngân sách",

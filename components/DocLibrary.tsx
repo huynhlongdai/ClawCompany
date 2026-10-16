@@ -19,7 +19,9 @@ export function DocLibraryTab({companyId, caps}: {companyId: number | null; caps
   const [group, setGroup] = useState(""), [status, setStatus] = useState(""), [q, setQ] = useState(""), [review, setReview] = useState("");
   const {data, error, reload, setError} = useLoad(() => companyId ? apiDocs.list(companyId, {group, status, q, review}) : Promise.resolve(null),
     [companyId, group, status, review]);
-  const [sel, setSel] = useState<number | null>(null), [mode, setMode] = useState<"" | "new" | "upload">("");
+  const [sel, setSel] = useState<number | null>(() => {   // M3e: ?doc=<id> (từ bảng vòng học) mở thẳng tài liệu
+    if (typeof window === "undefined") return null;
+    const v = Number(new URLSearchParams(window.location.search).get("doc")); return v > 0 ? v : null; }), [mode, setMode] = useState<"" | "new" | "upload">("");
   const [busy, setBusy] = useState(false);
   const toast = useToast();
   const can = !!caps?.invite || !!caps?.manage_roles;

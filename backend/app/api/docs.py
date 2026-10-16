@@ -228,6 +228,51 @@ def sync_source(source_id: int, principal: Principal = Depends(require_company_r
     return doc_ingest.sync_source(db, s, principal=principal)
 
 
+# ------------------------------------------------------------------ M3e vòng học
+
+@router.get("/doc-learning")
+def doc_learning(company_id: int, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
+    from app.services import doc_feedback
+    return doc_feedback.dashboard(db, active_org(principal), company_id)
+
+
+@router.post("/doc-learning/propose")
+def doc_learning_propose(company_id: int, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    """Gom ngay: cờ mở → đề xuất trên tài liệu; cụm lỗ hổng ≥ N lượt → nháp bổ sung / FAQ mới (beat cũng chạy mỗi giờ)."""
+    from app.services import doc_feedback
+    from app.models import KnowledgeDocument
+    from app.models.documents import DocumentFlag
+    org = active_org(principal)
+    lib._company(db, org, company_id, write=True)
+    made = []
+    ids = {f.document_id for f in db.query(DocumentFlag).join(KnowledgeDocument, KnowledgeDocument.id == DocumentFlag.document_id)
+           .filter(DocumentFlag.status == "open", KnowledgeDocument.company_id == company_id).all()}
+    for did in ids:
+        p = doc_feedback.propose_from_flags(db, db.get(KnowledgeDocument, did), principal=principal)
+        if p is not None:
+            made.append(p.id)
+    made += [p.id for p in doc_feedback.propose_from_gaps(db, org, company_id, principal=principal)]
+    return {"created_or_updated": sorted(set(made)), **doc_feedback.dashboard(db, org, company_id)}
+
+
+@router.post("/doc-learning/eval")
+def doc_learning_eval(company_id: int, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    """Chạy lại bộ eval truy hồi bằng góc nhìn agent của công ty; câu trượt → lỗ hổng (source=eval); đề xuất đã ban hành
+    đang chờ đo → ghi eval_after."""
+    from app.services import doc_feedback
+    org = active_org(principal)
+    lib._company(db, org, company_id, write=True)
+    out = doc_feedback.run_eval(db, org, company_id, trigger="manual")
+    pend = doc_feedback.eval_pending(db, org_id=org, reuse={company_id: out} if out.get("status") == "ok" else None)
+    return {**out, "pending_filled": pend}
+
+
+@router.post("/doc-learning/proposals/{proposal_id}/dismiss")
+def doc_learning_dismiss(proposal_id: int, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import doc_feedback
+    return doc_feedback.dismiss(db, active_org(principal), proposal_id)
+
+
 @router.post("/docs/import-sops")
 def import_sops(company_id: int, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
     return lib.import_sops(db, active_org(principal), principal, company_id)

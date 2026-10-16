@@ -1058,6 +1058,13 @@ export const apiIngest = {
   syncSource: (id: number) => request<any>(`/team/doc-sources/${id}/sync`, {method: "POST"}),
 };
 
+export const apiDocLearning = {   // M3e vòng học tài liệu
+  get: (companyId: number) => request<any>(`/team/doc-learning?company_id=${companyId}`),
+  propose: (companyId: number) => request<any>(`/team/doc-learning/propose?company_id=${companyId}`, {method: "POST"}),
+  evalRun: (companyId: number) => request<any>(`/team/doc-learning/eval?company_id=${companyId}`, {method: "POST"}),
+  dismiss: (id: number) => request<any>(`/team/doc-learning/proposals/${id}/dismiss`, {method: "POST"}),
+};
+
 export const apiDocs = {
   list: (companyId: number | null, f: Record<string, any> = {}) => request<any>(`/team/docs?${dq({company_id: companyId, ...f})}`),
   get: (id: number) => request<any>(`/team/docs/${id}`),
