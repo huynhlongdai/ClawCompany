@@ -255,3 +255,60 @@ def decision_preview(payload: dict, principal: Principal = Depends(require_compa
     from app.services.company_foundation import _company
     co = _company(db, active_org(principal), payload.get("company_id"))
     return meetings.agent_log(db, co.id, active_org(principal), query=str(payload.get("query") or "")[:120])
+
+
+# ------------------------------------------------------------------ M3j tài chính kinh doanh (không phải sổ kế toán)
+
+@router.get("/finance")
+def finance_overview(company_id: int | None = None, period: str | None = None,
+                     principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    """Thu chi là thông tin nhạy cảm: quản lý công ty trở lên mới xem (thành viên / người xem: 403)."""
+    from app.services import finance
+    return finance.overview(db, active_org(principal), company_id, period)
+
+
+@router.post("/finance/entries")
+def finance_record(payload: dict, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import finance
+    return finance.record(db, active_org(principal), principal, payload)
+
+
+@router.post("/finance/entries/{entry_id}/void")
+def finance_void(entry_id: int, payload: dict, principal: Principal = Depends(require_company_role("manager")),
+                 db: Session = Depends(get_db)):
+    from app.services import finance
+    return finance.void(db, active_org(principal), principal, entry_id, payload.get("reason") or "")
+
+
+@router.post("/finance/categories")
+def finance_category(payload: dict, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import finance
+    return finance.add_category(db, active_org(principal), principal, payload)
+
+
+@router.put("/finance/budgets")
+def finance_budget(payload: dict, principal: Principal = Depends(require_company_role("admin")), db: Session = Depends(get_db)):
+    from app.services import finance
+    return finance.set_budget(db, active_org(principal), principal, payload)
+
+
+@router.get("/finance/export")
+def finance_export(company_id: int | None = None, period: str = "", principal: Principal = Depends(require_company_role("manager")),
+                   db: Session = Depends(get_db)):
+    from fastapi.responses import Response
+    from app.services import finance
+    p = period or finance.today_vn().strftime("%Y-%m")
+    body = finance.export_csv(db, active_org(principal), company_id, p)
+    return Response("\ufeff" + body, media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="thu-chi-{p}.csv"'})
+
+
+@router.post("/finance/agent-preview")
+def finance_agent_preview(payload: dict, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.models import Member
+    from app.services import finance
+    from app.services.company_foundation import _company
+    co = _company(db, active_org(principal), payload.get("company_id"))
+    fake = Member(organization_id=co.organization_id, company_id=co.id, department_id=payload.get("department_id"), name="preview",
+                  member_type="agent")
+    return finance.agent_budget(db, fake)

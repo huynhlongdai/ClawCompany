@@ -752,7 +752,21 @@ textarea.ops-json{width:100%}
 .biz-table td{vertical-align:top}
 .biz-table .ui-pill{margin:0 4px 4px 0}
 .biz-timeline{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
-.biz-timeline li{padding:6px 0;border-bottom:1px solid var(--line, rgba(0,0,0,.06))}
+.biz-timeline li{padding:6px 0;border-bottom:1px solid var(--track)}
 .biz-num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 @media (max-width:640px){.biz-hide-m{display:none}.biz-table{font-size:13px}.biz-wrap .ui-input{min-width:0;flex:1 1 140px}}
-.biz-minutes{white-space:pre-wrap;font:inherit;font-size:13px;background:var(--surface-2,#f6f6f4);padding:10px 12px;border-radius:8px;max-height:420px;overflow:auto}
+.biz-minutes{white-space:pre-wrap;font:inherit;font-size:13px;background:var(--surface-2);padding:10px 12px;border-radius:8px;max-height:420px;overflow:auto}
+.biz-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0}
+.biz-kpi{padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.biz-kpi b{font-size:18px}
+.biz-kpi.is-neg b{color:var(--risk)}.biz-kpi.is-pos b,.biz-num.is-pos{color:var(--ok)}
+.biz-trend{display:flex;gap:10px;align-items:flex-end;height:120px;padding:6px 0}
+.biz-trend-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%}
+.biz-bars{flex:1;width:100%;display:flex;gap:3px;align-items:flex-end;justify-content:center}
+.biz-bar{width:38%;max-width:22px;border-radius:4px 4px 0 0;min-height:2px}
+.biz-bar.is-in,.biz-dot.is-in{background:var(--accent)}.biz-bar.is-out,.biz-dot.is-out{background:var(--wait)}
+.biz-dot{display:inline-block;width:9px;height:9px;border-radius:2px;vertical-align:middle}
+.biz-progress{height:6px;border-radius:4px;background:var(--track);overflow:hidden;margin-bottom:3px}
+.biz-progress span{display:block;height:100%;background:var(--accent)}
+.biz-progress span.is-warn{background:var(--wait)}.biz-progress span.is-over{background:var(--risk)}
+@media (max-width:640px){.biz-kpis{grid-template-columns:1fr}.biz-kpi b{font-size:16px}}

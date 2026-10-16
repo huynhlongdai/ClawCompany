@@ -2,7 +2,8 @@
 // P1 — Công ty › Kinh doanh: Khách hàng (M3g CRM), Dữ liệu cá nhân (đồng ý + yêu cầu chủ thể, Luật 91/2025 / NĐ 356/2025).
 // Nhãn là mã i18n (crm.*); lỗi có mã từ backend → câu theo ngôn ngữ người dùng (biz.err_<mã>), không hiện câu tiếng Việt của backend.
 import {useState} from "react";
-import {apiBizContracts, apiCrm, apiDocs, apiMeetings} from "../lib/api";
+import {apiBizContracts, apiCrm, apiDocs, apiFinance, apiMeetings} from "../lib/api";
+import {API_BASE} from "../lib/http";
 import {ErrorBanner, EmptyState} from "./ui/EmptyState";
 import {SkeletonRows} from "./ui/Skeleton";
 import {StatusPill} from "./ui/StatusPill";
@@ -587,5 +588,128 @@ function DecisionPreview({companyId}: {companyId: number}) {
       <button className="ui-btn is-ghost is-sm" onClick={async () => { setErr(null); try { setRes(await apiMeetings.preview(companyId, q)); } catch (e) { setErr(bizErr(e)); } }}>{tr("crm.preview_go")}</button></div>
     {res && <ul className="cat-preview">{res.decisions.length === 0 ? <li><small>{tr("mt.preview_none")}</small></li> : res.decisions.map((x: any) => <li key={x.id}>
       <code className="doc-code">{x.cite}</code> <b>{x.title}</b> — {x.decision}<br/><small>{x.decided_by || "—"} · {x.authority_basis} · {fmtDate(x.effective_from)}</small></li>)}</ul>}
+  </div>;
+}
+
+// ------------------------------------------------------------------ Tài chính kinh doanh (M3j) — không phải sổ kế toán
+
+const catName = (c: any) => c ? (c.key ? lbl("fin.c_", c.key) : c.name) : "—";
+
+export function FinanceTab({companyId, caps}: {companyId: number | null; caps: any}) {
+  const [period, setPeriod] = useState(""), [adding, setAdding] = useState(false), [budgeting, setBudgeting] = useState(false);
+  const {data, error, reload, setError} = useLoad(() => companyId ? apiFinance.overview(companyId, period || undefined) : Promise.resolve(null), [companyId, period]);
+  const can = !!caps?.invite || !!caps?.manage_roles, admin = !!caps?.manage_roles;
+  const toast = useToast();
+  if (!companyId) return <p><small>{tr("docs.pick_company")}</small></p>;
+  if (error && !data) return <ErrorBanner error={bizErr(error)} onRetry={reload}/>;
+  if (!data) return <SkeletonRows n={5} h={40}/>;
+  const d: any = data, v = d.pnl.VND, usd = d.pnl.USD;
+  const maxT = Math.max(1, ...d.trend.map((x: any) => Math.max(x.income, x.expense)));
+  async function exportCsv() {
+    try {
+      const tok = localStorage.getItem("clawcompany_token");
+      const r = await fetch(`${API_BASE}${apiFinance.exportUrl(companyId as number, d.period)}`, {headers: tok ? {Authorization: `Bearer ${tok}`} : {}});
+      if (!r.ok) throw new Error(String(r.status));
+      const url = URL.createObjectURL(await r.blob()), a = document.createElement("a");
+      a.href = url; a.download = `thu-chi-${d.period}.csv`; a.click(); URL.revokeObjectURL(url);
+    } catch (e) { setError(e); }
+  }
+  return <section className="ui-section" data-testid="finance">
+    {error ? <ErrorBanner error={error} onClose={() => setError(null)}/> : null}
+    <div className="ui-banner" data-testid="fin-scope"><div><b>{tr("fin.scope_title")}</b><br/><small>{tr("fin.scope_body")}</small></div></div>
+    <div className="tmRow biz-wrap">
+      <input className="ui-input" type="month" value={period || d.period} onChange={e => setPeriod(e.target.value)} style={{maxWidth: 170}} data-testid="fin-period"/>
+      <span className="ui-grow"/>
+      {can && <button className="ui-btn is-primary is-sm" onClick={() => setAdding(!adding)} data-testid="fin-new">{tr("fin.new")}</button>}
+      {admin && <button className="ui-btn is-ghost is-sm" onClick={() => setBudgeting(!budgeting)} data-testid="fin-budget-new">{tr("fin.set_budget")}</button>}
+      <button className="ui-btn is-ghost is-sm" onClick={exportCsv} data-testid="fin-export">{tr("fin.export")}</button>
+    </div>
+    <div className="biz-kpis" data-testid="fin-pnl">
+      <div className="ui-panel biz-kpi"><small>{tr("fin.income")}</small><b className="biz-num">{fmtMoney(v.income, "VND")}</b></div>
+      <div className="ui-panel biz-kpi"><small>{tr("fin.expense")}</small><b className="biz-num">{fmtMoney(v.expense, "VND")}</b></div>
+      <div className={"ui-panel biz-kpi" + (v.net < 0 ? " is-neg" : " is-pos")}><small>{tr("fin.net")}</small><b className="biz-num">{fmtMoney(v.net, "VND")}</b></div>
+    </div>
+    {usd && <p><small>{tr("fin.usd_line", {p0: fmtMoney(usd.income, "USD"), p1: fmtMoney(usd.expense, "USD")})}</small></p>}
+    {adding && <EntryForm companyId={companyId} cats={d.categories} setError={(e: any) => setError(bizErr(e))} onDone={() => { setAdding(false); toast(tr("fin.saved")); reload(); }}/>}
+    {budgeting && <BudgetForm companyId={companyId} cats={d.categories} period={d.period} setError={(e: any) => setError(bizErr(e))} onDone={() => { setBudgeting(false); toast(tr("fin.budget_saved")); reload(); }}/>}
+    <h4 className="ops-cat">{tr("fin.trend")}</h4>
+    <div className="biz-trend" data-testid="fin-trend">{d.trend.map((x: any) => <div key={x.period} className="biz-trend-col">
+      <div className="biz-bars"><span className="biz-bar is-in" style={{height: `${x.income / maxT * 100}%`}} title={fmtMoney(x.income, "VND")}/>
+        <span className="biz-bar is-out" style={{height: `${x.expense / maxT * 100}%`}} title={fmtMoney(x.expense, "VND")}/></div>
+      <small>{x.period.slice(5)}/{x.period.slice(2, 4)}</small></div>)}</div>
+    <p><small><span className="biz-dot is-in"/> {tr("fin.income")} · <span className="biz-dot is-out"/> {tr("fin.expense")}</small></p>
+    <h4 className="ops-cat">{tr("fin.budget_vs_actual")}</h4>
+    {d.budgets.length === 0 ? <p><small>{tr("fin.no_budgets")}</small></p> : <div className="ui-panel"><table className="ui-table biz-table" data-testid="fin-budgets"><thead><tr>
+      <th>{tr("fin.category")}</th><th className="biz-num">{tr("fin.budget")}</th><th className="biz-num biz-hide-m">{tr("fin.actual")}</th><th>{tr("fin.used")}</th></tr></thead>
+      <tbody>{d.budgets.map((b: any) => <tr key={b.id}><td>{catName(b.category)}{b.department_id ? <><br/><small>{tr("fin.dept_budget")}</small></> : null}</td>
+        <td className="biz-num">{fmtMoney(b.budget, "VND")}</td><td className="biz-num biz-hide-m">{fmtMoney(b.actual, "VND")}</td>
+        <td><div className="biz-progress"><span className={b.over ? "is-over" : b.alerting ? "is-warn" : ""} style={{width: `${Math.min(100, b.pct)}%`}}/></div>
+          <small>{b.pct}% · {tr("fin.remaining", {p0: fmtMoney(b.remaining, "VND")})}</small></td></tr>)}</tbody></table></div>}
+    <h4 className="ops-cat">{tr("fin.by_category")}</h4>
+    <ul className="biz-timeline">{v.by_category.length === 0 ? <li><small>{tr("fin.empty")}</small></li> : v.by_category.map((x: any) => <li key={x.category.id}>
+      <StatusPill tone={x.category.kind === "income" ? "ok" : "neutral"}>{lbl("fin.k_", x.category.kind)}</StatusPill> {catName(x.category)} — <b className="biz-num">{fmtMoney(x.amount, "VND")}</b></li>)}</ul>
+    <h4 className="ops-cat">{tr("fin.entries")}</h4>
+    <div className="ui-panel"><table className="ui-table biz-table" data-testid="fin-entries"><thead><tr>
+      <th>{tr("fin.date")}</th><th>{tr("fin.category")}</th><th className="biz-num">{tr("fin.amount")}</th><th className="biz-hide-m">{tr("fin.desc")}</th></tr></thead>
+      <tbody>{d.entries.length === 0 ? <tr><td colSpan={4}><EmptyState compact mood="chao" title={tr("fin.empty")}>{tr("fin.empty_hint")}</EmptyState></td></tr>
+        : d.entries.map((e: any) => <tr key={e.id} style={e.status === "void" ? {opacity: .55} : undefined}>
+          <td><small>{fmtDate(e.occurred_on)}</small></td>
+          <td>{catName(e.category)}{e.status === "void" && <> <StatusPill tone="neutral">{tr("fin.void")}</StatusPill></>}</td>
+          <td className={"biz-num " + (e.kind === "income" ? "is-pos" : "")}>{e.kind === "income" ? "+" : "−"}{fmtMoney(e.amount, e.currency)}</td>
+          <td className="biz-hide-m"><small>{e.description}{e.void_reason ? ` · ${e.void_reason}` : ""}</small>
+            {can && e.status === "recorded" && <VoidBtn id={e.id} onDone={reload} setError={(x: any) => setError(bizErr(x))}/>}</td></tr>)}</tbody></table></div>
+    <FinancePreview companyId={companyId}/>
+  </section>;
+}
+
+function VoidBtn({id, onDone, setError}: any) {
+  const [open, setOpen] = useState(false), [r, setR] = useState("");
+  if (!open) return <> <button className="ui-btn is-ghost is-sm" onClick={() => setOpen(true)}>{tr("fin.void_btn")}</button></>;
+  return <div className="tmRow biz-wrap"><input className="ui-input" placeholder={tr("fin.void_reason")} value={r} onChange={e => setR(e.target.value)}/>
+    <button className="ui-btn is-ghost is-sm" disabled={r.trim().length < 5} onClick={async () => { setError(null); try { await apiFinance.void(id, r); onDone(); } catch (e) { setError(e); } }}>{tr("fin.void_btn")}</button></div>;
+}
+
+function EntryForm({companyId, cats, setError, onDone}: any) {
+  const [f, setF] = useState<any>({kind: "expense", category_id: "", amount: "", currency: "VND", occurred_on: "", description: ""});
+  const set = (k: string) => (e: any) => setF({...f, [k]: e.target.value});
+  const list = cats.filter((c: any) => c.kind === f.kind && c.active);
+  return <section className="ui-panel tm-card" data-testid="fin-form"><FormRow>
+    <Field label={tr("crm.kind")}><select className="ui-input" value={f.kind} onChange={e => setF({...f, kind: e.target.value, category_id: ""})} data-testid="fin-f-kind">
+      <option value="income">{lbl("fin.k_", "income")}</option><option value="expense">{lbl("fin.k_", "expense")}</option></select></Field>
+    <Field label={tr("fin.category")}><select className="ui-input" value={f.category_id} onChange={set("category_id")} data-testid="fin-f-cat"><option value="">—</option>
+      {list.map((c: any) => <option key={c.id} value={c.id}>{catName(c)}</option>)}</select></Field>
+    <Field label={tr("fin.amount")}><input className="ui-input" inputMode="numeric" value={f.amount} onChange={set("amount")} placeholder="350000" data-testid="fin-f-amount"/></Field>
+    <Field label={tr("cat.currency")}><select className="ui-input" value={f.currency} onChange={set("currency")}><option>VND</option><option>USD</option></select></Field>
+  </FormRow><FormRow>
+    <Field label={tr("fin.date")}><input className="ui-input" type="date" value={f.occurred_on} onChange={set("occurred_on")}/></Field>
+    <Field label={tr("fin.desc")}><input className="ui-input" value={f.description} onChange={set("description")}/></Field>
+  </FormRow>
+    <button className="ui-btn is-primary" disabled={!f.category_id || !f.amount} data-testid="fin-f-save" onClick={async () => { setError(null); try {
+      await apiFinance.record({company_id: companyId, ...f, category_id: Number(f.category_id), occurred_on: f.occurred_on || null}); onDone(); } catch (e) { setError(e); } }}>{tr("crm.save")}</button>
+  </section>;
+}
+
+function BudgetForm({companyId, cats, period, setError, onDone}: any) {
+  const [f, setF] = useState<any>({category_id: "", amount: "", alert_pct: "80"});
+  const set = (k: string) => (e: any) => setF({...f, [k]: e.target.value});
+  return <section className="ui-panel tm-card" data-testid="fin-budget-form"><FormRow>
+    <Field label={tr("fin.category")}><select className="ui-input" value={f.category_id} onChange={set("category_id")}><option value="">—</option>
+      {cats.filter((c: any) => c.kind === "expense").map((c: any) => <option key={c.id} value={c.id}>{catName(c)}</option>)}</select></Field>
+    <Field label={tr("fin.budget_for", {p0: period})}><input className="ui-input" inputMode="numeric" value={f.amount} onChange={set("amount")}/></Field>
+    <Field label={tr("fin.alert_pct")}><input className="ui-input" type="number" min={1} max={100} value={f.alert_pct} onChange={set("alert_pct")}/></Field>
+  </FormRow>
+    <button className="ui-btn is-primary" disabled={!f.category_id || !f.amount} onClick={async () => { setError(null); try {
+      await apiFinance.budget({company_id: companyId, period, category_id: Number(f.category_id), amount: f.amount, alert_pct: Number(f.alert_pct)}); onDone(); } catch (e) { setError(e); } }}>{tr("crm.save")}</button>
+  </section>;
+}
+
+function FinancePreview({companyId}: {companyId: number}) {
+  const [res, setRes] = useState<any>(null), [err, setErr] = useState<unknown>(null);
+  return <div className="ui-panel tm-card" data-testid="fin-preview">
+    <h4 className="ops-cat">{tr("crm.preview")}</h4><p className="tmGuide">{tr("fin.preview_hint")}</p>
+    {err ? <ErrorBanner error={err} onClose={() => setErr(null)}/> : null}
+    <button className="ui-btn is-ghost is-sm" onClick={async () => { setErr(null); try { setRes(await apiFinance.agentPreview(companyId)); } catch (e) { setErr(bizErr(e)); } }}>{tr("crm.preview_go")}</button>
+    {res && <ul className="cat-preview">{res.budgets.length === 0 ? <li><small>{tr("fin.preview_none")}</small></li> : res.budgets.map((b: any, i: number) => <li key={i}>
+      {b.category}: {tr("fin.remaining", {p0: fmtMoney(b.remaining, "VND")})} ({b.pct_used}%)</li>)}</ul>}
   </div>;
 }

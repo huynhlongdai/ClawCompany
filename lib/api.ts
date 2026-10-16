@@ -1151,3 +1151,13 @@ export const apiMeetings = {
   revoke: (id: number, note: string) => request<any>(`/team/decision-log/${id}/revoke`, j({note})),
   preview: (companyId: number, query: string) => request<any>(`/team/decision-log/lookup`, j({company_id: companyId, query})),
 };
+// P1 M3j — tài chính kinh doanh (/api/team/finance…) — không phải sổ kế toán
+export const apiFinance = {
+  overview: (companyId: number | null, period?: string) => request<any>(`/team/finance?${qs({company_id: companyId, period}).slice(1)}`),
+  record: (body: any) => request<any>(`/team/finance/entries`, j(body)),
+  void: (id: number, reason: string) => request<any>(`/team/finance/entries/${id}/void`, j({reason})),
+  category: (body: any) => request<any>(`/team/finance/categories`, j(body)),
+  budget: (body: any) => request<any>(`/team/finance/budgets`, j(body, "PUT")),
+  agentPreview: (companyId: number, departmentId?: number | null) => request<any>(`/team/finance/agent-preview`, j({company_id: companyId, department_id: departmentId || null})),
+  exportUrl: (companyId: number, period: string) => `/team/finance/export?company_id=${companyId}&period=${period}`,
+};

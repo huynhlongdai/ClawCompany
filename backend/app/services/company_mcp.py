@@ -815,6 +815,16 @@ def _contract_get(ctx: ToolContext, args: dict) -> dict:
                                code=_str(args, "code", required=False, limit=48), partner=_str(args, "partner", required=False, limit=200))
 
 
+@tool("company_finance_budget", "knowledge",
+      "Ngân sách KINH DOANH tháng này (VND) theo nhóm chi của phòng anh/chị và toàn công ty: ngân sách, đã chi, còn lại, % đã dùng. "
+      "Kiểm trước khi đề xuất mua / chi; vượt 'remaining' thì nói rõ khi xin duyệt. Không thấy từng dòng thu chi. Khác "
+      "company_budget_check (ngân sách model USD).",
+      "company.knowledge:read", {"category": {"type": "string"}})
+def _finance_budget(ctx: ToolContext, args: dict) -> dict:
+    from app.services import finance
+    return finance.agent_budget(ctx.db, ctx.member, category=_str(args, "category", required=False, limit=80))
+
+
 @tool("company_sop_get", "knowledge",
       "Lấy SOP theo sop_id (dùng offset để đọc tiếp SOP dài), hoặc tìm theo tên.",
       "company.knowledge:read", {"sop_id": {"type": "integer"}, "query": {"type": "string"},

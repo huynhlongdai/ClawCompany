@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-MODULES = ("crm", "contracts")
+MODULES = ("crm", "contracts", "finance")
 
 
 def run(db: Session) -> dict:
