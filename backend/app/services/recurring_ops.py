@@ -102,11 +102,14 @@ def execute_operation(db: Session, item: RecurringOperation, *, user_id: int | N
                 budget_limit=payload.get("budget_limit"), currency=str(payload.get("currency") or "USD"),
             )
             from app.services import strategy
-            if strategy.owns_goal(db, goal):
-                # W0: mục tiêu đã thuộc Nina (strategy tạo việc lập kế hoạch) → không dựng thêm kế hoạch/chu kỳ cũ,
-                # nếu không hai bộ máy cùng giao việc cho một mục tiêu.
-                result.update({"goal_id": goal.id, "cycle_id": None, "owner": "strategy"})
-                payload = {**payload, "plan": False, "execute": False}
+            # W0: strategy (Nina) là chủ DUY NHẤT của mục tiêu sinh từ lịch. Bộ máy chu kỳ cũ không còn beat nào tick,
+            # nên không dựng kế hoạch/chu kỳ cũ nữa: có ghế chiến lược → Nina nhận việc lập kế hoạch; không có → mục
+            # tiêu ở nháp + sự kiện goal.no_strategy_seat (create_goal đã phát) để người thấy, thay vì chu kỳ chết.
+            owner = "strategy" if strategy.owns_goal(db, goal) else "none"
+            result.update({"goal_id": goal.id, "cycle_id": None, "owner": owner})
+            if owner == "none":
+                result["note"] = "chưa có ghế chiến lược (Nina) trong công ty — mục tiêu để nháp"
+            payload = {**payload, "plan": False, "execute": False}
             if payload.get("plan", True):
                 plan_goal(
                     db, goal, user_id=user_id, max_steps=int(payload.get("max_steps") or 5),

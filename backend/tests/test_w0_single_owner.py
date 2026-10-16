@@ -142,6 +142,22 @@ def test_recurring_nina_goal_runs_once_per_slot_and_goes_to_nina_only(env):
     assert op.next_run_at == datetime(2026, 10, 18, 1, 0)           # mốc kế tiếp: 08:00 hôm sau
 
 
+def test_recurring_goal_without_strategy_seat_stays_draft_not_a_dead_legacy_cycle(env):
+    """Như VM (org 1/công ty 1 không có ghế Nina): trước W0 mỗi sáng sinh một chu kỳ cũ chạy mãi."""
+    env.nina.status = "inactive"; env.db.add(env.nina); env.db.commit()
+    env.cskh.department_id = None
+    due = datetime(2026, 10, 17, 1, 0)
+    _daily_op(env.db, env.org, env.co, due)
+    from app.models import Department
+    d = Department(company_id=env.co.id, name="CSKH"); env.db.add(d); env.db.commit()
+    env.cskh.department_id = d.id; env.db.add(env.cskh); env.db.commit()   # không còn ghế điều hành nào
+    out = routines.tick_all(env.db, now=due + timedelta(seconds=5))["recurring_operations"]
+    assert len(out) == 1 and out[0]["owner"] == "none" and "error" not in out[0]
+    goal = env.db.query(ExecutiveGoal).one()
+    assert goal.status == "draft"
+    assert env.db.query(OperatingCycle).count() == 0 and env.db.query(DelegationAssignment).count() == 0
+
+
 # ------------------------------------------------------------------ SLA: sla.tick là chủ
 
 def _profile(env, minutes=60):
