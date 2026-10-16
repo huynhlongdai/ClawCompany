@@ -677,3 +677,25 @@ textarea.ops-json{width:100%}
 .cov-days{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;margin:6px 0}
 .cov-days input{width:100%}
 .ahr-wrap{overflow-x:auto}
+
+/* M3 — Công ty › Tài liệu & tri thức */
+.doc-layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:var(--sp-4);align-items:start;margin-top:10px}
+.doc-tree{display:flex;flex-direction:column;padding:6px}
+.doc-tree-item{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;padding:7px 10px;border-radius:var(--radius-sm);
+  background:none;border:0;color:var(--text);font-size:var(--fs-13);cursor:pointer}
+.doc-tree-item:hover{background:var(--hover)}
+.doc-tree-item.is-on{background:var(--surface-2);font-weight:var(--fw-semibold)}
+.doc-tree-item small{color:var(--text-muted)}
+.doc-tree-sub{padding:3px 10px 3px 22px;font-size:var(--fs-12);color:var(--text-muted)}
+.doc-main{display:flex;flex-direction:column;gap:10px;min-width:0}
+.doc-main .ui-table tr.is-selected td{background:var(--surface-2)}
+.doc-detail .ui-panel-body{display:flex;flex-direction:column;gap:10px}
+.doc-meta{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:0;font-size:var(--fs-13)}
+.doc-meta dt{color:var(--text-muted)}
+.doc-meta dd{margin:0}
+.doc-content{white-space:pre-wrap;word-break:break-word;font-size:var(--fs-13);background:var(--surface-2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:10px;max-height:360px;overflow:auto;margin:0}
+.doc-content .is-add{color:var(--ok)}
+.doc-content .is-del{color:var(--risk);text-decoration:line-through}
+.doc-pending{border:1px dashed var(--border-strong);border-radius:var(--radius-sm)}
+@media (max-width:760px){.doc-layout{grid-template-columns:1fr}.doc-tree{flex-direction:row;flex-wrap:wrap}.doc-tree-item{width:auto}}

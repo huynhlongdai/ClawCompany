@@ -467,8 +467,12 @@ def _doc_visible(ctx: ToolContext, doc: KnowledgeDocument | None) -> bool:
     if doc is not None and doc.organization_id != ctx.org:
         from app.services import seat_leases   # R2: tài liệu bên cho thuê trong phạm vi hợp đồng
         ls = seat_leases.lease_of_member(ctx.db, ctx.member.id, live_only=True)
-        return bool(ls is not None and ls.status == "active" and doc.id in seat_leases.scope_doc_ids(ls))
+        return bool(ls is not None and ls.status == "active" and doc.id in seat_leases.scope_doc_ids(ls)
+                    and doc.status == "published")
     if doc is None or doc.organization_id != ctx.org:
+        return False
+    from app.services import knowledge_hub   # M3a: chỉ bản đã ban hành, đang hiệu lực
+    if knowledge_hub.live_filter(ctx.db.query(KnowledgeDocument.id).filter(KnowledgeDocument.id == doc.id)).first() is None:
         return False
     if doc.company_id and ctx.member.company_id and doc.company_id != ctx.member.company_id:
         return False

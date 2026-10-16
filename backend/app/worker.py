@@ -45,6 +45,8 @@ CORE_BEAT_SCHEDULE = {
     # M2e.4: đồng hồ SLA (quá hạn → leo thang) + việc tới ngoài giờ của người → agent cùng chức danh / xếp hàng.
     "tick-sla": {"task": "sla.tick", "schedule": 60.0},
     "tick-lease": {"task": "lease.tick", "schedule": 300.0},   # R2 cho thuê agent
+    # M3a: thư viện tài liệu — tới ngày hiệu lực → ban hành; hết hiệu lực → lưu trữ; hạn rà soát → Hộp việc.
+    "tick-docs": {"task": "docs.tick", "schedule": 3600.0},
 }
 
 

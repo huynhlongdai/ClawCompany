@@ -138,6 +138,38 @@ class KnowledgeDocument(Base, TimestampMixin):
     # Kiến thức cốt lõi (luôn nằm trong AGENTS.md của seat) + lớp nghề nghiệp (chức danh chứa chữ này).
     is_core: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     role_keyword: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    # M3a (0053_document_library): sổ tài liệu chuẩn — loại, lớp (document/record), chủ, đối tượng, nhạy cảm,
+    # cách agent dùng, vòng đời, phiên bản, hiệu lực/rà soát, tệp gốc, lưu trữ. Nội dung ở ``content`` luôn là
+    # BẢN ĐÃ BAN HÀNH (agent chỉ đọc bản này); bản nháp / chờ duyệt nằm ở knowledge_document_versions.
+    doc_code: Mapped[str] = mapped_column(String(40), default="", server_default="", index=True)
+    doc_class: Mapped[str] = mapped_column(String(16), default="document", server_default="document")
+    doc_type: Mapped[str] = mapped_column(String(40), default="other", server_default="other", index=True)
+    owner_position_id: Mapped[int | None] = mapped_column(ForeignKey("positions.id"), nullable=True)
+    owner_member_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True)
+    audience: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    sensitivity: Mapped[str] = mapped_column(String(32), default="internal", server_default="internal")
+    agent_use: Mapped[str] = mapped_column(String(16), default="retrieve", server_default="retrieve")
+    customer_facing: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    lease_shareable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    exportable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    status: Mapped[str] = mapped_column(String(16), default="published", server_default="published", index=True)
+    version_no: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    current_version_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    effective_from: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    effective_to: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    review_interval_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    review_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    review_notified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_reviewed_by: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True)
+    supersedes_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_of_truth: Mapped[str] = mapped_column(String(80), default="internal", server_default="internal")
+    file_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    retention_class: Mapped[str] = mapped_column(String(32), default="", server_default="")
+    retain_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    legal_hold: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    reuse_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 class Approval(Base, TimestampMixin):
     __tablename__ = "approvals"

@@ -213,6 +213,8 @@ def ingest(db: Session, org_id: int, *, title: str, content: str, source_type: s
                             synced_at=datetime.utcnow(), access_level="restricted", is_core=bool(is_core), **sc)
     db.add(doc); db.commit(); db.refresh(doc)
     reindex(db, doc)
+    from app.services import doc_library     # M3a: phiên bản 1 đã ban hành + mã tài liệu
+    doc_library.init_legacy(db, doc)
     return {**public(db, doc), "duplicate": False}
 
 
@@ -228,6 +230,8 @@ def resync(db: Session, org_id: int, doc_id: int) -> dict:
         return {**public(db, doc), "changed": False, "stale_enrollments": 0}
     doc.content, doc.content_hash = text[:MAX_CHARS], h
     reindex(db, doc)
+    from app.services import doc_library     # M3a: nguồn ngoài đổi → phiên bản mới (bản cũ superseded)
+    doc_library.legacy_new_content(db, doc)
     stale = mark_courses_stale(db, doc)
     return {**public(db, doc), "changed": True, "stale_enrollments": stale}
 
@@ -287,7 +291,8 @@ def public(db: Session, doc: KnowledgeDocument) -> dict:
             "chars": len(doc.content or ""), "chunks": n, "scope": scope_label(db, doc),
             "company_id": doc.company_id, "department_id": doc.department_id, "project_id": doc.project_id,
             "agent_id": doc.agent_id, "is_core": bool(doc.is_core), "role_keyword": doc.role_keyword or "",
-            "layer": layer_of(doc), "synced_at": doc.synced_at.isoformat() if doc.synced_at else None,
+            "layer": layer_of(doc), "doc_code": doc.doc_code or "", "status": doc.status, "version_no": doc.version_no,
+            "doc_type": doc.doc_type, "synced_at": doc.synced_at.isoformat() if doc.synced_at else None,
             "created_at": doc.created_at.isoformat() if getattr(doc, "created_at", None) else None}
 
 
@@ -305,8 +310,16 @@ def _tokens(text: str) -> list[str]:
     return [t for t in TOKEN_RE.findall((text or "").lower()) if len(t) > 1 and t not in STOP]
 
 
+def live_filter(q, now: datetime | None = None):
+    """M3a: chỉ bản ĐÃ BAN HÀNH và đang trong hiệu lực (nháp / chờ duyệt / lưu trữ / hết hạn không bao giờ tới agent)."""
+    now = now or datetime.utcnow()
+    return (q.filter(KnowledgeDocument.status == "published")
+            .filter(or_(KnowledgeDocument.effective_from.is_(None), KnowledgeDocument.effective_from <= now))
+            .filter(or_(KnowledgeDocument.effective_to.is_(None), KnowledgeDocument.effective_to > now)))
+
+
 def visible_docs_query(db: Session, org_id: int, member: Member | None, agent: Agent | None):
-    q = db.query(KnowledgeDocument).filter(KnowledgeDocument.organization_id == org_id)
+    q = live_filter(db.query(KnowledgeDocument).filter(KnowledgeDocument.organization_id == org_id))
     if member is None:      # người: thấy cả tổ chức (đã qua quyền API)
         return q
     from app.services import seat_leases   # R2: ghế thuê thấy thêm ĐÚNG các tài liệu bên cho thuê cấp
@@ -319,7 +332,7 @@ def visible_docs_query(db: Session, org_id: int, member: Member | None, agent: A
     q = q.filter(or_(KnowledgeDocument.agent_id.is_(None), KnowledgeDocument.agent_id == (agent.id if agent else -1)))
     if scope:
         own = [r[0] for r in q.with_entities(KnowledgeDocument.id).all()]
-        return db.query(KnowledgeDocument).filter(KnowledgeDocument.id.in_(own + scope))
+        return live_filter(db.query(KnowledgeDocument).filter(KnowledgeDocument.id.in_(own + scope)))
     return q
 
 
@@ -444,8 +457,8 @@ def role_ok(doc: KnowledgeDocument, member: Member | None) -> bool:
 
 def core_docs(db: Session, org_id: int, *, company_id: int | None, department_id: int | None, role: str,
               agent_id: int | None) -> list[KnowledgeDocument]:
-    q = (db.query(KnowledgeDocument).filter(KnowledgeDocument.organization_id == org_id, KnowledgeDocument.is_core.is_(True),
-                                            KnowledgeDocument.project_id.is_(None))
+    q = (live_filter(db.query(KnowledgeDocument)).filter(KnowledgeDocument.organization_id == org_id,
+                                                         KnowledgeDocument.is_core.is_(True), KnowledgeDocument.project_id.is_(None))
          .filter(or_(KnowledgeDocument.company_id.is_(None), KnowledgeDocument.company_id == company_id))
          .filter(or_(KnowledgeDocument.department_id.is_(None), KnowledgeDocument.department_id == department_id))
          .filter(or_(KnowledgeDocument.agent_id.is_(None), KnowledgeDocument.agent_id == (agent_id or -1))))
@@ -499,6 +512,10 @@ def update_doc(db: Session, org_id: int, doc_id: int, data: dict) -> tuple[dict,
         doc.title = data["title"].strip()[:220]
     if data.get("is_core") is not None:
         doc.is_core = bool(data["is_core"])
+        if doc.is_core:
+            doc.agent_use = "core"
+        elif doc.agent_use == "core":
+            doc.agent_use = "retrieve"
     if data.get("role_keyword") is not None:
         doc.role_keyword = data["role_keyword"].strip()[:120]
     db.add(doc); db.commit()

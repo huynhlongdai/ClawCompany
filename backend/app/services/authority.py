@@ -42,6 +42,11 @@ ACTION_TYPES = {
     "hire_agent": {"vi": "Tuyển agent", "en": "Hire an agent", "money": True},
     "budget_overrun": {"vi": "Chạy tiếp khi vượt nấc ngân sách", "en": "Continue past budget stop", "money": True},
     "goal_execute": {"vi": "Chạy kế hoạch tự động", "en": "Auto-run a plan", "money": True},
+    # M3a: ban hành tài liệu công ty (rủi ro theo loại: chính sách gửi khách / nội quy / quy chế = cao)
+    "doc_publish": {"vi": "Ban hành tài liệu", "en": "Publish a document", "money": False},
+    # M3f: đổi giá bán (số tiền = mức thay đổi tính theo VND quy đổi? KHÔNG — ma trận tiền là USD; giá VND
+    # được xét theo % thay đổi qua risk, xem services/catalog.py)
+    "price_change": {"vi": "Đổi giá bán", "en": "Change a selling price", "money": False},
 }
 # Từ đồng nghĩa agent hay dùng khi gọi company_approval_request(action=…)
 ALIASES = {
@@ -54,6 +59,8 @@ ALIASES = {
     "delete": "data_delete", "xoá": "data_delete", "xóa": "data_delete",
     "shell": "exec", "command": "exec",
     "hire": "hire_agent",
+    "publish_doc": "doc_publish", "ban hành": "doc_publish", "ban hanh": "doc_publish",
+    "price": "price_change", "đổi giá": "price_change",
 }
 TOOL_CLASS_TO_ACTION = {"send": "external_message", "pay": "spend", "delete": "data_delete"}
 APPROVER_KINDS = {
@@ -490,6 +497,10 @@ DEFAULT_MATRIX = [
     _R("budget_overrun", None, None, "manager"),
     _R("goal_execute", None, None, "none", "", "Kế hoạch rủi ro thấp/vừa chạy thẳng.", ),
     _R("goal_execute", None, None, "owner", "", "Kế hoạch rủi ro cao trở lên chờ chủ duyệt.", "high"),
+    _R("doc_publish", None, None, "department_head", "", "SOP / tài liệu của phòng: trưởng phòng ban hành."),
+    _R("doc_publish", None, None, "owner", "", "Chính sách gửi khách, nội quy, quy chế: chủ ban hành.", "high"),
+    _R("price_change", None, None, "department_head", "", "Đổi giá nhỏ (dưới 10%): trưởng phòng."),
+    _R("price_change", None, None, "owner", "", "Đổi giá từ 10% hoặc giá mới: chủ duyệt.", "high"),
 ]
 TEMPLATE_OVERRIDES = {
     "shop": {   # CSKH trả lời khách liên tục; hoàn tiền nhỏ là việc hằng ngày
@@ -534,6 +545,22 @@ def seed_defaults(db: Session, organization_id: int, company_id: int, *, templat
         db.add(AuthorityRule(organization_id=organization_id, company_id=company_id, enabled=True, source=src, **spec))
     db.commit()
     return {"seeded": len(rows), "kept": 0, "source": src}
+
+
+def ensure_action_defaults(db: Session, organization_id: int, company_id: int | None, action_type: str) -> int:
+    """Công ty gieo ma trận trước khi có loại việc mới (vd. doc_publish M3a) → thêm luật mặc định của ĐÚNG loại đó
+    (không đụng luật khác). Công ty chưa có ma trận nào thì để nguyên (decide → None → nơi gọi tự xử lý)."""
+    if not company_id:
+        return 0
+    has_any = db.query(AuthorityRule.id).filter(AuthorityRule.company_id == company_id).first()
+    if has_any is None or db.query(AuthorityRule.id).filter(AuthorityRule.company_id == company_id,
+                                                           AuthorityRule.action_type == action_type).first():
+        return 0
+    rows = [r for r in DEFAULT_MATRIX if r["action_type"] == action_type]
+    for spec in rows:
+        db.add(AuthorityRule(organization_id=organization_id, company_id=company_id, enabled=True, source="default", **spec))
+    db.commit()
+    return len(rows)
 
 
 def require_hire_right(db: Session, principal, company_id: int | None) -> AuthorityDecision | None:

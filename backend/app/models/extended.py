@@ -87,6 +87,8 @@ class SOP(Base, TimestampMixin):
     content: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(32), default="draft")
     compliance_score: Mapped[float] = mapped_column(Float, default=0)
+    # M3a (0053): nội dung + phiên bản SOP sống ở thư viện tài liệu (knowledge_documents, doc_type=sop)
+    document_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 class Decision(Base, TimestampMixin):
     __tablename__ = "decisions"

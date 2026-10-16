@@ -13,6 +13,7 @@ import {CompanyProfileTab, PositionsTab, AuthorityTab} from "./CompanyFoundation
 import {ProcessesTab, KpiTab, RhythmTab, ComplianceTab, ReadinessTab} from "./CompanyOperations";
 import {RulesTab, ContractsTab, CoverageTab, AgentWorkforceTab} from "./AgentNative";
 import {CompanyRolesTab, LeaseOutTab, LeasedTab} from "./Rental";
+import {DocLibraryTab} from "./DocLibrary";
 import {DepartmentsTab, BuildTab, flatten} from "./TeamConsole";
 import {ErrorBanner, EmptyState} from "./ui/EmptyState";
 import {SkeletonRows} from "./ui/Skeleton";
@@ -79,6 +80,7 @@ export function CompanyConsole() {
       {tab === "agenthr" && <AgentWorkforceTab companyId={companyId} caps={caps}/>}
       {tab === "leaseout" && <LeaseOutTab companyId={companyId} caps={caps}/>}
       {tab === "leased" && <LeasedTab companyId={companyId} caps={caps}/>}
+      {tab === "docs" && <DocLibraryTab companyId={companyId} caps={caps}/>}
     </>}
   </PageFrame>;
 }

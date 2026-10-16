@@ -1,0 +1,229 @@
+"use client";
+// M3a — Công ty › Tài liệu & tri thức › Thư viện: cây 8 ngăn theo loại, lọc, trang tài liệu (siêu dữ liệu, nội dung
+// bản đang hiệu lực, phiên bản đang soạn / chờ duyệt, lịch sử phiên bản + so sánh), duyệt theo ma trận, tải tệp gốc.
+import {useEffect, useState} from "react";
+import {apiCompany, apiDocs} from "../lib/api";
+import {ErrorBanner, EmptyState} from "./ui/EmptyState";
+import {SkeletonRows} from "./ui/Skeleton";
+import {StatusPill, toneOf} from "./ui/StatusPill";
+import {useToast} from "./ui/Toast";
+import {Field, FormRow} from "./ui/Field";
+import {getLocale, t as tr, type Key} from "../lib/i18n";
+import {useLoad} from "./CompanyOperations";
+
+const lbl = (x: any) => x ? (getLocale() === "en" ? x.en : x.vi) : "";
+const day = (s?: string | null) => s ? new Date(s + (s.endsWith("Z") ? "" : "Z")).toLocaleDateString(getLocale() === "en" ? "en-GB" : "vi-VN") : "—";
+const REVIEW_TONE: Record<string, any> = {ok: "ok", due: "wait", stale: "risk", none: "neutral"};
+
+export function DocLibraryTab({companyId, caps}: {companyId: number | null; caps: any}) {
+  const [group, setGroup] = useState(""), [status, setStatus] = useState(""), [q, setQ] = useState(""), [review, setReview] = useState("");
+  const {data, error, reload, setError} = useLoad(() => companyId ? apiDocs.list(companyId, {group, status, q, review}) : Promise.resolve(null),
+    [companyId, group, status, review]);
+  const [sel, setSel] = useState<number | null>(null), [mode, setMode] = useState<"" | "new" | "upload">("");
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+  const can = !!caps?.invite || !!caps?.manage_roles;
+  if (!companyId) return <p><small>{tr("docs.pick_company")}</small></p>;
+  if (error && !data) return <ErrorBanner error={error} onRetry={reload} testId="docs-error"/>;
+  if (!data) return <SkeletonRows n={5} h={40}/>;
+  const d: any = data;
+  const tax = d.taxonomy, types: any[] = tax.types;
+  const typeOf = (k: string) => types.find(x => x.key === k);
+  async function run(fn: () => Promise<any>, ok: string) {
+    setBusy(true); setError(null);
+    try { const r = await fn(); toast(ok); await reload(); return r; } catch (e) { setError(e); } finally { setBusy(false); }
+  }
+  return <section className="ui-section" data-testid="doc-library">
+    {error ? <ErrorBanner error={error} onClose={() => setError(null)} testId="docs-save-error"/> : null}
+    <p className="tmGuide">{tr("docs.explain")}</p>
+    <div className="tmRow" data-testid="doc-stats">
+      <span className="ui-pill">{tr("docs.total")}: <b>{d.counts.total}</b></span>
+      <span className="ui-pill is-ok">{tr("docs.published")}: <b>{d.counts.published}</b></span>
+      <span className="ui-pill is-wait">{tr("docs.in_progress")}: <b>{d.counts.draft_or_review}</b></span>
+      <button className={"ui-pill" + (d.counts.review_due ? " is-risk" : "")} onClick={() => setReview(review ? "" : "due,stale")} data-testid="doc-review-filter">
+        {tr("docs.review_due")}: <b>{d.counts.review_due}</b></button>
+      <span className="ui-grow"/>
+      {can && <button className="ui-btn is-primary is-sm" onClick={() => { setMode(mode === "new" ? "" : "new"); setSel(null); }} data-testid="doc-new">{tr("docs.new")}</button>}
+      {can && <button className="ui-btn is-ghost is-sm" onClick={() => { setMode(mode === "upload" ? "" : "upload"); setSel(null); }} data-testid="doc-upload">{tr("docs.upload")}</button>}
+      {can && <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => run(() => apiDocs.importSops(companyId), tr("docs.sops_imported"))} data-testid="doc-import-sops">{tr("docs.import_sops")}</button>}
+    </div>
+    {mode && <NewDoc mode={mode} companyId={companyId} types={types} groups={tax.groups} busy={busy}
+      onCancel={() => setMode("")} onDone={(doc: any) => { setMode(""); reload(); setSel(doc?.id || null); }} setError={setError}/>}
+    <div className="doc-layout">
+      <nav className="ui-panel doc-tree" data-testid="doc-tree">
+        <button className={"doc-tree-item" + (!group ? " is-on" : "")} onClick={() => setGroup("")}>{tr("docs.all")} <small>{d.counts.total}</small></button>
+        {d.tree.map((g: any) => <div key={g.key}>
+          <button className={"doc-tree-item" + (group === g.key ? " is-on" : "")} onClick={() => setGroup(g.key)} data-testid={`doc-group-${g.key}`}>
+            {lbl(g)} <small>{g.count}</small></button>
+          {group === g.key && Object.entries(g.types).map(([k, n]: any) => <div key={k} className="doc-tree-sub">{lbl(typeOf(k))} · {n}</div>)}
+        </div>)}
+      </nav>
+      <div className="doc-main">
+        <div className="tmRow">
+          <input className="ui-input" placeholder={tr("docs.search")} value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === "Enter" && reload()} data-testid="doc-q"/>
+          <select className="ui-input" value={status} onChange={e => setStatus(e.target.value)} data-testid="doc-status-filter">
+            <option value="">{tr("docs.any_status")}</option>
+            {tax.statuses.map((s: string) => <option key={s} value={s}>{tr(`docs.st_${s}` as Key)}</option>)}</select>
+        </div>
+        <div className="ui-panel"><table className="ui-table" data-testid="doc-table"><thead><tr>
+          <th>{tr("docs.code")}</th><th>{tr("docs.title")}</th><th>{tr("docs.type")}</th><th>{tr("docs.status")}</th>
+          <th>{tr("docs.agent_use")}</th><th>{tr("docs.review")}</th></tr></thead>
+          <tbody>{d.items.length === 0 ? <tr><td colSpan={6}><EmptyState compact mood="chao" title={tr("docs.empty")}>{tr("docs.empty_hint")}</EmptyState></td></tr>
+            : d.items.map((x: any) => <tr key={x.id} className={sel === x.id ? "is-selected" : ""} onClick={() => { setSel(x.id); setMode(""); }} style={{cursor: "pointer"}} data-testid={`doc-row-${x.id}`}>
+              <td><code>{x.doc_code}</code></td>
+              <td><b>{x.title}</b>{x.doc_class === "record" && <> <span className="ui-pill is-outline">{tr("docs.record")}</span></>}
+                {x.pending_version && <><br/><small>{tr("docs.pending_v", {p0: x.pending_version.version_no, p1: tr(`docs.st_${x.pending_version.status}` as Key)})}</small></>}</td>
+              <td>{getLocale() === "en" ? x.doc_type_en : x.doc_type_vi}</td>
+              <td><StatusPill tone={toneOf(x.status === "published" ? "approved" : x.status)}>{tr(`docs.st_${x.status}` as Key)}</StatusPill>{x.version_no ? ` v${x.version_no}` : ""}</td>
+              <td>{tr(`docs.use_${x.agent_use}` as Key)}{x.sensitivity !== "internal" && <><br/><small>{tr(`docs.sens_${x.sensitivity}` as Key)}</small></>}</td>
+              <td><StatusPill tone={REVIEW_TONE[x.review_state]}>{tr(`docs.rv_${x.review_state}` as Key)}</StatusPill><br/><small>{day(x.review_due_at)}</small></td>
+            </tr>)}</tbody></table></div>
+        {sel && <DocDetail id={sel} can={can} onChanged={reload} onClose={() => setSel(null)}/>}
+      </div>
+    </div>
+  </section>;
+}
+
+function TypeSelect({types, groups, value, onChange}: {types: any[]; groups: any[]; value: string; onChange: (v: string) => void}) {
+  return <select className="ui-input" value={value} onChange={e => onChange(e.target.value)} data-testid="doc-type-pick">
+    {groups.map(g => <optgroup key={g.key} label={lbl(g)}>
+      {types.filter(t => t.group === g.key).map(t => <option key={t.key} value={t.key}>{lbl(t)}{t.doc_class === "record" ? ` (${tr("docs.record")})` : ""}</option>)}
+    </optgroup>)}</select>;
+}
+
+function NewDoc({mode, companyId, types, groups, busy, onCancel, onDone, setError}: any) {
+  const pos = useLoad(() => apiCompany.positions(companyId), [companyId]);
+  const [f, setF] = useState<any>({title: "", doc_type: "policy", content: "", sensitivity: "", agent_use: "", customer_facing: false,
+    owner_position_id: "", review_interval_days: "", effective_from: "", change_note: ""});
+  const [file, setFile] = useState<File | null>(null), [saving, setSaving] = useState(false);
+  const toast = useToast();
+  const ti = types.find((t: any) => t.key === f.doc_type) || {};
+  async function save() {
+    setSaving(true); setError(null);
+    try {
+      const common: any = {company_id: companyId, title: f.title, doc_type: f.doc_type, change_note: f.change_note,
+        effective_from: f.effective_from || undefined, owner_position_id: f.owner_position_id ? Number(f.owner_position_id) : undefined};
+      let r;
+      if (mode === "upload") {
+        if (!file) throw new Error(tr("docs.pick_file"));
+        r = await apiDocs.upload(file, {...common, sensitivity: f.sensitivity, agent_use: f.agent_use});
+      } else {
+        r = await apiDocs.create({...common, content: f.content, customer_facing: f.customer_facing,
+          sensitivity: f.sensitivity || undefined, agent_use: f.agent_use || undefined,
+          review_interval_days: f.review_interval_days ? Number(f.review_interval_days) : undefined});
+      }
+      toast(tr("docs.created", {p0: r.doc_code})); onDone(r);
+    } catch (e) { setError(e); } finally { setSaving(false); }
+  }
+  const positions: any[] = (pos.data as any)?.items || [];
+  return <section className="ui-panel tm-card" data-testid="doc-form">
+    <fieldset className="ui-form" disabled={busy || saving}>
+      <FormRow>
+        <Field label={tr("docs.title")}><input className="ui-input" value={f.title} onChange={e => setF({...f, title: e.target.value})} data-testid="df-title"/></Field>
+        <Field label={tr("docs.type")} hint={ti.doc_class === "record" ? tr("docs.record_hint") : tr("docs.document_hint")}>
+          <TypeSelect types={types} groups={groups} value={f.doc_type} onChange={v => setF({...f, doc_type: v})}/></Field>
+        <Field label={tr("docs.owner_position")}><select className="ui-input" value={f.owner_position_id} onChange={e => setF({...f, owner_position_id: e.target.value})}>
+          <option value="">—</option>{positions.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}</select></Field>
+      </FormRow>
+      <FormRow>
+        <Field label={tr("docs.agent_use")} hint={tr(`docs.use_${f.agent_use || ti.agent_use}_hint` as Key)}>
+          <select className="ui-input" value={f.agent_use} onChange={e => setF({...f, agent_use: e.target.value})} data-testid="df-use">
+            <option value="">{tr("docs.default_x", {p0: tr(`docs.use_${ti.agent_use}` as Key)})}</option>
+            {["core", "retrieve", "tool_only", "none"].map(u => <option key={u} value={u}>{tr(`docs.use_${u}` as Key)}</option>)}</select></Field>
+        <Field label={tr("docs.sensitivity")}><select className="ui-input" value={f.sensitivity} onChange={e => setF({...f, sensitivity: e.target.value})}>
+          <option value="">{tr("docs.default_x", {p0: tr(`docs.sens_${ti.sensitivity}` as Key)})}</option>
+          {["public", "internal", "confidential", "restricted", "personal_data", "sensitive_personal_data"].map(s => <option key={s} value={s}>{tr(`docs.sens_${s}` as Key)}</option>)}</select></Field>
+        <Field label={tr("docs.effective_from")}><input className="ui-input" type="date" value={f.effective_from} onChange={e => setF({...f, effective_from: e.target.value})}/></Field>
+        {mode === "new" && <Field label={tr("docs.review_days")} hint={tr("docs.default_x", {p0: ti.review_days ?? "—"})}>
+          <input className="ui-input" type="number" min={0} value={f.review_interval_days} onChange={e => setF({...f, review_interval_days: e.target.value})}/></Field>}
+      </FormRow>
+      {mode === "new" ? <Field label={tr("docs.content")} hint={tr("docs.content_hint")}>
+        <textarea className="ui-input" rows={10} value={f.content} onChange={e => setF({...f, content: e.target.value})} data-testid="df-content"/></Field>
+        : <Field label={tr("docs.file")} hint={tr("docs.file_hint")}><input type="file" accept=".pdf,.docx,.md,.txt,.csv,.html,.png,.jpg,.jpeg" onChange={e => setFile(e.target.files?.[0] || null)} data-testid="df-file"/></Field>}
+      {mode === "new" && <label className="tmInline"><input type="checkbox" checked={f.customer_facing} onChange={e => setF({...f, customer_facing: e.target.checked})}/> {tr("docs.customer_facing")}</label>}
+      <div className="tmRow" style={{marginTop: 10}}>
+        <button className="ui-btn is-primary" onClick={save} data-testid="df-save">{ti.doc_class === "record" ? tr("docs.save_record") : tr("docs.save_draft")}</button>
+        <button className="ui-btn is-ghost" onClick={onCancel}>{tr("docs.cancel")}</button>
+      </div>
+    </fieldset>
+  </section>;
+}
+
+function DocDetail({id, can, onChanged, onClose}: {id: number; can: boolean; onChanged: () => void; onClose: () => void}) {
+  const {data, error, reload, setError} = useLoad(() => apiDocs.get(id), [id]);
+  const [draft, setDraft] = useState<string | null>(null), [note, setNote] = useState(""), [busy, setBusy] = useState(false);
+  const [diff, setDiff] = useState<any>(null);
+  const toast = useToast();
+  const d: any = data;
+  const pend = d?.pending_version;
+  useEffect(() => { setDraft(null); setDiff(null); }, [id]);
+  if (error && !data) return <ErrorBanner error={error} onRetry={reload}/>;
+  if (!d) return <SkeletonRows n={3}/>;
+  async function run(fn: () => Promise<any>, ok: string) {
+    setBusy(true); setError(null);
+    try { const r = await fn(); toast(ok); setDraft(null); await reload(); onChanged(); return r; } catch (e) { setError(e); } finally { setBusy(false); }
+  }
+  const editing = draft !== null;
+  return <section className="ui-panel doc-detail" data-testid="doc-detail">
+    <header className="ui-panel-head"><div className="ui-grow">
+      <h2><code>{d.doc_code}</code> {d.title} {d.version_no ? <small>v{d.version_no}</small> : null}</h2>
+      <p>{getLocale() === "en" ? d.doc_type_en : d.doc_type_vi} · {d.doc_class === "record" ? tr("docs.record_locked") : tr("docs.document")}
+        {" · "}<StatusPill tone={toneOf(d.status === "published" ? "approved" : d.status)}>{tr(`docs.st_${d.status}` as Key)}</StatusPill></p></div>
+      <button className="ui-btn is-ghost is-sm" onClick={onClose}>{tr("docs.close")}</button></header>
+    <div className="ui-panel-body">
+      {error ? <ErrorBanner error={error} onClose={() => setError(null)}/> : null}
+      <dl className="doc-meta" data-testid="doc-meta">
+        <dt>{tr("docs.owner")}</dt><dd>{d.owner_position || d.owner || "—"}</dd>
+        <dt>{tr("docs.agent_use")}</dt><dd>{tr(`docs.use_${d.agent_use}` as Key)}</dd>
+        <dt>{tr("docs.sensitivity")}</dt><dd>{tr(`docs.sens_${d.sensitivity}` as Key)}{d.customer_facing ? ` · ${tr("docs.customer_facing")}` : ""}</dd>
+        <dt>{tr("docs.effective")}</dt><dd>{day(d.effective_from)} → {d.effective_to ? day(d.effective_to) : tr("docs.open_ended")}</dd>
+        <dt>{tr("docs.review")}</dt><dd><StatusPill tone={REVIEW_TONE[d.review_state]}>{tr(`docs.rv_${d.review_state}` as Key)}</StatusPill> {day(d.review_due_at)}{d.review_interval_days ? ` · ${tr("docs.every_n_days", {p0: d.review_interval_days})}` : ""}</dd>
+        <dt>{tr("docs.retention")}</dt><dd>{d.retention_class ? tr(`docs.ret_${d.retention_class}` as Key) : "—"}{d.legal_hold ? ` · ${tr("docs.legal_hold")}` : ""}</dd>
+        {d.file && <><dt>{tr("docs.file")}</dt><dd><button className="ui-btn is-ghost is-sm" onClick={() => apiDocs.file(d.file.id, d.file.filename).catch(setError)} data-testid="doc-download">{d.file.filename}</button> <small>sha256 {d.file.sha256.slice(0, 12)}…</small></dd></>}
+      </dl>
+      {!d.can_read ? <p className="is-warn" data-testid="doc-no-read">{tr("docs.no_read")}</p>
+        : d.status === "published" || d.status === "superseded" || d.status === "archived" ? <>
+          <h3 className="ops-cat">{tr("docs.current_content")}</h3>
+          <pre className="doc-content" data-testid="doc-content">{d.content || tr("docs.no_text")}</pre></> : null}
+
+      {pend && <div className="tm-card doc-pending" data-testid="doc-pending">
+        <h3 className="ops-cat">{tr("docs.pending_v", {p0: pend.version_no, p1: tr(`docs.st_${pend.status}` as Key)})}</h3>
+        {pend.change_note && <p><small>{pend.change_note}</small></p>}
+        {pend.status === "draft" && can ? <>
+          <textarea className="ui-input" rows={8} value={draft ?? pend.content ?? ""} onChange={e => setDraft(e.target.value)} data-testid="doc-draft-text"/>
+          <div className="tmRow">
+            {editing && <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => run(() => apiDocs.editVersion(d.id, pend.id, {content: draft}), tr("docs.saved"))}>{tr("docs.save_draft")}</button>}
+            <button className="ui-btn is-primary is-sm" disabled={busy || editing} onClick={() => run(() => apiDocs.submit(d.id, pend.id), tr("docs.submitted"))} data-testid="doc-submit">{tr("docs.submit")}</button>
+          </div></> : <pre className="doc-content">{pend.content}</pre>}
+        {pend.status === "in_review" && <p>{tr("docs.waiting_for", {p0: pend.approver || "—"})}</p>}
+        {pend.status === "approved" && <p>{tr("docs.approved_until", {p0: day(pend.effective_from)})}</p>}
+        {d.i_can_approve && <div className="tmRow">
+          <input className="ui-input" placeholder={tr("docs.note")} value={note} onChange={e => setNote(e.target.value)}/>
+          <button className="ui-btn is-primary is-sm" disabled={busy} onClick={() => run(() => apiDocs.decide(d.id, pend.id, "approved", note), tr("docs.approved_ok"))} data-testid="doc-approve">{tr("docs.approve")}</button>
+          <button className="ui-btn is-danger is-sm" disabled={busy} onClick={() => run(() => apiDocs.decide(d.id, pend.id, "rejected", note), tr("docs.rejected_ok"))} data-testid="doc-reject">{tr("docs.reject")}</button>
+        </div>}
+      </div>}
+
+      {can && <div className="tmRow" style={{marginTop: 10}}>
+        {d.doc_class === "document" && !pend && ["published", "draft", "in_review"].includes(d.status) && d.can_read &&
+          <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => run(() => apiDocs.newVersion(d.id, {content: d.content || "…", change_note: ""}), tr("docs.version_started"))} data-testid="doc-new-version">{tr("docs.new_version")}</button>}
+        {d.status === "published" && <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => run(() => apiDocs.review(d.id), tr("docs.reviewed_ok"))} data-testid="doc-mark-reviewed">{tr("docs.mark_reviewed")}</button>}
+        {!["archived", "disposed"].includes(d.status) && <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => run(() => apiDocs.archive(d.id), tr("docs.archived_ok"))}>{tr("docs.archive")}</button>}
+      </div>}
+
+      <h3 className="ops-cat">{tr("docs.history")}</h3>
+      <table className="ui-table" data-testid="doc-versions"><thead><tr><th>v</th><th>{tr("docs.status")}</th><th>{tr("docs.author")}</th>
+        <th>{tr("docs.approved_by")}</th><th>{tr("docs.change_note")}</th><th/></tr></thead>
+        <tbody>{(d.versions || []).map((v: any) => <tr key={v.id}><td>v{v.version_no}</td>
+          <td><StatusPill tone={toneOf(v.status === "published" ? "approved" : v.status)}>{tr(`docs.st_${v.status}` as Key)}</StatusPill></td>
+          <td>{v.author || "—"}</td><td>{v.approved_by || (v.status === "in_review" ? `→ ${v.approver || "—"}` : "—")}<br/><small>{day(v.approved_at || v.published_at)}</small></td>
+          <td><small>{v.change_note}{v.review_note ? ` · ${v.review_note}` : ""}</small></td>
+          <td>{v.version_no > 1 && d.can_read && <button className="ui-btn is-ghost is-sm" onClick={() => apiDocs.diff(d.id, v.version_no - 1, v.version_no).then(setDiff).catch(setError)} data-testid={`doc-diff-${v.version_no}`}>{tr("docs.diff")}</button>}</td>
+        </tr>)}</tbody></table>
+      {diff && <div className="doc-diff" data-testid="doc-diff">
+        <p><b>v{diff.from} → v{diff.to}</b> · +{diff.added} / −{diff.removed}</p>
+        <pre className="doc-content">{diff.lines.map((ln: string, i: number) => <span key={i} className={ln.startsWith("+") && !ln.startsWith("+++") ? "is-add" : ln.startsWith("-") && !ln.startsWith("---") ? "is-del" : ""}>{ln + "\n"}</span>)}</pre>
+      </div>}
+    </div>
+  </section>;
+}

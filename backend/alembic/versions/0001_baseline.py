@@ -96,13 +96,21 @@ COLUMNS_OWNED_BY_LATER_MIGRATIONS = {
                     "guide"],                       # 0024
     "inbox_items": ["task_id", "group_key", "kinds", "count", "body",   # 0025_inbox_escalation
                     "company_id"],                                    # 0047_company_scope
-    "sops": ["company_id"],                                           # 0047_company_scope
+    "sops": ["company_id",                                            # 0047_company_scope
+             "document_id"],                                          # 0053_document_library
     "approvals": ["expires_at", "escalate_to_member_id", "escalated_at",   # 0025
                   "payload", "revision"],                                 # 0027_strategy_plans
     "user_organization_access": ["status"],                                 # 0028_team_invitations
     "users": ["locale"],                                                    # 0031_user_locale
     "knowledge_documents": ["source_url", "content_hash", "synced_at", "agent_id",   # 0033_learning
-                            "is_core", "role_keyword"],                            # 0036_core_knowledge
+                            "is_core", "role_keyword",                             # 0036_core_knowledge
+                            # 0053_document_library (cột sổ tài liệu M3a)
+                            "doc_code", "doc_class", "doc_type", "owner_position_id", "owner_member_id", "audience",
+                            "sensitivity", "agent_use", "customer_facing", "lease_shareable", "exportable", "status",
+                            "version_no", "current_version_id", "effective_from", "effective_to", "review_interval_days",
+                            "review_due_at", "review_notified_at", "last_reviewed_at", "last_reviewed_by", "supersedes_id",
+                            "source_of_truth", "file_id", "retention_class", "retain_until", "legal_hold", "reuse_count",
+                            "last_used_at"],
 }
 
 # 0014 tự tạo index unique này; model cũng khai nó, nên create_all sẽ tạo

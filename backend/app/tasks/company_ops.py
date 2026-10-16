@@ -68,3 +68,21 @@ def lease_tick():
         return asyncio.run(seat_leases.tick(db, get_runtime()))
     finally:
         db.close()
+
+
+@celery_app.task(name="docs.tick")
+def docs_tick():
+    """M3a: thư viện tài liệu — ban hành bản đã duyệt tới ngày hiệu lực, lưu trữ bản hết hiệu lực, nhắc rà soát;
+    tài liệu cốt lõi đổi → sinh lại AGENTS.md của tổ chức đó."""
+    import asyncio
+    from app.db.session import SessionLocal
+    from app.runtime.factory import get_runtime
+    from app.services import doc_library
+    db = SessionLocal()
+    try:
+        out = doc_library.tick(db)
+        for org in out.get("core_orgs") or []:
+            out.setdefault("regen", {})[org] = asyncio.run(doc_library.regen_agents(db, get_runtime(), org))
+        return out
+    finally:
+        db.close()

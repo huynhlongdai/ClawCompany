@@ -1025,3 +1025,33 @@ export const apiRental = {
   decideChange: (id: number, crId: number, decision: "approved" | "rejected") =>
     request<any>(`/leases/${id}/change-requests/${crId}/decide`, {method: "POST", body: JSON.stringify({decision})}),
 };
+
+// M3 — thư viện tài liệu & tri thức công ty (/api/team/docs…)
+const dq = (o: Record<string, any>) => qs(o).slice(1);
+export const apiDocs = {
+  list: (companyId: number | null, f: Record<string, any> = {}) => request<any>(`/team/docs?${dq({company_id: companyId, ...f})}`),
+  get: (id: number) => request<any>(`/team/docs/${id}`),
+  create: (body: any) => request<any>(`/team/docs`, {method: "POST", body: JSON.stringify(body)}),
+  patch: (id: number, body: any) => request<any>(`/team/docs/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  upload: (file: File, fields: Record<string, any>) => {
+    const fd = new FormData(); fd.append("file", file);
+    Object.entries(fields).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== "") fd.append(k, String(v)); });
+    return request<any>(`/team/docs/upload`, {method: "POST", body: fd});
+  },
+  newVersion: (id: number, body: any) => request<any>(`/team/docs/${id}/versions`, {method: "POST", body: JSON.stringify(body)}),
+  editVersion: (id: number, vid: number, body: any) => request<any>(`/team/docs/${id}/versions/${vid}`, {method: "PATCH", body: JSON.stringify(body)}),
+  submit: (id: number, vid: number) => request<any>(`/team/docs/${id}/versions/${vid}/submit`, {method: "POST"}),
+  decide: (id: number, vid: number, decision: "approved" | "rejected", note = "") =>
+    request<any>(`/team/docs/${id}/versions/${vid}/decide`, {method: "POST", body: JSON.stringify({decision, note})}),
+  diff: (id: number, a?: number, b?: number) => request<any>(`/team/docs/${id}/diff?${dq({a, b})}`),
+  review: (id: number, note = "") => request<any>(`/team/docs/${id}/review`, {method: "POST", body: JSON.stringify({note})}),
+  archive: (id: number, reason = "") => request<any>(`/team/docs/${id}/archive`, {method: "POST", body: JSON.stringify({reason})}),
+  importSops: (companyId: number) => request<any>(`/team/docs/import-sops?company_id=${companyId}`, {method: "POST"}),
+  file: async (fileId: number, filename: string) => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("clawcompany_token") : null;
+    const r = await fetch(`${API_BASE}/team/docs/files/${fileId}`, {headers: token ? {Authorization: `Bearer ${token}`} : {}});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const url = URL.createObjectURL(await r.blob());
+    const a = document.createElement("a"); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
+  },
+};

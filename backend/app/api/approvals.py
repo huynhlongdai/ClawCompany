@@ -49,6 +49,22 @@ async def resolve_approval(approval_id: int, payload: ApprovalResolve, principal
             raise HTTPException(409, str(exc))
         db.refresh(obj)
         return obj
+    if (obj.policy_key or "").startswith("doc_publish:"):
+        # M3a: ban hành tài liệu — chỉ đúng người duyệt theo ma trận (hoặc owner tổ chức), tác giả không tự duyệt.
+        if payload.status not in ("approved", "rejected"):
+            raise HTTPException(422, "Document approvals take approved or rejected")
+        if obj.status != "pending":
+            raise HTTPException(409, "Approval already resolved")
+        if obj.approver_member_id and obj.approver_member_id not in principal.member_ids and principal.role != "owner":
+            raise HTTPException(403, {"error": "not_the_approver", "approver_member_id": obj.approver_member_id})
+        if obj.requester_member_id and obj.requester_member_id in principal.member_ids:
+            raise HTTPException(403, "Tác giả không tự duyệt phiên bản của mình")
+        obj.status = payload.status; obj.resolution_note = payload.resolution_note
+        db.add(obj); db.commit(); db.refresh(obj)
+        from app.services import doc_library
+        doc_library.on_approval_resolved(db, obj, principal)
+        db.refresh(obj)
+        return obj
     from app.services import strategy
     plan = strategy.is_strategy(obj)
     if plan and obj.status != "pending":
