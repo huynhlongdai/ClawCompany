@@ -11,13 +11,20 @@ def _task_org_company(db: Session, task: Task):
     return (company.organization_id if company else None, company.id if company else None)
 
 
-def monitor_sla(db: Session, organization_id: int | None = None) -> list[SLAIncident]:
+def monitor_sla(db: Session, organization_id: int | None = None, *, now: datetime | None = None,
+                skip_timed: bool = True) -> list[SLAIncident]:
+    """Hồ sơ SLA cũ (SLAProfile, theo tuổi việc). W0: chỉ chạy từ ``operating_time.tick`` (beat ``sla.tick``) và
+    bỏ qua việc đã có đồng hồ SLA mới (``sla_timers``) — một việc chỉ bị leo thang bởi MỘT bộ máy."""
     q = db.query(SLAProfile).filter(SLAProfile.enabled == True, SLAProfile.resource_type == "task")  # noqa: E712
     if organization_id is not None:
         q = q.filter(SLAProfile.organization_id == organization_id)
     profiles = q.all()
     created: list[SLAIncident] = []
-    now = datetime.utcnow()
+    now = now or datetime.utcnow()
+    timed: set[int] = set()
+    if skip_timed:
+        from app.models.agent_native import SlaTimer
+        timed = {tid for (tid,) in db.query(SlaTimer.task_id).distinct().all()}
     for profile in profiles:
         tq = db.query(Task).join(Project, Task.project_id == Project.id).join(Company, Project.company_id == Company.id).filter(
             Company.organization_id == profile.organization_id,
@@ -28,6 +35,8 @@ def monitor_sla(db: Session, organization_id: int | None = None) -> list[SLAInci
         if profile.priority != "*":
             tq = tq.filter(Task.priority == profile.priority)
         for task in tq.limit(500).all():
+            if task.id in timed:
+                continue
             age = now - task.created_at
             if age < timedelta(minutes=profile.completion_minutes):
                 continue

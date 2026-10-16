@@ -18,10 +18,10 @@ LAB_BEAT_SCHEDULE = {
 LAB_TASK_NAMES = tuple(v["task"] for v in LAB_BEAT_SCHEDULE.values())
 
 CORE_BEAT_SCHEDULE = {
-    "scan-recurring-operations": {"task": "operations.scan_recurring", "schedule": 60.0},
-    "tick-operating-cycles": {"task": "operations.tick_cycles", "schedule": 30.0},
+    # W0: KHÔNG còn "operations.scan_recurring" (việc định kỳ cũ → do routines.tick chạy, có claim CAS),
+    # "operations.tick_cycles" (bộ máy mục tiêu cũ → mục tiêu thuộc strategy/Nina; chu kỳ cũ chỉ chạy tay qua v9) và
+    # "events.monitor_sla" (SLA cũ → sla.tick là chủ duy nhất). Mỗi loại việc nền một chủ — xem tests/test_w0_single_owner.py.
     "dispatch-company-events": {"task": "events.dispatch_pending", "schedule": 10.0},
-    "monitor-company-sla": {"task": "events.monitor_sla", "schedule": 60.0},
     "tick-nina-decision-loops": {"task": "events.tick_decision_loops", "schedule": 30.0},
     "dispatch-event-webhooks": {"task": "webhooks.dispatch_due", "schedule": 5.0},
     # D2.1: biến lý do đánh thức thành lượt chạy (gộp trong cửa sổ 10 giây).
@@ -30,7 +30,7 @@ CORE_BEAT_SCHEDULE = {
     # Lệnh shell chờ duyệt (exec.mode=ask) → hộp duyệt, kể cả khi chat trực tiếp.
     "sweep-gateway-approvals": {"task": "approvals.sweep_gateway", "schedule": 10.0},
     "escalate-overdue-approvals": {"task": "approvals.escalate_overdue", "schedule": 60.0},
-    # D3.4: routines — giờ hẹn cron theo múi giờ, chạy bù, kết cục từng lần chạy.
+    # D3.4: routines — giờ hẹn cron theo múi giờ, chạy bù, kết cục từng lần chạy (+ W0: việc định kỳ cũ).
     "tick-routines": {"task": "routines.tick", "schedule": 30.0},
     # M5b việc 9: tới giờ học của khoá → mỗi agent học/thi một bước mỗi ngày.
     "tick-courses": {"task": "courses.tick", "schedule": 600.0},
@@ -43,6 +43,7 @@ CORE_BEAT_SCHEDULE = {
     # M2d.2: lịch sử KPI — chụp số kỳ hiện tại + đóng băng kỳ vừa qua.
     "snapshot-kpis": {"task": "kpi.snapshot", "schedule": 3600.0},
     # M2e.4: đồng hồ SLA (quá hạn → leo thang) + việc tới ngoài giờ của người → agent cùng chức danh / xếp hàng.
+    # W0: cũng là chủ duy nhất của hồ sơ SLA cũ (SLAProfile) cho việc không có đồng hồ SLA mới.
     "tick-sla": {"task": "sla.tick", "schedule": 60.0},
     "tick-lease": {"task": "lease.tick", "schedule": 300.0},   # R2 cho thuê agent
     # M3a: thư viện tài liệu — tới ngày hiệu lực → ban hành; hết hiệu lực → lưu trữ; hạn rà soát → Hộp việc.

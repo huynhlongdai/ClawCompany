@@ -66,12 +66,13 @@ def sweep_gateway_approvals():
 
 @celery_app.task(name="routines.tick")
 def tick_routines():
-    """D3.4: kích hoạt routine tới giờ (idempotency_key UNIQUE chặn chạy trùng)."""
+    """D3.4: kích hoạt routine tới giờ (idempotency_key UNIQUE chặn chạy trùng) + W0: việc định kỳ cũ
+    (RecurringOperation, claim CAS) — một chủ duy nhất cho mọi việc định kỳ."""
     from app.db.session import SessionLocal
     from app.services import routines
     db = SessionLocal()
     try:
-        return routines.tick(db)
+        return routines.tick_all(db)
     finally:
         db.close()
 

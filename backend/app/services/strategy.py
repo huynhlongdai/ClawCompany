@@ -143,6 +143,13 @@ def on_goal_created(db: Session, goal: ExecutiveGoal) -> dict:
         return {"woken": False, "reason": f"error: {exc}"}
 
 
+def owns_goal(db: Session, goal: ExecutiveGoal | int) -> bool:
+    """W0: mục tiêu do strategy (Nina) điều phối khi đã có việc lập kế hoạch hoặc kế hoạch đã duyệt sinh việc con.
+    Khi đó bộ máy chu kỳ cũ (orchestration.create_cycle/tick_cycle) không được giao việc cho mục tiêu này."""
+    gid = goal if isinstance(goal, int) else goal.id
+    return planning_task(db, gid) is not None
+
+
 def planning_task(db: Session, goal_id: int) -> Task | None:
     return (db.query(Task).filter(Task.goal_id == goal_id, Task.parent_task_id.is_(None),
                                   Task.title.like("Lập kế hoạch:%")).order_by(Task.id).first())

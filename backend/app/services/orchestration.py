@@ -126,6 +126,10 @@ def _goal_authority(db: Session, goal: ExecutiveGoal, estimate_usd: float):
 def create_cycle(db: Session, goal: ExecutiveGoal, *, estimated_cost_per_assignment: float = 0.25) -> OperatingCycle:
     if not goal.execution_plan_id:
         raise ValueError("Goal must be planned before execution")
+    from app.services import strategy
+    if strategy.owns_goal(db, goal):
+        # W0: một chủ cho mỗi mục tiêu — Nina đã nhận lập kế hoạch, chu kỳ cũ sẽ giao việc trùng.
+        raise ValueError("Mục tiêu này do Nina điều phối (đã có việc lập kế hoạch) — không chạy thêm chu kỳ cũ")
     policy = get_policy(db, goal.organization_id, goal.company_id)
     mode = goal.autonomy_mode if goal.autonomy_mode and goal.autonomy_mode != "inherit" else policy.mode
     cycle = OperatingCycle(
@@ -382,6 +386,10 @@ async def tick_cycle(db: Session, cycle: OperatingCycle, *, capture_runtime: boo
     goal = db.get(ExecutiveGoal, cycle.goal_id)
     if not goal:
         raise ValueError("Goal not found")
+    from app.services import strategy
+    if strategy.owns_goal(db, goal):
+        # W0: chu kỳ cũ sót lại của mục tiêu Nina đang giữ → không phát việc (tránh giao đôi).
+        return summarize_cycle(db, cycle)
     policy = get_policy(db, goal.organization_id, goal.company_id)
     snap = _snapshot(cycle)
     approval = db.get(Approval, snap.get("approval_id")) if snap.get("approval_id") else None

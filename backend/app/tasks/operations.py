@@ -3,16 +3,15 @@ from app.worker import celery_app
 from app.db.session import SessionLocal
 from app.models import OperatingCycle
 from app.services.orchestration import tick_cycle
-from app.services.recurring_ops import due_operations, execute_operation
+from app.services.recurring_ops import run_due
 
 
 @celery_app.task(name="operations.scan_recurring")
 def scan_recurring_operations():
+    """W0: không còn trong beat (routines.tick là chủ); gọi tay vẫn an toàn nhờ claim CAS."""
     db = SessionLocal()
-    results = []
     try:
-        for item in due_operations(db)[:50]:
-            results.append(execute_operation(db, item))
+        results = run_due(db)
         return {"processed": len(results), "results": results}
     finally:
         db.close()
@@ -20,6 +19,7 @@ def scan_recurring_operations():
 
 @celery_app.task(name="operations.tick_cycles")
 def tick_operating_cycles():
+    """W0: không còn trong beat (mục tiêu thuộc strategy/Nina). Gọi tay: bỏ qua chu kỳ của mục tiêu strategy giữ."""
     db = SessionLocal()
     results = []
     try:

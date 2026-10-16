@@ -78,7 +78,16 @@ def _payload(item: RecurringOperation) -> dict:
         return {}
 
 
-def execute_operation(db: Session, item: RecurringOperation, *, user_id: int | None = None):
+def _base(item: RecurringOperation, now: datetime | None) -> datetime:
+    """Mốc tính lần chạy kế: ``now`` (UTC naive) của tick nếu có, không thì đồng hồ thật — theo múi giờ của việc."""
+    zone = ZoneInfo(item.timezone or "UTC")
+    if now is None:
+        return datetime.now(zone)
+    return now.replace(tzinfo=timezone.utc).astimezone(zone)
+
+
+def execute_operation(db: Session, item: RecurringOperation, *, user_id: int | None = None,
+                      now: datetime | None = None):
     payload = _payload(item)
     result: dict = {"operation_id": item.id, "type": item.operation_type}
     try:
@@ -92,6 +101,12 @@ def execute_operation(db: Session, item: RecurringOperation, *, user_id: int | N
                 autonomy_mode=str(payload.get("autonomy_mode") or "inherit"), deadline="",
                 budget_limit=payload.get("budget_limit"), currency=str(payload.get("currency") or "USD"),
             )
+            from app.services import strategy
+            if strategy.owns_goal(db, goal):
+                # W0: mục tiêu đã thuộc Nina (strategy tạo việc lập kế hoạch) → không dựng thêm kế hoạch/chu kỳ cũ,
+                # nếu không hai bộ máy cùng giao việc cho một mục tiêu.
+                result.update({"goal_id": goal.id, "cycle_id": None, "owner": "strategy"})
+                payload = {**payload, "plan": False, "execute": False}
             if payload.get("plan", True):
                 plan_goal(
                     db, goal, user_id=user_id, max_steps=int(payload.get("max_steps") or 5),
@@ -100,6 +115,7 @@ def execute_operation(db: Session, item: RecurringOperation, *, user_id: int | N
             cycle = None
             if payload.get("execute", True) and goal.execution_plan_id:
                 cycle = create_cycle(db, goal, estimated_cost_per_assignment=float(payload.get("estimated_cost_per_assignment") or 0.25))
+            result.setdefault("owner", "orchestration")
             result.update({"goal_id": goal.id, "cycle_id": cycle.id if cycle else None})
         elif item.operation_type == "progress_sync":
             # v34: the progress drift sweep is now a scheduled operation.
@@ -115,7 +131,7 @@ def execute_operation(db: Session, item: RecurringOperation, *, user_id: int | N
         item.last_status = "failed"
         result["error"] = str(exc)
     item.last_run_at = datetime.utcnow()
-    item.next_run_at = compute_next(item.schedule, item.timezone, datetime.now(ZoneInfo(item.timezone or "UTC"))) if item.enabled else None
+    item.next_run_at = compute_next(item.schedule, item.timezone, _base(item, now)) if item.enabled else None
     db.add(item); db.commit(); db.refresh(item)
     log_event(db, item.organization_id, "recurring_operation.run", "recurring_operations", item.id, actor_name="scheduler", result=item.last_status, payload=result)
     return result
@@ -128,3 +144,33 @@ def due_operations(db: Session, now: datetime | None = None):
         RecurringOperation.next_run_at.is_not(None),
         RecurringOperation.next_run_at <= now,
     ).order_by(RecurringOperation.next_run_at).all()
+
+
+def claim(db: Session, item: RecurringOperation, now: datetime | None = None) -> bool:
+    """W0: giành lượt chạy bằng CAS trên ``next_run_at`` — chỉ một tiến trình thắng cho mỗi mốc giờ."""
+    from sqlalchemy import update
+    now = now or datetime.utcnow()
+    old = item.next_run_at
+    if old is None or old > now:
+        return False
+    try:
+        nxt = compute_next(item.schedule, item.timezone, _base(item, now))
+    except Exception:  # noqa: BLE001
+        nxt = None
+    res = db.execute(update(RecurringOperation).where(RecurringOperation.id == item.id,
+                                                      RecurringOperation.next_run_at == old)
+                     .values(next_run_at=nxt))
+    db.commit()
+    return res.rowcount == 1
+
+
+def run_due(db: Session, now: datetime | None = None, limit: int = 50) -> list[dict]:
+    """Chạy các việc định kỳ cũ tới hạn, mỗi việc chỉ khi giành được lượt (gọi từ ``routines.tick_all``)."""
+    now = now or datetime.utcnow()
+    out = []
+    for item in due_operations(db, now)[:limit]:
+        if not claim(db, item, now):
+            continue
+        db.refresh(item)
+        out.append(execute_operation(db, item, now=now))
+    return out

@@ -522,8 +522,22 @@ def tick(db: Session, now: datetime | None = None) -> dict:
             if not db.query(SlaTimer).filter(SlaTimer.task_id == task.id).count():
                 started += len(start_timers(db, task, now=now))
     # 2) quá hạn
+    from sqlalchemy import update
     for t in db.query(SlaTimer).filter(SlaTimer.status == "running", SlaTimer.due_at <= now).all():
-        breach(db, t, now); breached += 1
+        # W0: giành đồng hồ bằng CAS — hai tick chạy đồng thời (beat + /team/sla/tick) không leo thang hai lần.
+        won = db.execute(update(SlaTimer).where(SlaTimer.id == t.id, SlaTimer.status == "running")
+                         .values(status="breaching")).rowcount == 1
+        db.commit()
+        if not won:
+            continue
+        db.refresh(t)
+        try:
+            breach(db, t, now); breached += 1
+        except Exception as exc:  # noqa: BLE001 — trả đồng hồ về để tick sau thử lại
+            db.rollback()
+            db.execute(update(SlaTimer).where(SlaTimer.id == t.id, SlaTimer.status == "breaching").values(status="running"))
+            db.commit()
+            print(f"[sla] breach timer {t.id}: {exc}")
     # 3) ngoài giờ: việc bước quy trình / có SLA, chưa bắt tay, giao người đang ngoài giờ
     cand = set(r.task_id for r in db.query(ProcessStepRun).filter(ProcessStepRun.status == "active").all() if r.task_id)
     cand |= set(t.task_id for t in db.query(SlaTimer).filter(SlaTimer.status.in_(("running", "breached"))).all())
@@ -538,7 +552,15 @@ def tick(db: Session, now: datetime | None = None) -> dict:
         if task is None or task.status not in ("backlog", "todo") or (m is not None and on_duty(db, m, now)):
             r.status = "done"
     db.commit()
-    return {"started": started, "breached": breached, "routed": routed}
+    # 5) W0: hồ sơ SLA cũ (SLAProfile) — cùng một chủ, bỏ qua việc đã có đồng hồ ở trên.
+    legacy = 0
+    try:
+        from app.services.sla import monitor_sla
+        legacy = len(monitor_sla(db, now=now))
+    except Exception as exc:  # noqa: BLE001 — bảng cũ lỗi không được chặn SLA mới
+        db.rollback()
+        print(f"[W0] legacy SLA monitor: {exc}")
+    return {"started": started, "breached": breached, "routed": routed, "legacy_incidents": legacy}
 
 
 def attainment(db: Session, *, company_id: int | None = None, member_ids: list[int] | None = None,

@@ -512,13 +512,27 @@ def tick(db: Session, *, now: datetime | None = None, organization_id: int | Non
     return out
 
 
+def tick_all(db: Session, *, now: datetime | None = None) -> dict:
+    """W0: chủ DUY NHẤT của việc định kỳ — routine (D3.4) + việc định kỳ cũ ``RecurringOperation`` (trước do beat
+    ``operations.scan_recurring`` chạy song song). Việc cũ được giành bằng CAS trên ``next_run_at`` nên tick chạy đồng
+    thời (beat + vòng trong API) không chạy một lần hai lượt."""
+    from app.services import recurring_ops
+    out = {"routines": tick(db, now=now), "recurring_operations": []}
+    try:
+        out["recurring_operations"] = recurring_ops.run_due(db, now=now)
+    except Exception as exc:  # noqa: BLE001 — routine mới không được hỏng vì bảng cũ
+        db.rollback()
+        out["recurring_error"] = str(exc)[:300]
+    return out
+
+
 async def tick_forever(interval_seconds: float) -> None:
     import asyncio
     from app.db.session import SessionLocal
     while True:
         db = SessionLocal()
         try:
-            tick(db)
+            tick_all(db)
         except Exception as exc:  # noqa: BLE001
             print(f"[D3.4] routines tick: {exc}")
         finally:
