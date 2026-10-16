@@ -572,7 +572,11 @@ def _core_for(db: Session, member: Member, agent: Agent) -> str:
 def _position_for(db: Session, member: Member | None) -> dict | None:
     from app.services import company_foundation
     try:
-        return company_foundation.position_brief(db, member)
+        brief = company_foundation.position_brief(db, member)
+        if brief is not None and member is not None:   # R2: ghế thuê → công cụ hiệu lực = sàn ∩ chức danh
+            from app.services import seat_leases
+            brief["allowed_tools"] = seat_leases.effective_tools(db, member, brief.get("allowed_tools")) or []
+        return brief
     except Exception as exc:  # noqa: BLE001 — thiếu chức danh không được chặn sinh file
         print(f"[position] {exc}")
         return None
@@ -613,6 +617,8 @@ async def _regen(db: Session, runtime: Any, agent: Agent, member: Member, names:
                          address_style=spec.get("address_style") or DEFAULT_ADDRESS_STYLE,
                          daily_cap_usd=spec.get("daily_cap_usd"), core_knowledge=_core_for(db, member, agent),
                          position=_position_for(db, member), **_ctx(db, member))
+    from app.services import seat_leases   # R2: ghế thuê → sàn bên cho thuê đứng đầu AGENTS.md
+    files["AGENTS.md"] = seat_leases.place_floor(db, member, files["AGENTS.md"])
     snaps = snapshots(db, agent.id)
     result: dict[str, dict] = {}
     for fname in names:

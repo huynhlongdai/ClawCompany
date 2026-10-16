@@ -204,6 +204,8 @@ async def hr_hire(payload: HireIn, principal: Principal = Depends(require_role("
 async def hr_update(agent_id: int, payload: HrPatchIn, principal: Principal = Depends(require_role("manager")),
                     db: Session = Depends(get_db)):
     """Sửa hồ sơ, ghi DB + gateway (agents.update) và sinh lại file nếu gateway chưa bị sửa tay."""
+    from app.services import seat_leases   # R2: ghế thuê — bên thuê không đổi chính sách/nền tảng
+    seat_leases.guard_renter_edit(db, agent_id, set(payload.model_fields_set), payload.model_dump())
     return await agent_hr.update_hr(db, principal, active_org(principal), get_runtime(), agent_id,
                                     payload.model_dump(), set(payload.model_fields_set))
 
@@ -365,6 +367,12 @@ async def write_seat_file(agent_id: int, name: str, payload: SeatFileIn,
     409 khi `expectedHash` đã cũ — nghĩa là có người khác vừa sửa. Phản hồi mang
     `current_hash` để client đọc lại và ghi trên bản mới.
     """
+    if name == "AGENTS.md":   # R2: ghế thuê phải giữ nguyên mục sàn của bên cho thuê
+        from app.models import Agent as _A
+        from app.services import seat_leases
+        _ag = db.get(_A, agent_id)
+        if _ag is not None:
+            seat_leases.check_agents_md(db, _ag, payload.content)
     try:
         result = await _seat_service(db).write_file(
             agent_id, active_org(principal), name=name, content=payload.content,
@@ -387,6 +395,8 @@ async def write_seat_config(agent_id: int, payload: SeatConfigIn,
     Khoá được phép ghi bị giới hạn theo tab ở tầng server. `dry_run: true` trả
     về đúng frame sẽ gửi mà không ghi gì.
     """
+    from app.services import seat_leases   # R2: cấu hình nền tảng của ghế thuê do bên cho thuê duyệt
+    seat_leases.guard_renter_edit(db, agent_id, kind="config", tab=payload.tab)
     try:
         return await _seat_service(db).write_config(
             agent_id, active_org(principal), tab=payload.tab,

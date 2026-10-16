@@ -311,9 +311,17 @@ async def handle_rpc(db: Session, runtime: Any, rid: str, body: Any, authorizati
     x.calls = (x.calls or 0) + 1
     x.last_used_at = datetime.utcnow()
     db.add(x); db.commit()
+    lease_row = None
+    try:   # R2: ghế thuê → đo phiên A2A (usage thật của gateway) + ghi người gọi
+        from app.services import seat_leases
+        lease_row = await seat_leases.meter_session(db, runtime, m, ag, key, channel="a2a", caller=f"a2a:exposure:{x.id}:{ctx}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[lease] a2a meter {exc}")
     emit_event(db, organization_id=m.organization_id, event_type="agent.a2a.inbound", source=SOURCE,
                company_id=m.company_id, aggregate_type="member", aggregate_id=str(m.id), actor_member_id=m.id,
-               payload={"session_key": key, "chars_in": len(text), "chars_out": len(answer), "error": err})
+               payload={"session_key": key, "chars_in": len(text), "chars_out": len(answer), "error": err,
+                        "lease_id": lease_row.lease_id if lease_row is not None else None,
+                        "billed_usd": lease_row.billed_usd if lease_row is not None else None})
     if not answer:
         return _rpc_error(req_id, -32603, err or "Agent không trả lời")
     return {"jsonrpc": "2.0", "id": req_id,

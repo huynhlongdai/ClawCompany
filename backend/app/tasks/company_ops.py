@@ -54,3 +54,17 @@ def sla_tick():
         return operating_time.tick(db)
     finally:
         db.close()
+
+
+@celery_app.task(name="lease.tick")
+def lease_tick():
+    """R2: hợp đồng thuê agent — hết hạn → kết thúc + dọn ghế thuê; phí tháng; chạm trần → tạm dừng."""
+    import asyncio
+    from app.db.session import SessionLocal
+    from app.runtime.factory import get_runtime
+    from app.services import seat_leases
+    db = SessionLocal()
+    try:
+        return asyncio.run(seat_leases.tick(db, get_runtime()))
+    finally:
+        db.close()

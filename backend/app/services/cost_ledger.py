@@ -113,6 +113,13 @@ def record_message_usage(db: Session, *, organization_id: int, task: Task | None
         run.tokens_out = (run.tokens_out or 0) + u["output"]
         run.cost_usd = round((run.cost_usd or 0.0) + u["cost_usd"], 10)
         db.add(run); db.commit()
+    try:   # R2: ghế thuê → dòng đo đếm theo hợp đồng (chi phí thật + markup)
+        from app.services import seat_leases
+        seat_leases.on_model_usage(db, agent_id=agent_id, usage_event=item, run=run, session_key=session_key,
+                                   channel="task" if task is not None else "chat",
+                                   tokens_in=u["input"] + u["cache_read"] + u["cache_write"], tokens_out=u["output"])
+    except Exception as exc:  # noqa: BLE001 — đo đếm thuê lỗi không được làm mất usage gốc
+        db.rollback(); print(f"[lease] usage {exc}")
     return item
 
 

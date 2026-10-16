@@ -309,11 +309,17 @@ def visible_docs_query(db: Session, org_id: int, member: Member | None, agent: A
     q = db.query(KnowledgeDocument).filter(KnowledgeDocument.organization_id == org_id)
     if member is None:      # người: thấy cả tổ chức (đã qua quyền API)
         return q
+    from app.services import seat_leases   # R2: ghế thuê thấy thêm ĐÚNG các tài liệu bên cho thuê cấp
+    ls = seat_leases.lease_of_member(db, member.id, live_only=True)
+    scope = seat_leases.scope_doc_ids(ls) if ls is not None and ls.status == "active" else []
     proj_ids = [r[0] for r in db.query(Task.project_id).filter(Task.assignee_member_id == member.id).distinct().all() if r[0]]
     q = q.filter(or_(KnowledgeDocument.company_id.is_(None), KnowledgeDocument.company_id == member.company_id))
     q = q.filter(or_(KnowledgeDocument.department_id.is_(None), KnowledgeDocument.department_id == member.department_id))
     q = q.filter(or_(KnowledgeDocument.project_id.is_(None), KnowledgeDocument.project_id.in_(proj_ids or [-1])))
     q = q.filter(or_(KnowledgeDocument.agent_id.is_(None), KnowledgeDocument.agent_id == (agent.id if agent else -1)))
+    if scope:
+        own = [r[0] for r in q.with_entities(KnowledgeDocument.id).all()]
+        return db.query(KnowledgeDocument).filter(KnowledgeDocument.id.in_(own + scope))
     return q
 
 
@@ -479,8 +485,10 @@ def core_section(db: Session, org_id: int, *, company_id: int | None, department
 
 
 def core_for_member(db: Session, member: Member, agent: Agent | None) -> str:
-    return core_section(db, member.organization_id, company_id=member.company_id, department_id=member.department_id,
+    core = core_section(db, member.organization_id, company_id=member.company_id, department_id=member.department_id,
                         role=member.role or "", agent_id=agent.id if agent else None)
+    from app.services import seat_leases   # R2: ghế thuê → sàn bên cho thuê đứng trước lớp bên thuê
+    return seat_leases.layered_core(db, member, core)
 
 
 def update_doc(db: Session, org_id: int, doc_id: int, data: dict) -> tuple[dict, bool]:

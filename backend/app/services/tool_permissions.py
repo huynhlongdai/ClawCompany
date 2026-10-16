@@ -114,6 +114,10 @@ def resolve(db: Session, member: Member, tool: str) -> tuple[str, str]:
     """(mức, nguồn). Nguồn: ``member`` | ``tier:<bậc>`` | ``default:<bậc>`` | ``unknown_tool``
     | ``action:<loại>/<nguồn>`` khi loại hành động chặt hơn hàng của tool."""
     level, source = _resolve_one(db, member, tool)
+    from app.services import seat_leases   # R2: sàn bên cho thuê — trên cả quyền riêng của ghế
+    lg = seat_leases.tool_gate(db, member, tool)
+    if lg is not None:
+        return lg
     pos = _position_gate(db, member, tool)
     if pos is not None:
         return pos

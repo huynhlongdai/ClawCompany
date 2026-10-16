@@ -76,6 +76,10 @@ def check(db: Session, member: Member | None) -> str:
     if member is None or member.member_type != "agent":
         return ""
     try:
+        from app.services import seat_leases   # R2: hợp đồng thuê (trạng thái, hạn, trần tháng) đứng trước
+        lr = seat_leases.block_reason(db, member)
+        if lr:
+            return lr
         return block_reason(state(db, member))
     except Exception:  # noqa: BLE001 - trần chi không được làm hỏng đường giao việc
         return ""

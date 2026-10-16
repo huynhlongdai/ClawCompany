@@ -231,6 +231,12 @@ def finish_run(db: Session, run: TaskRun, status: str, *, error_reason: str = ""
     if task is not None and task.checkout_run_id == run.id:
         task.checkout_run_id = None
         db.add(task)
+    if status in ("completed", "succeeded"):
+        try:   # R2: phí theo việc / theo giờ của ghế thuê
+            from app.services import seat_leases
+            seat_leases.on_run_end(db, run, commit=False)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[lease] run end {exc}")
     if commit:
         db.commit(); db.refresh(run)
     return run

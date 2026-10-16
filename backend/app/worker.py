@@ -44,6 +44,7 @@ CORE_BEAT_SCHEDULE = {
     "snapshot-kpis": {"task": "kpi.snapshot", "schedule": 3600.0},
     # M2e.4: đồng hồ SLA (quá hạn → leo thang) + việc tới ngoài giờ của người → agent cùng chức danh / xếp hàng.
     "tick-sla": {"task": "sla.tick", "schedule": 60.0},
+    "tick-lease": {"task": "lease.tick", "schedule": 300.0},   # R2 cho thuê agent
 }
 
 

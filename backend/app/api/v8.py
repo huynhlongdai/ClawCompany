@@ -195,6 +195,9 @@ async def portal_send_message(binding_id: int, payload: CustomerChatMessage, use
     customer=_portal_customer(db,user); binding=_binding_for_user(db,binding_id,user)
     agent=db.get(Agent,binding.agent_id); member=db.get(Member,agent.member_id) if agent else None
     if not agent or not member: raise HTTPException(404,"Assigned agent not found")
+    from app.services import seat_limits   # R2: ghế thuê hết hạn / tạm dừng / chạm trần → không gửi
+    blocked=seat_limits.check(db,member)
+    if blocked: raise HTTPException(402,blocked)
     inbound=ConversationMessage(conversation_id=binding.conversation_id,sender_member_id=None,sender_name=user.display_name or customer.name,content=payload.content,message_type="text")
     db.add(inbound);db.commit();db.refresh(inbound)
     run=await get_runtime().run_agent(
@@ -224,6 +227,13 @@ async def portal_chat_events(binding_id: int, run_id: str, user: CustomerPortalU
                 elif isinstance(result,str): final_text=result
                 if not final_text and str(event.get("type") or "").endswith("message"): final_text=str(event.get("content") or event.get("message") or "")
                 yield {"event":str(event.get("type") or "runtime"),"data":json.dumps(event,ensure_ascii=False)}
+            try:   # R2: ghế thuê → đo phiên cổng khách theo usage thật của gateway
+                from app.services import seat_leases
+                a_=stream_db.get(Agent,agent_id); m_=stream_db.get(Member,a_.member_id) if a_ else None
+                if a_ and m_ and session_key:
+                    await seat_leases.meter_session(stream_db,rt,m_,a_,session_key,channel="portal",caller=f"portal:customer:{customer_id}")
+            except Exception as exc:  # noqa: BLE001
+                print(f"[lease] portal meter {exc}")
             if final_text:
                 streamed_agent=stream_db.get(Agent,agent_id)
                 msg=ConversationMessage(conversation_id=conversation_id,sender_member_id=streamed_agent.member_id if streamed_agent else None,sender_name="AI Employee",content=final_text,message_type="text")

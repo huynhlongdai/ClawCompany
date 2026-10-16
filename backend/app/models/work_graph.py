@@ -45,6 +45,9 @@ class TaskRun(Base):
     tokens_in: Mapped[int] = mapped_column(Integer, default=0)
     tokens_out: Mapped[int] = mapped_column(Integer, default=0)
     error_reason: Mapped[str] = mapped_column(Text, default="")
+    # R2 (0052): lượt chạy của ghế agent đi thuê — hợp đồng thuê + số tiền đã tính cho bên thuê (USD)
+    lease_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    billed_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

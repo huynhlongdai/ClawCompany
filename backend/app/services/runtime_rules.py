@@ -280,7 +280,12 @@ def rules_for(db: Session, member: Member | None) -> list[dict]:
     q = db.query(CompanyRule).filter(CompanyRule.company_id == member.company_id, CompanyRule.enabled.is_(True))
     rows = [r for r in q.order_by(CompanyRule.id).all()
             if r.position_id is None or r.position_id == getattr(member, "position_id", None)]
-    return [as_dict(r) for r in rows]
+    out = [as_dict(r) for r in rows]
+    from app.services import seat_leases   # R2: ghế thuê → luật sàn của bên cho thuê luôn đi kèm (đứng trước)
+    ls = seat_leases.lease_of_member(db, member.id, live_only=True)
+    if ls is not None:
+        out = seat_leases.provider_rules(db, ls) + out
+    return out
 
 
 def agents_md_lines(db: Session, member: Member | None, position_id: int | None = None, company_id: int | None = None) -> list[str]:
@@ -308,7 +313,13 @@ def compile_agent(db: Session, member: Member, agent: Agent) -> dict:
         r["tools"] = tools_of(r) if r["kind"] in ("tool", "approval") else []
     from app.services.tool_permissions import ALWAYS_ALLOWED
     allowed = sorted(set(pos.allowed_tools) | set(ALWAYS_ALLOWED)) if pos is not None and pos.allowed_tools else None
-    return {"seat": member.id, "company": member.company_id, "position": pos.id if pos else None,
+    from app.services import seat_leases   # R2: công cụ = sàn ∩ chức danh bên thuê (bên thuê chỉ siết)
+    ls = seat_leases.lease_of_member(db, member.id, live_only=True)
+    floor = seat_leases.provider_allowed_tools(db, ls) if ls is not None else None
+    if floor:
+        f = set(floor) | set(ALWAYS_ALLOWED)
+        allowed = sorted(f & set(allowed)) if allowed else sorted(f)
+    return {"seat": member.id, "lease": ls.id if ls is not None else None, "company": member.company_id, "position": pos.id if pos else None,
             "rules": rules, "allowedCompanyTools": allowed}
 
 

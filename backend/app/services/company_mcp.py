@@ -464,6 +464,10 @@ def _project_get(ctx: ToolContext, args: dict) -> dict:
 # ------------------------------------------------------------------ Tri thức
 
 def _doc_visible(ctx: ToolContext, doc: KnowledgeDocument | None) -> bool:
+    if doc is not None and doc.organization_id != ctx.org:
+        from app.services import seat_leases   # R2: tài liệu bên cho thuê trong phạm vi hợp đồng
+        ls = seat_leases.lease_of_member(ctx.db, ctx.member.id, live_only=True)
+        return bool(ls is not None and ls.status == "active" and doc.id in seat_leases.scope_doc_ids(ls))
     if doc is None or doc.organization_id != ctx.org:
         return False
     if doc.company_id and ctx.member.company_id and doc.company_id != ctx.member.company_id:
