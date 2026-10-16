@@ -381,7 +381,7 @@ SYNONYMS = {
 # chuyển thành "loại câu trả lời mong đợi": hỏi số tiền → đoạn có số tiền; hỏi số điện thoại → đoạn có số điện thoại;
 # hỏi thời lượng → đoạn có "n ngày/giờ". Kỹ thuật QA cổ điển (expected answer type), không gắn với câu nào của bộ eval.
 QUESTION_PHRASES = ("bao nhieu tien", "bao nhieu", "bao lau", "la gi", "nhu the nao", "the nao", "o dau", "khi nao",
-                    "may ngay", "co duoc khong", "duoc khong", "the nao")
+                    "may ngay", "co duoc khong", "duoc khong", "the nao", "mat bao lau", "dau tien", "vay", "nhi", "nhe")
 ANSWER_TYPES = {
     "amount": (re.compile(r"\b(bao nhieu tien|gia bao nhieu|phi bao nhieu|muc phi|het bao nhieu|tu bao nhieu|bao nhieu thi)"),
                re.compile(r"\d[\d.,]*\s*(?:d|dong|vnd|k|nghin|trieu)\b")),
@@ -399,7 +399,8 @@ def answer_types(query: str) -> list[str]:
 
 
 def strip_question_phrases(query: str) -> str:
-    q = " " + re.sub(r"\s+", " ", unaccent((query or "").lower())) + " "
+    # dấu câu → khoảng trắng trước khi so cụm ("mất bao lâu?" phải khớp " bao lau ")
+    q = " " + re.sub(r"\s+", " ", re.sub(r"[^0-9a-z@.+-]+", " ", unaccent((query or "").lower()))) + " "
     for ph in sorted(set(QUESTION_PHRASES), key=len, reverse=True):
         q = q.replace(f" {ph} ", " ")
     # "số" trước hotline / điện thoại / zalo là danh từ chỉ loại ("số hotline" = cái số) — thuộc loại câu trả lời
@@ -474,8 +475,15 @@ def cite_of(d: KnowledgeDocument, ch: KnowledgeChunk) -> str:
 def _pg_lexical(db: Session, doc_ids: list[int], qt: set[str]) -> dict[int, float]:
     """Postgres: FTS (to_tsvector 'simple' trên chữ không dấu, GIN) — hạng từ khoá kiểu BM25 của Postgres (ts_rank_cd)."""
     from sqlalchemy import bindparam, text
-    terms = [re.sub(r"[^0-9a-z]", "", t) for t in qt]
-    terms = [t for t in terms if t]
+    # Mỗi phần tử là một từ hoặc một CỤM đồng nghĩa ("mien phi van chuyen") → cụm thành truy vấn cụm (w1 <-> w2 …),
+    # khớp đúng ngữ nghĩa nhánh Python. Bản M3b tách cụm thành từ rời (mien | phi | van | chuyen) nên SOP nào có
+    # "vận chuyển"/"giao hàng" đều được FTS xếp cao cho câu "freeship" (đo trên Postgres VM 2026-10-16).
+    terms = []
+    for t in qt:
+        ws = [re.sub(r"[^0-9a-z]", "", w) for w in str(t).split()]
+        ws = [w for w in ws if w]
+        if ws:
+            terms.append(ws[0] if len(ws) == 1 else "(" + " <-> ".join(ws) + ")")
     if not terms or not doc_ids:
         return {}
     sql = text("SELECT id, ts_rank_cd(to_tsvector('simple', search_text), to_tsquery('simple', :q)) AS r FROM knowledge_chunks "
@@ -516,7 +524,6 @@ def search(db: Session, org_id: int, query: str, *, member: Member | None = None
     qt = set(_tokens(strip_question_phrases(query))) or set(_tokens(query))
     want_types = answer_types(query)
     groups = [(t, [f" {a} " for a in (SYNONYMS.get(t, ()) if expand else ())]) for t in qt]
-    lex_terms = set(qt) | {w for _t, alts in groups for a in alts for w in a.split()}
     docs = {d.id: d for d in visible_docs_query(db, org_id, member, agent).all() if agent_ok(d, member)}
     hits = []
     if qt and docs:
@@ -529,7 +536,7 @@ def search(db: Session, org_id: int, query: str, *, member: Member | None = None
                 .outerjoin(KnowledgeVector, KnowledgeVector.chunk_id == KnowledgeChunk.id)
                 .filter(KnowledgeChunk.document_id.in_(list(docs))).limit(20000).all())
         pg = db.get_bind().dialect.name == "postgresql"
-        fts = _pg_lexical(db, list(docs), lex_terms) if pg else {}
+        fts = _pg_lexical(db, list(docs), set(qt) | {a.strip() for _t, alts in groups for a in alts}) if pg else {}
         pvec = _pg_vector(db, list(docs), query) if pg and real_q is None else {}
         cand = []
         # IDF theo nhóm từ khoá trên các đoạn được phép (kiểu BM25): từ hiếm ("freeship") nặng hơn từ phổ biến ("đơn")
@@ -566,7 +573,7 @@ def search(db: Session, org_id: int, query: str, *, member: Member | None = None
                 s = 0.45 * cover + 0.55 * sem + title_bonus
                 if cover > 0 or sem >= 0.35:
                     at = ANSWER_TYPE_BONUS if want_types and any(ANSWER_TYPES[k][1].search(flat[ch.id]) for k in want_types) else 0.0
-                    cand.append({"ch": ch, "s": s + at, "lex": fts.get(ch.id, cover) + at + title_bonus, "vec": sem})
+                    cand.append({"ch": ch, "s": s + at, "lex": cover + at + title_bonus, "fts": fts.get(ch.id, 0.0), "vec": sem})
                 continue
             if ch.id in pvec:
                 vec = max(0.0, pvec[ch.id])
@@ -577,12 +584,19 @@ def search(db: Session, org_id: int, query: str, *, member: Member | None = None
             s = 0.7 * cover + 0.3 * vec + title_bonus
             if cover > 0:
                 at = ANSWER_TYPE_BONUS if want_types and any(ANSWER_TYPES[k][1].search(flat[ch.id]) for k in want_types) else 0.0
-                cand.append({"ch": ch, "s": s + at, "lex": fts.get(ch.id, 0.0) + cover + at + title_bonus, "vec": vec})
+                cand.append({"ch": ch, "s": s + at, "lex": cover + at + title_bonus, "fts": fts.get(ch.id, 0.0), "vec": vec})
         # RRF: hạng từ khoá + hạng vector (k=60), hoà → điểm tuyệt đối
         # M3e: vector BĂM (hash384, khi chưa có embedding thật) không mang nghĩa — chỉ là từ khoá thứ hai ồn hơn. RRF chỉ
         # dùng HẠNG nên một hạng vector ồn đủ đẩy đoạn đúng (điểm 0.9) xuống hạng 4–5 (đo trên câu "freeship"). Khi băm:
-        # vector chỉ còn trong điểm tuyệt đối (0.3·vec), không vào RRF; embedding thật (hoặc pgvector) thì RRF đủ hai nhánh.
-        vec_w = 1.0 if (real_q is not None or pvec) else 0.0
+        # vector chỉ còn trong điểm tuyệt đối (0.3·vec), không vào RRF; chỉ embedding thật mới vào RRF. pgvector cũng là
+        # vector BĂM (cột vector(384) của hash384) nên không tính là thật — bản đầu M3e cho pgvector vào RRF và Postgres
+        # (VM) vẫn trượt "freeship" dù SQLite đúng (đo 2026-10-16).
+        vec_w = 1.0 if real_q is not None else 0.0
+        # FTS Postgres (ts_rank_cd, thang 0..vài đơn vị, nghiêng về đoạn dài lặp từ) chuẩn hoá về 0..1 theo đoạn mạnh nhất
+        # rồi chỉ cộng 0.3 — trước đây cộng thẳng nên SOP dài không mục (§0) thắng đoạn đúng mục ở top-1 trên VM.
+        fmax = max((c["fts"] for c in cand), default=0.0) or 1.0
+        for c in cand:
+            c["lex"] += 0.3 * c["fts"] / fmax
         for key, w in (("lex", 1.0), ("vec", vec_w)):
             for rank, c in enumerate(sorted(cand, key=lambda c: -c[key])):
                 c["rrf"] = c.get("rrf", 0.0) + w / (RRF_K + rank + 1)
