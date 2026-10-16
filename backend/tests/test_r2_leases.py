@@ -175,7 +175,7 @@ def test_agents_md_puts_provider_floor_before_renter_layer(L):
     floor_at = md.index(seat_leases.FLOOR_HEADING)
     assert PROHIBITION in md and "Sàn: không phát sự kiện" in md
     # sàn đứng ngay sau tiêu đề, trước cả vai trò/nhiệm vụ do bên thuê đặt
-    assert floor_at < md.index("## Vai trò") < md.index("## Lớp của bên thuê")
+    assert floor_at < md.index("## Lớp của bên thuê") < md.index("## Vai trò")
     # danh sách công cụ của chức danh trong file là công cụ hiệu lực (sàn ∩ chức danh bên thuê)
     tools_line = next(x for x in md.splitlines() if x.startswith("- Công cụ công ty được dùng:"))
     assert "company_event_emit" not in tools_line and "company_budget_check" not in tools_line

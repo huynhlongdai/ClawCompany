@@ -206,23 +206,22 @@ def scope_section(db: Session, ls: SeatLease) -> str:
     return "\n\n".join(parts)
 
 
+RENTER_HEADING = "## Lớp của bên thuê (chỉ thêm/siết — mọi mục dưới đây)"
+
+
 def layered_core(db: Session, member: Member, renter_core: str) -> str:
-    """Phần "Kiến thức cốt lõi" của ghế thuê = lớp bên thuê (có nhãn). Sàn + phạm vi tri thức đặt ở ĐẦU AGENTS.md
-    bằng ``place_floor`` (trước cả vai trò/nhiệm vụ do bên thuê đặt)."""
-    ls = lease_of_member(db, member.id, live_only=True)
-    renter = renter_core.strip()
-    if ls is None or not renter:
-        return renter_core
-    return "## Lớp của bên thuê (chỉ thêm/siết)\n" + renter
+    """Phần "Kiến thức cốt lõi" của ghế thuê là của bên thuê và giữ nguyên; sàn + phạm vi tri thức + nhãn lớp bên thuê
+    được ``place_floor`` đặt ở ĐẦU AGENTS.md (trước cả vai trò/nhiệm vụ do bên thuê đặt)."""
+    return renter_core
 
 
 def place_floor(db: Session, member: Member | None, agents_md: str) -> str:
-    """AGENTS.md của ghế thuê: tiêu đề → sàn bên cho thuê → tri thức được cấp → phần còn lại (lớp bên thuê)."""
+    """AGENTS.md của ghế thuê: tiêu đề → sàn bên cho thuê → tri thức được cấp → nhãn lớp bên thuê → phần còn lại."""
     ls = lease_of_member(db, member.id, live_only=True) if member is not None else None
     if ls is None:
         return agents_md
     head, _, rest = agents_md.partition("\n")
-    block = "\n\n".join(x for x in (floor_section(db, ls), scope_section(db, ls)) if x)
+    block = "\n\n".join(x for x in (floor_section(db, ls), scope_section(db, ls), RENTER_HEADING) if x)
     return f"{head}\n\n{block}\n\n{rest.lstrip()}"
 
 
