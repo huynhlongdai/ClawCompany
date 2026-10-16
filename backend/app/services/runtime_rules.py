@@ -343,13 +343,37 @@ async def push(db: Session, runtime: Any) -> dict:
     raw = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     if not agent_hr._has_rpc(runtime):
         return {"pushed": False, "reason": "no_gateway", "agents": len(data["agents"]), "bytes": len(raw)}
+    import asyncio
     from app.services.openclaw_config import ConfigRegistry
-    reg = ConfigRegistry(runtime)
-    snap = await reg.snapshot()
-    await reg.patch({PLUGIN_CFG + ("rulesJson",): raw, PLUGIN_CFG + ("reportUrl",): report_url(),
-                     PLUGIN_CFG + ("reportToken",): report_token()}, base_hash=snap.get("hash"),
-                    note="ClawCompany: luật cứng cho guard plugin")
-    return {"pushed": True, "agents": len(data["agents"]), "bytes": len(raw)}
+    values = {PLUGIN_CFG + ("rulesJson",): raw, PLUGIN_CFG + ("reportUrl",): report_url(),
+              PLUGIN_CFG + ("reportToken",): report_token()}
+    async with _push_lock():
+        last = None
+        for attempt in range(4):   # nhiều lần sửa luật liền nhau → đẩy chồng → hash cũ: lấy lại config rồi thử lại
+            reg = ConfigRegistry(runtime)
+            snap = await reg.snapshot()
+            cur = ((((snap.get("config") or {}).get("plugins") or {}).get("entries") or {}).get("clawcompany-guard") or {})
+            if ((cur.get("config") or {}).get("rulesJson") or "").split(',"agents"', 1)[-1] == raw.split(',"agents"', 1)[-1]:
+                return {"pushed": False, "reason": "unchanged", "agents": len(data["agents"]), "bytes": len(raw)}
+            try:
+                await reg.patch(values, base_hash=snap.get("hash"), note="ClawCompany: luật cứng cho guard plugin")
+                return {"pushed": True, "agents": len(data["agents"]), "bytes": len(raw), "attempts": attempt + 1}
+            except Exception as exc:  # noqa: BLE001
+                last = exc
+                if "changed since last load" not in str(exc) and "base" not in str(exc).lower():
+                    raise
+                await asyncio.sleep(0.5 * (attempt + 1))
+        raise last  # type: ignore[misc]
+
+
+_LOCKS: dict[int, Any] = {}
+
+
+def _push_lock():
+    """Một lần đẩy luật mỗi lúc trong mỗi event loop (các lần sửa liên tiếp xếp hàng thay vì giẫm hash của nhau)."""
+    import asyncio
+    loop = asyncio.get_running_loop()
+    return _LOCKS.setdefault(id(loop), asyncio.Lock())
 
 
 # ------------------------------------------------------------------ vi phạm
