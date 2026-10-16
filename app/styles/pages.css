@@ -699,3 +699,7 @@ textarea.ops-json{width:100%}
 .doc-content .is-del{color:var(--risk);text-decoration:line-through}
 .doc-pending{border:1px dashed var(--border-strong);border-radius:var(--radius-sm)}
 @media (max-width:760px){.doc-layout{grid-template-columns:1fr}.doc-tree{flex-direction:row;flex-wrap:wrap}.doc-tree-item{width:auto}}
+.doc-main td code{white-space:nowrap}
+.doc-main>.tmRow{flex-wrap:nowrap}
+.doc-main>.tmRow .ui-input:first-child{flex:1;min-width:0}
+.doc-main>.tmRow select.ui-input{width:auto;flex:0 0 auto}
