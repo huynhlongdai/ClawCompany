@@ -155,7 +155,9 @@ def test_local_today_follows_the_configured_timezone(monkeypatch):
     monkeypatch.setattr(settings, "app_timezone", "Etc/GMT+12")           # UTC-12
     west = v36.local_today()
     assert east != west, "local_today phải đổi theo app_timezone"
-    assert (east - west).days == 1
+    # (lỗi test, sửa 2026-10-16: hai múi cách nhau 26 giờ nên ngày lịch lệch 1 HOẶC 2 — lệch 2 khi UTC trong 10:00–12:00;
+    # bản cũ "== 1" đỏ đúng trong khung đó, đo lúc 11:xx UTC. Không phải lỗi code.)
+    assert (east - west).days in (1, 2)
 
     # Múi giờ sai chính tả không được làm sập trang chủ.
     monkeypatch.setattr(settings, "app_timezone", "Mars/Olympus_Mons")
