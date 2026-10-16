@@ -592,8 +592,11 @@ def _brief_of_position(db: Session, position) -> dict | None:
 def _core_at_hire(db: Session, org_id: int, company_id: int | None, department_id: int | None, role: str) -> str:
     from app.services import knowledge_hub
     try:
+        # M3b: seat chưa có trong DB → ghế tạm (không lưu) để lọc nhạy cảm / đối tượng như mọi seat agent
+        probe = Member(organization_id=org_id, company_id=company_id, department_id=department_id, role=role or "",
+                       member_type="agent")
         return knowledge_hub.core_section(db, org_id, company_id=company_id, department_id=department_id,
-                                          role=role or "", agent_id=None)
+                                          role=role or "", agent_id=None, member=probe)
     except Exception as exc:  # noqa: BLE001
         print(f"[core] {exc}")
         return ""

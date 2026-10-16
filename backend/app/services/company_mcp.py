@@ -482,9 +482,10 @@ def _doc_visible(ctx: ToolContext, doc: KnowledgeDocument | None) -> bool:
 
 
 @tool("company_knowledge_search", "knowledge",
-      "Tìm trong kho tri thức công ty (tài liệu, quy định, sổ tay, khoá học) trong phạm vi của bạn. Mỗi kết quả có "
-      "\"cite\" — khi trả lời dựa vào tài liệu, ghi kèm cite đó. found=false nghĩa là kho chưa có câu trả lời: "
-      "nói rõ là chưa có tài liệu, đừng đoán.",
+      "Tìm trong kho tri thức công ty (chính sách, sổ tay, SOP, FAQ — chỉ bản đã ban hành, đang hiệu lực) trong phạm vi "
+      "của bạn. Mỗi kết quả có \"cite\" dạng [DOC:mã vN §mục] — ghi cite trong báo cáo/ghi chú nội bộ, KHÔNG đưa mã vào tin "
+      "gửi khách. stale=true: tài liệu quá hạn rà soát, nói rõ là theo tài liệu đang chờ rà soát. found=false nghĩa là kho "
+      "chưa có câu trả lời: nói rõ là chưa có tài liệu, đừng đoán. Giá / số liệu: dùng company_fact_get hoặc tool sản phẩm.",
       "company.knowledge:read", {"query": {"type": "string"}, "limit": {"type": "integer"}, "maxResults": {"type": "integer"}},
       ("query",))
 def _knowledge_search(ctx: ToolContext, args: dict) -> dict:
@@ -687,6 +688,50 @@ def _knowledge_get(ctx: ToolContext, args: dict) -> dict:
         raise ToolError("not_found", "Không thấy tài liệu")
     return {"id": doc.id, "title": doc.title, "access_level": doc.access_level,
             **_slice(doc.content or "", args)}
+
+
+@tool("company_doc_get", "knowledge",
+      "Đọc một tài liệu công ty theo mã (vd POL-001) — bản đang hiệu lực, kể cả tài liệu 'chỉ qua tool' (mẫu biểu, bảng). "
+      "Trả mã, phiên bản, các mục (§) và nội dung (offset để đọc tiếp).",
+      "company.knowledge:read", {"doc_code": {"type": "string"}, "offset": {"type": "integer"}}, ("doc_code",))
+def _doc_get(ctx: ToolContext, args: dict) -> dict:
+    from app.services import doc_library, knowledge_hub
+    doc = doc_library.by_code(ctx.db, ctx.member, _str(args, "doc_code", limit=40))
+    if doc is None or not knowledge_hub.agent_ok(doc, ctx.member, ("core", "retrieve", "tool_only")):
+        raise ToolError("not_found", "Không thấy tài liệu (chưa ban hành, hết hiệu lực, hoặc không dành cho agent)")
+    secs = [{"section_no": no, "section": path} for path, no, _ in knowledge_hub.sections(doc.content or "") if path]
+    return {"doc_code": doc.doc_code, "version_no": doc.version_no, "title": doc.title, "doc_type": doc.doc_type,
+            "cite": f"[DOC:{doc.doc_code} v{doc.version_no}]", "stale": doc_library.review_state(doc) == "stale",
+            "effective_from": doc.effective_from.isoformat() if doc.effective_from else None, "sections": secs,
+            **_slice(doc.content or "", args)}
+
+
+@tool("company_doc_flag", "knowledge",
+      "Đánh dấu một tài liệu công ty sai / đã cũ / mâu thuẫn / thiếu trường hợp khi bạn dùng nó (KCS 'flag it'). "
+      "Người phụ trách tài liệu nhận trong Hộp việc. reason: wrong | outdated | conflict | missing_case.",
+      "company.knowledge:read", {"doc_code": {"type": "string"}, "reason": {"type": "string"}, "note": {"type": "string"},
+                                 "task_id": {"type": "integer"}}, ("doc_code", "reason"), writes=True)
+def _doc_flag(ctx: ToolContext, args: dict) -> dict:
+    from app.services import doc_library
+    doc = doc_library.by_code(ctx.db, ctx.member, _str(args, "doc_code", limit=40))
+    if doc is None:
+        raise ToolError("not_found", "Không thấy tài liệu theo mã này")
+    reason = _str(args, "reason", limit=24).lower()
+    if reason not in doc_library.FLAG_REASONS:
+        raise ToolError("invalid_argument", f"reason phải là một trong {', '.join(doc_library.FLAG_REASONS)}")
+    task_id = _int(args, "task_id", required=False, default=None) or (ctx.run.task_id if ctx.run else None)
+    return doc_library.flag(ctx.db, member=ctx.member, doc=doc, reason=reason, note=_str(args, "note", required=False, limit=2000),
+                            task_id=task_id)
+
+
+@tool("company_fact_get", "knowledge",
+      "Tra số liệu chính thức của công ty (số ngày đổi trả, thời gian hoàn tiền, bảo hành, ngưỡng miễn phí vận chuyển, giờ "
+      "mở cửa, hotline…) kèm nguồn. conflict=true: các nguồn đang ghi khác nhau — đừng tự chọn, báo người phụ trách.",
+      "company.knowledge:read", {"key": {"type": "string"}, "query": {"type": "string"}})
+def _fact_get(ctx: ToolContext, args: dict) -> dict:
+    from app.services import company_facts
+    return company_facts.for_agent(ctx.db, ctx.member.company_id, key=_str(args, "key", required=False, limit=80),
+                                   query=_str(args, "query", required=False, limit=200))
 
 
 @tool("company_sop_get", "knowledge",

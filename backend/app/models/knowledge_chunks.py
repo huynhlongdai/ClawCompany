@@ -11,6 +11,10 @@ class KnowledgeChunk(Base):
     content: Mapped[str] = mapped_column(Text)
     embedding_provider: Mapped[str] = mapped_column(String(64), default="none")
     embedding_ref: Mapped[str] = mapped_column(String(255), default="")
+    # M3b (0054): cắt theo đề mục — đường dẫn đề mục, số mục (§), chữ không dấu cho FTS/từ khoá
+    section: Mapped[str] = mapped_column(String(300), default="", server_default="")
+    section_no: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    search_text: Mapped[str] = mapped_column(Text, default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 class BackgroundJob(Base):

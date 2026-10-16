@@ -1,0 +1,237 @@
+{
+ "name": "CSKH Tiệm Gốm Mộc (M3b)",
+ "company": "Tiệm Gốm Mộc",
+ "docs": [
+  {
+   "key": "doitra",
+   "title": "Chính sách đổi trả & hoàn tiền",
+   "doc_type": "policy",
+   "agent_use": "core",
+   "customer_facing": true,
+   "content": "## Điều kiện đổi trả\n\nTiệm Gốm Mộc nhận đổi trả trong 7 ngày kể từ ngày khách nhận hàng khi sản phẩm bị nứt, vỡ hoặc mẻ do vận chuyển. Khách cần gửi ảnh hoặc video mở hộp và mã đơn hàng.\n\n## Trường hợp không áp dụng\n\nKhông đổi trả hàng giảm giá trên 30%, sản phẩm đặt làm riêng có khắc tên, và sản phẩm khách làm rơi vỡ sau khi đã nhận.\n\n## Hoàn tiền\n\nHoàn tiền trong 48 giờ sau khi xác nhận lỗi, chuyển về đúng phương thức khách đã thanh toán (tài khoản ngân hàng hoặc thẻ).\n\n## Phí vận chuyển khi đổi trả\n\nLỗi do tiệm hoặc do đơn vị vận chuyển thì tiệm chịu toàn bộ phí gửi lại. Khách đổi ý (đổi mẫu, đổi màu) thì khách trả phí vận chuyển hai chiều."
+  },
+  {
+   "key": "vanchuyen",
+   "title": "Chính sách vận chuyển",
+   "doc_type": "policy",
+   "agent_use": "retrieve",
+   "customer_facing": true,
+   "content": "## Phí vận chuyển\n\nMiễn phí vận chuyển cho đơn từ 500.000đ. Đơn dưới mức này phí 30.000đ nội thành TP.HCM và 45.000đ đi tỉnh.\n\n## Thời gian giao\n\nNội thành TP.HCM giao trong 1–2 ngày làm việc; các tỉnh khác 3–5 ngày. Giao hoả tốc nội thành trong 2 giờ, phụ phí 50.000đ.\n\n## Đóng gói\n\nMỗi sản phẩm được bọc ba lớp mút xốp và đặt trong thùng carton 5 lớp có nhãn dễ vỡ.\n\n## Giao quốc tế\n\nHiện tiệm chưa nhận giao hàng ra nước ngoài."
+  },
+  {
+   "key": "baohanh",
+   "title": "Chính sách bảo hành men gốm",
+   "doc_type": "policy",
+   "agent_use": "retrieve",
+   "customer_facing": true,
+   "content": "## Thời hạn bảo hành\n\nBảo hành lớp men 12 tháng kể từ ngày mua cho lỗi bong tróc men hoặc đổi màu bất thường.\n\n## Không thuộc bảo hành\n\nVết rạn chân chim trên men rạn là đặc trưng tự nhiên, không phải lỗi. Không bảo hành sản phẩm bị rơi vỡ, sốc nhiệt do khách sử dụng sai hướng dẫn.\n\n## Cách yêu cầu bảo hành\n\nKhách nhắn ảnh sản phẩm và hoá đơn qua Zalo OA; tiệm phản hồi phương án trong 2 ngày làm việc."
+  },
+  {
+   "key": "baoquan",
+   "title": "Hướng dẫn sử dụng và bảo quản gốm",
+   "doc_type": "product_sheet",
+   "agent_use": "retrieve",
+   "customer_facing": true,
+   "content": "## Lò vi sóng và máy rửa bát\n\nGốm men lam và men trắng dùng được trong lò vi sóng và máy rửa bát. Sản phẩm có viền vàng hoặc vẽ nhũ kim loại tuyệt đối không cho vào lò vi sóng.\n\n## Tránh sốc nhiệt\n\nKhông đổ nước sôi vào cốc đang lạnh, không đặt bát nóng lên bề mặt ướt lạnh; để gốm nguội dần.\n\n## Chậu đất nung trồng cây\n\nNgâm chậu đất nung trong nước 30 phút trước khi trồng cây để đất không hút hết nước của cây.\n\n## Vệ sinh\n\nRửa bằng nước rửa chén thông thường, không dùng búi sắt cọ lên men."
+  },
+  {
+   "key": "faq",
+   "title": "Câu hỏi thường gặp của khách",
+   "doc_type": "faq",
+   "agent_use": "retrieve",
+   "customer_facing": true,
+   "content": "## Giờ mở cửa và liên hệ\n\nCửa hàng mở cửa 8:00–21:00 tất cả các ngày trong tuần. Hotline 0901 234 567, Zalo OA Tiệm Gốm Mộc.\n\n## Đặt làm theo yêu cầu\n\nTiệm nhận đặt làm gốm khắc tên, logo cho quà tặng doanh nghiệp. Thời gian làm 15–20 ngày, đặt cọc 50% giá trị đơn.\n\n## Thanh toán\n\nKhách thanh toán khi nhận hàng (COD), chuyển khoản ngân hàng hoặc thẻ qua cổng thanh toán trên website.\n\n## Hoá đơn VAT\n\nTiệm xuất hoá đơn điện tử VAT trong vòng 7 ngày nếu khách gửi thông tin công ty khi đặt hàng.\n\n## Gói quà\n\nGói quà bằng giấy kraft và thiệp viết tay miễn phí, chỉ cần ghi chú khi đặt."
+  },
+  {
+   "key": "sopvo",
+   "title": "Quy trình xử lý khiếu nại hàng vỡ",
+   "doc_type": "sop",
+   "agent_use": "retrieve",
+   "customer_facing": false,
+   "content": "## Bước 1: Tiếp nhận\n\nXin khách ảnh hoặc video mở hộp, mã đơn và số điện thoại đặt hàng.\n\n## Bước 2: Kiểm tra đơn\n\nĐối chiếu ngày nhận hàng trên vận đơn; còn trong hạn đổi trả thì sang bước 3.\n\n## Bước 3: Đề xuất phương án\n\nĐề xuất gửi sản phẩm thay thế hoặc hoàn tiền; hoàn tiền trên 500.000đ phải xin trưởng phòng duyệt.\n\n## Bước 4: Ghi nhận\n\nGhi kết quả vào phiếu khiếu nại và báo đơn vị vận chuyển để đòi bồi thường."
+  },
+  {
+   "key": "thanthiet",
+   "title": "Chương trình khách hàng thân thiết",
+   "doc_type": "promo",
+   "agent_use": "retrieve",
+   "customer_facing": true,
+   "content": "## Tích điểm\n\nMỗi đơn hàng tích 1% giá trị thành điểm thưởng, 1 điểm bằng 1.000đ khi mua lần sau.\n\n## Hạng thành viên\n\nHạng Bạc khi tổng chi tiêu từ 5 triệu đồng, giảm 5% mọi đơn. Hạng Vàng từ 15 triệu đồng, giảm 10% và miễn phí giao hoả tốc.\n\n## Quà sinh nhật\n\nThành viên nhận voucher 100.000đ trong tháng sinh nhật, dùng cho đơn từ 300.000đ."
+  },
+  {
+   "key": "giong",
+   "title": "Giọng thương hiệu Tiệm Gốm Mộc",
+   "doc_type": "brand_guide",
+   "agent_use": "core",
+   "customer_facing": false,
+   "content": "## Xưng hô\n\nXưng em, gọi khách là anh/chị. Không dùng tiếng lóng, không viết tắt.\n\n## Giọng văn\n\nẤm áp, mộc mạc, kể chuyện về đất và lửa; luôn cảm ơn khách đã kiên nhẫn chờ hàng thủ công."
+  }
+ ],
+ "questions": [
+  {
+   "q": "Bình bị vỡ khi giao thì bao lâu được đổi?",
+   "doc": "doitra",
+   "section": "Điều kiện đổi trả"
+  },
+  {
+   "q": "binh bi vo khi giao co doi duoc khong",
+   "doc": "doitra",
+   "section": "Điều kiện đổi trả"
+  },
+  {
+   "q": "Hàng sale 40% có đổi trả được không?",
+   "doc": "doitra",
+   "section": "Trường hợp không áp dụng"
+  },
+  {
+   "q": "Sản phẩm khắc tên riêng có được trả lại không",
+   "doc": "doitra",
+   "section": "Trường hợp không áp dụng"
+  },
+  {
+   "q": "Bao lâu thì tôi nhận lại tiền?",
+   "doc": "doitra",
+   "section": "Hoàn tiền"
+  },
+  {
+   "q": "hoan tien ve dau",
+   "doc": "doitra",
+   "section": "Hoàn tiền"
+  },
+  {
+   "q": "Tôi muốn đổi sang màu khác thì ai trả phí ship?",
+   "doc": "doitra",
+   "section": "Phí vận chuyển khi đổi trả"
+  },
+  {
+   "q": "Đơn bao nhiêu tiền thì được freeship?",
+   "doc": "vanchuyen",
+   "section": "Phí vận chuyển"
+  },
+  {
+   "q": "phi ship di tinh bao nhieu",
+   "doc": "vanchuyen",
+   "section": "Phí vận chuyển"
+  },
+  {
+   "q": "Giao hàng ra Hà Nội mất mấy ngày?",
+   "doc": "vanchuyen",
+   "section": "Thời gian giao"
+  },
+  {
+   "q": "Có giao hỏa tốc trong ngày không?",
+   "doc": "vanchuyen",
+   "section": "Thời gian giao"
+  },
+  {
+   "q": "Hàng gốm được đóng gói thế nào để không vỡ?",
+   "doc": "vanchuyen",
+   "section": "Đóng gói"
+  },
+  {
+   "q": "Tiệm có ship sang Mỹ không?",
+   "doc": "vanchuyen",
+   "section": "Giao quốc tế"
+  },
+  {
+   "q": "Men bị bong thì có được bảo hành không?",
+   "doc": "baohanh",
+   "section": "Thời hạn bảo hành"
+  },
+  {
+   "q": "bao hanh may thang",
+   "doc": "baohanh",
+   "section": "Thời hạn bảo hành"
+  },
+  {
+   "q": "Cốc men rạn có vết nứt nhỏ li ti là lỗi à?",
+   "doc": "baohanh",
+   "section": "Không thuộc bảo hành"
+  },
+  {
+   "q": "Muốn bảo hành thì gửi gì cho tiệm?",
+   "doc": "baohanh",
+   "section": "Cách yêu cầu bảo hành"
+  },
+  {
+   "q": "Bát này cho vào lò vi sóng được không?",
+   "doc": "baoquan",
+   "section": "Lò vi sóng và máy rửa bát"
+  },
+  {
+   "q": "Đĩa viền vàng dùng microwave được không",
+   "doc": "baoquan",
+   "section": "Lò vi sóng và máy rửa bát"
+  },
+  {
+   "q": "Đổ nước sôi vào cốc có bị nứt không?",
+   "doc": "baoquan",
+   "section": "Tránh sốc nhiệt"
+  },
+  {
+   "q": "Chậu đất nung trước khi trồng cây cần làm gì?",
+   "doc": "baoquan",
+   "section": "Chậu đất nung trồng cây"
+  },
+  {
+   "q": "Có được dùng búi sắt chà không",
+   "doc": "baoquan",
+   "section": "Vệ sinh"
+  },
+  {
+   "q": "Cửa hàng mở cửa mấy giờ?",
+   "doc": "faq",
+   "section": "Giờ mở cửa và liên hệ"
+  },
+  {
+   "q": "so hotline cua tiem",
+   "doc": "faq",
+   "section": "Giờ mở cửa và liên hệ"
+  },
+  {
+   "q": "Đặt làm cốc in logo công ty mất bao lâu?",
+   "doc": "faq",
+   "section": "Đặt làm theo yêu cầu"
+  },
+  {
+   "q": "Có thanh toán khi nhận hàng không?",
+   "doc": "faq",
+   "section": "Thanh toán"
+  },
+  {
+   "q": "Công ty tôi cần xuất hóa đơn đỏ",
+   "doc": "faq",
+   "section": "Hoá đơn VAT"
+  },
+  {
+   "q": "Có gói quà tặng không, có mất phí không?",
+   "doc": "faq",
+   "section": "Gói quà"
+  },
+  {
+   "q": "Khách báo hàng vỡ thì CSKH làm bước đầu tiên là gì?",
+   "doc": "sopvo",
+   "section": "Bước 1: Tiếp nhận"
+  },
+  {
+   "q": "Hoàn tiền 700 nghìn có cần ai duyệt không?",
+   "doc": "sopvo",
+   "section": "Bước 3: Đề xuất phương án"
+  },
+  {
+   "q": "Tích điểm thành viên thế nào?",
+   "doc": "thanthiet",
+   "section": "Tích điểm"
+  },
+  {
+   "q": "Chi tiêu bao nhiêu thì lên hạng Vàng?",
+   "doc": "thanthiet",
+   "section": "Hạng thành viên"
+  },
+  {
+   "q": "Sinh nhật có quà gì không",
+   "doc": "thanthiet",
+   "section": "Quà sinh nhật"
+  }
+ ]
+}

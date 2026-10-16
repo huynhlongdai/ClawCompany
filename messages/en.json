@@ -162,7 +162,8 @@
   "co_hieu_qua": "Performance",
   "co_cho_thue": "Rental",
   "co_tai_lieu": "Documents & knowledge",
-  "co_thu_vien": "Library"
+  "co_thu_vien": "Library",
+  "co_su_kien": "Company facts"
  },
  "shell": {
   "cong_ty": "{p0} · {p1:company|companies}",
@@ -3264,6 +3265,28 @@
   "ret_permanent": "Permanent",
   "ret_5y": "5 years",
   "ret_10y_after_end": "10 years after expiry (to verify)",
-  "ret_purpose_end": "Delete when purpose ends (Law 91/2025)"
+  "ret_purpose_end": "Delete when purpose ends (Law 91/2025)",
+  "core_summary": "Core summary (goes into AGENTS.md)",
+  "core_summary_hint": "≤ 600 chars, approved with the document. Empty: auto-summary by heading (never cut mid-way).",
+  "core_summary_auto": "(Auto-summarised by heading — short documents go in verbatim)",
+  "conflicts": "{p0} figure(s) conflict with other sources",
+  "override": "I've reviewed the conflicts — publish anyway",
+  "flags_open": "Flagged by agents / people",
+  "flag_wrong": "Wrong",
+  "flag_outdated": "Outdated",
+  "flag_conflict": "Conflict",
+  "flag_missing_case": "Missing case",
+  "flag_resolve": "Resolved",
+  "flag_dismiss": "Dismiss",
+  "facts_explain": "The company's official figures, each with its source (document code + version + section, or entered by hand). Extracted automatically from published documents; two sources disagreeing = a conflict, soft-blocked at approval. Agents read them via company_fact_get.",
+  "facts_conflicts": "Conflicts",
+  "facts_empty": "No facts yet — publish a policy with return days, warranty… or enter one by hand.",
+  "fact": "Fact",
+  "fact_value": "Value",
+  "fact_source": "Source",
+  "conflict": "Conflict",
+  "fact_manual": "Enter by hand (wins when agents look up)",
+  "fact_save": "Save fact",
+  "remove": "Remove"
  }
 }

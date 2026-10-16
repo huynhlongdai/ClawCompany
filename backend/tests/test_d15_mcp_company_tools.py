@@ -110,7 +110,8 @@ def test_initialize_and_list_all_26_tools(env):
     # 29 = 26 + company_lesson_propose + company_knowledge_gap_report (M5b) + company_ask_advisor (M6)
     # +2 A2A: company_external_agents, company_delegate_external; +2 M2e.3: company_task_submit_output,
     # company_process_step_outcome (đổi assertion vì thêm tool thật, không phải để test xanh)
-    assert len(tools) == 33 and all(n.startswith("company_") for n in names)
+    # +3 M3b: company_doc_get, company_doc_flag, company_fact_get (thêm tool thật — đổi assertion có lý do)
+    assert len(tools) == 36 and all(n.startswith("company_") for n in names)
     assert "company_task_checkout" in names and "company_memory_search" in names
 
 
@@ -236,7 +237,8 @@ def test_executor_seat_gets_403_on_budget_check_even_with_full_scopes(env):
     k = env["key"](junior, scopes=("*",))     # gateway/scope đều cho qua
     names = {t["name"] for t in env["rpc"](k, "tools/list").json()["result"]["tools"]}
     # 28 → 30: M2e.3 thêm company_task_submit_output + company_process_step_outcome (tool thật mới, không phải sửa cho xanh)
-    assert "company_budget_check" not in names and len(names) == 30   # +2 A2A (company_external_agents, company_delegate_external); +company_lesson_propose, company_knowledge_gap_report (M5b), company_ask_advisor (M6)
+    # 33 = 30 + 3 tool M3b (company_doc_get, company_doc_flag, company_fact_get)
+    assert "company_budget_check" not in names and len(names) == 33   # +2 A2A (company_external_agents, company_delegate_external); +company_lesson_propose, company_knowledge_gap_report (M5b), company_ask_advisor (M6)
     r = env["rpc"](k, "tools/call", {"name": "company_budget_check", "arguments": {}})
     assert r.status_code == 403 and r.json()["error"]["data"]["level"] == "off"
     # Trưởng phòng thì được.

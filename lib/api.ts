@@ -1041,8 +1041,14 @@ export const apiDocs = {
   newVersion: (id: number, body: any) => request<any>(`/team/docs/${id}/versions`, {method: "POST", body: JSON.stringify(body)}),
   editVersion: (id: number, vid: number, body: any) => request<any>(`/team/docs/${id}/versions/${vid}`, {method: "PATCH", body: JSON.stringify(body)}),
   submit: (id: number, vid: number) => request<any>(`/team/docs/${id}/versions/${vid}/submit`, {method: "POST"}),
-  decide: (id: number, vid: number, decision: "approved" | "rejected", note = "") =>
-    request<any>(`/team/docs/${id}/versions/${vid}/decide`, {method: "POST", body: JSON.stringify({decision, note})}),
+  decide: (id: number, vid: number, decision: "approved" | "rejected", note = "", override_conflicts = false) =>
+    request<any>(`/team/docs/${id}/versions/${vid}/decide`, {method: "POST", body: JSON.stringify({decision, note, override_conflicts})}),
+  flagStatus: (id: number, flagId: number, status: "resolved" | "dismissed") =>
+    request<any>(`/team/docs/${id}/flags/${flagId}`, {method: "POST", body: JSON.stringify({status})}),
+  chunks: (id: number) => request<any>(`/team/docs/${id}/chunks`),
+  facts: (companyId: number | null) => request<any>(`/team/facts?${dq({company_id: companyId})}`),
+  putFact: (body: any) => request<any>(`/team/facts`, {method: "PUT", body: JSON.stringify(body)}),
+  delFact: (id: number) => request<any>(`/team/facts/${id}`, {method: "DELETE"}),
   diff: (id: number, a?: number, b?: number) => request<any>(`/team/docs/${id}/diff?${dq({a, b})}`),
   review: (id: number, note = "") => request<any>(`/team/docs/${id}/review`, {method: "POST", body: JSON.stringify({note})}),
   archive: (id: number, reason = "") => request<any>(`/team/docs/${id}/archive`, {method: "POST", body: JSON.stringify({reason})}),

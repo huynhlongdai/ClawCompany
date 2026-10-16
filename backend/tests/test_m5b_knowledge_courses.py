@@ -45,7 +45,8 @@ def test_ingest_dedupe_search_with_citation_and_gap(L):
     ctx = company_mcp.ToolContext(db=L.db, member=m, agent=ag, scopes=["company.knowledge:read"])
     r = company_mcp.TOOLS["company_knowledge_search"].handler(ctx, {"query": "đổi trả trong bao nhiêu ngày"})
     assert r["found"] and r["hits"][0]["document_id"] == d["id"], r
-    assert r["hits"][0]["cite"].startswith(f"[KB#{d['id']}§") and "7 ngày" in r["hits"][0]["content"]
+    # M3b đổi định dạng trích dẫn: [DOC:mã vN §mục] (tài liệu cũ được cấp mã DOC-<id>) — luật đổi, không phải để xanh
+    assert r["hits"][0]["cite"].startswith(f"[DOC:DOC-{d['id']} v1 §") and "7 ngày" in r["hits"][0]["content"]
     miss = company_mcp.TOOLS["company_knowledge_search"].handler(ctx, {"query": "chính sách bảo hành máy lạnh inverter"})
     assert miss["found"] is False and miss["gap_id"]
     gaps = L.c.get("/api/learning/gaps", headers=L.tok("manager")).json()["items"]
@@ -211,7 +212,8 @@ def test_memory_search_also_returns_library_hits(L):
     out = hire(L); ag = L.db.get(Agent, out["agent_id"]); m = L.db.get(Member, ag.member_id)
     ctx = company_mcp.ToolContext(db=L.db, member=m, agent=ag, scopes=["company.knowledge:read"])
     r = company_mcp.TOOLS["company_memory_search"].handler(ctx, {"query": "hàng vỡ khi vận chuyển gửi ảnh"})
-    assert r["knowledge"] and "48 giờ" in r["knowledge"][0]["content"] and r["knowledge"][0]["cite"].startswith("[KB#")
+    # M3b: trích dẫn mới [DOC:…] (trước đây [KB#…])
+    assert r["knowledge"] and "48 giờ" in r["knowledge"][0]["content"] and r["knowledge"][0]["cite"].startswith("[DOC:")
 
 
 def test_core_knowledge_three_layers_compiled_into_agents_md(L):

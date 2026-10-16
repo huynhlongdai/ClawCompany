@@ -304,10 +304,19 @@ def agents_md_lines(db: Session, member: Member | None, position_id: int | None 
     return out[:20]
 
 
+# M3b: trích dẫn nội bộ [DOC:mã vN §m] dùng trong báo cáo/ghi chú; tin gửi KHÁCH thì plugin gỡ đi (scrub).
+DOC_CITE_RULE = {"id": 0, "kind": "regex", "pattern": r"\[DOC:[^\]]{1,80}\]", "action": "scrub", "external_only": True,
+                 "message": "Không gửi mã tài liệu nội bộ cho khách", "name": "Mã tài liệu nội bộ (M3b, hệ thống)"}
+
+
 def compile_agent(db: Session, member: Member, agent: Agent) -> dict:
     from app.services.company_foundation import position_of
     pos = position_of(db, member)
     rules = rules_for(db, member)
+    if member.company_id:
+        from app.models import KnowledgeDocument
+        if db.query(KnowledgeDocument.id).filter(KnowledgeDocument.organization_id == member.organization_id).first():
+            rules = rules + [dict(DOC_CITE_RULE)]   # M3b: mã tài liệu nội bộ không ra tới khách
     for r in rules:
         r["regex"] = [src for _l, src in regex_of(r)]
         r["tools"] = tools_of(r) if r["kind"] in ("tool", "approval") else []

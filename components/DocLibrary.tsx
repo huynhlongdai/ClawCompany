@@ -94,7 +94,7 @@ function TypeSelect({types, groups, value, onChange}: {types: any[]; groups: any
 function NewDoc({mode, companyId, types, groups, busy, onCancel, onDone, setError}: any) {
   const pos = useLoad(() => apiCompany.positions(companyId), [companyId]);
   const [f, setF] = useState<any>({title: "", doc_type: "policy", content: "", sensitivity: "", agent_use: "", customer_facing: false,
-    owner_position_id: "", review_interval_days: "", effective_from: "", change_note: ""});
+    owner_position_id: "", review_interval_days: "", effective_from: "", change_note: "", core_summary: ""});
   const [file, setFile] = useState<File | null>(null), [saving, setSaving] = useState(false);
   const toast = useToast();
   const ti = types.find((t: any) => t.key === f.doc_type) || {};
@@ -108,7 +108,7 @@ function NewDoc({mode, companyId, types, groups, busy, onCancel, onDone, setErro
         if (!file) throw new Error(tr("docs.pick_file"));
         r = await apiDocs.upload(file, {...common, sensitivity: f.sensitivity, agent_use: f.agent_use});
       } else {
-        r = await apiDocs.create({...common, content: f.content, customer_facing: f.customer_facing,
+        r = await apiDocs.create({...common, content: f.content, customer_facing: f.customer_facing, core_summary: f.core_summary || undefined,
           sensitivity: f.sensitivity || undefined, agent_use: f.agent_use || undefined,
           review_interval_days: f.review_interval_days ? Number(f.review_interval_days) : undefined});
       }
@@ -140,6 +140,8 @@ function NewDoc({mode, companyId, types, groups, busy, onCancel, onDone, setErro
       {mode === "new" ? <Field label={tr("docs.content")} hint={tr("docs.content_hint")}>
         <textarea className="ui-input" rows={10} value={f.content} onChange={e => setF({...f, content: e.target.value})} data-testid="df-content"/></Field>
         : <Field label={tr("docs.file")} hint={tr("docs.file_hint")}><input type="file" accept=".pdf,.docx,.md,.txt,.csv,.html,.png,.jpg,.jpeg" onChange={e => setFile(e.target.files?.[0] || null)} data-testid="df-file"/></Field>}
+      {mode === "new" && (f.agent_use || ti.agent_use) === "core" && <Field label={tr("docs.core_summary")} hint={tr("docs.core_summary_hint")}>
+        <textarea className="ui-input" rows={3} maxLength={1200} value={f.core_summary} onChange={e => setF({...f, core_summary: e.target.value})} data-testid="df-summary"/></Field>}
       {mode === "new" && <label className="tmInline"><input type="checkbox" checked={f.customer_facing} onChange={e => setF({...f, customer_facing: e.target.checked})}/> {tr("docs.customer_facing")}</label>}
       <div className="tmRow" style={{marginTop: 10}}>
         <button className="ui-btn is-primary" onClick={save} data-testid="df-save">{ti.doc_class === "record" ? tr("docs.save_record") : tr("docs.save_draft")}</button>
@@ -152,11 +154,11 @@ function NewDoc({mode, companyId, types, groups, busy, onCancel, onDone, setErro
 function DocDetail({id, can, onChanged, onClose}: {id: number; can: boolean; onChanged: () => void; onClose: () => void}) {
   const {data, error, reload, setError} = useLoad(() => apiDocs.get(id), [id]);
   const [draft, setDraft] = useState<string | null>(null), [note, setNote] = useState(""), [busy, setBusy] = useState(false);
-  const [diff, setDiff] = useState<any>(null);
+  const [diff, setDiff] = useState<any>(null), [override, setOverride] = useState(false), [sum, setSum] = useState<string | null>(null);
   const toast = useToast();
   const d: any = data;
   const pend = d?.pending_version;
-  useEffect(() => { setDraft(null); setDiff(null); }, [id]);
+  useEffect(() => { setDraft(null); setDiff(null); setOverride(false); setSum(null); }, [id]);
   if (error && !data) return <ErrorBanner error={error} onRetry={reload}/>;
   if (!d) return <SkeletonRows n={3}/>;
   async function run(fn: () => Promise<any>, ok: string) {
@@ -184,22 +186,36 @@ function DocDetail({id, can, onChanged, onClose}: {id: number; can: boolean; onC
       {!d.can_read ? <p className="is-warn" data-testid="doc-no-read">{tr("docs.no_read")}</p>
         : d.status === "published" || d.status === "superseded" || d.status === "archived" ? <>
           <h3 className="ops-cat">{tr("docs.current_content")}</h3>
-          <pre className="doc-content" data-testid="doc-content">{d.content || tr("docs.no_text")}</pre></> : null}
+          <pre className="doc-content" data-testid="doc-content">{d.content || tr("docs.no_text")}</pre>
+          {d.agent_use === "core" && <><h3 className="ops-cat">{tr("docs.core_summary")}</h3>
+            <p className="tmGuide" data-testid="doc-summary">{d.core_summary || tr("docs.core_summary_auto")}</p></>}</> : null}
+      {(d.flags || []).some((f: any) => f.status === "open") && <div className="tm-card doc-pending" data-testid="doc-flags">
+        <h3 className="ops-cat">{tr("docs.flags_open")}</h3>
+        {(d.flags || []).filter((f: any) => f.status === "open").map((f: any) => <div key={f.id} className="tmRow">
+          <span className="ui-pill is-wait">{tr(`docs.flag_${f.reason}` as Key)}</span><span className="ui-grow">{f.member || "—"} · v{f.version_no}: {f.note}</span>
+          {can && <><button className="ui-btn is-ghost is-sm" onClick={() => run(() => apiDocs.flagStatus(d.id, f.id, "resolved"), tr("docs.saved"))}>{tr("docs.flag_resolve")}</button>
+            <button className="ui-btn is-ghost is-sm" onClick={() => run(() => apiDocs.flagStatus(d.id, f.id, "dismissed"), tr("docs.saved"))}>{tr("docs.flag_dismiss")}</button></>}
+        </div>)}</div>}
 
       {pend && <div className="tm-card doc-pending" data-testid="doc-pending">
         <h3 className="ops-cat">{tr("docs.pending_v", {p0: pend.version_no, p1: tr(`docs.st_${pend.status}` as Key)})}</h3>
         {pend.change_note && <p><small>{pend.change_note}</small></p>}
+        {(pend.conflicts || []).length > 0 && <div className="is-warn" data-testid="doc-conflicts"><b>{tr("docs.conflicts", {p0: pend.conflicts.length})}</b>
+          <ul>{pend.conflicts.map((c: any, i: number) => <li key={i}>{c.label}: <b>{c.value}</b> ≠ {c.other_value} ({c.other_source})</li>)}</ul></div>}
+        {pend.status === "draft" && can && d.agent_use === "core" && <Field label={tr("docs.core_summary")} hint={tr("docs.core_summary_hint")}>
+          <textarea className="ui-input" rows={3} maxLength={1200} value={sum ?? pend.core_summary ?? ""} onChange={e => setSum(e.target.value)} data-testid="doc-summary-edit"/></Field>}
         {pend.status === "draft" && can ? <>
           <textarea className="ui-input" rows={8} value={draft ?? pend.content ?? ""} onChange={e => setDraft(e.target.value)} data-testid="doc-draft-text"/>
           <div className="tmRow">
-            {editing && <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => run(() => apiDocs.editVersion(d.id, pend.id, {content: draft}), tr("docs.saved"))}>{tr("docs.save_draft")}</button>}
-            <button className="ui-btn is-primary is-sm" disabled={busy || editing} onClick={() => run(() => apiDocs.submit(d.id, pend.id), tr("docs.submitted"))} data-testid="doc-submit">{tr("docs.submit")}</button>
+            {(editing || sum !== null) && <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => run(() => apiDocs.editVersion(d.id, pend.id, {...(editing ? {content: draft} : {}), ...(sum !== null ? {core_summary: sum} : {})}), tr("docs.saved"))}>{tr("docs.save_draft")}</button>}
+            <button className="ui-btn is-primary is-sm" disabled={busy || editing || sum !== null} onClick={() => run(() => apiDocs.submit(d.id, pend.id), tr("docs.submitted"))} data-testid="doc-submit">{tr("docs.submit")}</button>
           </div></> : <pre className="doc-content">{pend.content}</pre>}
         {pend.status === "in_review" && <p>{tr("docs.waiting_for", {p0: pend.approver || "—"})}</p>}
         {pend.status === "approved" && <p>{tr("docs.approved_until", {p0: day(pend.effective_from)})}</p>}
         {d.i_can_approve && <div className="tmRow">
           <input className="ui-input" placeholder={tr("docs.note")} value={note} onChange={e => setNote(e.target.value)}/>
-          <button className="ui-btn is-primary is-sm" disabled={busy} onClick={() => run(() => apiDocs.decide(d.id, pend.id, "approved", note), tr("docs.approved_ok"))} data-testid="doc-approve">{tr("docs.approve")}</button>
+          {(pend.conflicts || []).length > 0 && <label className="tmInline"><input type="checkbox" checked={override} onChange={e => setOverride(e.target.checked)} data-testid="doc-override"/> {tr("docs.override")}</label>}
+          <button className="ui-btn is-primary is-sm" disabled={busy || ((pend.conflicts || []).length > 0 && !override)} onClick={() => run(() => apiDocs.decide(d.id, pend.id, "approved", note, override), tr("docs.approved_ok"))} data-testid="doc-approve">{tr("docs.approve")}</button>
           <button className="ui-btn is-danger is-sm" disabled={busy} onClick={() => run(() => apiDocs.decide(d.id, pend.id, "rejected", note), tr("docs.rejected_ok"))} data-testid="doc-reject">{tr("docs.reject")}</button>
         </div>}
       </div>}
@@ -225,5 +241,42 @@ function DocDetail({id, can, onChanged, onClose}: {id: number; can: boolean; onC
         <pre className="doc-content">{diff.lines.map((ln: string, i: number) => <span key={i} className={ln.startsWith("+") && !ln.startsWith("+++") ? "is-add" : ln.startsWith("-") && !ln.startsWith("---") ? "is-del" : ""}>{ln + "\n"}</span>)}</pre>
       </div>}
     </div>
+  </section>;
+}
+
+/* M3b — Sự kiện công ty: số liệu chính thức có nguồn (trích từ tài liệu đã ban hành / nhập tay), mâu thuẫn giữa nguồn. */
+export function FactsTab({companyId, caps}: {companyId: number | null; caps: any}) {
+  const {data, error, reload, setError} = useLoad(() => companyId ? apiDocs.facts(companyId) : Promise.resolve(null), [companyId]);
+  const [f, setF] = useState({key: "return_window_days", value: ""}), [busy, setBusy] = useState(false);
+  const toast = useToast();
+  const can = !!caps?.invite || !!caps?.manage_roles;
+  if (!companyId) return <p><small>{tr("docs.pick_company")}</small></p>;
+  if (error && !data) return <ErrorBanner error={error} onRetry={reload} testId="facts-error"/>;
+  if (!data) return <SkeletonRows n={4} h={36}/>;
+  const d: any = data;
+  async function run(fn: () => Promise<any>, ok: string) {
+    setBusy(true); setError(null);
+    try { await fn(); toast(ok); await reload(); } catch (e) { setError(e); } finally { setBusy(false); }
+  }
+  const en = getLocale() === "en";
+  return <section className="ui-section" data-testid="facts">
+    {error ? <ErrorBanner error={error} onClose={() => setError(null)}/> : null}
+    <p className="tmGuide">{tr("docs.facts_explain")}</p>
+    <div className="tmRow"><span className={"ui-pill" + (d.conflicts ? " is-risk" : " is-ok")}>{tr("docs.facts_conflicts")}: <b>{d.conflicts}</b></span></div>
+    <div className="ui-panel"><table className="ui-table" data-testid="facts-table"><thead><tr>
+      <th>{tr("docs.fact")}</th><th>{tr("docs.fact_value")}</th><th>{tr("docs.fact_source")}</th><th/></tr></thead>
+      <tbody>{d.items.length === 0 ? <tr><td colSpan={4}><small>{tr("docs.facts_empty")}</small></td></tr>
+        : d.items.flatMap((it: any) => it.sources.map((x: any, i: number) => <tr key={x.id} className={it.conflict ? "is-warn" : ""}>
+          <td>{i === 0 ? <><b>{en ? it.label_en : it.label_vi}</b>{it.conflict && <> <StatusPill tone="risk">{tr("docs.conflict")}</StatusPill></>}</> : ""}</td>
+          <td><b>{x.value}</b> {x.unit}</td><td>{x.source}<br/><small>{x.excerpt}</small></td>
+          <td>{can && x.source_kind === "manual" && <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => run(() => apiDocs.delFact(x.id), tr("docs.saved"))}>{tr("docs.remove")}</button>}</td>
+        </tr>))}</tbody></table></div>
+    {can && <><h3 className="ops-cat">{tr("docs.fact_manual")}</h3>
+      <FormRow>
+        <Field label={tr("docs.fact")}><select className="ui-input" value={f.key} onChange={e => setF({...f, key: e.target.value})} data-testid="fact-key">
+          {d.keys.map((k: any) => <option key={k.key} value={k.key}>{en ? k.en : k.vi}</option>)}</select></Field>
+        <Field label={tr("docs.fact_value")}><input className="ui-input" value={f.value} onChange={e => setF({...f, value: e.target.value})} data-testid="fact-value"/></Field>
+      </FormRow>
+      <button className="ui-btn is-primary" disabled={busy || !f.value} onClick={() => run(() => apiDocs.putFact({company_id: companyId, ...f}), tr("docs.saved"))} data-testid="fact-save">{tr("docs.fact_save")}</button></>}
   </section>;
 }

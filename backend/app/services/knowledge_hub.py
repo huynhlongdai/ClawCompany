@@ -151,17 +151,65 @@ def _hash(text: str) -> str:
     return hashlib.sha256(re.sub(r"\s+", " ", text or "").strip().encode()).hexdigest()
 
 
+def unaccent(text: str) -> str:
+    """Bỏ dấu tiếng Việt (đ → d) để tra được cả khi gõ không dấu."""
+    import unicodedata
+    t = (text or "").replace("đ", "d").replace("Đ", "D")
+    return "".join(c for c in unicodedata.normalize("NFD", t) if unicodedata.category(c) != "Mn")
+
+
+HEAD_RE = re.compile(r"^(#{1,4})\s+(.+?)\s*#*\s*$")
+
+
+def sections(text: str) -> list[tuple[str, int, str]]:
+    """M3b: [(đường dẫn đề mục "A › B", số mục §n, thân)] theo đề mục Markdown. Phần trước đề mục đầu tiên = §0."""
+    out, stack, body, no, path = [], [], [], 0, ""
+    for line in (text or "").splitlines():
+        m = HEAD_RE.match(line.strip())
+        if m:
+            if "\n".join(body).strip():
+                out.append((path, no, "\n".join(body).strip()))
+            level, title = len(m.group(1)), m.group(2).strip()
+            stack = [x for x in stack if x[0] < level] + [(level, title)]
+            no += 1
+            path, body = " › ".join(t for _, t in stack), []
+            continue
+        body.append(line)
+    if "\n".join(body).strip() or not out:
+        out.append((path, no, "\n".join(body).strip()))
+    return [x for x in out if x[2] or x[0]]
+
+
+def context_header(doc: KnowledgeDocument, path: str) -> str:
+    """Tiêu đề ngữ cảnh xác định cho mỗi đoạn (Contextual Retrieval, không tốn model): mã + phiên bản + tiêu đề › mục
+    + loại + ngày hiệu lực. Đưa vào cả embedding lẫn chỉ mục từ khoá."""
+    head = f"{doc.doc_code} v{doc.version_no} · " if getattr(doc, "doc_code", "") else ""
+    eff = f" · hiệu lực {doc.effective_from:%d/%m/%Y}" if getattr(doc, "effective_from", None) else ""
+    return f"[{head}{doc.title}{' › ' + path if path else ''}{eff}]"
+
+
+def chunk_doc(doc: KnowledgeDocument) -> list[dict]:
+    out = []
+    for path, no, body in sections(doc.content or ""):
+        hdr = context_header(doc, path)
+        for part in chunk_text(body or path, size=max(300, CHUNK - len(hdr) - 1)):
+            out.append({"section": path[:300], "section_no": no, "content": hdr + "\n" + part})
+    return out
+
+
 def reindex(db: Session, doc: KnowledgeDocument) -> int:
     old = [c.id for c in db.query(KnowledgeChunk.id).filter(KnowledgeChunk.document_id == doc.id).all()]
     if old:
         db.query(KnowledgeVector).filter(KnowledgeVector.chunk_id.in_(old)).delete(synchronize_session=False)
         db.query(KnowledgeChunk).filter(KnowledgeChunk.document_id == doc.id).delete(synchronize_session=False)
-    parts = chunk_text(doc.content)
+    parts = chunk_doc(doc)
     from app.services import embeddings
-    real = embeddings.embed(parts)
+    real = embeddings.embed([p["content"] for p in parts])
     prov = embeddings.provider_name() if real else "hash384"
     for i, part in enumerate(parts):
-        ch = KnowledgeChunk(document_id=doc.id, chunk_index=i, content=part, embedding_provider=prov)
+        ch = KnowledgeChunk(document_id=doc.id, chunk_index=i, content=part["content"], embedding_provider=prov,
+                            section=part["section"], section_no=part["section_no"],
+                            search_text=unaccent(part["content"].lower()))
         db.add(ch); db.flush()
         if real:
             db.add(KnowledgeVector(chunk_id=ch.id, embedding_json=json.dumps(real[i])))
@@ -212,9 +260,9 @@ def ingest(db: Session, org_id: int, *, title: str, content: str, source_type: s
                             source_type=source_type, source_url=source_url[:1000], content_hash=h,
                             synced_at=datetime.utcnow(), access_level="restricted", is_core=bool(is_core), **sc)
     db.add(doc); db.commit(); db.refresh(doc)
-    reindex(db, doc)
-    from app.services import doc_library     # M3a: phiên bản 1 đã ban hành + mã tài liệu
+    from app.services import doc_library     # M3a: phiên bản 1 đã ban hành + mã tài liệu (trước khi cắt đoạn: tiêu đề ngữ cảnh mang mã)
     doc_library.init_legacy(db, doc)
+    reindex(db, doc)
     return {**public(db, doc), "duplicate": False}
 
 
@@ -306,8 +354,26 @@ def list_docs(db: Session, org_id: int, company_id: int | None = None) -> list[d
 
 # ------------------------------------------------------------------ tra cứu có trích dẫn
 
+STOP_U = {unaccent(w) for w in STOP}
+AGENT_SENS_MAX = 1          # agent đọc tới mức "internal" (public=0, internal=1); mật / dữ liệu cá nhân không bao giờ
+RRF_K = 60
+# M3b: từ lóng / tiếng Anh hay gặp trong chat bán hàng VN → cụm tương đương (không dấu). Một nhóm từ khoá "khớp" khi
+# chính từ đó hoặc MỌI chữ của một cụm tương đương có trong đoạn. Danh sách chung cho thương mại điện tử, không theo
+# một bộ eval; tắt được bằng expand=False (bộ eval báo cả hai con số).
+SYNONYMS = {
+    "freeship": ("mien phi van chuyen", "mien phi giao hang", "mien phi ship"),
+    "ship": ("van chuyen", "giao hang"), "shipper": ("giao hang", "van chuyen"),
+    "sale": ("giam gia", "khuyen mai"), "voucher": ("ma giam gia", "phieu qua"),
+    "cod": ("thanh toan khi nhan hang",), "ck": ("chuyen khoan",),
+    "refund": ("hoan tien",), "return": ("doi tra",), "bh": ("bao hanh",), "warranty": ("bao hanh",),
+    "microwave": ("lo vi song",), "hotline": ("so dien thoai",), "sdt": ("so dien thoai", "hotline"),
+    "shop": ("cua hang", "tiem"), "size": ("kich thuoc",), "order": ("don hang",), "invoice": ("hoa don",),
+}
+
+
 def _tokens(text: str) -> list[str]:
-    return [t for t in TOKEN_RE.findall((text or "").lower()) if len(t) > 1 and t not in STOP]
+    """Token không dấu (khớp cả "doi tra" với "đổi trả"), bỏ từ dừng."""
+    return [t for t in TOKEN_RE.findall(unaccent((text or "").lower())) if len(t) > 1 and t not in STOP_U]
 
 
 def live_filter(q, now: datetime | None = None):
@@ -316,6 +382,24 @@ def live_filter(q, now: datetime | None = None):
     return (q.filter(KnowledgeDocument.status == "published")
             .filter(or_(KnowledgeDocument.effective_from.is_(None), KnowledgeDocument.effective_from <= now))
             .filter(or_(KnowledgeDocument.effective_to.is_(None), KnowledgeDocument.effective_to > now)))
+
+
+def audience_ok(doc: KnowledgeDocument, member: Member | None) -> bool:
+    """M3b: đối tượng (phòng / chức danh / ghế) — rỗng = cả công ty. Người (member None) thấy hết."""
+    a = doc.audience or {}
+    if member is None or not any(a.get(k) for k in ("department_ids", "position_ids", "seat_ids")):
+        return True
+    return (member.department_id in (a.get("department_ids") or []) or getattr(member, "position_id", None) in (a.get("position_ids") or [])
+            or member.id in (a.get("seat_ids") or []))
+
+
+def agent_ok(doc: KnowledgeDocument, member: Member | None, uses: tuple[str, ...] = ("core", "retrieve")) -> bool:
+    """M3b — lọc quyền TRƯỚC khi chấm điểm (security trimming): cách dùng, nhạy cảm, đối tượng, lớp nghề."""
+    if member is None:
+        return True
+    from app.services.doc_library import SENS_RANK
+    return ((doc.agent_use or "retrieve") in uses and SENS_RANK.get(doc.sensitivity or "internal", 1) <= AGENT_SENS_MAX
+            and audience_ok(doc, member) and role_ok(doc, member))
 
 
 def visible_docs_query(db: Session, org_id: int, member: Member | None, agent: Agent | None):
@@ -336,15 +420,60 @@ def visible_docs_query(db: Session, org_id: int, member: Member | None, agent: A
     return q
 
 
+def cite_of(d: KnowledgeDocument, ch: KnowledgeChunk) -> str:
+    if d.doc_code:
+        return f"[DOC:{d.doc_code} v{d.version_no} §{ch.section_no}]"
+    return f"[KB#{d.id}§{ch.chunk_index + 1}: {d.title}]"
+
+
+def _pg_lexical(db: Session, doc_ids: list[int], qt: set[str]) -> dict[int, float]:
+    """Postgres: FTS (to_tsvector 'simple' trên chữ không dấu, GIN) — hạng từ khoá kiểu BM25 của Postgres (ts_rank_cd)."""
+    from sqlalchemy import bindparam, text
+    terms = [re.sub(r"[^0-9a-z]", "", t) for t in qt]
+    terms = [t for t in terms if t]
+    if not terms or not doc_ids:
+        return {}
+    sql = text("SELECT id, ts_rank_cd(to_tsvector('simple', search_text), to_tsquery('simple', :q)) AS r FROM knowledge_chunks "
+               "WHERE document_id IN :ids AND to_tsvector('simple', search_text) @@ to_tsquery('simple', :q) "
+               "ORDER BY r DESC LIMIT 200").bindparams(bindparam("ids", expanding=True))
+    try:
+        return {int(i): float(r) for i, r in db.execute(sql, {"q": " | ".join(terms), "ids": doc_ids}).all()}
+    except Exception as exc:  # noqa: BLE001 — FTS lỗi thì vẫn còn đường Python
+        db.rollback()
+        print(f"[kb] fts {exc}")
+        return {}
+
+
+def _pg_vector(db: Session, doc_ids: list[int], query: str) -> dict[int, float]:
+    """Postgres + pgvector (cột knowledge_vectors.embedding vector(384), vector băm): cosine trong DB."""
+    from sqlalchemy import bindparam, text
+    v = "[" + ",".join(f"{x:.8f}" for x in hash384_embedding(query)) + "]"
+    sql = text("SELECT kv.chunk_id, 1 - (kv.embedding <=> CAST(:v AS vector)) AS s FROM knowledge_vectors kv "
+               "JOIN knowledge_chunks c ON c.id = kv.chunk_id WHERE c.document_id IN :ids AND kv.embedding IS NOT NULL "
+               "ORDER BY kv.embedding <=> CAST(:v AS vector) LIMIT 200").bindparams(bindparam("ids", expanding=True))
+    try:
+        return {int(i): float(sv) for i, sv in db.execute(sql, {"v": v, "ids": doc_ids}).all()}
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        print(f"[kb] pgvector {exc}")
+        return {}
+
+
 def search(db: Session, org_id: int, query: str, *, member: Member | None = None, agent: Agent | None = None,
-           limit: int = 6, log_gap: bool = True, task_id: int | None = None) -> dict:
+           limit: int = 6, log_gap: bool = True, task_id: int | None = None, track: bool = True,
+           expand: bool = True) -> dict:
+    """M3b: lọc quyền trước (công ty/phòng/dự án/agent/thuê + trạng thái/hiệu lực + cách dùng/nhạy cảm/đối tượng) → điểm
+    lai từ khoá không dấu + vector → xếp hạng hợp nhất RRF (Postgres: FTS + pgvector). Điểm tuyệt đối (0..1) vẫn quyết
+    "tìm thấy" / ghi lỗ hổng như trước."""
     import json as _json
+    from app.services import doc_library
     query = (query or "").strip()
     qt = set(_tokens(query))
-    docs = {d.id: d for d in visible_docs_query(db, org_id, member, agent).all() if role_ok(d, member)}
-    if not qt or not docs:
-        hits = []
-    else:
+    groups = [(t, [f" {a} " for a in (SYNONYMS.get(t, ()) if expand else ())]) for t in qt]
+    lex_terms = set(qt) | {w for _t, alts in groups for a in alts for w in a.split()}
+    docs = {d.id: d for d in visible_docs_query(db, org_id, member, agent).all() if agent_ok(d, member)}
+    hits = []
+    if qt and docs:
         from app.services import embeddings
         qemb = hash384_embedding(query)
         prov = embeddings.provider_name()
@@ -352,35 +481,70 @@ def search(db: Session, org_id: int, query: str, *, member: Member | None = None
         rows = (db.query(KnowledgeChunk, KnowledgeVector)
                 .outerjoin(KnowledgeVector, KnowledgeVector.chunk_id == KnowledgeChunk.id)
                 .filter(KnowledgeChunk.document_id.in_(list(docs))).limit(20000).all())
-        scored = []
+        pg = db.get_bind().dialect.name == "postgresql"
+        fts = _pg_lexical(db, list(docs), lex_terms) if pg else {}
+        pvec = _pg_vector(db, list(docs), query) if pg and real_q is None else {}
+        cand = []
+        # IDF theo nhóm từ khoá trên các đoạn được phép (kiểu BM25): từ hiếm ("freeship") nặng hơn từ phổ biến ("đơn")
+        toks = {ch.id: set(_tokens(ch.search_text or ch.content)) for ch, _kv in rows}
+        flat = {ch.id: " " + " ".join(re.findall(r"[0-9a-z]+", ch.search_text or unaccent((ch.content or "").lower()))) + " "
+                for ch, _kv in rows}
+        cur: dict = {}
+        hit = lambda t, alts, ct: t in ct or any(a in cur["flat"] for a in alts)  # noqa: E731 — cụm phải liền nhau
+        import math
+        nchunks = max(1, len(toks))
+        df = [0] * len(groups)
+        for cid, ct in toks.items():
+            cur["flat"] = flat[cid]
+            for i, (t, alts) in enumerate(groups):
+                df[i] += hit(t, alts, ct)
+        idf = [math.log(1 + nchunks / (1 + n)) for n in df]
+        idf_sum = sum(idf) or 1.0
         for ch, kv in rows:
-            ct = set(_tokens(ch.content))
-            cover = len(qt & ct) / len(qt)
+            ct = toks[ch.id]
+            cur["flat"] = flat[ch.id]
+            cover = sum(w for (t, alts), w in zip(groups, idf) if hit(t, alts, ct)) / idf_sum
             title_bonus = 0.1 if qt & set(_tokens(docs[ch.document_id].title)) else 0.0
             try:
                 emb = _json.loads(kv.embedding_json) if kv else []
             except Exception:  # noqa: BLE001
                 emb = []
             if real_q is not None and ch.embedding_provider == prov and emb:
-                # Embedding thật: hiểu cùng ý khác chữ ("bể" ~ "vỡ") → cho vào cả khi không trùng từ nào.
                 sem = embeddings.semantic(cosine(real_q, emb))
                 s = 0.45 * cover + 0.55 * sem + title_bonus
                 if cover > 0 or sem >= 0.35:
-                    scored.append((s, ch))
+                    cand.append({"ch": ch, "s": s, "lex": fts.get(ch.id, cover), "vec": sem})
                 continue
-            if ch.embedding_provider != "hash384" or not emb:
-                emb = hash384_embedding(ch.content)
-            s = 0.7 * cover + 0.3 * max(0.0, cosine(qemb, emb)) + title_bonus
+            if ch.id in pvec:
+                vec = max(0.0, pvec[ch.id])
+            else:
+                if ch.embedding_provider != "hash384" or not emb:
+                    emb = hash384_embedding(ch.search_text or ch.content)
+                vec = max(0.0, cosine(qemb, emb))
+            s = 0.7 * cover + 0.3 * vec + title_bonus
             if cover > 0:
-                scored.append((s, ch))
-        scored.sort(key=lambda x: -x[0])
-        hits = []
-        for s, ch in scored[:limit]:
-            d = docs[ch.document_id]
-            hits.append({"chunk_id": ch.id, "document_id": d.id, "title": d.title, "chunk": ch.chunk_index, "score": round(s, 3),
-                         "source_url": d.source_url or "", "scope": scope_label(db, d),
-                         "cite": f"[KB#{d.id}§{ch.chunk_index + 1}: {d.title}]", "content": ch.content})
-    best = hits[0]["score"] if hits else 0.0
+                cand.append({"ch": ch, "s": s, "lex": fts.get(ch.id, 0.0) + cover, "vec": vec})
+        # RRF: hạng từ khoá + hạng vector (k=60), hoà → điểm tuyệt đối
+        for key in ("lex", "vec"):
+            for rank, c in enumerate(sorted(cand, key=lambda c: -c[key])):
+                c["rrf"] = c.get("rrf", 0.0) + 1.0 / (RRF_K + rank + 1)
+        cand.sort(key=lambda c: (-c["rrf"], -c["s"]))
+        seen_docs: set[int] = set()
+        for c in cand[:limit]:
+            ch = c["ch"]; d = docs[ch.document_id]
+            stale = doc_library.review_state(d) == "stale"
+            hits.append({"chunk_id": ch.id, "document_id": d.id, "doc_code": d.doc_code or "", "version_no": d.version_no,
+                         "title": d.title, "chunk": ch.chunk_index, "section": ch.section or "", "section_no": ch.section_no,
+                         "score": round(c["s"], 3), "source_url": d.source_url or "", "scope": scope_label(db, d),
+                         "cite": cite_of(d, ch), "stale": stale, "content": ch.content,
+                         **({"note": "Tài liệu đang quá hạn rà soát — nói rõ với người hỏi là theo tài liệu (đang chờ rà soát)"} if stale else {})})
+            seen_docs.add(d.id)
+        if member is not None and seen_docs and track:
+            now = datetime.utcnow()
+            for did in seen_docs:
+                d = docs[did]; d.reuse_count = (d.reuse_count or 0) + 1; d.last_used_at = now; db.add(d)
+            db.commit()
+    best = max((h["score"] for h in hits), default=0.0)
     gap = None
     if log_gap and member is not None and query and best < GAP_THRESHOLD:
         gap = record_gap(db, org_id, member.id, query, source="search", task_id=task_id)
@@ -456,19 +620,48 @@ def role_ok(doc: KnowledgeDocument, member: Member | None) -> bool:
 
 
 def core_docs(db: Session, org_id: int, *, company_id: int | None, department_id: int | None, role: str,
-              agent_id: int | None) -> list[KnowledgeDocument]:
+              agent_id: int | None, member: Member | None = None) -> list[KnowledgeDocument]:
     q = (live_filter(db.query(KnowledgeDocument)).filter(KnowledgeDocument.organization_id == org_id,
                                                          KnowledgeDocument.is_core.is_(True), KnowledgeDocument.project_id.is_(None))
          .filter(or_(KnowledgeDocument.company_id.is_(None), KnowledgeDocument.company_id == company_id))
          .filter(or_(KnowledgeDocument.department_id.is_(None), KnowledgeDocument.department_id == department_id))
          .filter(or_(KnowledgeDocument.agent_id.is_(None), KnowledgeDocument.agent_id == (agent_id or -1))))
     r = (role or "").lower()
-    return [d for d in q.order_by(KnowledgeDocument.id).all() if not d.role_keyword or d.role_keyword.lower() in r]
+    out = [d for d in q.order_by(KnowledgeDocument.id).all() if not d.role_keyword or d.role_keyword.lower() in r]
+    if member is not None:   # M3b: đối tượng chức danh/phòng/ghế + nhạy cảm (tài liệu mật không vào AGENTS.md)
+        out = [d for d in out if agent_ok(d, member, ("core",))]
+    return out
+
+
+CORE_FULL_MAX = 1_200      # tài liệu cốt lõi ngắn hơn mức này vào nguyên văn; dài hơn → bản tóm tắt
+SUMMARY_MAX = 600
+
+
+def auto_summary(text: str, limit: int = SUMMARY_MAX) -> str:
+    """Tóm tắt xác định (không model): mỗi mục một dòng "Đề mục: câu đầu". Không cắt giữa câu — dòng không vừa thì bỏ."""
+    lines = []
+    for path, _no, body in sections(text):
+        first = re.split(r"(?<=[.!?…])\s+|\n", (body or "").strip(), maxsplit=1)[0].strip()
+        line = f"- {path}: {first}" if path and first else f"- {first or path}"
+        if len("\n".join(lines + [line])) > limit:
+            break
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def core_body(d: KnowledgeDocument) -> tuple[str, bool]:
+    """(phần đưa vào AGENTS.md, có phải tóm tắt không)."""
+    body = re.sub(r"\n{3,}", "\n\n", (d.content or "").strip())
+    if (d.core_summary or "").strip():
+        return d.core_summary.strip()[:SUMMARY_MAX * 2], True
+    if len(body) <= CORE_FULL_MAX:
+        return body, False
+    return auto_summary(body), True
 
 
 def core_section(db: Session, org_id: int, *, company_id: int | None, department_id: int | None, role: str,
-                 agent_id: int | None) -> str:
-    docs = core_docs(db, org_id, company_id=company_id, department_id=department_id, role=role, agent_id=agent_id)
+                 agent_id: int | None, member: Member | None = None) -> str:
+    docs = core_docs(db, org_id, company_id=company_id, department_id=department_id, role=role, agent_id=agent_id, member=member)
     # M2b: hiến chương công ty đứng đầu phần cốt lõi (không bị cắt bởi CORE_BUDGET ở cuối).
     from app.services.company_foundation import charter_block
     charter = charter_block(db, company_id)
@@ -477,6 +670,7 @@ def core_section(db: Session, org_id: int, *, company_id: int | None, department
     parts = ["## Kiến thức cốt lõi (luôn áp dụng khi trả lời; chi tiết khác: company_knowledge_search)"]
     if charter:
         parts.append(charter)
+    used = len("\n\n".join(parts))
     for layer in ("personal", "profession", "company"):
         mine = [d for d in docs if layer_of(d) == layer]
         if not mine:
@@ -485,21 +679,21 @@ def core_section(db: Session, org_id: int, *, company_id: int | None, department
         head = LAYER_VI[layer] + (f" — {role}" if layer == "profession" and role else "")
         parts.append(f"### {head}")
         for d in mine:
-            body = re.sub(r"\n{3,}", "\n\n", (d.content or "").strip())
-            if left <= 200:
-                parts.append(f"- {d.title}: đọc bằng company_knowledge_get document_id={d.id}")
-                continue
-            take = body[:left - 120]
-            more = len(body) > len(take)
-            parts.append(f"#### {d.title}\n{take}" + (f"\n(… còn tiếp: company_knowledge_get document_id={d.id})" if more else ""))
-            left -= len(take) + len(d.title) + 20
-    text = "\n\n".join(parts)
-    return text[:CORE_BUDGET]
+            ref = f"company_doc_get doc_code={d.doc_code}" if d.doc_code else f"company_knowledge_get document_id={d.id}"
+            tag = f" [{d.doc_code} v{d.version_no}]" if d.doc_code else ""
+            body, summarized = core_body(d)
+            block = f"#### {d.title}{tag}\n{body}" + (f"\n(Tóm tắt — nguyên văn: {ref})" if summarized else "")
+            # M3b: không cắt cụt giữa chừng — không vừa ngân sách thì chỉ còn một dòng trỏ tới tài liệu
+            if len(block) > left or used + len(block) + 2 > CORE_BUDGET:
+                block = f"- {d.title}{tag}: đọc bằng {ref}"
+            parts.append(block)
+            left -= len(block); used += len(block) + 2
+    return "\n\n".join(parts)[:CORE_BUDGET]
 
 
 def core_for_member(db: Session, member: Member, agent: Agent | None) -> str:
     core = core_section(db, member.organization_id, company_id=member.company_id, department_id=member.department_id,
-                        role=member.role or "", agent_id=agent.id if agent else None)
+                        role=member.role or "", agent_id=agent.id if agent else None, member=member)
     from app.services import seat_leases   # R2: ghế thuê → sàn bên cho thuê đứng trước lớp bên thuê
     return seat_leases.layered_core(db, member, core)
 

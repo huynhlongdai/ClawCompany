@@ -162,7 +162,8 @@
   "co_hieu_qua": "Hiệu quả",
   "co_cho_thue": "Cho thuê",
   "co_tai_lieu": "Tài liệu & tri thức",
-  "co_thu_vien": "Thư viện"
+  "co_thu_vien": "Thư viện",
+  "co_su_kien": "Sự kiện công ty"
  },
  "shell": {
   "cong_ty": "{p0} · {p1} công ty",
@@ -3264,6 +3265,28 @@
   "ret_permanent": "Vĩnh viễn",
   "ret_5y": "5 năm",
   "ret_10y_after_end": "10 năm sau khi hết hạn (cần kiểm tra)",
-  "ret_purpose_end": "Xoá khi hết mục đích (Luật 91/2025)"
+  "ret_purpose_end": "Xoá khi hết mục đích (Luật 91/2025)",
+  "core_summary": "Tóm tắt cốt lõi (vào AGENTS.md)",
+  "core_summary_hint": "≤ 600 ký tự, người duyệt duyệt cùng tài liệu. Bỏ trống: hệ thống tự tóm tắt theo đề mục (không cắt cụt).",
+  "core_summary_auto": "(Tự tóm tắt theo đề mục — tài liệu ngắn thì vào nguyên văn)",
+  "conflicts": "{p0} số liệu mâu thuẫn với nguồn khác",
+  "override": "Tôi đã xem mâu thuẫn — vẫn ban hành",
+  "flags_open": "Agent / người đã đánh dấu",
+  "flag_wrong": "Sai",
+  "flag_outdated": "Đã cũ",
+  "flag_conflict": "Mâu thuẫn",
+  "flag_missing_case": "Thiếu trường hợp",
+  "flag_resolve": "Đã xử lý",
+  "flag_dismiss": "Bỏ qua",
+  "facts_explain": "Số liệu chính thức của công ty, mỗi số có nguồn (mã tài liệu + phiên bản + mục, hoặc nhập tay). Hệ thống tự trích từ tài liệu đã ban hành; hai nguồn ghi khác nhau = mâu thuẫn, chặn mềm lúc duyệt. Agent đọc qua tool company_fact_get.",
+  "facts_conflicts": "Mâu thuẫn",
+  "facts_empty": "Chưa có sự kiện nào — ban hành chính sách có số ngày đổi trả, bảo hành… hoặc nhập tay.",
+  "fact": "Sự kiện",
+  "fact_value": "Giá trị",
+  "fact_source": "Nguồn",
+  "conflict": "Mâu thuẫn",
+  "fact_manual": "Nhập tay (thắng khi agent tra)",
+  "fact_save": "Lưu sự kiện",
+  "remove": "Gỡ"
  }
 }

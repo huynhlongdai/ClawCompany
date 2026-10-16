@@ -110,7 +110,9 @@ COLUMNS_OWNED_BY_LATER_MIGRATIONS = {
                             "version_no", "current_version_id", "effective_from", "effective_to", "review_interval_days",
                             "review_due_at", "review_notified_at", "last_reviewed_at", "last_reviewed_by", "supersedes_id",
                             "source_of_truth", "file_id", "retention_class", "retain_until", "legal_hold", "reuse_count",
-                            "last_used_at"],
+                            "last_used_at",
+                            "core_summary", "flag_count"],                         # 0054_doc_retrieval
+    "knowledge_chunks": ["section", "section_no", "search_text"],                    # 0054_doc_retrieval
 }
 
 # 0014 tự tạo index unique này; model cũng khai nó, nên create_all sẽ tạo

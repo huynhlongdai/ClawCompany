@@ -34,6 +34,9 @@ class DocumentVersion(Base):
     review_note: Mapped[str] = mapped_column(Text, default="")
     effective_from: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # M3b (0054): tóm tắt cốt lõi của phiên bản + mâu thuẫn sự kiện phát hiện lúc gửi duyệt
+    core_summary: Mapped[str] = mapped_column(Text, default="")
+    conflicts: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -62,4 +65,40 @@ class DocumentFile(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
-__all__ = ["DocumentVersion", "DocumentLink", "DocumentFile", "VERSION_STATUSES"]
+class CompanyFact(Base):
+    """M3b — sự kiện công ty có nguồn (khoá → giá trị): refund_window_days=7 ← CS-POL-003 v4 §2. Một khoá có một dòng
+    ``active`` mỗi nguồn; hai nguồn khác giá trị cho cùng khoá = mâu thuẫn."""
+    __tablename__ = "company_facts"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    key: Mapped[str] = mapped_column(String(80), index=True)
+    value: Mapped[str] = mapped_column(String(500), default="")
+    value_num: Mapped[float | None] = mapped_column(nullable=True)
+    unit: Mapped[str] = mapped_column(String(24), default="")
+    source_kind: Mapped[str] = mapped_column(String(16), default="document")   # document | manual | structured
+    source_doc_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    source_version_no: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_section: Mapped[str] = mapped_column(String(300), default="")
+    excerpt: Mapped[str] = mapped_column(String(500), default="")
+    status: Mapped[str] = mapped_column(String(16), default="active", index=True)   # active | superseded
+    updated_by_member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class DocumentFlag(Base):
+    """M3b — agent/người đánh dấu tài liệu sai / cũ / mâu thuẫn / thiếu trường hợp (KCS "flag it")."""
+    __tablename__ = "document_flags"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("knowledge_documents.id"), index=True)
+    version_no: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reason: Mapped[str] = mapped_column(String(24))      # wrong | outdated | conflict | missing_case
+    note: Mapped[str] = mapped_column(Text, default="")
+    member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    task_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)   # open | resolved | dismissed
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+__all__ = ["DocumentVersion", "DocumentLink", "DocumentFile", "CompanyFact", "DocumentFlag", "VERSION_STATUSES"]

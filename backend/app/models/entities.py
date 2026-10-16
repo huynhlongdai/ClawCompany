@@ -170,6 +170,9 @@ class KnowledgeDocument(Base, TimestampMixin):
     legal_hold: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     reuse_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # M3b (0054): bản tóm tắt cốt lõi (biên dịch vào AGENTS.md thay vì cắt cụt nội dung)
+    core_summary: Mapped[str] = mapped_column(Text, default="", server_default="")
+    flag_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 class Approval(Base, TimestampMixin):
     __tablename__ = "approvals"

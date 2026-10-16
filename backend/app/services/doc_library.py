@@ -209,7 +209,8 @@ def version_public(db: Session, v: DocumentVersion, *, content: bool = False) ->
            "approver": _member_name(db, v.approver_member_id), "approver_member_id": v.approver_member_id,
            "approved_by": _member_name(db, v.approved_by_member_id), "approved_at": _iso(v.approved_at),
            "approval_id": v.approval_id, "review_note": v.review_note, "effective_from": _iso(v.effective_from),
-           "published_at": _iso(v.published_at), "created_at": _iso(v.created_at)}
+           "published_at": _iso(v.published_at), "created_at": _iso(v.created_at),
+           "core_summary": v.core_summary or "", "conflicts": v.conflicts or []}
     if content:
         out["content"] = v.content
     return out
@@ -239,7 +240,8 @@ def public(db: Session, doc: KnowledgeDocument, *, principal=None, detail: bool 
            "retention_class": doc.retention_class, "retain_until": _iso(doc.retain_until), "legal_hold": bool(doc.legal_hold),
            "file": {"id": f.id, "filename": f.filename, "mime": f.mime, "size": f.size, "sha256": f.sha256} if f else None,
            "pending_version": version_public(db, open_v) if open_v else None, "is_core": bool(doc.is_core),
-           "reuse_count": doc.reuse_count or 0, "chars": len(doc.content or ""),
+           "reuse_count": doc.reuse_count or 0, "chars": len(doc.content or ""), "core_summary": doc.core_summary or "",
+           "flag_count": doc.flag_count or 0,
            "updated_at": _iso(getattr(doc, "updated_at", None)), "created_at": _iso(getattr(doc, "created_at", None))}
     if detail:
         can_read = SENS_RANK.get(doc.sensitivity or "internal", 1) <= human_max_sensitivity(principal, doc.company_id)
@@ -249,6 +251,10 @@ def public(db: Session, doc: KnowledgeDocument, *, principal=None, detail: bool 
         out["versions"] = [version_public(db, v, content=can_read and v.status in OPEN_VERSION) for v in vs]
         out["links"] = [{"id": lk.id, "target_type": lk.target_type, "target_id": lk.target_id, "note": lk.note}
                         for lk in db.query(DocumentLink).filter(DocumentLink.document_id == doc.id).order_by(DocumentLink.id)]
+        from app.models.documents import DocumentFlag
+        out["flags"] = [{"id": f.id, "reason": f.reason, "note": f.note, "version_no": f.version_no, "member": _member_name(db, f.member_id),
+                         "task_id": f.task_id, "status": f.status, "created_at": _iso(f.created_at)}
+                        for f in db.query(DocumentFlag).filter(DocumentFlag.document_id == doc.id).order_by(DocumentFlag.id.desc()).limit(50)]
         me = set(getattr(principal, "member_ids", []) or []) if principal is not None else set()
         out["i_can_approve"] = bool(open_v and open_v.status == "in_review" and (open_v.approver_member_id in me
                                     or getattr(principal, "role", "") == "owner") and open_v.author_member_id not in me)
@@ -416,6 +422,7 @@ def create(db: Session, org_id: int, principal, data: dict, *, file: DocumentFil
     if not doc.doc_code:
         doc.doc_code = _next_code(db, co.id, ti["group"])
     v = DocumentVersion(document_id=doc.id, version_no=1, status="draft", title=doc.title, content=content,
+                        core_summary=(data.get("core_summary") or "").strip()[:1200],
                         content_hash=_hash(content), file_id=doc.file_id, change_note=(data.get("change_note") or "Bản đầu")[:2000],
                         author_member_id=seat, author_user_id=getattr(principal, "user_id", None),
                         effective_from=_dt(data.get("effective_from")))
@@ -485,7 +492,8 @@ def new_version(db: Session, org_id: int, principal, doc_id: int, data: dict, *,
                         title=(data.get("title") or doc.title)[:220], content=content, content_hash=_hash(content),
                         file_id=file.id if file else None, change_note=(data.get("change_note") or "")[:2000],
                         author_member_id=seat, author_user_id=getattr(principal, "user_id", None),
-                        effective_from=_dt(data.get("effective_from")))
+                        effective_from=_dt(data.get("effective_from")),
+                        core_summary=(data.get("core_summary") if data.get("core_summary") is not None else doc.core_summary or "")[:1200])
     db.add(v); db.commit(); db.refresh(v)
     return version_public(db, v, content=True)
 
@@ -504,6 +512,8 @@ def edit_version(db: Session, org_id: int, principal, doc_id: int, vid: int, dat
         v.title = data["title"].strip()[:220]
     if data.get("change_note") is not None:
         v.change_note = data["change_note"][:2000]
+    if data.get("core_summary") is not None:
+        v.core_summary = data["core_summary"].strip()[:1200]
     if "effective_from" in data:
         v.effective_from = _dt(data.get("effective_from"))
     db.add(v); db.commit(); db.refresh(v)
@@ -538,22 +548,33 @@ def submit(db: Session, org_id: int, principal, doc_id: int, vid: int, *, reques
     v.status, v.approver_member_id = "in_review", approver
     if doc.status == "draft":
         doc.status = "in_review"
+    from app.services import company_facts
+    v.conflicts = company_facts.conflicts_for(db, doc, v.content) or None   # M3b: số liệu lệch với nguồn khác
     db.add(v); db.add(doc); db.flush()
+    if v.conflicts:
+        from app.services import inbox
+        others = [db.get(KnowledgeDocument, c["other_doc_id"]) for c in v.conflicts if c.get("other_doc_id")]
+        recips = [_review_owner(db, doc)] + [_review_owner(db, o) for o in others if o is not None]
+        inbox.notify(db, organization_id=org_id, recipients=recips, kind="doc_conflict", company_id=doc.company_id,
+                     title=f"{doc.doc_code} v{v.version_no} mâu thuẫn {len(v.conflicts)} số liệu với nguồn khác",
+                     related_type="document", related_id=str(doc.id), commit=False,
+                     line="; ".join(f"{c['label']}: {c['value']} ≠ {c['other_value']} ({c['other_source']})" for c in v.conflicts)[:380])
     self_ok = (req_m is not None and req_m.member_type == "human" and approver == req_m.id) or (d is not None and d.approver_kind == "none"
                                                                                                and (req_m is None or req_m.member_type == "human"))
-    if self_ok:
+    if self_ok and not v.conflicts:
         db.commit()
         return _decide_version(db, doc, v, "approved", seat, note=(d.reason if d else "Người gửi là người có quyền duyệt"))
     a = Approval(organization_id=org_id, company_id=doc.company_id, requester_member_id=seat, approver_member_id=approver,
                  action=f"Ban hành tài liệu {doc.doc_code} v{v.version_no}: {v.title}"[:220], risk=risk_of(doc),
                  policy_key=f"doc_publish:{doc.id}:{v.id}", status="pending",
-                 evidence=(v.change_note or "")[:2000],
+                 evidence=((v.change_note or "") + ("\nMÂU THUẪN: " + "; ".join(f"{c['label']}: {c['value']} ≠ {c['other_value']} ({c['other_source']})"
+                                                                         for c in v.conflicts) if v.conflicts else ""))[:2000],
                  payload=authority.annotate({"document_id": doc.id, "version_id": v.id, "doc_code": doc.doc_code}, d))
     db.add(a); db.flush()
     v.approval_id = a.id
     db.add(v); db.commit()
     return {**public(db, doc, principal=principal, detail=True), "approval_id": a.id,
-            "authority": d.card() if d is not None else None}
+            "authority": d.card() if d is not None else None, "conflicts": v.conflicts or []}
 
 
 def _decide_version(db: Session, doc: KnowledgeDocument, v: DocumentVersion, decision: str, actor: int | None,
@@ -577,7 +598,8 @@ def _decide_version(db: Session, doc: KnowledgeDocument, v: DocumentVersion, dec
     return {**public(db, doc, detail=True), "published": False}
 
 
-def decide(db: Session, org_id: int, principal, doc_id: int, vid: int, decision: str, note: str = "") -> dict:
+def decide(db: Session, org_id: int, principal, doc_id: int, vid: int, decision: str, note: str = "",
+           override_conflicts: bool = False) -> dict:
     if decision not in ("approved", "rejected"):
         raise HTTPException(422, "decision phải là approved hoặc rejected")
     doc = get_doc(db, org_id, doc_id)
@@ -585,11 +607,14 @@ def decide(db: Session, org_id: int, principal, doc_id: int, vid: int, decision:
     if v.status != "in_review":
         raise HTTPException(409, f"Phiên bản v{v.version_no} đang '{v.status}' — không chờ duyệt")
     me = set(getattr(principal, "member_ids", []) or [])
-    if v.author_member_id and v.author_member_id in me:
+    if v.author_member_id and v.author_member_id in me and v.approver_member_id != v.author_member_id:
         raise HTTPException(403, "Tác giả không tự duyệt phiên bản của mình")
     if v.approver_member_id not in me and getattr(principal, "role", "") != "owner":
         raise HTTPException(403, {"error": "not_the_approver", "approver_member_id": v.approver_member_id,
                                   "message": f"Người duyệt theo ma trận là {_member_name(db, v.approver_member_id)}"})
+    if decision == "approved" and v.conflicts and not override_conflicts:
+        raise HTTPException(409, {"error": "conflicts", "conflicts": v.conflicts,
+                                  "message": "Phiên bản này mâu thuẫn số liệu với nguồn khác — sửa, hoặc duyệt với override_conflicts=true"})
     actor = v.approver_member_id if v.approver_member_id in me else _seat(db, principal, doc.company_id)
     if v.approval_id:
         a = db.get(Approval, v.approval_id)
@@ -626,6 +651,7 @@ def _publish(db: Session, doc: KnowledgeDocument, v: DocumentVersion, *, now: da
     doc.effective_from = v.effective_from or now
     if v.file_id:
         doc.file_id = v.file_id
+    doc.core_summary = v.core_summary or ""
     doc.last_reviewed_at, doc.review_notified_at = now, None
     doc.review_due_at = now + timedelta(days=doc.review_interval_days) if doc.review_interval_days else None
     doc.synced_at = now
@@ -633,11 +659,13 @@ def _publish(db: Session, doc: KnowledgeDocument, v: DocumentVersion, *, now: da
     from app.services import knowledge_hub
     chunks = knowledge_hub.reindex(db, doc) if (doc.content or "").strip() else 0
     stale = knowledge_hub.mark_courses_stale(db, doc) if prev and changed else 0
+    from app.services import company_facts
+    facts = company_facts.upsert_from_doc(db, doc)
     from app.services.company_event_bus import emit_event
     emit_event(db, organization_id=doc.organization_id, company_id=doc.company_id, event_type="document.published",
                source="doc_library", aggregate_type="document", aggregate_id=str(doc.id), actor_member_id=v.approved_by_member_id,
                payload={"doc_code": doc.doc_code, "version_no": v.version_no, "superseded": [p.version_no for p in prev]})
-    return {"chunks": chunks, "stale_enrollments": stale, "superseded_versions": [p.version_no for p in prev],
+    return {"chunks": chunks, "stale_enrollments": stale, "superseded_versions": [p.version_no for p in prev], "facts": facts,
             "core_changed": doc.agent_use == "core"}
 
 
@@ -658,6 +686,8 @@ def archive(db: Session, org_id: int, principal, doc_id: int, reason: str = "") 
         raise HTTPException(409, f"Tài liệu đã {doc.status}")
     was_core = doc.status == "published" and doc.agent_use == "core"
     doc.status = "archived"
+    from app.services import company_facts
+    company_facts.retire_doc(db, doc)
     for v in db.query(DocumentVersion).filter(DocumentVersion.document_id == doc.id, DocumentVersion.status.in_(OPEN_VERSION)):
         v.status = "rejected"; v.review_note = "Tài liệu đã lưu trữ"; db.add(v)
     from app.services.company_event_bus import emit_event
@@ -807,6 +837,8 @@ def init_legacy(db: Session, doc: KnowledgeDocument) -> None:
     doc.current_version_id, doc.version_no, doc.status = v.id, 1, "published"
     doc.effective_from = doc.effective_from or datetime.utcnow()
     db.add(doc); db.commit()
+    from app.services import company_facts
+    company_facts.upsert_from_doc(db, doc)
 
 
 def legacy_new_content(db: Session, doc: KnowledgeDocument) -> None:
@@ -820,6 +852,51 @@ def legacy_new_content(db: Session, doc: KnowledgeDocument) -> None:
     db.add(v); db.flush()
     doc.current_version_id, doc.version_no = v.id, v.version_no
     db.add(doc); db.commit()
+    from app.services import company_facts
+    company_facts.upsert_from_doc(db, doc)
+
+
+# ------------------------------------------------------------------ đánh dấu (agent "flag it")
+
+FLAG_REASONS = {"wrong": "sai", "outdated": "đã cũ", "conflict": "mâu thuẫn", "missing_case": "thiếu trường hợp"}
+
+
+def flag(db: Session, *, member: Member, doc: KnowledgeDocument, reason: str, note: str = "", task_id: int | None = None) -> dict:
+    from app.models.documents import DocumentFlag
+    if reason not in FLAG_REASONS:
+        raise HTTPException(422, f"reason phải là một trong {', '.join(FLAG_REASONS)}")
+    f = DocumentFlag(document_id=doc.id, version_no=doc.version_no, reason=reason, note=(note or "")[:2000],
+                     member_id=member.id, task_id=task_id, status="open")
+    doc.flag_count = (doc.flag_count or 0) + 1
+    db.add(f); db.add(doc); db.flush()
+    from app.services import inbox
+    inbox.notify(db, organization_id=doc.organization_id, recipients=[_review_owner(db, doc)], kind="doc_flagged",
+                 title=f"{member.name} đánh dấu {doc.doc_code or doc.title} là {FLAG_REASONS[reason]}", task_id=None,
+                 related_type="document", related_id=str(doc.id), company_id=doc.company_id, commit=False,
+                 line=f"{doc.doc_code} v{doc.version_no}: {FLAG_REASONS[reason]} — {note[:200]}")
+    db.commit()
+    open_n = db.query(DocumentFlag).filter(DocumentFlag.document_id == doc.id, DocumentFlag.status == "open").count()
+    return {"flag_id": f.id, "doc_code": doc.doc_code, "open_flags": open_n,
+            "message": "Đã báo người phụ trách tài liệu (Hộp việc). Trong lúc chờ, nói rõ với người hỏi là đang xác minh."}
+
+
+def resolve_flag(db: Session, org_id: int, doc_id: int, flag_id: int, status: str) -> dict:
+    from app.models.documents import DocumentFlag
+    doc = get_doc(db, org_id, doc_id)
+    f = db.get(DocumentFlag, flag_id)
+    if f is None or f.document_id != doc.id:
+        raise HTTPException(404, "Không thấy đánh dấu")
+    if status not in ("resolved", "dismissed"):
+        raise HTTPException(422, "status: resolved | dismissed")
+    f.status = status; db.add(f); db.commit()
+    return {"id": f.id, "status": f.status}
+
+
+def by_code(db: Session, member: Member, code: str) -> KnowledgeDocument | None:
+    """Tài liệu theo mã trong công ty của ghế (kể cả bản đã cấp qua hợp đồng thuê) — bản đang hiệu lực."""
+    from app.services import knowledge_hub
+    q = knowledge_hub.visible_docs_query(db, member.organization_id, member, None)
+    return q.filter(KnowledgeDocument.doc_code == (code or "").strip().upper()).first()
 
 
 # ------------------------------------------------------------------ nhịp (beat docs.tick)
@@ -854,6 +931,8 @@ def tick(db: Session, now: datetime | None = None, org_id: int | None = None) ->
     for doc in _org(db.query(KnowledgeDocument).filter(KnowledgeDocument.status == "published", KnowledgeDocument.effective_to.isnot(None),
                                                        KnowledgeDocument.effective_to <= now)).all():
         doc.status = "archived"; db.add(doc); out["archived"] += 1
+        from app.services import company_facts
+        company_facts.retire_doc(db, doc)
         if doc.agent_use == "core":
             core_orgs.add(doc.organization_id)
         from app.services import inbox

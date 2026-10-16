@@ -42,6 +42,7 @@ class DocIn(BaseModel):
     retention_class: str | None = None
     legal_hold: bool | None = None
     supersedes_id: int | None = None
+    core_summary: str | None = None
 
 
 class VersionIn(BaseModel):
@@ -49,11 +50,25 @@ class VersionIn(BaseModel):
     content: str | None = None
     change_note: str | None = None
     effective_from: str | None = None
+    core_summary: str | None = None
 
 
 class DecideIn(BaseModel):
     decision: str
     note: str = ""
+    override_conflicts: bool = False
+
+
+class FactIn(BaseModel):
+    company_id: int | None = None
+    key: str
+    value: str
+    value_num: float | None = None
+    unit: str | None = None
+
+
+class FlagStatusIn(BaseModel):
+    status: str
 
 
 class LinkIn(BaseModel):
@@ -166,7 +181,8 @@ def submit(doc_id: int, vid: int, background: BackgroundTasks, principal: Princi
 @router.post("/docs/{doc_id}/versions/{vid}/decide")
 def decide(doc_id: int, vid: int, payload: DecideIn, background: BackgroundTasks,
            principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
-    out = lib.decide(db, active_org(principal), principal, doc_id, vid, payload.decision, payload.note)
+    out = lib.decide(db, active_org(principal), principal, doc_id, vid, payload.decision, payload.note,
+                     override_conflicts=payload.override_conflicts)
     if out.get("published") and out.get("core_changed"):
         resync_core_later(background, principal, active_org(principal))
     return out
@@ -203,6 +219,42 @@ def add_link(doc_id: int, payload: LinkIn, principal: Principal = Depends(requir
 def remove_link(doc_id: int, link_id: int, principal: Principal = Depends(require_company_role("manager")),
                 db: Session = Depends(get_db)):
     return lib.remove_link(db, active_org(principal), doc_id, link_id)
+
+
+@router.post("/docs/{doc_id}/flags/{flag_id}")
+def flag_status(doc_id: int, flag_id: int, payload: FlagStatusIn, principal: Principal = Depends(require_company_role("manager")),
+                db: Session = Depends(get_db)):
+    return lib.resolve_flag(db, active_org(principal), doc_id, flag_id, payload.status)
+
+
+@router.get("/docs/{doc_id}/chunks")
+def chunks(doc_id: int, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
+    """M3b: các đoạn đã chỉ mục (đề mục, §, tiêu đề ngữ cảnh) — để xem agent sẽ trích dẫn gì."""
+    from app.models import KnowledgeChunk
+    doc = lib.get_doc(db, active_org(principal), doc_id, principal=principal, content=True)
+    rows = db.query(KnowledgeChunk).filter(KnowledgeChunk.document_id == doc.id).order_by(KnowledgeChunk.chunk_index).all()
+    return {"items": [{"chunk_index": c.chunk_index, "section": c.section, "section_no": c.section_no, "chars": len(c.content or ""),
+                       "head": (c.content or "").split("\n", 1)[0]} for c in rows]}
+
+
+# ------------------------------------------------------------------ M3b sự kiện công ty
+
+@router.get("/facts")
+def facts(company_id: int | None = None, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
+    from app.services import company_facts
+    return company_facts.listing(db, active_org(principal), company_id)
+
+
+@router.put("/facts")
+def put_fact(payload: FactIn, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import company_facts
+    return company_facts.set_manual(db, active_org(principal), principal, payload.model_dump(exclude_none=True))
+
+
+@router.delete("/facts/{fact_id}")
+def del_fact(fact_id: int, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import company_facts
+    return company_facts.remove_manual(db, active_org(principal), fact_id)
 
 
 @router.post("/docs/tick")
