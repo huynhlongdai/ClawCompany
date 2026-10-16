@@ -114,7 +114,8 @@ def test_initialize_and_list_all_26_tools(env):
     # +1 M3f: company_product_lookup (giá đang hiệu lực — thêm tool thật, đổi assertion có lý do)
     # +1 M3e: company_doc_propose (agent đề xuất bản nháp tài liệu — thêm tool thật, đổi assertion có lý do)
     # +2 P1 M3g: company_customer_lookup, company_customer_outreach (tool thật mới — đổi assertion có lý do)
-    assert len(tools) == 40 and all(n.startswith("company_") for n in names)
+    # +1 P1 M3h: company_contract_get (tool thật mới — đổi assertion có lý do)
+    assert len(tools) == 41 and all(n.startswith("company_") for n in names)
     assert "company_task_checkout" in names and "company_memory_search" in names
 
 
@@ -244,7 +245,8 @@ def test_executor_seat_gets_403_on_budget_check_even_with_full_scopes(env):
     # +1 M3f company_product_lookup (đọc giá, scope knowledge:read — tool thật mới, đổi số có lý do)
     # +1 M3e company_doc_propose (scope knowledge:read, chỉ tạo nháp — tool thật mới, đổi số có lý do)
     # +2 P1 M3g: company_customer_lookup (đọc, PII che) + company_customer_outreach (send, guard đồng ý) — tool thật mới, đổi số có lý do
-    assert "company_budget_check" not in names and len(names) == 37   # +2 A2A (company_external_agents, company_delegate_external); +company_lesson_propose, company_knowledge_gap_report (M5b), company_ask_advisor (M6)
+    # +1 P1 M3h: company_contract_get (đọc hợp đồng đang hiệu lực) — tool thật mới
+    assert "company_budget_check" not in names and len(names) == 38   # +2 A2A (company_external_agents, company_delegate_external); +company_lesson_propose, company_knowledge_gap_report (M5b), company_ask_advisor (M6)
     r = env["rpc"](k, "tools/call", {"name": "company_budget_check", "arguments": {}})
     assert r.status_code == 403 and r.json()["error"]["data"]["level"] == "off"
     # Trưởng phòng thì được.

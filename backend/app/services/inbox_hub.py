@@ -437,6 +437,10 @@ def after_decision(db: Session, a: Approval, actor_member_id: int | None) -> dic
         from app.services import catalog
         catalog.on_approval_resolved(db, a, actor_member_id=actor_member_id)
         return {"effect": "price_change"}
+    if key.startswith("contract:"):
+        from app.services import contracts
+        contracts.on_approval_resolved(db, a, actor_member_id=actor_member_id)
+        return {"effect": "contract"}
     if key.startswith("skill:"):
         return {"effect": "skill"}   # áp lên gateway là việc async → decide() làm tiếp
     if key.startswith("lesson:"):

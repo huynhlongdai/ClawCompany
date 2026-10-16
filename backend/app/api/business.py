@@ -107,3 +107,75 @@ def crm_lookup_preview(payload: dict, principal: Principal = Depends(require_com
     fake = Member(organization_id=co.organization_id, company_id=co.id, department_id=payload.get("department_id"),
                   name="preview", member_type="agent")
     return crm.agent_lookup(db, fake, query=str(payload.get("query") or "")[:200])
+
+
+# ------------------------------------------------------------------ M3h hợp đồng & đối tác
+
+@router.get("/biz-contracts")
+def contracts_list(company_id: int | None = None, status: str = "", q: str = "",
+                   principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
+    from app.services import contracts
+    return contracts.listing(db, active_org(principal), company_id, status=status, q=q)
+
+
+@router.post("/partners")
+def partner_create(payload: dict, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import contracts
+    return contracts.create_partner(db, active_org(principal), principal, payload)
+
+
+@router.patch("/partners/{partner_id}")
+def partner_patch(partner_id: int, payload: dict, principal: Principal = Depends(require_company_role("manager")),
+                  db: Session = Depends(get_db)):
+    from app.services import contracts
+    return contracts.update_partner(db, active_org(principal), principal, partner_id, payload)
+
+
+@router.post("/biz-contracts")
+def contract_create(payload: dict, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import contracts
+    return contracts.create(db, active_org(principal), principal, payload)
+
+
+@router.get("/biz-contracts/{contract_id}")
+def contract_get(contract_id: int, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
+    from app.services import contracts
+    return contracts.get(db, active_org(principal), contract_id)
+
+
+@router.patch("/biz-contracts/{contract_id}")
+def contract_patch(contract_id: int, payload: dict, principal: Principal = Depends(require_company_role("manager")),
+                   db: Session = Depends(get_db)):
+    from app.services import contracts
+    return contracts.update(db, active_org(principal), principal, contract_id, payload)
+
+
+@router.post("/biz-contracts/{contract_id}/submit")
+def contract_submit(contract_id: int, payload: dict | None = None, principal: Principal = Depends(require_company_role("manager")),
+                    db: Session = Depends(get_db)):
+    from app.services import contracts
+    return contracts.submit(db, active_org(principal), principal, contract_id, payload or {})
+
+
+@router.post("/biz-contracts/{contract_id}/decide")
+def contract_decide(contract_id: int, payload: dict, principal: Principal = Depends(require_company_role("member")),
+                    db: Session = Depends(get_db)):
+    from app.services import contracts
+    return contracts.decide(db, active_org(principal), principal, contract_id, payload.get("decision"), payload.get("note") or "")
+
+
+@router.post("/biz-contracts/{contract_id}/terminate")
+def contract_terminate(contract_id: int, payload: dict, principal: Principal = Depends(require_company_role("manager")),
+                       db: Session = Depends(get_db)):
+    from app.services import contracts
+    return contracts.terminate(db, active_org(principal), principal, contract_id, payload.get("note") or "")
+
+
+@router.post("/biz-contracts/lookup")
+def contract_lookup_preview(payload: dict, principal: Principal = Depends(require_company_role("member")),
+                            db: Session = Depends(get_db)):
+    """Xem trước đúng thứ agent nhận từ MCP company_contract_get."""
+    from app.services import contracts
+    from app.services.company_foundation import _company
+    co = _company(db, active_org(principal), payload.get("company_id"))
+    return contracts.agent_get(db, co.id, query=str(payload.get("query") or "")[:200])

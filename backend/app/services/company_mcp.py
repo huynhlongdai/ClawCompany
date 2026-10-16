@@ -804,6 +804,17 @@ def _customer_outreach(ctx: ToolContext, args: dict) -> dict:
         raise ToolError(d.get("error", "error"), d.get("message", "")) from None
 
 
+@tool("company_contract_get", "knowledge",
+      "Tra hợp đồng ĐANG HIỆU LỰC của công ty với nhà cung cấp / đối tác / khách doanh nghiệp (theo tên đối tác, mã HĐ hoặc từ "
+      "khoá): điều khoản chính, SLA có cấu trúc (giờ phản hồi, ngày giao, hạn thanh toán, bảo hành), ngày hiệu lực / hết hạn / "
+      "hạn báo trước. Số SLA chỉ lấy từ trường sla — không đoán; không có hợp đồng khớp thì nói chưa có.",
+      "company.knowledge:read", {"query": {"type": "string"}, "code": {"type": "string"}, "partner": {"type": "string"}})
+def _contract_get(ctx: ToolContext, args: dict) -> dict:
+    from app.services import contracts
+    return contracts.agent_get(ctx.db, ctx.member.company_id, query=_str(args, "query", required=False, limit=200),
+                               code=_str(args, "code", required=False, limit=48), partner=_str(args, "partner", required=False, limit=200))
+
+
 @tool("company_sop_get", "knowledge",
       "Lấy SOP theo sop_id (dùng offset để đọc tiếp SOP dài), hoặc tìm theo tên.",
       "company.knowledge:read", {"sop_id": {"type": "integer"}, "query": {"type": "string"},

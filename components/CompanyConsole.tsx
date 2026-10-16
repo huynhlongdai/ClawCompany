@@ -15,7 +15,7 @@ import {RulesTab, ContractsTab, CoverageTab, AgentWorkforceTab} from "./AgentNat
 import {CompanyRolesTab, LeaseOutTab, LeasedTab} from "./Rental";
 import {DocLibraryTab, FactsTab, RecordsTab} from "./DocLibrary";
 import {CatalogTab} from "./Catalog";
-import {CustomersTab, PrivacyTab} from "./Business";
+import {CustomersTab, PartnersTab, PrivacyTab} from "./Business";
 import {DocIngestTab} from "./DocIngest";
 import {DocLearningTab} from "./DocLearning";
 import {DepartmentsTab, BuildTab, flatten} from "./TeamConsole";
@@ -92,6 +92,7 @@ export function CompanyConsole() {
       {tab === "catalog" && <CatalogTab companyId={companyId} caps={caps}/>}
       {tab === "customers" && <CustomersTab companyId={companyId} caps={caps}/>}
       {tab === "privacy" && <PrivacyTab companyId={companyId} caps={caps}/>}
+      {tab === "partners" && <PartnersTab companyId={companyId} caps={caps}/>}
     </>}
   </PageFrame>;
 }

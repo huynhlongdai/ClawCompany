@@ -1124,3 +1124,16 @@ export const apiCrm = {
   act: (rid: number, body: any) => request<any>(`/team/crm/requests/${rid}/act`, j(body)),
   preview: (companyId: number, query: string, departmentId?: number | null) => request<any>(`/team/crm/lookup`, j({company_id: companyId, query, department_id: departmentId || null})),
 };
+// P1 M3h — hợp đồng & đối tác (/api/team/biz-contracts, /api/team/partners)
+export const apiBizContracts = {
+  list: (companyId: number | null, f: Record<string, any> = {}) => request<any>(`/team/biz-contracts?${qs({company_id: companyId, ...f}).slice(1)}`),
+  get: (id: number) => request<any>(`/team/biz-contracts/${id}`),
+  create: (body: any) => request<any>(`/team/biz-contracts`, j(body)),
+  patch: (id: number, body: any) => request<any>(`/team/biz-contracts/${id}`, j(body, "PATCH")),
+  submit: (id: number) => request<any>(`/team/biz-contracts/${id}/submit`, j({})),
+  decide: (id: number, decision: "approved" | "rejected", note = "") => request<any>(`/team/biz-contracts/${id}/decide`, j({decision, note})),
+  terminate: (id: number, note: string) => request<any>(`/team/biz-contracts/${id}/terminate`, j({note})),
+  createPartner: (body: any) => request<any>(`/team/partners`, j(body)),
+  patchPartner: (id: number, body: any) => request<any>(`/team/partners/${id}`, j(body, "PATCH")),
+  preview: (companyId: number, query: string) => request<any>(`/team/biz-contracts/lookup`, j({company_id: companyId, query})),
+};

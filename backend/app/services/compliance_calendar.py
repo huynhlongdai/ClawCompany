@@ -33,7 +33,7 @@ DISCLAIMER = ("Lịch tham khảo do hệ thống tính từ căn cứ pháp lý
               "Đối chiếu với kế toán hoặc cơ quan thuế trước khi nộp; ngày lễ chưa được tính.")
 HORIZON_DAYS = 120
 FREQUENCIES = ("monthly", "quarterly", "yearly", "once")
-CATEGORIES = ("tax", "social", "report", "license")
+CATEGORIES = ("tax", "social", "report", "license", "contract")   # contract: P1 M3h (hạn báo trước / hết hạn hợp đồng)
 DUE_TYPES = ("next_month_day", "next_month_end", "next_quarter_first_month_end", "months_after_year_end", "fixed_date")
 COMPANY_TYPES = ["dntn", "tnhh_1tv", "tnhh_2tv", "co_phan", "hop_danh"]
 QLT = ("Điều 44 Luật Quản lý thuế 38/2019/QH14 (tới 30/6/2026); từ 1/7/2026: Luật Quản lý thuế 2025 và "
