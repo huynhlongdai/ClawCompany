@@ -205,3 +205,29 @@ async def test_retired_seats_are_not_written_and_non_gateway_runtime_is_skipped(
     class Mock:
         pass
     assert (await seat_provision.ensure_session_isolation(db, Mock()))["skipped"]
+
+
+@pytest.mark.asyncio
+async def test_losing_a_concurrent_write_rereads_instead_of_failing(db):
+    """Hai tiến trình API cùng khởi động: tiến trình thua baseHash đọc lại thấy đã đúng → không lỗi, không ghi lần 2."""
+    org = _org(db, "gom")
+    _seat(db, org, "cskh")
+    gw = Gateway(["cskh"])
+
+    class Racing(Gateway):
+        def __init__(self, inner):
+            self.inner, self.raced = inner, False
+
+        async def list_agents(self):
+            return await self.inner.list_agents()
+
+        async def rpc(self, method, params=None):
+            if method == ocp.M_CONFIG_PATCH and not self.raced:
+                self.raced = True
+                await seat_provision.ensure_session_isolation(db, self.inner)   # tiến trình kia ghi trước
+                raise RuntimeError("baseHash mismatch")
+            return await self.inner.rpc(method, params)
+
+    out = await seat_provision.ensure_session_isolation(db, Racing(gw))
+    assert out["changed"] == [] and out["ok"] is True
+    assert len(gw.patches) == 1

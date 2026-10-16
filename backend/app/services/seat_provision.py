@@ -290,21 +290,29 @@ async def ensure_session_isolation(db: Session, runtime: Any, *, dry_run: bool =
     Idempotent: chỉ patch phần lệch; đã đúng → không gọi config.patch."""
     if not agent_hr._has_rpc(runtime):
         return {"skipped": "runtime không phải gateway thật"}
-    registry = ConfigRegistry(runtime)
-    snap = await registry.snapshot()
-    config = snap["config"] or {}
     try:
         roster = {agent_hr._rid_of(a) for a in await runtime.list_agents()}
     except Exception:  # noqa: BLE001 — không đọc được roster thì chỉ đặt khoá gốc
         roster = set()
     rids = [r for r in company_seat_rids(db) if r in roster]
-    values, replace = session_isolation_values(config, rids)
-    if not values:
-        return {"changed": [], **session_isolation_report(config, rids)}
-    result = await registry.patch(values, base_hash=snap["hash"] or None, replace_paths=replace,
-                                  note="ClawCompany W0 · cách ly phiên giữa agent", dry_run=dry_run)
-    return {"changed": [".".join(p) for p in values], "dry_run": dry_run,
-            "changed_paths": result.get("changed_paths"), "seats": len(rids)}
+    for attempt in (1, 2):
+        # Hai tiến trình API (uvicorn --workers 2) cùng khởi động: tiến trình thua baseHash đọc lại — thường đã đúng.
+        registry = ConfigRegistry(runtime)
+        snap = await registry.snapshot()
+        config = snap["config"] or {}
+        values, replace = session_isolation_values(config, rids)
+        if not values:
+            return {"changed": [], **session_isolation_report(config, rids)}
+        try:
+            result = await registry.patch(values, base_hash=snap["hash"] or None, replace_paths=replace,
+                                          note="ClawCompany W0 · cách ly phiên giữa agent", dry_run=dry_run)
+        except Exception:  # noqa: BLE001
+            if attempt == 2 or dry_run:
+                raise
+            continue
+        return {"changed": [".".join(p) for p in values], "dry_run": dry_run,
+                "changed_paths": result.get("changed_paths"), "seats": len(rids)}
+    return {"changed": []}
 
 
 def schedule_session_isolation() -> None:
