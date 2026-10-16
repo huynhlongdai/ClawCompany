@@ -65,9 +65,9 @@ class TickIn(BaseModel):
 
 
 @router.get("")
-def list_leases(side: str = "provider", principal: Principal = Depends(require_company_role("member")),
-                db: Session = Depends(get_db)):
-    return svc.list_for(db, active_org(principal), side)
+def list_leases(side: str = "provider", company_id: int | None = None,
+                principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
+    return svc.list_for(db, active_org(principal), side, company_id)
 
 
 @router.post("")

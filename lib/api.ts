@@ -1008,4 +1008,20 @@ export const apiRental = {
   setCompanyAccess: (body: any) => request<any>(`/team/company-access`, {method: "PUT", body: JSON.stringify(body)}),
   removeCompanyAccess: (id: number) => request<any>(`/team/company-access/${id}`, {method: "DELETE"}),
   linkSeat: (body: any) => request<any>(`/team/user-seats`, {method: "POST", body: JSON.stringify(body)}),
+  // R2 cho thuê agent
+  leases: (side: "provider" | "renter", companyId?: number | null) =>
+    request<any>(`/leases?side=${side}${companyId ? `&company_id=${companyId}` : ""}`),
+  lease: (id: number) => request<any>(`/leases/${id}`),
+  leasePolicy: (id: number) => request<any>(`/leases/${id}/policy`),
+  createOffer: (body: any) => request<any>(`/leases`, {method: "POST", body: JSON.stringify(body)}),
+  previewOffer: (code: string) => request<any>(`/leases/offer/${encodeURIComponent(code)}`),
+  acceptOffer: (body: any) => request<any>(`/leases/accept`, {method: "POST", body: JSON.stringify(body)}),
+  updateLease: (id: number, body: any) => request<any>(`/leases/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
+  leaseStatus: (id: number, action: "suspend" | "resume", reason = "") =>
+    request<any>(`/leases/${id}/status`, {method: "POST", body: JSON.stringify({action, reason})}),
+  endLease: (id: number, reason = "") => request<any>(`/leases/${id}/end`, {method: "POST", body: JSON.stringify({reason})}),
+  requestChange: (id: number, body: {changes: any; note?: string}) =>
+    request<any>(`/leases/${id}/change-requests`, {method: "POST", body: JSON.stringify(body)}),
+  decideChange: (id: number, crId: number, decision: "approved" | "rejected") =>
+    request<any>(`/leases/${id}/change-requests/${crId}/decide`, {method: "POST", body: JSON.stringify({decision})}),
 };

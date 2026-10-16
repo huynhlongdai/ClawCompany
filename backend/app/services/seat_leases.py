@@ -799,7 +799,7 @@ def view(db: Session, ls: SeatLease, org_id: int) -> dict:
     return out
 
 
-def list_for(db: Session, org_id: int, side: str) -> dict:
+def list_for(db: Session, org_id: int, side: str, company_id: int | None = None) -> dict:
     from app.core import company_scope
     if side == "provider":
         q = db.query(SeatLease).filter(SeatLease.provider_org_id == org_id)
@@ -809,6 +809,8 @@ def list_for(db: Session, org_id: int, side: str) -> dict:
         q = company_scope.scope_filter(q, SeatLease.renter_company_id, include_null=False)
     else:
         raise _err(422, "side là provider hoặc renter")
+    if company_id:
+        q = q.filter((SeatLease.provider_company_id if side == "provider" else SeatLease.renter_company_id) == company_id)
     rows = [view(db, x, org_id) for x in q.order_by(SeatLease.id.desc()).all()]
     totals = {"leases": len(rows), "active": sum(1 for r in rows if r["status"] == "active"),
               "billed_usd": round(sum(r["usage"]["billed_usd"] for r in rows), 6),

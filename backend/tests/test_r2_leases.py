@@ -465,3 +465,5 @@ def test_provider_cannot_see_renter_seat_data(L):
     assert ok(X.c.get(f"/api/leases/{ls.id}", headers=X.tR))["renter"]["agent_id"] == ag.id
     assert X.c.get(f"/api/leases/{ls.id}", headers=X.tok("other")).status_code == 404
     assert ok(X.c.get("/api/leases?side=renter", headers=X.tok("owner")))["items"] == []
+    assert len(ok(X.c.get(f"/api/leases?side=renter&company_id={X.rco.id}", headers=X.tR))["items"]) == 1
+    assert ok(X.c.get(f"/api/leases?side=renter&company_id={X.co.id}", headers=X.tR))["items"] == []
