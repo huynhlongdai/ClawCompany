@@ -619,8 +619,9 @@ def coverage(db: Session, org_id: int, company_id: int | None, now: datetime | N
             "sla": attainment(db, company_id=co.id),
             "queue": sum(x["queue"] for x in out),
             "queued_after_hours": db.query(AfterHoursRoute).filter(AfterHoursRoute.company_id == co.id, AfterHoursRoute.status == "open").count(),
-            "breached_open": db.query(SlaTimer).filter(SlaTimer.company_id == co.id, SlaTimer.status == "breached",
-                                                       SlaTimer.met_at.is_(None)).count(),
+            "breached_open": db.query(SlaTimer).join(Task, Task.id == SlaTimer.task_id).filter(
+                SlaTimer.company_id == co.id, SlaTimer.status == "breached", SlaTimer.met_at.is_(None),
+                Task.status.in_(OPEN)).count(),     # việc đã xong/huỷ không còn là "quá hạn chưa xong"
             "positions": out, "policies": [public_policy(db, p) for p in pols], "steps": steps, "humans": humans,
             "timers": [{"id": t.id, "task_id": t.task_id, "kind": t.kind, "seat": names.get(t.member_id or -1), "seat_type": t.seat_type,
                         "minutes": t.minutes, "started_at": t.started_at.isoformat(), "due_at": t.due_at.isoformat(),
