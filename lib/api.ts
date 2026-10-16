@@ -799,6 +799,7 @@ export const apiNative = {
   createSla: (body: any) => request<any>(`/team/sla-policies`, {method: "POST", body: JSON.stringify(body)}),
   updateSla: (id: number, body: any) => request<any>(`/team/sla-policies/${id}`, {method: "PATCH", body: JSON.stringify(body)}),
   deleteSla: (id: number) => request<any>(`/team/sla-policies/${id}`, {method: "DELETE"}),
+  agentHr: (companyId?: number | null) => request<any>(`/team/agent-hr${cq(companyId)}`),
 };
 
 export const apiOps = {

@@ -117,3 +117,24 @@ Công ty agent: mỗi chức danh / bước quy trình có **hợp đồng dữ 
 - Giới hạn thật: lưới độ phủ dựa trên lịch tuần mẫu (nghỉ phép/lễ hiện ở danh sách ghế, không trừ vào lưới); "phản hồi
   đầu" đo bằng trạng thái việc, không đo tin nhắn đầu tiên gửi khách trên kênh chat; `sla/tick` thủ công chạy cho mọi công
   ty trên máy (giống beat).
+
+## M2e.5 — HR cho ghế agent
+
+Thước đo nhân sự riêng cho ghế agent — đúng những thứ công ty truyền thống không đo được ở người (`services/agent_workforce.py`,
+30 ngày, tính từ bảng có sẵn nên **không cần migration**):
+
+- **Tuân thủ luật cứng** = lượt chạy không vi phạm / tổng lượt (M2e.2).
+- **Đúng hợp đồng dữ liệu** = lần nộp hợp lệ / tổng lần nộp (gồm lượt kết thúc mà chưa nộp) + tỷ lệ đạt ngay lần đầu (M2e.3).
+- **Nhất quán** = 1 − 2 × độ lệch chuẩn trung bình của chất lượng giữa k lần chạy cùng một ca đánh giá (eval_runs 90 ngày;
+  chất lượng một lần thử = tỷ lệ tiêu chí must_include / must_not_include đạt) + phương sai. Chưa có đánh giá k lần → để
+  trống (không ước đoán).
+- **Đạt SLA** = đồng hồ SLA đóng đúng hạn (M2e.4).
+- **Giờ làm 24/7** = tổng thời lượng lượt chạy (mỗi lượt tối đa 6 giờ), phần ngoài giờ hành chính (T2–T6 08:00–17:30 VN),
+  số ô giờ trong tuần (7×24) có hoạt động.
+- **Chi phí mỗi việc (USD)** = chi phí lượt chạy / việc xong.
+- Ghế người giữ trường HR thường: chức danh, giờ làm/tuần, đang trong giờ / trực lại lúc, số lần nghỉ, việc xong, đạt SLA.
+- Nơi hiện: scorecard (`GET /api/learning/career/{agent_id}` → `consistency`, `sla_attainment_rate`, `hours`,
+  `cost_per_task_usd`, `output_conformance_rate`, `rule_compliance_rate`) → thẻ "Sự nghiệp" trong AgentHR; tổng hợp công ty
+  `GET /api/team/agent-hr?company_id=` → Đội ngũ → tab "Nhân sự agent".
+- Giới hạn thật: giờ làm của agent = thời gian lượt chạy (không phải "ca trực" — agent luôn trực); nhất quán cần chạy bộ
+  đánh giá k lần (tốn quota model).

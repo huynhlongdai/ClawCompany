@@ -468,3 +468,50 @@ export function CoverageTab({companyId, caps}: {companyId: number | null; caps: 
         <td><span className="ui-pill is-info">{tr(`native.ra_${r.action}` as Key)}</span></td><td><small>{r.reason}</small></td></tr>)}</tbody></table></div></>}
   </section>;
 }
+
+// ===================================================================== M2e.5 nhân sự agent
+const usd = (v: any) => v == null ? "—" : `$${Number(v).toFixed(2)}`;
+const hrs = (v: any) => v == null ? "—" : `${Number(v).toFixed(1)}h`;
+const tone = (v: any, good = 0.95, ok = 0.8) => v == null ? "" : v >= good ? "is-ok" : v >= ok ? "is-wait" : "is-risk";
+
+export function AgentWorkforceTab({companyId}: {companyId: number | null; caps: any}) {
+  const {data, error, reload} = useLoad(() => apiNative.agentHr(companyId), [companyId]);
+  if (error && !data) return <ErrorBanner error={error} onRetry={reload} testId="agent-hr-error"/>;
+  if (!data) return <SkeletonRows n={4} h={44}/>;
+  const d: any = data, tt = d.totals;
+  const cell = (v: any, good?: number, ok?: number) => <td className="ui-num"><span className={"ui-pill " + tone(v, good, ok)}>{pct(v)}</span></td>;
+  return <section className="ui-section" data-testid="agent-hr-summary">
+    <p className="tmGuide">{tr("native.ahr_explain", {p0: d.days})}</p>
+    <div className="ui-grid is-4">{[[tr("native.ahr_rules"), pct(tt.rule_compliance_rate)], [tr("native.ahr_conformance"), pct(tt.output_conformance_rate)],
+      [tr("native.ahr_consistency"), pct(tt.consistency)], [tr("native.ahr_sla"), pct(tt.sla_attainment_rate)],
+      [tr("native.ahr_hours"), `${hrs(tt.hours)} · ${tr("native.ahr_after_share", {p0: pct(tt.after_hours_share)})}`],
+      [tr("native.ahr_cost_task"), usd(tt.cost_per_task_usd)], [tr("native.ahr_cost_total"), usd(tt.cost_usd)], [tr("native.ahr_done"), tt.tasks_done]].map(([l, v], i) =>
+      <section key={i} className="ui-panel tm-card"><small>{l}</small><div className="ops-big"><b className="ui-num">{v}</b></div></section>)}</div>
+    <h3 className="ops-cat">{tr("native.ahr_agents", {p0: tt.agents})}</h3>
+    {d.agents.length === 0 ? <p><small>{tr("native.ahr_no_agents")}</small></p>
+      : <div className="ui-panel ahr-wrap"><table className="ui-table" data-testid="agent-hr-table"><thead><tr>
+        <th>{tr("native.seat")}</th><th>{tr("native.ahr_rules")}</th><th>{tr("native.ahr_conformance")}</th><th>{tr("native.ahr_consistency")}</th>
+        <th>{tr("native.ahr_sla")}</th><th>{tr("native.ahr_hours")}</th><th>{tr("native.ahr_after")}</th><th>{tr("native.ahr_done")}</th><th>{tr("native.ahr_cost_task")}</th></tr></thead>
+        <tbody>{d.agents.map((a: any) => <tr key={a.member_id}>
+          <td><b>{a.name}</b><br/><small>{a.position || "—"} · {tr(`native.lvl_${a.level}` as Key)}</small></td>
+          {cell(a.rule_compliance_rate)}
+          <td className="ui-num"><span className={"ui-pill " + tone(a.output_conformance_rate)}>{pct(a.output_conformance_rate)}</span>
+            {a.output_submissions ? <small> {tr("native.ahr_first", {p0: pct(a.output_first_try_rate)})}</small> : null}</td>
+          <td className="ui-num"><span className={"ui-pill " + tone(a.consistency.score, 0.9, 0.7)}>{pct(a.consistency.score)}</span>
+            {a.consistency.cases ? <small> σ²={a.consistency.variance}</small> : <small> {tr("native.ahr_no_eval")}</small>}</td>
+          {cell(a.sla_attainment_rate)}
+          <td className="ui-num">{hrs(a.hours.hours)}<br/><small>{tr("native.ahr_slots", {p0: a.hours.active_slots})}</small></td>
+          <td className="ui-num">{hrs(a.hours.after_hours)}<br/><small>{pct(a.hours.after_hours_share)}</small></td>
+          <td className="ui-num">{a.tasks_done}</td><td className="ui-num">{usd(a.cost_per_task_usd)}<br/><small>{usd(a.cost_usd)}</small></td>
+        </tr>)}</tbody></table></div>}
+    <small className="tmGuide">{tr("native.ahr_note")}</small>
+    <h3 className="ops-cat">{tr("native.ahr_humans", {p0: tt.humans})}</h3>
+    {d.humans.length === 0 ? <p><small>{tr("native.ahr_no_humans")}</small></p>
+      : <div className="ui-panel"><table className="ui-table" data-testid="human-hr-table"><thead><tr><th>{tr("native.seat")}</th><th>{tr("native.week_hours")}</th>
+        <th>{tr("native.now")}</th><th>{tr("native.leaves")}</th><th>{tr("native.ahr_done")}</th><th>{tr("native.ahr_sla")}</th></tr></thead>
+        <tbody>{d.humans.map((h: any) => <tr key={h.member_id}><td><b>{h.name}</b><br/><small>{h.position || h.role || "—"}</small></td>
+          <td className="ui-num">{h.weekly_hours}</td>
+          <td>{h.on_duty ? tr("native.on_duty") : `${tr("native.off_duty")}${h.next_on_duty_local ? " · " + tr("native.back_at", {p0: h.next_on_duty_local}) : ""}`}{h.off_today ? <small> · {h.off_today}</small> : null}</td>
+          <td className="ui-num">{h.leaves}</td><td className="ui-num">{h.tasks_done}</td><td className="ui-num">{pct(h.sla_attainment_rate)}</td></tr>)}</tbody></table></div>}
+  </section>;
+}

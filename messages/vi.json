@@ -142,7 +142,8 @@
   "san_sang": "Sẵn sàng agent",
   "luat_cung": "Luật cứng",
   "hop_dong_du_lieu": "Hợp đồng dữ liệu",
-  "van_hanh_24_7": "Vận hành 24/7"
+  "van_hanh_24_7": "Vận hành 24/7",
+  "nhan_su_agent": "Nhân sự agent"
  },
  "shell": {
   "cong_ty": "{p0} · {p1} công ty",
@@ -3000,6 +3001,28 @@
   "dow_3": "T5",
   "dow_4": "T6",
   "dow_5": "T7",
-  "dow_6": "CN"
+  "dow_6": "CN",
+  "ahr_explain": "Thước đo nhân sự riêng cho ghế agent ({p0} ngày): làm đúng luật cứng, nộp đúng hợp đồng dữ liệu, cùng một đầu vào cho cùng chất lượng (nhất quán), đúng SLA, làm cả ngoài giờ hành chính, và tốn bao nhiêu USD mỗi việc. Ghế người giữ hồ sơ nhân sự thường.",
+  "ahr_rules": "Tuân thủ luật cứng",
+  "ahr_conformance": "Đúng hợp đồng dữ liệu",
+  "ahr_consistency": "Nhất quán",
+  "ahr_sla": "Đạt SLA",
+  "ahr_hours": "Giờ làm",
+  "ahr_after": "Ngoài giờ hành chính",
+  "ahr_after_share": "{p0} ngoài giờ",
+  "ahr_cost_task": "Chi phí mỗi việc",
+  "ahr_cost_total": "Chi phí AI",
+  "ahr_done": "Việc xong",
+  "ahr_agents": "Ghế agent ({p0})",
+  "ahr_humans": "Ghế người ({p0})",
+  "ahr_no_agents": "Công ty chưa có ghế agent.",
+  "ahr_no_humans": "Công ty chưa có ghế người — mọi chức danh đang do agent đảm nhiệm.",
+  "ahr_first": "lần đầu {p0}",
+  "ahr_no_eval": "chưa đánh giá k lần",
+  "ahr_slots": "{p0}/168 ô giờ",
+  "ahr_note": "Nhất quán = 1 − 2 × độ lệch chuẩn chất lượng giữa k lần chạy cùng một ca đánh giá (90 ngày); chưa chạy đánh giá k lần thì để trống, không ước đoán. Giờ hành chính = T2–T6 08:00–17:30 giờ Việt Nam. Chi phí tính bằng USD từ lượt chạy.",
+  "lvl_probation": "thử việc",
+  "lvl_standard": "tiêu chuẩn",
+  "lvl_trusted": "tin cậy"
  }
 }

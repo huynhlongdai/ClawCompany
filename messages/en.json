@@ -142,7 +142,8 @@
   "san_sang": "Agent readiness",
   "luat_cung": "Hard rules",
   "hop_dong_du_lieu": "Data contracts",
-  "van_hanh_24_7": "24/7 operations"
+  "van_hanh_24_7": "24/7 operations",
+  "nhan_su_agent": "Agent workforce"
  },
  "shell": {
   "cong_ty": "{p0} · {p1:company|companies}",
@@ -3000,6 +3001,28 @@
   "dow_3": "Thu",
   "dow_4": "Fri",
   "dow_5": "Sat",
-  "dow_6": "Sun"
+  "dow_6": "Sun",
+  "ahr_explain": "Workforce metrics built for agent seats ({p0} days): following hard rules, submitting outputs that match the data contract, giving the same quality for the same input (consistency), meeting SLAs, working outside office hours, and USD cost per task. Human seats keep normal HR records.",
+  "ahr_rules": "Hard-rule compliance",
+  "ahr_conformance": "Data-contract conformance",
+  "ahr_consistency": "Consistency",
+  "ahr_sla": "SLA met",
+  "ahr_hours": "Hours worked",
+  "ahr_after": "Outside office hours",
+  "ahr_after_share": "{p0} after hours",
+  "ahr_cost_task": "Cost per task",
+  "ahr_cost_total": "AI cost",
+  "ahr_done": "Tasks done",
+  "ahr_agents": "Agent seats ({p0})",
+  "ahr_humans": "Human seats ({p0})",
+  "ahr_no_agents": "No agent seats in this company.",
+  "ahr_no_humans": "No human seats — every position is staffed by agents.",
+  "ahr_first": "first try {p0}",
+  "ahr_no_eval": "no k-run eval yet",
+  "ahr_slots": "{p0}/168 hour slots",
+  "ahr_note": "Consistency = 1 − 2 × standard deviation of quality across k runs of the same eval case (90 days); left blank until a k-run eval exists — never estimated. Office hours = Mon–Fri 08:00–17:30 Vietnam time. Cost in USD from runs.",
+  "lvl_probation": "probation",
+  "lvl_standard": "standard",
+  "lvl_trusted": "trusted"
  }
 }

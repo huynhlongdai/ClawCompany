@@ -676,3 +676,4 @@ textarea.ops-json{width:100%}
 .cov-seats{list-style:none;padding:0;margin:4px 0;display:flex;gap:14px;flex-wrap:wrap;font-size:13px}
 .cov-days{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;margin:6px 0}
 .cov-days input{width:100%}
+.ahr-wrap{overflow-x:auto}

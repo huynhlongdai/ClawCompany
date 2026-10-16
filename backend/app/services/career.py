@@ -177,7 +177,11 @@ def scorecard(db: Session, org_id: int, agent_id: int, *, days: int = 30) -> dic
     from app.services import io_contracts, runtime_rules   # M2e.3 hợp đồng dữ liệu, M2e.2 luật cứng
     conf = io_contracts.conformance(db, member_ids=[m.id], days=days)
     rules = runtime_rules.compliance(db, m, days=days)
+    from app.services import agent_workforce   # M2e.5: nhất quán, SLA, giờ làm 24/7, chi phí mỗi việc
+    hr = agent_workforce.seat_metrics(db, m, days=days)
     return {"agent_id": ag.id, "name": m.name, "days": days,
+            "consistency": hr["consistency"], "sla_attainment_rate": hr["sla_attainment_rate"], "sla_closed": hr["sla_closed"],
+            "hours": hr["hours"], "cost_per_task_usd": hr["cost_per_task_usd"],
             "output_conformance": conf, "output_conformance_rate": conf["rate"],
             "rule_compliance_rate": rules["rate"], "rule_violations": rules["violations"],
             "kpis": kpis, "kpi_attainment": round(sum(scored) / len(scored), 1) if scored else None,

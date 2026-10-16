@@ -345,3 +345,14 @@ def sla_tick_now(principal: Principal = Depends(require_role("manager")), db: Se
     """Chạy ngay một nhịp của beat ``sla.tick`` (beat chạy mỗi 60 giây)."""
     from app.services import operating_time as ot
     return ot.tick(db)
+
+
+# ------------------------------------------------------------------ M2e.5 HR agent
+
+@router.get("/agent-hr")
+def agent_hr_summary(company_id: int | None = None, days: int = 30, principal: Principal = Depends(require_role("member")),
+                     db: Session = Depends(get_db)):
+    """Nhân sự agent: tuân thủ luật, đúng hợp đồng dữ liệu, nhất quán, đạt SLA, giờ làm 24/7, chi phí mỗi việc (USD);
+    ghế người giữ trường HR thường."""
+    from app.services import agent_workforce
+    return agent_workforce.company_summary(db, active_org(principal), company_id, days=max(1, min(days, 90)))
