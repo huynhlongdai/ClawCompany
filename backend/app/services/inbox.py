@@ -38,7 +38,8 @@ KINDS = ("approval_pending", "approval_escalated", "run_failed", "task_review", 
          "standup", "weekly_report", "compliance_due",   # M2c D6 giao ban/báo cáo tuần, D7 hạn tuân thủ
          "rule_violation", "output_rework", "output_escalated", "sla_breach", "after_hours",   # M2e
          "doc_review_due", "doc_expired", "doc_flagged", "doc_conflict", "record_disposal_due",   # M3
-         "doc_proposal")   # M3e vòng học: đề xuất sửa tài liệu
+         "doc_proposal",   # M3e vòng học: đề xuất sửa tài liệu
+         "dsr_due", "contract_due", "meeting_action", "finance_budget")   # P1: DLCN, hợp đồng, họp, tài chính
 KIND_VI = {
     "rule_violation": "Vi phạm luật cứng", "output_rework": "Kết quả sai chuẩn — trả làm lại",
     "output_escalated": "Kết quả sai chuẩn quá số lần — cần người", "sla_breach": "Quá hạn SLA — leo thang",
@@ -47,6 +48,8 @@ KIND_VI = {
     "doc_flagged": "Agent đánh dấu tài liệu sai/cũ", "doc_conflict": "Tài liệu mâu thuẫn",
     "record_disposal_due": "Hồ sơ hết hạn lưu trữ — chờ duyệt huỷ",
     "doc_proposal": "Đề xuất sửa tài liệu (vòng học)",
+    "dsr_due": "Yêu cầu dữ liệu cá nhân — có hạn", "contract_due": "Hợp đồng sắp hết hạn / hạn báo trước",
+    "meeting_action": "Việc sau họp", "finance_budget": "Ngân sách kinh doanh chạm ngưỡng",
     "approval_pending": "Chờ duyệt", "approval_escalated": "Duyệt quá hạn — chuyển lên anh",
     "run_failed": "Run lỗi", "task_review": "Vào review", "mention": "Được nhắc tên",
     "budget_warned": "Ngân sách chạm nấc cảnh báo", "budget_exhausted": "Hết ngân sách",

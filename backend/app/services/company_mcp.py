@@ -767,6 +767,43 @@ def _product_lookup(ctx: ToolContext, args: dict) -> dict:
                           limit=_int(args, "limit", required=False, default=5) or 5)
 
 
+@tool("company_customer_lookup", "knowledge",
+      "Tra khách hàng/liên hệ của công ty (theo tên, nhóm, nhãn hoặc contact_id) kèm 5 tương tác gần nhất. Chỉ trả liên hệ của "
+      "phòng anh/chị và đã đồng ý cho xử lý (chăm sóc khách / AI); điện thoại, email LUÔN bị che — đừng hỏi lại hay đoán. "
+      "Muốn nhắn marketing: dùng company_customer_outreach (hệ thống chặn người chưa đồng ý).",
+      "company.knowledge:read", {"query": {"type": "string"}, "contact_id": {"type": "integer"}, "limit": {"type": "integer"}})
+def _customer_lookup(ctx: ToolContext, args: dict) -> dict:
+    from app.services import crm
+    return crm.agent_lookup(ctx.db, ctx.member, query=_str(args, "query", required=False, limit=200),
+                            contact_id=_int(args, "contact_id", required=False),
+                            limit=_int(args, "limit", required=False, default=5) or 5)
+
+
+@tool("company_customer_outreach", "collab",
+      "Ghi/xin gửi một tin cho khách (purpose=marketing|service, channel=zalo|sms|email|phone|…). Marketing chỉ được khi khách "
+      "đã đồng ý marketing đúng kênh, chưa rút, không bị hạn chế/xoá — nếu không, hệ thống CHẶN (error no_marketing_consent) và "
+      "ghi lại; đừng thử kênh khác để lách. Tool chỉ ghi nhật ký được phép, không tự gửi ra kênh ngoài.",
+      "company.messages:write", {"contact_id": {"type": "integer"}, "purpose": {"type": "string"}, "channel": {"type": "string"},
+                                 "message": {"type": "string"}}, required=("contact_id", "message"), writes=True)
+def _customer_outreach(ctx: ToolContext, args: dict) -> dict:
+    from fastapi import HTTPException
+    from app.models.crm import CrmContact
+    from app.services import crm
+    cid = _int(args, "contact_id")
+    c = ctx.db.get(CrmContact, cid)
+    if c is None or c.company_id != ctx.member.company_id:
+        raise ToolError("not_found", "Không thấy liên hệ trong công ty của anh/chị")
+    if ctx.member.department_id and c.department_id not in (None, ctx.member.department_id):
+        raise ToolError("forbidden", "Liên hệ thuộc phòng khác")
+    try:
+        return crm.outreach(ctx.db, ctx.org, None, cid, {"purpose": _str(args, "purpose", required=False, limit=16) or "marketing",
+                                                         "channel": _str(args, "channel", required=False, limit=16) or "other",
+                                                         "message": _str(args, "message", limit=4000)}, actor=ctx.member)
+    except HTTPException as exc:
+        d = exc.detail if isinstance(exc.detail, dict) else {"error": "error", "message": str(exc.detail)}
+        raise ToolError(d.get("error", "error"), d.get("message", "")) from None
+
+
 @tool("company_sop_get", "knowledge",
       "Lấy SOP theo sop_id (dùng offset để đọc tiếp SOP dài), hoặc tìm theo tên.",
       "company.knowledge:read", {"sop_id": {"type": "integer"}, "query": {"type": "string"},

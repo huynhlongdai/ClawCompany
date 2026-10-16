@@ -745,3 +745,13 @@ textarea.ops-json{width:100%}
 .ui-text-ok{color:var(--ok, #2e7d32)}
 .ui-text-risk{color:var(--risk, #c62828)}
 @media (max-width:760px){.learn-hide-sm{display:none}}
+/* P1 kinh doanh (khách hàng, DLCN, hợp đồng, họp, tài chính) */
+.biz-wrap{flex-wrap:wrap;gap:8px}
+.biz-mono{font-variant-numeric:tabular-nums;white-space:nowrap}
+.biz-check{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.biz-table td{vertical-align:top}
+.biz-table .ui-pill{margin:0 4px 4px 0}
+.biz-timeline{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.biz-timeline li{padding:6px 0;border-bottom:1px solid var(--line, rgba(0,0,0,.06))}
+.biz-num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+@media (max-width:640px){.biz-hide-m{display:none}.biz-table{font-size:13px}.biz-wrap .ui-input{min-width:0;flex:1 1 140px}}

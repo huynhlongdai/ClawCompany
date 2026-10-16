@@ -1107,3 +1107,20 @@ export const apiDocs = {
     const a = document.createElement("a"); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
   },
 };
+
+// P1 M3g — khách hàng & đồng ý DLCN (/api/team/crm…)
+const j = (body: any, method = "POST") => ({method, body: JSON.stringify(body)});
+export const apiCrm = {
+  list: (companyId: number | null, f: Record<string, any> = {}) => request<any>(`/team/crm/contacts?${qs({company_id: companyId, ...f}).slice(1)}`),
+  get: (id: number) => request<any>(`/team/crm/contacts/${id}`),
+  create: (body: any) => request<any>(`/team/crm/contacts`, j(body)),
+  patch: (id: number, body: any) => request<any>(`/team/crm/contacts/${id}`, j(body, "PATCH")),
+  consent: (id: number, body: any) => request<any>(`/team/crm/contacts/${id}/consents`, j(body)),
+  withdraw: (consentId: number, reason: string) => request<any>(`/team/crm/consents/${consentId}/withdraw`, j({reason})),
+  interaction: (id: number, body: any) => request<any>(`/team/crm/contacts/${id}/interactions`, j(body)),
+  outreach: (id: number, body: any) => request<any>(`/team/crm/contacts/${id}/outreach`, j(body)),
+  openRequest: (id: number, body: any) => request<any>(`/team/crm/contacts/${id}/requests`, j(body)),
+  requests: (companyId: number | null, status = "") => request<any>(`/team/crm/requests?${qs({company_id: companyId, status}).slice(1)}`),
+  act: (rid: number, body: any) => request<any>(`/team/crm/requests/${rid}/act`, j(body)),
+  preview: (companyId: number, query: string, departmentId?: number | null) => request<any>(`/team/crm/lookup`, j({company_id: companyId, query, department_id: departmentId || null})),
+};

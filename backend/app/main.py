@@ -61,6 +61,7 @@ from app.api.company_ops import router as company_ops_router  # M2c
 from app.api.agent_native import router as agent_native_router, guard_router  # M2e
 from app.api.leases import router as leases_router  # R2 cho thuê agent
 from app.api.docs import router as docs_router  # M3 thư viện tài liệu & tri thức
+from app.api.business import router as business_router  # P1 kinh doanh: CRM/DLCN, hợp đồng, họp, tài chính
 from app.api.work import router as work_router, successor as work_successor  # M4a
 from app.api.inbox import router as inbox_router, costs_router, successor as inbox_successor  # M4b
 from app.core.middleware import RequestContextMiddleware
@@ -176,6 +177,7 @@ app.include_router(company_ops_router, prefix="/api")
 app.include_router(agent_native_router, prefix="/api")
 app.include_router(leases_router, prefix="/api")
 app.include_router(docs_router, prefix="/api")
+app.include_router(business_router, prefix="/api")
 app.include_router(guard_router, prefix="/api")
 app.include_router(work_router, prefix="/api")
 app.include_router(inbox_router, prefix="/api")

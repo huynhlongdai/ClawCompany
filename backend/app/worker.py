@@ -47,6 +47,7 @@ CORE_BEAT_SCHEDULE = {
     "tick-lease": {"task": "lease.tick", "schedule": 300.0},   # R2 cho thuê agent
     # M3a: thư viện tài liệu — tới ngày hiệu lực → ban hành; hết hiệu lực → lưu trữ; hạn rà soát → Hộp việc.
     "tick-docs": {"task": "docs.tick", "schedule": 3600.0},
+    "tick-business": {"task": "business.tick", "schedule": 3600.0},   # P1 DLCN / hợp đồng / họp / tài chính
 }
 
 

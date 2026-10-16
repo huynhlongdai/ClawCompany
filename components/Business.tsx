@@ -1,0 +1,257 @@
+"use client";
+// P1 — Công ty › Kinh doanh: Khách hàng (M3g CRM), Dữ liệu cá nhân (đồng ý + yêu cầu chủ thể, Luật 91/2025 / NĐ 356/2025).
+// Nhãn là mã i18n (crm.*); lỗi có mã từ backend → câu theo ngôn ngữ người dùng (biz.err_<mã>), không hiện câu tiếng Việt của backend.
+import {useState} from "react";
+import {apiCrm} from "../lib/api";
+import {ErrorBanner, EmptyState} from "./ui/EmptyState";
+import {SkeletonRows} from "./ui/Skeleton";
+import {StatusPill} from "./ui/StatusPill";
+import {useToast} from "./ui/Toast";
+import {Field, FormRow} from "./ui/Field";
+import {fmtDate, fmtDateTime, t as tr, type Key} from "../lib/i18n";
+import {useLoad} from "./CompanyOperations";
+
+/** Lỗi có mã (detail.error) → câu i18n `biz.err_<mã>` nếu có, giữ nguyên các trường khác của ApiError. */
+export function bizErr(e: any) {
+  const code = e?.code || e?.detail?.error;
+  if (code && e && typeof e === "object") {
+    const key = `biz.err_${code}` as Key, s = tr(key, (e.detail || {}) as any);
+    if (s !== key) { try { e.message = s; } catch { /* bỏ qua */ } }
+  }
+  return e;
+}
+export const lbl = (ns: string, v: string) => tr(`${ns}${v}` as Key);
+
+// ------------------------------------------------------------------ Khách hàng
+
+export function CustomersTab({companyId, caps}: {companyId: number | null; caps: any}) {
+  const [q, setQ] = useState(""), [mk, setMk] = useState(false), [sel, setSel] = useState<number | null>(null), [adding, setAdding] = useState(false);
+  const {data, error, reload, setError} = useLoad(() => companyId ? apiCrm.list(companyId, {q, consent: mk ? "marketing" : ""}) : Promise.resolve(null), [companyId, mk]);
+  const can = !!caps?.invite || !!caps?.manage_roles;
+  if (!companyId) return <p><small>{tr("docs.pick_company")}</small></p>;
+  if (error && !data) return <ErrorBanner error={bizErr(error)} onRetry={reload} testId="crm-error"/>;
+  if (!data) return <SkeletonRows n={5} h={40}/>;
+  const d: any = data;
+  return <section className="ui-section" data-testid="crm">
+    {error ? <ErrorBanner error={bizErr(error)} onClose={() => setError(null)} testId="crm-save-error"/> : null}
+    <p className="tmGuide">{tr("crm.explain")}</p>
+    <div className="tmRow biz-wrap" data-testid="crm-stats">
+      <span className="ui-pill">{tr("crm.total")}: <b>{d.counts.total}</b></span>
+      <span className="ui-pill is-ok">{tr("crm.marketing_ok")}: <b>{d.counts.marketing_ok}</b></span>
+      <span className={"ui-pill" + (d.counts.overdue_requests ? " is-risk" : d.counts.open_requests ? " is-wait" : "")}>{tr("crm.open_requests")}: <b>{d.counts.open_requests}</b></span>
+      {d.pii_masked && <StatusPill tone="neutral">{tr("crm.pii_masked")}</StatusPill>}
+      <span className="ui-grow"/>
+      {can && <button className="ui-btn is-primary is-sm" onClick={() => { setAdding(!adding); setSel(null); }} data-testid="crm-new">{tr("crm.new")}</button>}
+    </div>
+    {adding && <NewContact companyId={companyId} meta={d} setError={(e: any) => setError(bizErr(e))} onDone={(c: any) => { setAdding(false); reload(); setSel(c.id); }} onCancel={() => setAdding(false)}/>}
+    <div className="tmRow biz-wrap">
+      <input className="ui-input" placeholder={tr("crm.search")} value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === "Enter" && reload()} data-testid="crm-q"/>
+      <label className="biz-check"><input type="checkbox" checked={mk} onChange={e => setMk(e.target.checked)}/> {tr("crm.only_marketing")}</label>
+    </div>
+    <div className="ui-panel"><table className="ui-table biz-table" data-testid="crm-table"><thead><tr>
+      <th>{tr("crm.name")}</th><th className="biz-hide-m">{tr("crm.phone")}</th><th className="biz-hide-m">{tr("crm.segment")}</th><th>{tr("crm.consents")}</th></tr></thead>
+      <tbody>{d.items.length === 0 ? <tr><td colSpan={4}><EmptyState compact mood="chao" title={tr("crm.empty")}>{tr("crm.empty_hint")}</EmptyState></td></tr>
+        : d.items.map((x: any) => <tr key={x.id} className={sel === x.id ? "is-selected" : ""} style={{cursor: "pointer"}} onClick={() => { setSel(x.id); setAdding(false); }} data-testid={`crm-row-${x.id}`}>
+          <td><b>{x.name}</b>{x.org_name && <><br/><small>{x.org_name}</small></>}{x.status !== "active" && <> <StatusPill tone="risk">{lbl("crm.st_", x.status)}</StatusPill></>}</td>
+          <td className="biz-hide-m biz-mono">{x.phone || "—"}</td>
+          <td className="biz-hide-m">{x.segment || "—"}</td>
+          <td>{x.consents.length === 0 ? <small>{tr("crm.no_consent")}</small> : x.consents.map((k: string) => {
+            const [p, ch] = k.split(":"); return <span key={k} className={"ui-pill is-outline" + (p === "marketing" ? " is-ok" : "")}>{lbl("crm.p_", p)} · {lbl("crm.ch_", ch)}</span>; })}
+            {x.open_requests > 0 && <> <StatusPill tone="wait">{tr("crm.req_open_n", {p0: x.open_requests})}</StatusPill></>}</td>
+        </tr>)}</tbody></table></div>
+    {sel && <ContactDetail id={sel} can={can} meta={d} onChanged={reload} onClose={() => setSel(null)}/>}
+    <AgentPreview companyId={companyId} meta={d}/>
+  </section>;
+}
+
+function NewContact({companyId, meta, setError, onDone, onCancel}: any) {
+  const [f, setF] = useState<any>({name: "", kind: "person", phone: "", email: "", address: "", org_name: "", segment: "", department_id: ""});
+  const [saving, setSaving] = useState(false);
+  const toast = useToast();
+  const set = (k: string) => (e: any) => setF({...f, [k]: e.target.value});
+  async function save() {
+    setSaving(true); setError(null);
+    try { const r = await apiCrm.create({company_id: companyId, ...f, department_id: f.department_id ? Number(f.department_id) : null}); toast(tr("crm.created")); onDone(r); }
+    catch (e) { setError(e); } finally { setSaving(false); }
+  }
+  return <section className="ui-panel tm-card" data-testid="crm-form">
+    <fieldset className="ui-form" disabled={saving}>
+      <FormRow>
+        <Field label={tr("crm.name")}><input className="ui-input" value={f.name} onChange={set("name")} data-testid="crm-f-name"/></Field>
+        <Field label={tr("crm.kind")}><select className="ui-input" value={f.kind} onChange={set("kind")}>
+          <option value="person">{tr("crm.k_person")}</option><option value="business">{tr("crm.k_business")}</option></select></Field>
+        <Field label={tr("crm.org_name")}><input className="ui-input" value={f.org_name} onChange={set("org_name")}/></Field>
+      </FormRow>
+      <FormRow>
+        <Field label={tr("crm.phone")}><input className="ui-input" inputMode="tel" value={f.phone} onChange={set("phone")} data-testid="crm-f-phone"/></Field>
+        <Field label={tr("crm.email")}><input className="ui-input" inputMode="email" value={f.email} onChange={set("email")}/></Field>
+        <Field label={tr("crm.segment")}><input className="ui-input" value={f.segment} onChange={set("segment")}/></Field>
+        <Field label={tr("crm.department")}><select className="ui-input" value={f.department_id} onChange={set("department_id")}>
+          <option value="">{tr("crm.dep_any")}</option>{(meta.departments || []).map((x: any) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></Field>
+      </FormRow>
+      <Field label={tr("crm.address")}><input className="ui-input" value={f.address} onChange={set("address")}/></Field>
+      <p><small>{tr("crm.form_hint")}</small></p>
+      <div className="tmRow">
+        <button className="ui-btn is-primary" disabled={!f.name.trim()} onClick={save} data-testid="crm-f-save">{tr("crm.save")}</button>
+        <button className="ui-btn is-ghost" onClick={onCancel}>{tr("docs.cancel")}</button>
+      </div>
+    </fieldset>
+  </section>;
+}
+
+function ContactDetail({id, can, meta, onChanged, onClose}: {id: number; can: boolean; meta: any; onChanged: () => void; onClose: () => void}) {
+  const {data, error, reload, setError} = useLoad(() => apiCrm.get(id), [id]);
+  const [cf, setCf] = useState({purpose: "marketing", channel: "zalo", evidence: "", notice_ref: ""});
+  const [note, setNote] = useState(""), [rk, setRk] = useState("access"), [busy, setBusy] = useState(false), [msg, setMsg] = useState({purpose: "marketing", channel: "zalo", message: ""});
+  const toast = useToast();
+  if (error && !data) return <ErrorBanner error={bizErr(error)} onRetry={reload}/>;
+  if (!data) return <SkeletonRows n={3} h={40}/>;
+  const c: any = data;
+  async function run(fn: () => Promise<any>, ok: string) {
+    setBusy(true); setError(null);
+    try { const r = await fn(); toast(ok); await reload(); onChanged(); return r; } catch (e) { setError(bizErr(e)); await reload(); } finally { setBusy(false); }
+  }
+  const erased = c.status === "erased";
+  return <section className="ui-panel tm-card" data-testid="crm-detail">
+    {error ? <ErrorBanner error={error} onClose={() => setError(null)} testId="crm-detail-error"/> : null}
+    <div className="tmRow"><h3>{c.name}</h3><span className="ui-grow"/><button className="ui-btn is-ghost is-sm" onClick={onClose}>{tr("docs.close")}</button></div>
+    <div className="tmRow biz-wrap">
+      <span className="ui-pill">{tr("crm.phone")}: <b className="biz-mono">{c.phone || "—"}</b></span>
+      <span className="ui-pill">{tr("crm.email")}: <b>{c.email || "—"}</b></span>
+      {c.address && <span className="ui-pill">{tr("crm.address")}: <b>{c.address}</b></span>}
+      <StatusPill tone={c.status === "active" ? "ok" : "risk"}>{lbl("crm.st_", c.status)}</StatusPill>
+      {c.pii_masked && <StatusPill tone="neutral">{tr("crm.pii_masked")}</StatusPill>}
+    </div>
+    {c.notes && <p><small>{c.notes}</small></p>}
+
+    <h4 className="ops-cat">{tr("crm.consent_title")}</h4>
+    <p className="tmGuide">{tr("crm.consent_hint")}</p>
+    <div className="ui-panel"><table className="ui-table biz-table" data-testid="crm-consents"><thead><tr>
+      <th>{tr("crm.purpose")}</th><th>{tr("crm.channel")}</th><th className="biz-hide-m">{tr("crm.evidence")}</th><th>{tr("crm.status")}</th></tr></thead>
+      <tbody>{c.consent_history.length === 0 ? <tr><td colSpan={4}><small>{tr("crm.no_consent")}</small></td></tr> : c.consent_history.map((x: any) => <tr key={x.id}>
+        <td>{lbl("crm.p_", x.purpose)}</td><td>{lbl("crm.ch_", x.channel)}</td>
+        <td className="biz-hide-m"><small>{x.evidence}{x.notice_ref ? ` · ${x.notice_ref}` : ""}<br/>{fmtDateTime(x.granted_at)}{x.recorded_by ? ` · ${x.recorded_by}` : ""}</small></td>
+        <td>{x.status === "granted" ? <StatusPill tone="ok">{tr("crm.granted")}</StatusPill> : <StatusPill tone="neutral">{tr("crm.withdrawn_on", {p0: fmtDate(x.withdrawn_at)})}</StatusPill>}
+          {can && x.status === "granted" && !erased && <> <button className="ui-btn is-ghost is-sm" disabled={busy} data-testid={`crm-withdraw-${x.id}`}
+            onClick={() => run(() => apiCrm.withdraw(x.id, note || tr("crm.withdraw_default")), tr("crm.withdrawn"))}>{tr("crm.withdraw")}</button></>}</td>
+      </tr>)}</tbody></table></div>
+    {can && !erased && <FormRow>
+      <Field label={tr("crm.purpose")}><select className="ui-input" value={cf.purpose} onChange={e => setCf({...cf, purpose: e.target.value})} data-testid="crm-c-purpose">
+        {meta.purposes.map((p: string) => <option key={p} value={p}>{lbl("crm.p_", p)}</option>)}</select></Field>
+      <Field label={tr("crm.channel")}><select className="ui-input" value={cf.channel} onChange={e => setCf({...cf, channel: e.target.value})}>
+        {meta.channels.map((p: string) => <option key={p} value={p}>{lbl("crm.ch_", p)}</option>)}</select></Field>
+      <Field label={tr("crm.evidence")}><input className="ui-input" value={cf.evidence} placeholder={tr("crm.evidence_ph")} onChange={e => setCf({...cf, evidence: e.target.value})} data-testid="crm-c-evidence"/></Field>
+      <Field label={tr("crm.notice_ref")}><input className="ui-input" value={cf.notice_ref} onChange={e => setCf({...cf, notice_ref: e.target.value})}/></Field>
+      <Field label=" "><button className="ui-btn is-primary" disabled={busy} data-testid="crm-c-save"
+        onClick={() => run(() => apiCrm.consent(c.id, cf), tr("crm.consent_saved")).then(() => setCf({...cf, evidence: ""}))}>{tr("crm.consent_add")}</button></Field>
+    </FormRow>}
+
+    {can && !erased && <><h4 className="ops-cat">{tr("crm.outreach_title")}</h4>
+      <p className="tmGuide">{tr("crm.outreach_hint")}</p>
+      <FormRow>
+        <Field label={tr("crm.purpose")}><select className="ui-input" value={msg.purpose} onChange={e => setMsg({...msg, purpose: e.target.value})}>
+          <option value="marketing">{lbl("crm.p_", "marketing")}</option><option value="service">{lbl("crm.p_", "service")}</option></select></Field>
+        <Field label={tr("crm.channel")}><select className="ui-input" value={msg.channel} onChange={e => setMsg({...msg, channel: e.target.value})}>
+          {meta.channels.map((p: string) => <option key={p} value={p}>{lbl("crm.ch_", p)}</option>)}</select></Field>
+        <Field label={tr("crm.message")}><input className="ui-input" value={msg.message} onChange={e => setMsg({...msg, message: e.target.value})} data-testid="crm-o-msg"/></Field>
+        <Field label=" "><button className="ui-btn is-ghost" disabled={busy || !msg.message.trim()} data-testid="crm-o-send"
+          onClick={() => run(() => apiCrm.outreach(c.id, msg), tr("crm.outreach_ok"))}>{tr("crm.outreach_btn")}</button></Field>
+      </FormRow></>}
+
+    {can && !erased && <><h4 className="ops-cat">{tr("crm.req_title")}</h4>
+      <div className="tmRow biz-wrap">
+        <select className="ui-input" value={rk} onChange={e => setRk(e.target.value)} data-testid="crm-r-kind">
+          {meta.dsr_kinds.map((k: string) => <option key={k} value={k}>{lbl("crm.dsr_", k)} ({tr("crm.n_days", {p0: meta.dsr_days[k]})})</option>)}</select>
+        <input className="ui-input" placeholder={tr("crm.req_note")} value={note} onChange={e => setNote(e.target.value)}/>
+        <button className="ui-btn is-ghost is-sm" disabled={busy} data-testid="crm-r-open"
+          onClick={() => run(() => apiCrm.openRequest(c.id, {kind: rk, note}), tr("crm.req_opened"))}>{tr("crm.req_open")}</button>
+      </div></>}
+    {c.requests.length > 0 && <RequestTable items={c.requests} can={can} onDone={() => { reload(); onChanged(); }} setError={(e: any) => setError(bizErr(e))}/>}
+
+    <h4 className="ops-cat">{tr("crm.history")}</h4>
+    <ul className="biz-timeline" data-testid="crm-history">{c.interactions.length === 0 ? <li><small>{tr("crm.no_history")}</small></li>
+      : c.interactions.map((i: any) => <li key={i.id}><small>{fmtDateTime(i.occurred_at)}{i.by ? ` · ${i.by}` : ""}</small>{" "}
+        <StatusPill tone={i.kind === "outreach_blocked" ? "risk" : i.kind === "outreach" ? "ok" : "neutral"}>{lbl("crm.ik_", i.kind)}</StatusPill>{" "}
+        {i.code ? interactionLine(i) : i.summary}{i.task_id ? <> · <a href={`/app/tasks/${i.task_id}`}>#{i.task_id}</a></> : null}</li>)}</ul>
+  </section>;
+}
+
+function interactionLine(i: any): string {
+  const p = i.params || {};
+  if (i.code.startsWith("dsr_")) {
+    const m = /^dsr_(opened|done)_(\w+)$/.exec(i.code);
+    return m ? tr(`crm.ev_dsr_${m[1]}` as Key, {p0: lbl("crm.dsr_", m[2]), p1: p.request_id}) : tr(`crm.ev_${i.code}` as Key, {p0: p.request_id});
+  }
+  const base = tr(`crm.ev_${i.code}` as Key, {p0: p.purpose ? lbl("crm.p_", p.purpose) : "", p1: p.channel ? lbl("crm.ch_", p.channel) : ""});
+  return i.summary ? `${base} — ${i.summary}` : base;
+}
+
+function RequestTable({items, can, onDone, setError}: {items: any[]; can: boolean; onDone: () => void; setError: (e: any) => void}) {
+  const [busy, setBusy] = useState(false), [reason, setReason] = useState("");
+  const toast = useToast();
+  async function act(r: any, action: string) {
+    setBusy(true); setError(null);
+    try { await apiCrm.act(r.id, {action, note: reason}); toast(tr("crm.req_saved")); setReason(""); onDone(); } catch (e) { setError(e); } finally { setBusy(false); }
+  }
+  return <div className="ui-panel"><table className="ui-table biz-table" data-testid="crm-requests"><thead><tr>
+    <th>{tr("crm.req_kind")}</th><th>{tr("crm.req_due")}</th><th>{tr("crm.status")}</th>{can && <th/>}</tr></thead>
+    <tbody>{items.map(r => { const open = r.status === "open" || r.status === "in_progress"; return <tr key={r.id} data-testid={`crm-req-${r.id}`}>
+      <td><b>#{r.id}</b> {lbl("crm.dsr_", r.kind)}{r.contact_name ? <><br/><small>{r.contact_name}</small></> : null}</td>
+      <td><small>{tr("crm.ack_by", {p0: fmtDateTime(r.ack_due_at)})}{r.ack_overdue && <> <StatusPill tone="risk">{tr("crm.overdue")}</StatusPill></>}<br/>
+        {tr("crm.do_by", {p0: fmtDate(r.due_at), p1: r.days_allowed})}{r.overdue && <> <StatusPill tone="risk">{tr("crm.overdue")}</StatusPill></>}</small></td>
+      <td><StatusPill tone={r.status === "done" ? "ok" : r.status === "rejected" ? "neutral" : "wait"}>{lbl("crm.rs_", r.status)}</StatusPill>
+        {r.evidence?.export_sha256 && <><br/><small className="biz-mono">sha256 {r.evidence.export_sha256.slice(0, 12)}…</small></>}
+        {r.evidence?.pre_erase_sha256 && <><br/><small className="biz-mono">{tr("crm.erased_hash")} {r.evidence.pre_erase_sha256.slice(0, 12)}…</small></>}</td>
+      {can && <td>{open && <div className="tmRow biz-wrap">
+        {!r.acknowledged_at && <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => act(r, "ack")} data-testid={`crm-req-ack-${r.id}`}>{tr("crm.req_ack")}</button>}
+        <button className="ui-btn is-primary is-sm" disabled={busy} onClick={() => act(r, "complete")} data-testid={`crm-req-done-${r.id}`}>{r.kind === "delete" ? tr("crm.req_erase") : tr("crm.req_complete")}</button>
+        <input className="ui-input" placeholder={tr("crm.reject_reason")} value={reason} onChange={e => setReason(e.target.value)} style={{maxWidth: 160}}/>
+        <button className="ui-btn is-ghost is-sm" disabled={busy || reason.trim().length < 5} onClick={() => act(r, "reject")}>{tr("crm.req_reject")}</button>
+      </div>}</td>}
+    </tr>; })}</tbody></table></div>;
+}
+
+function AgentPreview({companyId, meta}: {companyId: number; meta: any}) {
+  const [q, setQ] = useState(""), [dep, setDep] = useState(""), [res, setRes] = useState<any>(null), [err, setErr] = useState<unknown>(null);
+  async function go() { setErr(null); try { setRes(await apiCrm.preview(companyId, q, dep ? Number(dep) : null)); } catch (e) { setErr(bizErr(e)); } }
+  return <div className="ui-panel tm-card" data-testid="crm-preview">
+    <h4 className="ops-cat">{tr("crm.preview")}</h4>
+    <p className="tmGuide">{tr("crm.preview_hint")}</p>
+    {err ? <ErrorBanner error={err} onClose={() => setErr(null)}/> : null}
+    <div className="tmRow biz-wrap">
+      <select className="ui-input" value={dep} onChange={e => setDep(e.target.value)}><option value="">{tr("crm.dep_none")}</option>
+        {(meta.departments || []).map((x: any) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
+      <input className="ui-input" value={q} placeholder={tr("crm.preview_ph")} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === "Enter" && go()} data-testid="crm-preview-q"/>
+      <button className="ui-btn is-ghost is-sm" onClick={go} data-testid="crm-preview-go">{tr("crm.preview_go")}</button>
+    </div>
+    {res && <><ul className="cat-preview" data-testid="crm-preview-out">{res.contacts.length === 0 ? <li><small>{tr("crm.preview_none")}</small></li>
+      : res.contacts.map((x: any) => <li key={x.contact_id}><b>{x.name}</b> <span className="biz-mono">{x.phone || "—"}</span> · {x.email || "—"}
+        {x.marketing_allowed_channels.length > 0 && <><br/><small>{tr("crm.preview_mk", {p0: x.marketing_allowed_channels.map((c: string) => lbl("crm.ch_", c)).join(", ")})}</small></>}</li>)}</ul>
+      {res.hidden_without_consent ? <p><small>{tr("crm.preview_hidden", {p0: res.hidden_without_consent})}</small></p> : null}</>}
+  </div>;
+}
+
+// ------------------------------------------------------------------ Dữ liệu cá nhân (yêu cầu của chủ thể)
+
+export function PrivacyTab({companyId, caps}: {companyId: number | null; caps: any}) {
+  const [st, setSt] = useState("open");
+  const {data, error, reload, setError} = useLoad(() => companyId ? apiCrm.requests(companyId, st) : Promise.resolve(null), [companyId, st]);
+  const can = !!caps?.invite || !!caps?.manage_roles;
+  if (!companyId) return <p><small>{tr("docs.pick_company")}</small></p>;
+  if (error && !data) return <ErrorBanner error={bizErr(error)} onRetry={reload}/>;
+  if (!data) return <SkeletonRows n={4} h={40}/>;
+  const d: any = data;
+  return <section className="ui-section" data-testid="privacy">
+    {error ? <ErrorBanner error={error} onClose={() => setError(null)}/> : null}
+    <p className="tmGuide">{tr("crm.privacy_explain")}</p>
+    <div className="ui-banner" data-testid="privacy-deadlines"><div>
+      <b>{tr("crm.deadlines_title")}</b><br/>
+      <small>{tr("crm.deadlines_line", {p0: d.ack_working_days, p1: d.days.access, p2: d.days.withdraw, p3: d.days.delete})}</small><br/>
+      <small>{tr("crm.legal_note")}</small></div></div>
+    <div className="tmRow biz-wrap">
+      {["open", "done", "rejected", ""].map(s => <button key={s || "all"} className={"ui-btn is-sm " + (st === s ? "is-primary" : "is-ghost")} onClick={() => setSt(s)}>{s ? lbl("crm.rs_", s === "open" ? "open" : s) : tr("crm.all")}</button>)}
+    </div>
+    {d.items.length === 0 ? <EmptyState compact mood="duyet-xong" title={tr("crm.req_empty")}>{tr("crm.req_empty_hint")}</EmptyState>
+      : <RequestTable items={d.items} can={can} onDone={reload} setError={(e: any) => setError(bizErr(e))}/>}
+  </section>;
+}

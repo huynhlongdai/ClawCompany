@@ -29,6 +29,7 @@ from app.core import company_scope
 AWARE = {
     "app.api.team", "app.api.company_ops", "app.api.docs", "app.api.leases", "app.api.agent_native",
     "app.api.inbox", "app.api.learning", "app.api.auth", "app.api.health",
+    "app.api.business",   # P1 (M3g–M3j): require_company_role + company_scope.check ở service
 }
 # module cũ được lọc ở bản này
 SCOPED = {

@@ -65,7 +65,7 @@ ACTION_CLASSES = {a.name: a for a in (
     _ActionClass("delete", "Xoá", "Xoá dữ liệu không khôi phục được."),
 )}
 # Tool chưa liệt kê: không ghi → read, có ghi → draft (nội bộ).
-_TOOL_ACTION: dict[str, str] = {}
+_TOOL_ACTION: dict[str, str] = {"company_customer_outreach": "send"}   # P1 M3g: tin ra khách = gửi (Hỏi trước + guard đồng ý)
 _ACTION_DEFAULTS = {
     "lead": {"read": "allowed", "draft": "allowed", "send": "ask", "pay": "ask", "delete": "ask"},
     "executor": {"read": "allowed", "draft": "allowed", "send": "ask", "pay": "off", "delete": "off"},

@@ -96,3 +96,16 @@ def docs_tick():
         return out
     finally:
         db.close()
+
+
+@celery_app.task(name="business.tick")
+def business_tick():
+    """P1 (M3g–M3j): yêu cầu DLCN sắp/quá hạn, hợp đồng tới hạn báo trước / hết hạn, việc sau họp quá hạn, ngân sách chạm
+    ngưỡng. Mỗi phần chạy riêng: một phần lỗi không chặn phần khác."""
+    from app.db.session import SessionLocal
+    from app.services import business_tick as bt
+    db = SessionLocal()
+    try:
+        return bt.run(db)
+    finally:
+        db.close()
