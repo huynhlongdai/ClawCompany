@@ -173,6 +173,15 @@ function schemaOf(rows: FieldRow[]): any {
   }
   return {type: "object", properties, required: rows.filter(r => r.required && r.name.trim()).map(r => r.name.trim()), additionalProperties: false};
 }
+export function fieldsText(schema: any): string {
+  const req: string[] = schema?.required || [];
+  return "{" + Object.entries(schema?.properties || {}).map(([k, v]: [string, any]) => {
+    let d = v?.enum ? v.enum.join("|") : tr(`native.ct_${v?.type || "string"}` as Key);
+    if (v?.minimum != null) d += ` ≥${v.minimum}`; if (v?.maximum != null) d += ` ≤${v.maximum}`;
+    if (v?.minLength) d += ` ≥${v.minLength}`;
+    return `${k}: ${d}${req.includes(k) ? "*" : ""}`;
+  }).join(", ") + "}";
+}
 const EMPTY_CONTRACT = {name: "", description: "", position_id: null as number | null, max_attempts: 3, outcome_field: "",
   output_schema: {type: "object", properties: {}, required: []}, input_schema: null as any, acceptance: [] as any[]};
 
@@ -233,7 +242,7 @@ export function ContractsTab({companyId, caps}: {companyId: number | null; caps:
     {form && <section className="ui-panel tm-card" data-testid="contract-form">
       <fieldset className="ui-form cf-form" disabled={busy}>
         <FormRow>
-          <Field label={tr("native.f_name")}><input value={form.name} onChange={e => setForm({...form, name: e.target.value})} data-testid="cf-name"/></Field>
+          <Field label={tr("native.c_name")}><input value={form.name} onChange={e => setForm({...form, name: e.target.value})} data-testid="cf-name"/></Field>
           <Field label={tr("native.c_position")} hint={tr("native.c_position_hint")}><select value={form.position_id ?? ""}
             onChange={e => setForm({...form, position_id: e.target.value ? Number(e.target.value) : null})}>
             <option value="">—</option>{positions.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}</select></Field>
@@ -288,9 +297,9 @@ export function ContractsTab({companyId, caps}: {companyId: number | null; caps:
 
     {d.items.length === 0 ? <EmptyState mood="chao" title={tr("native.c_empty")} testId="contracts-empty">{tr("native.c_empty_hint")}</EmptyState>
       : <div className="ui-panel"><table className="ui-table" data-testid="contracts-table"><thead><tr>
-        <th>{tr("native.f_name")}</th><th>{tr("native.c_position")}</th><th>{tr("native.c_used_in")}</th><th>{tr("native.c_rate")}</th><th></th></tr></thead>
+        <th>{tr("native.c_name")}</th><th>{tr("native.c_position")}</th><th>{tr("native.c_used_in")}</th><th>{tr("native.c_rate")}</th><th></th></tr></thead>
         <tbody>{d.items.map((c: any) => <tr key={c.id}>
-          <td><b>{c.name}</b> <small>v{c.version}</small><br/><small><code>{c.fields}</code></small>
+          <td><b>{c.name}</b> <small>v{c.version}</small><br/><small><code>{fieldsText(c.output_schema)}</code></small>
             {(c.acceptance || []).length > 0 && <div><small>{tr("native.c_acceptance")}: {c.acceptance.map((a: any) => a.text || a.field).join("; ")}</small></div>}</td>
           <td>{c.position || "—"}</td>
           <td>{c.steps.length ? c.steps.map((s: any) => `#${s.process_id} B${s.seq} ${s.name}`).join(", ") : "—"}</td>

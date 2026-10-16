@@ -709,6 +709,15 @@ def _settle(db: Session, inst: ProcessInstance, now: datetime, *, wake_roots: bo
             if tc is not None and tc.status == "open":
                 io_contracts.set_input(db, tc, None, _step_input(inst, r, by_seq_all))
                 _write_contract_brief(db, t, tc)
+            elif tc is None:   # bước không có hợp đồng vẫn nhận kết quả chuẩn của bước trước làm dữ liệu vào
+                prev = {k: v for k, v in _step_input(inst, r, by_seq_all).items() if k not in (inst.input_json or {})}
+                if prev:
+                    import json as _json
+                    marker = "\n\n## Dữ liệu từ bước trước"
+                    desc = t.description or ""
+                    t.description = (desc.split(marker)[0] if marker in desc else desc) + marker + "\n```json\n" + \
+                        _json.dumps(prev, ensure_ascii=False, indent=1)[:3000] + "\n```"
+                    db.commit()
         if t.status == "backlog":
             lifecycle.transition(db, t, "todo", reason=f"quy trình lần chạy #{inst.id}: bước {r.seq} tới lượt",
                                  via="process", system=True, organization_id=inst.organization_id,

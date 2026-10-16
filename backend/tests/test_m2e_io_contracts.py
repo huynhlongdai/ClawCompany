@@ -127,6 +127,8 @@ def test_step_task_carries_input_and_contract_submit_rework_accept_and_branch_on
     tc3 = E.db.query(TaskContract).filter(TaskContract.task_id == t3).one()
     assert tc3.input_json["customer_message"] == GOOD["customer_message"] and tc3.input_json["order_id"] == "DH-1024"
     assert "Dữ liệu vào" in E.db.get(Task, t3).description
+    # bước không có hợp đồng (B2) vẫn nhận kết quả chuẩn của B1 trong mô tả việc
+    assert "## Dữ liệu từ bước trước" in E.db.get(Task, t2).description and '"decision": "approve"' in E.db.get(Task, t2).description
     outs = E.db.query(TaskOutput).filter(TaskOutput.task_id == t1).order_by(TaskOutput.id).all()
     assert [(o.attempt, o.valid, o.via) for o in outs] == [(1, False, "mcp"), (2, True, "mcp")]
     lst = E.c.get(f"/api/team/contracts?company_id={E.co.id}", headers=E.tok("member")).json()

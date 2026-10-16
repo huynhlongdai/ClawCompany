@@ -2926,6 +2926,7 @@
   "c_no_recent": "Chưa có lần nộp nào.",
   "c_attempt": "lần {p0}",
   "c_ok": "đạt",
-  "c_bad": "sai chuẩn"
+  "c_bad": "sai chuẩn",
+  "c_name": "Tên hợp đồng"
  }
 }

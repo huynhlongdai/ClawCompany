@@ -2926,6 +2926,7 @@
   "c_no_recent": "No submissions yet.",
   "c_attempt": "attempt {p0}",
   "c_ok": "valid",
-  "c_bad": "non-conforming"
+  "c_bad": "non-conforming",
+  "c_name": "Contract name"
  }
 }
