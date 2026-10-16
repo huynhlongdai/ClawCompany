@@ -14,6 +14,11 @@ const pct = (r: number | null | undefined) => r == null ? "—" : `${Math.round(
 const EMPTY_RULE = {name: "", kind: "phrase", pattern: "", action: "revise", message: "", external_only: false,
   position_id: null as number | null, source_ref: ""};
 
+export function Stats({items}: {items: [string, any][]}) {
+  return <div className="ui-grid is-3">{items.map(([label, v], i) => <section key={i} className="ui-panel tm-card">
+    <small>{label}</small><div className="ops-big"><b className="ui-num">{v}</b></div></section>)}</div>;
+}
+
 export function RulesTab({companyId, caps}: {companyId: number | null; caps: any}) {
   const {data, error, reload, setError} = useLoad(() => apiNative.rules(companyId), [companyId]);
   const pos = useLoad(() => apiCompany.positions(companyId), [companyId]);
@@ -43,12 +48,9 @@ export function RulesTab({companyId, caps}: {companyId: number | null; caps: any
   return <section className="ui-section" data-testid="rules">
     {error ? <ErrorBanner error={error} onClose={() => setError(null)}/> : null}
     <p className="tmGuide">{tr("native.rules_explain")}</p>
-    <div className="ui-grid is-3 nat-stats">
-      <div className="ui-panel"><small>{tr("native.rules_active")}</small><b className="ui-num">{d.rules.filter((r: any) => r.enabled).length}</b></div>
-      <div className="ui-panel"><small>{tr("native.violations_30d")}</small><b className="ui-num">{d.violations_30d}</b></div>
-      <div className="ui-panel"><small>{tr("native.charter_enforced")}</small>
-        <b className="ui-num">{d.prohibitions.filter((p: any) => p.enforced).length}/{d.prohibitions.length}</b></div>
-    </div>
+    <Stats items={[[tr("native.rules_active"), d.rules.filter((r: any) => r.enabled).length],
+      [tr("native.violations_30d"), d.violations_30d],
+      [tr("native.charter_enforced"), `${d.prohibitions.filter((p: any) => p.enforced).length}/${d.prohibitions.length}`]]}/>
 
     {d.prohibitions.length > 0 && <section className="ui-panel tm-card" data-testid="rules-charter">
       <div className="tm-card-head"><div><b>{tr("native.charter_title")}</b><span>{tr("native.charter_desc")}</span></div></div>
