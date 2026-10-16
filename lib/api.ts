@@ -1137,3 +1137,17 @@ export const apiBizContracts = {
   patchPartner: (id: number, body: any) => request<any>(`/team/partners/${id}`, j(body, "PATCH")),
   preview: (companyId: number, query: string) => request<any>(`/team/biz-contracts/lookup`, j({company_id: companyId, query})),
 };
+// P1 M3i — họp & quyết định (/api/team/meetings, /api/team/decision-log)
+export const apiMeetings = {
+  list: (companyId: number | null) => request<any>(`/team/meetings?${qs({company_id: companyId}).slice(1)}`),
+  get: (id: number) => request<any>(`/team/meetings/${id}`),
+  create: (body: any) => request<any>(`/team/meetings`, j(body)),
+  patch: (id: number, body: any) => request<any>(`/team/meetings/${id}`, j(body, "PATCH")),
+  draft: (id: number) => request<any>(`/team/meetings/${id}/draft-minutes`, j({})),
+  submit: (id: number) => request<any>(`/team/meetings/${id}/submit`, j({})),
+  decide: (id: number, decision: "approved" | "rejected", note = "") => request<any>(`/team/meetings/${id}/decide`, j({decision, note})),
+  actions: (id: number, items: any[]) => request<any>(`/team/meetings/${id}/actions`, j({items})),
+  decision: (body: any) => request<any>(`/team/decision-log`, j(body)),
+  revoke: (id: number, note: string) => request<any>(`/team/decision-log/${id}/revoke`, j({note})),
+  preview: (companyId: number, query: string) => request<any>(`/team/decision-log/lookup`, j({company_id: companyId, query})),
+};

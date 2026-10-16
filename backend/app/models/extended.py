@@ -1,5 +1,5 @@
-from datetime import datetime
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Text, Float, Boolean
+from datetime import date, datetime
+from sqlalchemy import JSON, Date, String, Integer, DateTime, ForeignKey, Text, Float, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 
@@ -102,6 +102,19 @@ class Decision(Base, TimestampMixin):
     owner_member_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="pending")
     impact: Mapped[str] = mapped_column(String(32), default="medium")
+    # P1 M3i (0062_meetings): sổ quyết định — ai quyết, căn cứ thẩm quyền, hiệu lực, thay thế, liên kết; agent đọc (tool_only)
+    number: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    meeting_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decided_by_member_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    authority_basis: Mapped[str | None] = mapped_column(Text, nullable=True)
+    authority_rule_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    effective_from: Mapped[date | None] = mapped_column(Date, nullable=True)
+    effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
+    supersedes_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    linked: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    agent_visible: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=True)
 
 class Conversation(Base, TimestampMixin):
     __tablename__ = "conversations"

@@ -179,3 +179,79 @@ def contract_lookup_preview(payload: dict, principal: Principal = Depends(requir
     from app.services.company_foundation import _company
     co = _company(db, active_org(principal), payload.get("company_id"))
     return contracts.agent_get(db, co.id, query=str(payload.get("query") or "")[:200])
+
+
+# ------------------------------------------------------------------ M3i họp & quyết định
+
+@router.get("/meetings")
+def meetings_list(company_id: int | None = None, principal: Principal = Depends(require_company_role("member")),
+                  db: Session = Depends(get_db)):
+    from app.services import meetings
+    return meetings.listing(db, active_org(principal), company_id)
+
+
+@router.post("/meetings")
+def meeting_create(payload: dict, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import meetings
+    return meetings.create(db, active_org(principal), principal, payload)
+
+
+@router.get("/meetings/{meeting_id}")
+def meeting_get(meeting_id: int, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
+    from app.services import meetings
+    return meetings.get(db, active_org(principal), meeting_id)
+
+
+@router.patch("/meetings/{meeting_id}")
+def meeting_patch(meeting_id: int, payload: dict, principal: Principal = Depends(require_company_role("manager")),
+                  db: Session = Depends(get_db)):
+    from app.services import meetings
+    return meetings.update(db, active_org(principal), principal, meeting_id, payload)
+
+
+@router.post("/meetings/{meeting_id}/draft-minutes")
+def meeting_draft(meeting_id: int, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import meetings
+    return meetings.draft_minutes(db, active_org(principal), principal, meeting_id)
+
+
+@router.post("/meetings/{meeting_id}/submit")
+def meeting_submit(meeting_id: int, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import meetings
+    return meetings.submit_minutes(db, active_org(principal), principal, meeting_id)
+
+
+@router.post("/meetings/{meeting_id}/decide")
+def meeting_decide(meeting_id: int, payload: dict, principal: Principal = Depends(require_company_role("member")),
+                   db: Session = Depends(get_db)):
+    from app.services import meetings
+    return meetings.decide_minutes(db, active_org(principal), principal, meeting_id, payload.get("decision"), payload.get("note") or "")
+
+
+@router.post("/meetings/{meeting_id}/actions")
+def meeting_actions(meeting_id: int, payload: dict, principal: Principal = Depends(require_company_role("manager")),
+                    db: Session = Depends(get_db)):
+    from app.services import meetings
+    return meetings.add_actions(db, active_org(principal), principal, meeting_id, payload.get("items") or [])
+
+
+@router.post("/decision-log")
+def decision_record(payload: dict, principal: Principal = Depends(require_company_role("manager")), db: Session = Depends(get_db)):
+    from app.services import meetings
+    return meetings.record_decision(db, active_org(principal), principal, payload)
+
+
+@router.post("/decision-log/{decision_id}/revoke")
+def decision_revoke(decision_id: int, payload: dict, principal: Principal = Depends(require_company_role("manager")),
+                    db: Session = Depends(get_db)):
+    from app.services import meetings
+    return meetings.revoke_decision(db, active_org(principal), principal, decision_id, payload.get("note") or "")
+
+
+@router.post("/decision-log/lookup")
+def decision_preview(payload: dict, principal: Principal = Depends(require_company_role("member")), db: Session = Depends(get_db)):
+    """Xem trước đúng thứ agent nhận từ MCP company_decision_log."""
+    from app.services import meetings
+    from app.services.company_foundation import _company
+    co = _company(db, active_org(principal), payload.get("company_id"))
+    return meetings.agent_log(db, co.id, active_org(principal), query=str(payload.get("query") or "")[:120])

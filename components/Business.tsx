@@ -2,7 +2,7 @@
 // P1 — Công ty › Kinh doanh: Khách hàng (M3g CRM), Dữ liệu cá nhân (đồng ý + yêu cầu chủ thể, Luật 91/2025 / NĐ 356/2025).
 // Nhãn là mã i18n (crm.*); lỗi có mã từ backend → câu theo ngôn ngữ người dùng (biz.err_<mã>), không hiện câu tiếng Việt của backend.
 import {useState} from "react";
-import {apiBizContracts, apiCrm, apiDocs} from "../lib/api";
+import {apiBizContracts, apiCrm, apiDocs, apiMeetings} from "../lib/api";
 import {ErrorBanner, EmptyState} from "./ui/EmptyState";
 import {SkeletonRows} from "./ui/Skeleton";
 import {StatusPill} from "./ui/StatusPill";
@@ -416,5 +416,176 @@ function ContractPreview({companyId}: {companyId: number}) {
       <button className="ui-btn is-ghost is-sm" onClick={async () => { setErr(null); try { setRes(await apiBizContracts.preview(companyId, q)); } catch (e) { setErr(bizErr(e)); } }} data-testid="ct-preview-go">{tr("crm.preview_go")}</button></div>
     {res && <ul className="cat-preview">{res.contracts.length === 0 ? <li><small>{tr("ct.preview_none")}</small></li> : res.contracts.map((x: any) => <li key={x.code}>
       <code className="doc-code">{x.code}</code> <b>{x.title}</b> — {x.partner}<br/><small>{Object.entries(x.sla || {}).map(([k, v]: any) => `${lbl("ct.sla_k_", k)} ${v}`).join(" · ") || tr("ct.no_sla")}</small></li>)}</ul>}
+  </div>;
+}
+
+// ------------------------------------------------------------------ Họp & quyết định (M3i)
+
+const MS_TONE: Record<string, any> = {draft: "neutral", in_review: "wait", approved: "ok"};
+const DS_TONE: Record<string, any> = {decided: "ok", superseded: "neutral", revoked: "risk"};
+
+export function MeetingsTab({companyId, caps}: {companyId: number | null; caps: any}) {
+  const [sel, setSel] = useState<number | null>(null), [adding, setAdding] = useState<"" | "meeting" | "decision">("");
+  const {data, error, reload, setError} = useLoad(() => companyId ? apiMeetings.list(companyId) : Promise.resolve(null), [companyId]);
+  const can = !!caps?.invite || !!caps?.manage_roles;
+  if (!companyId) return <p><small>{tr("docs.pick_company")}</small></p>;
+  if (error && !data) return <ErrorBanner error={bizErr(error)} onRetry={reload}/>;
+  if (!data) return <SkeletonRows n={5} h={40}/>;
+  const d: any = data;
+  return <section className="ui-section" data-testid="meetings">
+    {error ? <ErrorBanner error={error} onClose={() => setError(null)}/> : null}
+    <p className="tmGuide">{tr("mt.explain")}</p>
+    <div className="tmRow biz-wrap" data-testid="mt-stats">
+      <span className="ui-pill">{tr("mt.meetings")}: <b>{d.counts.meetings}</b></span>
+      <span className="ui-pill is-ok">{tr("mt.in_effect")}: <b>{d.counts.decisions_in_effect}</b></span>
+      <span className={"ui-pill" + (d.counts.open_actions ? " is-wait" : "")}>{tr("mt.open_actions")}: <b>{d.counts.open_actions}</b></span>
+      <span className={"ui-pill" + (d.counts.pending_minutes ? " is-wait" : "")}>{tr("mt.pending_minutes")}: <b>{d.counts.pending_minutes}</b></span>
+      <span className="ui-grow"/>
+      {can && <><button className="ui-btn is-primary is-sm" onClick={() => setAdding(adding === "meeting" ? "" : "meeting")} data-testid="mt-new">{tr("mt.new")}</button>
+        <button className="ui-btn is-ghost is-sm" onClick={() => setAdding(adding === "decision" ? "" : "decision")} data-testid="dc-new">{tr("mt.new_decision")}</button></>}
+    </div>
+    {adding === "meeting" && <NewMeeting companyId={companyId} meta={d} setError={(e: any) => setError(bizErr(e))} onDone={(m: any) => { setAdding(""); reload(); setSel(m.id); }}/>}
+    {adding === "decision" && <DecisionForm companyId={companyId} meta={d} setError={(e: any) => setError(bizErr(e))} onDone={() => { setAdding(""); reload(); }}/>}
+    <div className="ui-panel"><table className="ui-table biz-table" data-testid="mt-table"><thead><tr>
+      <th>{tr("mt.meeting")}</th><th>{tr("mt.when")}</th><th className="biz-hide-m">{tr("mt.counts")}</th><th>{tr("crm.status")}</th></tr></thead>
+      <tbody>{d.meetings.length === 0 ? <tr><td colSpan={4}><EmptyState compact mood="chao" title={tr("mt.empty")}>{tr("mt.empty_hint")}</EmptyState></td></tr>
+        : d.meetings.map((m: any) => <tr key={m.id} className={sel === m.id ? "is-selected" : ""} style={{cursor: "pointer"}} onClick={() => setSel(m.id)} data-testid={`mt-row-${m.id}`}>
+          <td><b>{m.title}</b><br/><small>{lbl("mt.k_", m.kind)}{m.chair ? ` · ${m.chair}` : ""}</small></td>
+          <td><small>{fmtDateTime(m.held_at)}</small></td>
+          <td className="biz-hide-m"><small>{tr("mt.n_dec_act", {p0: m.n_decisions, p1: m.n_actions})}</small></td>
+          <td><StatusPill tone={MS_TONE[m.status]}>{lbl("mt.ms_", m.status)}</StatusPill></td></tr>)}</tbody></table></div>
+    {sel && <MeetingDetail id={sel} can={can} meta={d} onChanged={reload} onClose={() => setSel(null)}/>}
+    <h4 className="ops-cat">{tr("mt.decision_log")}</h4>
+    <div className="ui-panel"><table className="ui-table biz-table" data-testid="dc-table"><thead><tr>
+      <th>{tr("mt.decision")}</th><th className="biz-hide-m">{tr("mt.basis")}</th><th>{tr("mt.effective")}</th><th>{tr("crm.status")}</th></tr></thead>
+      <tbody>{d.decisions.length === 0 ? <tr><td colSpan={4}><small>{tr("mt.no_decisions")}</small></td></tr> : d.decisions.map((x: any) => <tr key={x.id}>
+        <td><code className="doc-code">{x.number}</code> <b>{x.title}</b><br/><small>{x.body}</small>{!x.agent_visible && <> <StatusPill tone="neutral">{tr("mt.hidden_agents")}</StatusPill></>}</td>
+        <td className="biz-hide-m"><small>{x.decided_by ? `${x.decided_by} · ` : ""}{x.authority_basis}</small></td>
+        <td><small>{fmtDate(x.effective_from)}{x.effective_to ? ` → ${fmtDate(x.effective_to)}` : ""}</small></td>
+        <td><StatusPill tone={DS_TONE[x.status] || "neutral"}>{lbl("mt.ds_", x.status)}</StatusPill>
+          {can && x.status === "decided" && <RevokeBtn id={x.id} onDone={reload} setError={(e: any) => setError(bizErr(e))}/>}</td></tr>)}</tbody></table></div>
+    <DecisionPreview companyId={companyId}/>
+  </section>;
+}
+
+function RevokeBtn({id, onDone, setError}: any) {
+  const [open, setOpen] = useState(false), [note, setNote] = useState("");
+  if (!open) return <> <button className="ui-btn is-ghost is-sm" onClick={() => setOpen(true)}>{tr("mt.revoke")}</button></>;
+  return <div className="tmRow biz-wrap"><input className="ui-input" placeholder={tr("mt.revoke_reason")} value={note} onChange={e => setNote(e.target.value)}/>
+    <button className="ui-btn is-ghost is-sm" disabled={note.trim().length < 5} onClick={async () => { setError(null); try { await apiMeetings.revoke(id, note); onDone(); } catch (e) { setError(e); } }}>{tr("mt.revoke")}</button></div>;
+}
+
+function NewMeeting({companyId, meta, setError, onDone}: any) {
+  const [f, setF] = useState<any>({title: "", kind: "weekly", held_at: "", location: "", attendee_ids: [] as number[], agenda: "", rhythm_report_id: ""});
+  const set = (k: string) => (e: any) => setF({...f, [k]: e.target.value});
+  const humans = meta.members.filter((m: any) => m.type === "human");
+  return <section className="ui-panel tm-card" data-testid="mt-form"><FormRow>
+    <Field label={tr("mt.title")}><input className="ui-input" value={f.title} onChange={set("title")} data-testid="mt-f-title"/></Field>
+    <Field label={tr("crm.kind")}><select className="ui-input" value={f.kind} onChange={set("kind")}>{meta.kinds.map((k: string) => <option key={k} value={k}>{lbl("mt.k_", k)}</option>)}</select></Field>
+    <Field label={tr("mt.when")}><input className="ui-input" type="datetime-local" value={f.held_at} onChange={set("held_at")}/></Field>
+    <Field label={tr("mt.location")}><input className="ui-input" value={f.location} onChange={set("location")}/></Field>
+  </FormRow>
+    <Field label={tr("mt.attendees")}><div className="tmRow biz-wrap">{humans.map((m: any) => <label key={m.id} className="biz-check">
+      <input type="checkbox" checked={f.attendee_ids.includes(m.id)} onChange={e => setF({...f, attendee_ids: e.target.checked ? [...f.attendee_ids, m.id] : f.attendee_ids.filter((x: number) => x !== m.id)})}/> {m.name}</label>)}</div></Field>
+    <Field label={tr("mt.agenda")}><textarea className="ui-input" rows={3} value={f.agenda} onChange={set("agenda")}/></Field>
+    {meta.rhythm_reports.length > 0 && <Field label={tr("mt.link_report")}><select className="ui-input" value={f.rhythm_report_id} onChange={set("rhythm_report_id")}><option value="">—</option>
+      {meta.rhythm_reports.map((r: any) => <option key={r.id} value={r.id}>{lbl("mt.rk_", r.kind)} {r.period_key}</option>)}</select></Field>}
+    <button className="ui-btn is-primary" disabled={!f.title.trim()} data-testid="mt-f-save" onClick={async () => { setError(null); try {
+      const held = f.held_at ? new Date(f.held_at).toISOString().slice(0, 19) : undefined;
+      onDone(await apiMeetings.create({company_id: companyId, ...f, held_at: held, rhythm_report_id: f.rhythm_report_id ? Number(f.rhythm_report_id) : null})); } catch (e) { setError(e); } }}>{tr("crm.save")}</button>
+  </section>;
+}
+
+function DecisionForm({companyId, meta, meetingId, setError, onDone}: any) {
+  const [f, setF] = useState<any>({title: "", body: "", authority_basis: "", action_type: "", decided_by_member_id: "", effective_from: "", agent_visible: true});
+  const set = (k: string) => (e: any) => setF({...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value});
+  const toast = useToast();
+  return <section className="ui-panel tm-card" data-testid="dc-form"><FormRow>
+    <Field label={tr("mt.decision")}><input className="ui-input" value={f.title} onChange={set("title")} data-testid="dc-f-title"/></Field>
+    <Field label={tr("mt.decided_by")}><select className="ui-input" value={f.decided_by_member_id} onChange={set("decided_by_member_id")}><option value="">{tr("mt.me")}</option>
+      {meta.members.filter((m: any) => m.type === "human").map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
+    <Field label={tr("mt.effective_from")}><input className="ui-input" type="date" value={f.effective_from} onChange={set("effective_from")}/></Field>
+  </FormRow>
+    <Field label={tr("mt.body")}><textarea className="ui-input" rows={2} value={f.body} onChange={set("body")} data-testid="dc-f-body"/></Field>
+    <FormRow>
+      <Field label={tr("mt.by_matrix")}><select className="ui-input" value={f.action_type} onChange={set("action_type")}><option value="">—</option>
+        {meta.action_types.map((a: string) => <option key={a} value={a}>{lbl("mt.at_", a)}</option>)}</select></Field>
+      <Field label={tr("mt.basis")}><input className="ui-input" value={f.authority_basis} placeholder={tr("mt.basis_ph")} onChange={set("authority_basis")} data-testid="dc-f-basis"/></Field>
+    </FormRow>
+    <label className="biz-check"><input type="checkbox" checked={f.agent_visible} onChange={set("agent_visible")}/> {tr("mt.agent_visible")}</label>
+    <div className="tmRow"><button className="ui-btn is-primary" disabled={!f.title.trim()} data-testid="dc-f-save" onClick={async () => { setError(null); try {
+      await apiMeetings.decision({company_id: companyId, meeting_id: meetingId || null, ...f, action_type: f.action_type || null,
+        decided_by_member_id: f.decided_by_member_id ? Number(f.decided_by_member_id) : null, effective_from: f.effective_from || null});
+      toast(tr("mt.decision_saved")); onDone(); } catch (e) { setError(e); } }}>{tr("mt.record")}</button></div>
+  </section>;
+}
+
+function MeetingDetail({id, can, meta, onChanged, onClose}: {id: number; can: boolean; meta: any; onChanged: () => void; onClose: () => void}) {
+  const {data, error, reload, setError} = useLoad(() => apiMeetings.get(id), [id]);
+  const [busy, setBusy] = useState(false), [notes, setNotes] = useState<string | null>(null), [note, setNote] = useState("");
+  const [act, setAct] = useState({title: "", assignee_member_id: "", due_date: ""}), [dec, setDec] = useState(false);
+  const toast = useToast();
+  if (error && !data) return <ErrorBanner error={bizErr(error)} onRetry={reload}/>;
+  if (!data) return <SkeletonRows n={3} h={40}/>;
+  const m: any = data;
+  async function run(fn: () => Promise<any>, ok: string) {
+    setBusy(true); setError(null);
+    try { await fn(); toast(ok); await reload(); onChanged(); } catch (e) { setError(bizErr(e)); } finally { setBusy(false); }
+  }
+  const draft = m.status === "draft";
+  return <section className="ui-panel tm-card" data-testid="mt-detail">
+    {error ? <ErrorBanner error={error} onClose={() => setError(null)}/> : null}
+    <div className="tmRow"><h3>{m.title}</h3><span className="ui-grow"/><button className="ui-btn is-ghost is-sm" onClick={onClose}>{tr("docs.close")}</button></div>
+    <div className="tmRow biz-wrap">
+      <StatusPill tone={MS_TONE[m.status]}>{lbl("mt.ms_", m.status)}</StatusPill>
+      <span className="ui-pill">{lbl("mt.k_", m.kind)} · {fmtDateTime(m.held_at)}</span>
+      {m.chair && <span className="ui-pill">{tr("mt.chair")}: <b>{m.chair}</b></span>}
+      {m.approver && <span className="ui-pill">{tr("mt.approver")}: <b>{m.approver}</b></span>}
+      {m.minutes_document && <span className="ui-pill is-ok">{tr("mt.stored_as")}: <code className="doc-code">{m.minutes_document.doc_code}</code></span>}
+      {m.rhythm_report && <span className="ui-pill">{tr("mt.linked_report")}: {lbl("mt.rk_", m.rhythm_report.kind)} {m.rhythm_report.period_key}</span>}
+    </div>
+    <p><small>{tr("mt.attendees")}: {m.attendees.map((a: any) => a.name).join(", ") || "—"}</small></p>
+    {m.agenda && <p className="tmGuide" style={{whiteSpace: "pre-wrap"}}>{m.agenda}</p>}
+    <h4 className="ops-cat">{tr("mt.notes")}</h4>
+    {can && draft ? <><textarea className="ui-input" rows={4} value={notes ?? m.notes} onChange={e => setNotes(e.target.value)} data-testid="mt-notes"/>
+      <div className="tmRow biz-wrap"><button className="ui-btn is-ghost is-sm" disabled={busy || notes === null} onClick={() => run(() => apiMeetings.patch(m.id, {notes}), tr("docs.saved"))}>{tr("mt.save_notes")}</button>
+        <button className="ui-btn is-ghost is-sm" disabled={busy} onClick={() => run(async () => { if (notes !== null) await apiMeetings.patch(m.id, {notes}); return apiMeetings.draft(m.id); }, tr("mt.drafted"))} data-testid="mt-draft">{tr("mt.draft_minutes")}</button></div></>
+      : <p style={{whiteSpace: "pre-wrap"}}><small>{m.notes || "—"}</small></p>}
+    <h4 className="ops-cat">{tr("mt.minutes")}</h4>
+    {m.minutes ? <pre className="biz-minutes" data-testid="mt-minutes">{m.minutes}</pre> : <p><small>{tr("mt.no_minutes")}</small></p>}
+    {m.locked && <p><small>{tr("mt.locked_hint")}</small></p>}
+    {can && draft && m.minutes && <button className="ui-btn is-primary is-sm" disabled={busy} onClick={() => run(() => apiMeetings.submit(m.id), tr("mt.submitted"))} data-testid="mt-submit">{tr("mt.submit")}</button>}
+    {m.status === "in_review" && <div className="tmRow biz-wrap">
+      <input className="ui-input" placeholder={tr("cat.decide_note")} value={note} onChange={e => setNote(e.target.value)}/>
+      <button className="ui-btn is-primary is-sm" disabled={busy} onClick={() => run(() => apiMeetings.decide(m.id, "approved", note), tr("mt.approved"))} data-testid="mt-approve">{tr("mt.approve")}</button>
+      <button className="ui-btn is-ghost is-sm" disabled={busy || note.trim().length < 3} onClick={() => run(() => apiMeetings.decide(m.id, "rejected", note), tr("mt.returned"))}>{tr("mt.return")}</button></div>}
+    <h4 className="ops-cat">{tr("mt.actions")}</h4>
+    <ul className="biz-timeline" data-testid="mt-actions">{m.actions.length === 0 ? <li><small>{tr("mt.no_actions")}</small></li> : m.actions.map((a: any) => <li key={a.id}>
+      <b>{a.title}</b> — {a.assignee || "—"}{a.due_date ? ` · ${fmtDate(a.due_date)}` : ""} · <a href={`/app/tasks/${a.task_id}`}>#{a.task_id}</a>{" "}
+      <StatusPill tone={a.task_status === "done" ? "ok" : "wait"}>{a.task_status ? lbl("mt.ts_", a.task_status) : "—"}</StatusPill></li>)}</ul>
+    {can && <FormRow>
+      <Field label={tr("mt.action")}><input className="ui-input" value={act.title} onChange={e => setAct({...act, title: e.target.value})} data-testid="mt-a-title"/></Field>
+      <Field label={tr("mt.assignee")}><select className="ui-input" value={act.assignee_member_id} onChange={e => setAct({...act, assignee_member_id: e.target.value})} data-testid="mt-a-who"><option value="">—</option>
+        {meta.members.map((x: any) => <option key={x.id} value={x.id}>{x.name}{x.type === "agent" ? " (agent)" : ""}</option>)}</select></Field>
+      <Field label={tr("mt.due")}><input className="ui-input" type="date" value={act.due_date} onChange={e => setAct({...act, due_date: e.target.value})}/></Field>
+      <Field label=" "><button className="ui-btn is-ghost" disabled={busy || !act.title.trim() || !act.assignee_member_id} data-testid="mt-a-save"
+        onClick={() => run(() => apiMeetings.actions(m.id, [{...act, assignee_member_id: Number(act.assignee_member_id), due_date: act.due_date || null}]), tr("mt.action_created")).then(() => setAct({title: "", assignee_member_id: "", due_date: ""}))}>{tr("mt.to_task")}</button></Field>
+    </FormRow>}
+    <h4 className="ops-cat">{tr("mt.decisions_here")}</h4>
+    <ul className="biz-timeline">{m.decisions.map((x: any) => <li key={x.id}><code className="doc-code">{x.number}</code> <b>{x.title}</b> — {x.body} <StatusPill tone={DS_TONE[x.status] || "neutral"}>{lbl("mt.ds_", x.status)}</StatusPill></li>)}</ul>
+    {can && (dec ? <DecisionForm companyId={m.company_id} meta={meta} meetingId={m.id} setError={(e: any) => setError(bizErr(e))} onDone={() => { setDec(false); reload(); onChanged(); }}/>
+      : <button className="ui-btn is-ghost is-sm" onClick={() => setDec(true)}>{tr("mt.new_decision")}</button>)}
+  </section>;
+}
+
+function DecisionPreview({companyId}: {companyId: number}) {
+  const [q, setQ] = useState(""), [res, setRes] = useState<any>(null), [err, setErr] = useState<unknown>(null);
+  return <div className="ui-panel tm-card" data-testid="dc-preview">
+    <h4 className="ops-cat">{tr("crm.preview")}</h4><p className="tmGuide">{tr("mt.preview_hint")}</p>
+    {err ? <ErrorBanner error={err} onClose={() => setErr(null)}/> : null}
+    <div className="tmRow biz-wrap"><input className="ui-input" value={q} placeholder={tr("mt.preview_ph")} onChange={e => setQ(e.target.value)}/>
+      <button className="ui-btn is-ghost is-sm" onClick={async () => { setErr(null); try { setRes(await apiMeetings.preview(companyId, q)); } catch (e) { setErr(bizErr(e)); } }}>{tr("crm.preview_go")}</button></div>
+    {res && <ul className="cat-preview">{res.decisions.length === 0 ? <li><small>{tr("mt.preview_none")}</small></li> : res.decisions.map((x: any) => <li key={x.id}>
+      <code className="doc-code">{x.cite}</code> <b>{x.title}</b> — {x.decision}<br/><small>{x.decided_by || "—"} · {x.authority_basis} · {fmtDate(x.effective_from)}</small></li>)}</ul>}
   </div>;
 }

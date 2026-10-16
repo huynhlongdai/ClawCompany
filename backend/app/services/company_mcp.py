@@ -840,19 +840,17 @@ def _sop_get(ctx: ToolContext, args: dict) -> dict:
                      for s in rows]}
 
 
-@tool("company_decision_log", "knowledge", "Các quyết định đã ghi của công ty (mới nhất trước).",
-      "company.knowledge:read", {"query": {"type": "string"}, "limit": {"type": "integer"}, "maxResults": {"type": "integer"}})
+@tool("company_decision_log", "knowledge",
+      "Sổ quyết định của công ty: quyết định ĐANG HIỆU LỰC mới nhất trước — số, nội dung, người quyết, căn cứ thẩm quyền, hiệu "
+      "lực từ/đến. Quyết định bị thay thế/huỷ không áp dụng (include_history=true chỉ để tra lịch sử). Trích [QĐ:số].",
+      "company.knowledge:read", {"query": {"type": "string"}, "limit": {"type": "integer"}, "maxResults": {"type": "integer"},
+                                 "include_history": {"type": "boolean"}})
 def _decision_log(ctx: ToolContext, args: dict) -> dict:
-    q = select(Decision).where(Decision.organization_id == ctx.org)
-    if ctx.member.company_id:
-        q = q.where(or_(Decision.company_id.is_(None), Decision.company_id == ctx.member.company_id))
-    text = _str(args, "query", required=False, limit=120)
-    if text:
-        q = q.where(or_(Decision.title.ilike(f"%{text}%"), Decision.context.ilike(f"%{text}%")))
-    rows = ctx.db.execute(q.order_by(Decision.id.desc()).limit(_limit(args))).scalars().all()
-    return {"decisions": [{"id": d.id, "title": d.title, "status": d.status,
-                           "recommendation": d.recommendation, "impact": d.impact}
-                          for d in rows]}
+    # P1 M3i: đọc từ sổ quyết định (meetings.agent_log) — chỉ cùng công ty, agent_visible, đang hiệu lực
+    from app.services import meetings
+    lim = _int(args, "limit", required=False) or _int(args, "maxResults", required=False) or 10
+    return meetings.agent_log(ctx.db, ctx.member.company_id, ctx.org, query=_str(args, "query", required=False, limit=120),
+                              limit=lim, include_history=bool(args.get("include_history")))
 
 
 # ------------------------------------------------------------------ Phối hợp

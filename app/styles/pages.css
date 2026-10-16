@@ -755,3 +755,4 @@ textarea.ops-json{width:100%}
 .biz-timeline li{padding:6px 0;border-bottom:1px solid var(--line, rgba(0,0,0,.06))}
 .biz-num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 @media (max-width:640px){.biz-hide-m{display:none}.biz-table{font-size:13px}.biz-wrap .ui-input{min-width:0;flex:1 1 140px}}
+.biz-minutes{white-space:pre-wrap;font:inherit;font-size:13px;background:var(--surface-2,#f6f6f4);padding:10px 12px;border-radius:8px;max-height:420px;overflow:auto}

@@ -114,6 +114,8 @@ COLUMNS_OWNED_BY_LATER_MIGRATIONS = {
                             "core_summary", "flag_count",                          # 0054_doc_retrieval
                             "disposal_notified_at", "disposed_at", "disposed_by"],  # 0055_document_requirements
     "knowledge_chunks": ["section", "section_no", "search_text"],                    # 0054_doc_retrieval
+    "decisions": ["number", "meeting_id", "body", "decided_by_member_id", "decided_at", "authority_basis",   # 0062_meetings
+                  "authority_rule_id", "effective_from", "effective_to", "supersedes_id", "linked", "agent_visible"],
 }
 
 # 0014 tự tạo index unique này; model cũng khai nó, nên create_all sẽ tạo
