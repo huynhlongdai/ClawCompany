@@ -950,6 +950,7 @@ def tick(db: Session, now: datetime | None = None, org_id: int | None = None) ->
     def _org(q):
         return q.filter(KnowledgeDocument.organization_id == org_id) if org_id else q
     out = {"published": 0, "archived": 0, "review_due": 0, "core_orgs": []}
+    expired_licenses: list[KnowledgeDocument] = []
     core_orgs: set[int] = set()
     for v in db.query(DocumentVersion).filter(DocumentVersion.status == "approved", DocumentVersion.effective_from <= now).all():
         doc = db.get(KnowledgeDocument, v.document_id)
@@ -962,8 +963,11 @@ def tick(db: Session, now: datetime | None = None, org_id: int | None = None) ->
     for doc in _org(db.query(KnowledgeDocument).filter(KnowledgeDocument.status == "published", KnowledgeDocument.effective_to.isnot(None),
                                                        KnowledgeDocument.effective_to <= now)).all():
         doc.status = "archived"; db.add(doc); out["archived"] += 1
-        from app.services import company_facts
+        from app.services import company_facts, doc_requirements
         company_facts.retire_doc(db, doc)
+        doc_requirements.refresh_retention(db, doc)          # M3d: lưu trữ → hạn lưu tính lại (vd. superseded_10y)
+        if doc.doc_type == "license":
+            expired_licenses.append(doc)
         if doc.agent_use == "core":
             core_orgs.add(doc.organization_id)
         from app.services import inbox
@@ -971,6 +975,9 @@ def tick(db: Session, now: datetime | None = None, org_id: int | None = None) ->
                      title=f"Tài liệu {doc.doc_code} hết hiệu lực — đã lưu trữ: {doc.title}", related_type="document",
                      related_id=str(doc.id), company_id=doc.company_id, commit=False)
     db.commit()
+    for doc in expired_licenses:                             # M3d: giấy phép hết hạn → tắt nghĩa vụ gia hạn đã quá
+        from app.services import doc_requirements
+        doc_requirements.sync_license_deadline(db, doc)
     due = _org(db.query(KnowledgeDocument).filter(KnowledgeDocument.status == "published", KnowledgeDocument.review_due_at.isnot(None),
                                                   KnowledgeDocument.review_due_at <= now)).all()
     from app.services import inbox

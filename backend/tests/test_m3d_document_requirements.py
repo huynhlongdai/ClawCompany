@@ -119,6 +119,14 @@ def test_license_expiry_becomes_compliance_deadline_and_readiness_layer(E):
     assert E.c.post(f"/api/team/docs/{lic['id']}/archive", json={"reason": "đổi giấy"}, headers=E.tok("manager")).status_code == 200
     E.db.expire_all()
     assert E.db.get(ComplianceDeadline, mine[0].id).status == "skipped"
+    # giấy phép hết hạn qua nhịp docs.tick (tự lưu trữ) → nghĩa vụ gia hạn cũng tắt
+    exp2 = (datetime.utcnow() + timedelta(days=20)).date()
+    lic2 = E.c.post("/api/team/docs", json={"company_id": E.co.id, "title": "Giấy phép bán rượu", "doc_type": "license", "content": "",
+                                            "effective_to": exp2.isoformat()}, headers=E.tok("manager")).json()
+    from app.models.company_ops import ComplianceRule
+    assert doc_library.tick(E.db, now=datetime.utcnow() + timedelta(days=21))["archived"] >= 1
+    E.db.expire_all()
+    assert E.db.query(ComplianceRule).filter(ComplianceRule.key == f"doc_license:{lic2['id']}").one().enabled is False
 
 
 def test_custom_requirement_attach_and_isolation(E):
