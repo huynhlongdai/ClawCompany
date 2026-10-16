@@ -46,7 +46,7 @@ def scrub(text: str) -> str:
     out = text or ""
     for rx, rep in PII_RES:
         out = rx.sub(rep, out)
-    out = NAME_RE.sub(lambda m: m.group(1) + " [tên]", out)
+    out = NAME_RE.sub(lambda m: m.group(1) + " [tên] ", out)   # giữ khoảng trắng sau tên (regex nuốt nó)
     return re.sub(r"\s+", " ", out).strip()
 
 

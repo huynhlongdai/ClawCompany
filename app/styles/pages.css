@@ -735,11 +735,12 @@ textarea.ops-json{width:100%}
 .ingest-dl dd{margin:0;overflow-wrap:anywhere}
 /* M3e vòng học tài liệu */
 .learn-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:12px 0}
-.learn-kpi{display:flex;flex-direction:column;gap:4px;min-width:0}
+.learn-kpi{display:flex;flex-direction:column;gap:4px;min-width:0;padding:12px 14px}
 .learn-kpi b{font-size:1.6rem;line-height:1.1}
-.learn-prop{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;min-width:0}
+.learn-prop{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;min-width:0;padding:12px 14px}
 .learn-prop .tmRow{flex-wrap:wrap;gap:8px}
 .learn-qs{margin:0;padding-left:18px}
+[data-testid=learning-clusters],[data-testid=learning-eval-history]{padding:4px 8px;overflow-x:auto}
 .learn-eval small b{font-variant-numeric:tabular-nums}
 .ui-text-ok{color:var(--ok, #2e7d32)}
 .ui-text-risk{color:var(--risk, #c62828)}

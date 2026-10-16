@@ -3512,7 +3512,7 @@
   "c_sample": "Typical question (personal data removed)",
   "c_size": "Size",
   "c_state": "State",
-  "c_asks": "{p0} questions · {p1} asks",
+  "c_asks": "questions: {p0} · asks: {p1}",
   "c_ready": "Ready to propose",
   "c_below": "Below {p0} asks",
   "h_open": "Open proposals (draft to edit / approve)",
