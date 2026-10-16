@@ -155,8 +155,12 @@ async def gateway_isolation(principal: Principal = Depends(require_role("admin")
     runtime = get_runtime()
     if not agent_hr._has_rpc(runtime):
         return {"skipped": "runtime không phải gateway thật"}
-    snap = await ConfigRegistry(runtime).snapshot()
-    return seat_provision.session_isolation_report(snap["config"] or {}, seat_provision.company_seat_rids(db))
+    try:
+        snap = await ConfigRegistry(runtime).snapshot()
+    except Exception as exc:  # noqa: BLE001 — trang đọc-chỉ: nói thật là không đọc được, không 500
+        return {"ok": None, "reachable": False, "error": f"Không đọc được cấu hình gateway: {str(exc)[:200]}"}
+    return {"reachable": True,
+            **seat_provision.session_isolation_report(snap["config"] or {}, seat_provision.company_seat_rids(db))}
 
 
 @router.post("/gateway/isolation")
