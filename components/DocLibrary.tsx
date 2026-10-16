@@ -313,19 +313,20 @@ export function RecordsTab({companyId, caps}: {companyId: number | null; caps: a
       <span className="ui-pill">{tr("docs.req_entity")}: <b>{f.entity_type || "—"}</b></span>
       <span className="ui-pill">{tr("docs.req_pd")}: <b>{f.personal_data ? tr("docs.yes") : tr("docs.no")}</b></span>
       {f.templates.length > 0 && <span className="ui-pill">{tr("docs.req_industry")}: <b>{f.templates.join(", ")}</b></span>}
-      <label className="tmRow" style={{gap: 6}}><input type="checkbox" checked={showNa} onChange={e => setShowNa(e.target.checked)} data-testid="records-show-na"/> {tr("docs.req_show_na")}</label>
+      <label style={{display: "inline-flex", gap: 6, alignItems: "center"}}><input type="checkbox" checked={showNa} onChange={e => setShowNa(e.target.checked)} data-testid="records-show-na"/> {tr("docs.req_show_na")}</label>
     </div>
     {PACKS.map(pk => {
       const rows = items.filter(i => i.pack === pk);
       if (!rows.length) return null;
       return <div key={pk} className="ui-panel"><h3 className="ops-cat">{tr(("docs.pack_" + pk) as Key)}</h3>
-        <table className="ui-table" data-testid={"records-" + pk}><thead><tr>
+        <table className="ui-table req-table" data-testid={"records-" + pk}><thead><tr>
           <th>{tr("docs.req_item")}</th><th>{tr("docs.req_status")}</th><th>{tr("docs.req_basis")}</th><th>{tr("docs.req_docs")}</th></tr></thead>
           <tbody>{rows.map(i => <tr key={i.id} data-testid={"req-" + i.key} className={i.status === "missing" && i.level === "required" ? "is-warn" : ""}>
             <td><b>{en ? i.name_en : i.name}</b><br/>
               <StatusPill tone={i.level === "required" ? "wait" : "neutral"}>{tr(i.level === "required" ? "docs.req_level_required" : "docs.req_level_recommended")}</StatusPill>
               {i.needs_review && <> <StatusPill tone="wait">{tr("docs.req_to_verify")}</StatusPill></>}
-              {i.source === "custom" && <> <StatusPill tone="neutral">{tr("docs.req_custom")}</StatusPill></>}</td>
+              {i.source === "custom" && <> <StatusPill tone="neutral">{tr("docs.req_custom")}</StatusPill></>}
+              <small className="req-basis-m">{i.legal_basis}</small></td>
             <td><StatusPill tone={REQ_TONE[i.status]}>{tr(statusKey(i.status))}</StatusPill>{i.why && <><br/><small>{i.why}</small></>}</td>
             <td><small>{i.legal_basis}</small></td>
             <td>{i.documents.map((x: any) => <div key={x.doc_code}><code className="doc-code">{x.doc_code}</code> <small>{x.title}</small></div>)}

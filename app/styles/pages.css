@@ -712,3 +712,9 @@ textarea.ops-json{width:100%}
   .cat-table th:nth-child(1),.cat-table td:nth-child(1),.cat-table th:nth-child(3),.cat-table td:nth-child(3){display:none}
   .cat-sku-m{display:block;font-size:var(--fs-12);color:var(--text-muted)}
 }
+/* M3d hồ sơ bắt buộc: điện thoại — căn cứ xuống dưới tên mục */
+.req-basis-m{display:none}
+@media (max-width:760px){
+  .req-table th:nth-child(3),.req-table td:nth-child(3){display:none}
+  .req-basis-m{display:block;margin-top:4px;color:var(--text-muted)}
+}
