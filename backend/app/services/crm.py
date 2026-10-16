@@ -435,7 +435,7 @@ def public_request(db: Session, r: CrmDataRequest) -> dict:
     now = datetime.utcnow()
     open_ = r.status in ("open", "in_progress")
     c = db.get(CrmContact, r.contact_id)
-    return {"id": r.id, "contact_id": r.contact_id, "contact_name": c.name if c else None, "kind": r.kind, "status": r.status,
+    return {"id": r.id, "contact_id": r.contact_id, "contact_name": c.name if c else None, "contact_status": c.status if c else None, "kind": r.kind, "status": r.status,
             "channel": r.channel, "received_at": r.received_at.isoformat(), "ack_due_at": r.ack_due_at.isoformat(),
             "due_at": r.due_at.isoformat(), "acknowledged_at": r.acknowledged_at.isoformat() if r.acknowledged_at else None,
             "days_allowed": DSR_DAYS.get(r.kind), "overdue": open_ and r.due_at < now,

@@ -3713,7 +3713,8 @@
   "legal_note": "Tham khảo, không phải tư vấn pháp lý; mức gia hạn và ngoại lệ (Điều 19 Luật 91/2025) cần kiểm tra.",
   "all": "Tất cả",
   "req_empty": "Không có yêu cầu",
-  "req_empty_hint": "Mở yêu cầu từ trang chi tiết khách hàng."
+  "req_empty_hint": "Mở yêu cầu từ trang chi tiết khách hàng.",
+  "erased_name": "[đã xoá #{p0}]"
  },
  "biz": {
   "err_consent_evidence_required": "Cần bằng chứng đồng ý (cách thu, thời điểm, nơi lưu) — im lặng không phải đồng ý.",

@@ -3713,7 +3713,8 @@
   "legal_note": "Reference only, not legal advice; extensions and exceptions (Art. 19, Law 91/2025) need review.",
   "all": "All",
   "req_empty": "No requests",
-  "req_empty_hint": "Open requests from a customer's detail page."
+  "req_empty_hint": "Open requests from a customer's detail page.",
+  "erased_name": "[erased #{p0}]"
  },
  "biz": {
   "err_consent_evidence_required": "Consent evidence is required (how, when, where stored) — silence isn't consent.",
@@ -3858,7 +3859,7 @@
   "meeting": "Meeting",
   "when": "When",
   "counts": "Decisions / follow-ups",
-  "n_dec_act": "{p0} decisions · {p1} follow-ups",
+  "n_dec_act": "{p0} decision(s) · {p1} follow-up(s)",
   "empty": "No meetings yet",
   "empty_hint": "Add a meeting, take notes during it, then draft the minutes.",
   "k_members_council": "Members' council",

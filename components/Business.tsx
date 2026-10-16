@@ -53,7 +53,7 @@ export function CustomersTab({companyId, caps}: {companyId: number | null; caps:
       <th>{tr("crm.name")}</th><th className="biz-hide-m">{tr("crm.phone")}</th><th className="biz-hide-m">{tr("crm.segment")}</th><th>{tr("crm.consents")}</th></tr></thead>
       <tbody>{d.items.length === 0 ? <tr><td colSpan={4}><EmptyState compact mood="chao" title={tr("crm.empty")}>{tr("crm.empty_hint")}</EmptyState></td></tr>
         : d.items.map((x: any) => <tr key={x.id} className={sel === x.id ? "is-selected" : ""} style={{cursor: "pointer"}} onClick={() => { setSel(x.id); setAdding(false); }} data-testid={`crm-row-${x.id}`}>
-          <td><b>{x.name}</b>{x.org_name && <><br/><small>{x.org_name}</small></>}{x.status !== "active" && <> <StatusPill tone="risk">{lbl("crm.st_", x.status)}</StatusPill></>}</td>
+          <td><b>{contactName(x)}</b>{x.org_name && <><br/><small>{x.org_name}</small></>}{x.status !== "active" && <> <StatusPill tone="risk">{lbl("crm.st_", x.status)}</StatusPill></>}</td>
           <td className="biz-hide-m biz-mono">{x.phone || "—"}</td>
           <td className="biz-hide-m">{x.segment || "—"}</td>
           <td>{x.consents.length === 0 ? <small>{tr("crm.no_consent")}</small> : x.consents.map((k: string) => {
@@ -115,7 +115,7 @@ function ContactDetail({id, can, meta, onChanged, onClose}: {id: number; can: bo
   const erased = c.status === "erased";
   return <section className="ui-panel tm-card" data-testid="crm-detail">
     {error ? <ErrorBanner error={error} onClose={() => setError(null)} testId="crm-detail-error"/> : null}
-    <div className="tmRow"><h3>{c.name}</h3><span className="ui-grow"/><button className="ui-btn is-ghost is-sm" onClick={onClose}>{tr("docs.close")}</button></div>
+    <div className="tmRow"><h3>{contactName(c)}</h3><span className="ui-grow"/><button className="ui-btn is-ghost is-sm" onClick={onClose}>{tr("docs.close")}</button></div>
     <div className="tmRow biz-wrap">
       <span className="ui-pill">{tr("crm.phone")}: <b className="biz-mono">{c.phone || "—"}</b></span>
       <span className="ui-pill">{tr("crm.email")}: <b>{c.email || "—"}</b></span>
@@ -197,7 +197,7 @@ function RequestTable({items, can, onDone, setError}: {items: any[]; can: boolea
   return <div className="ui-panel"><table className="ui-table biz-table" data-testid="crm-requests"><thead><tr>
     <th>{tr("crm.req_kind")}</th><th>{tr("crm.req_due")}</th><th>{tr("crm.status")}</th>{can && <th/>}</tr></thead>
     <tbody>{items.map(r => { const open = r.status === "open" || r.status === "in_progress"; return <tr key={r.id} data-testid={`crm-req-${r.id}`}>
-      <td><b>#{r.id}</b> {lbl("crm.dsr_", r.kind)}{r.contact_name ? <><br/><small>{r.contact_name}</small></> : null}</td>
+      <td><b>#{r.id}</b> {lbl("crm.dsr_", r.kind)}{r.contact_name ? <><br/><small>{r.contact_status === "erased" ? tr("crm.erased_name", {p0: r.contact_id}) : r.contact_name}</small></> : null}</td>
       <td><small>{tr("crm.ack_by", {p0: fmtDateTime(r.ack_due_at)})}{r.ack_overdue && <> <StatusPill tone="risk">{tr("crm.overdue")}</StatusPill></>}<br/>
         {tr("crm.do_by", {p0: fmtDate(r.due_at), p1: r.days_allowed})}{r.overdue && <> <StatusPill tone="risk">{tr("crm.overdue")}</StatusPill></>}</small></td>
       <td><StatusPill tone={r.status === "done" ? "ok" : r.status === "rejected" ? "neutral" : "wait"}>{lbl("crm.rs_", r.status)}</StatusPill>
@@ -593,6 +593,8 @@ function DecisionPreview({companyId}: {companyId: number}) {
 
 // ------------------------------------------------------------------ Tài chính kinh doanh (M3j) — không phải sổ kế toán
 
+/* Tên khách đã xoá theo yêu cầu: backend lưu nhãn cố định "[đã xoá #id]" (không PII) → hiện theo ngôn ngữ người xem. */
+const contactName = (c: any) => c?.status === "erased" ? tr("crm.erased_name", {p0: c.id}) : c?.name;
 const catName = (c: any) => c ? (c.key ? lbl("fin.c_", c.key) : c.name) : "—";
 
 export function FinanceTab({companyId, caps}: {companyId: number | null; caps: any}) {

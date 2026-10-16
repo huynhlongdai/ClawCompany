@@ -749,6 +749,7 @@ textarea.ops-json{width:100%}
 .biz-wrap{flex-wrap:wrap;gap:8px}
 .biz-mono{font-variant-numeric:tabular-nums;white-space:nowrap}
 .biz-check{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.biz-check input[type=checkbox]{flex:none;min-width:0;width:auto;margin:0}
 .biz-table td{vertical-align:top}
 .biz-table .ui-pill{margin:0 4px 4px 0}
 .biz-timeline{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
