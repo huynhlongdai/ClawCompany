@@ -11,7 +11,7 @@ import {Any, Intro, LabBody, Panel, Pill, Stats, Table, useAction, useLoad} from
 const DEMO = {industry: "Thương mại số", departments: [{name: "Tăng trưởng", agents: [{name: "Maya", role: "Trưởng tăng trưởng", skills: ["research", "analytics"]},
   {name: "Leo", role: "Chạy quảng cáo", skills: ["ads", "copy"]}]}, {name: "Vận hành", agents: [{name: "Iris", role: "Quản lý vận hành", skills: ["planning", "reporting"]}]}]};
 
-/* Dựng công ty từ mẫu — đời cũ (v8). Luồng chính nay ở Đội ngũ › Dựng công ty. */
+/* Dựng công ty từ mẫu — đời cũ (v8). Luồng chính nay ở Công ty › Tạo & nhập. */
 export function CompanyFactoryConsole() {
   const org = activeOrganizationId();
   const q = useLoad(async () => {
@@ -26,7 +26,7 @@ export function CompanyFactoryConsole() {
   const jobs = q.data.jobs;
   return <PageFrame>
     <LabBody q={q}>
-      <Notice>Trang đời cũ. Dựng công ty có trưởng phòng là agent và sơ đồ báo cáo nằm ở Đội ngũ › Dựng công ty.</Notice>
+      <Notice>Trang đời cũ. Dựng công ty có trưởng phòng là agent và sơ đồ báo cáo nằm ở Công ty › Tạo & nhập.</Notice>
       <Intro flow={["Manifest", "Công ty", "Phòng ban", "Nhân sự AI", "Runtime"]}>Dựng một tổ chức thật (phòng ban + nhân sự AI) từ mẫu trong Kho mẫu hoặc mẫu demo có sẵn.</Intro>
       {act.error ? <ErrorBanner error={act.error} context="Dựng công ty" onClose={() => act.setError(null)}/> : null}
       <div className="ui-grid is-2">

@@ -32,6 +32,13 @@ export function PageFrame({title = "", subtitle = "", action, actions, rail, chi
   }, [h1, detail, page, tab, section]);
 
   const group = !detail ? activeGroup(section, tab) : undefined;
+  /* Màn hẹp: hàng nhóm cuộn ngang — đưa nhóm đang chọn vào tầm nhìn (vd. "Vận hành" nằm ngoài mép phải) */
+  useEffect(() => {
+    if (!group) return;
+    const el = document.querySelector<HTMLElement>('[data-testid="group-tabs"] .ui-tabs [aria-current="page"]');
+    const bar = el?.parentElement;
+    if (el && bar && bar.scrollWidth > bar.clientWidth) bar.scrollLeft += el.getBoundingClientRect().left - bar.getBoundingClientRect().left - (bar.clientWidth - el.offsetWidth) / 2;
+  }, [group?.key]);
   const tabs = !detail && section && !section.groups && section.tabs.length > 1 ? section.tabs : null;
   const body = <div className="ui-page-body">{children}</div>;
   return <>
