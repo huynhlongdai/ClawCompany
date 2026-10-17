@@ -40,7 +40,8 @@ KINDS = ("approval_pending", "approval_escalated", "run_failed", "task_review", 
          "doc_review_due", "doc_expired", "doc_flagged", "doc_conflict", "record_disposal_due",   # M3
          "doc_proposal",   # M3e vòng học: đề xuất sửa tài liệu
          "dsr_due", "contract_due", "meeting_action", "finance_budget",   # P1: DLCN, hợp đồng, họp, tài chính
-         "agent_question")   # W1: agent hỏi người — việc chờ câu trả lời, không giữ ghế
+         "agent_question",   # W1: agent hỏi người — việc chờ câu trả lời, không giữ ghế
+         "voice_flag")   # giọng thương hiệu: văn bản gửi khách lệch giọng (chế độ gắn cờ)
 KIND_VI = {
     "rule_violation": "Vi phạm luật cứng", "output_rework": "Kết quả sai chuẩn — trả làm lại",
     "output_escalated": "Kết quả sai chuẩn quá số lần — cần người", "sla_breach": "Quá hạn SLA — leo thang",
@@ -50,7 +51,7 @@ KIND_VI = {
     "record_disposal_due": "Hồ sơ hết hạn lưu trữ — chờ duyệt huỷ",
     "doc_proposal": "Đề xuất sửa tài liệu (vòng học)",
     "dsr_due": "Yêu cầu dữ liệu cá nhân — có hạn", "contract_due": "Hợp đồng sắp hết hạn / hạn báo trước",
-    "meeting_action": "Việc sau họp", "agent_question": "Agent hỏi — chờ anh trả lời", "finance_budget": "Ngân sách kinh doanh chạm ngưỡng",
+    "meeting_action": "Việc sau họp", "agent_question": "Agent hỏi — chờ anh trả lời", "voice_flag": "Văn bản gửi khách lệch giọng thương hiệu", "finance_budget": "Ngân sách kinh doanh chạm ngưỡng",
     "approval_pending": "Chờ duyệt", "approval_escalated": "Duyệt quá hạn — chuyển lên anh",
     "run_failed": "Run lỗi", "task_review": "Vào review", "mention": "Được nhắc tên",
     "budget_warned": "Ngân sách chạm nấc cảnh báo", "budget_exhausted": "Hết ngân sách",

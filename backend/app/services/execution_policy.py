@@ -328,6 +328,10 @@ async def run_clean_review(db: Session, task: Task, reviewer: Member, runtime, *
     results = (db.query(TaskJournalEntry).filter(TaskJournalEntry.task_id == task.id, TaskJournalEntry.kind == "result")
                .order_by(TaskJournalEntry.seq.desc()).limit(3).all())
     res_text = "\n".join(f"- {j.summary}" + (f": {(j.detail or '')[:1500]}" if j.detail else "") for j in reversed(results)) or "(không có)"
+    from app.services.brand_voice import review_note   # điểm giọng thương hiệu tự động (nếu việc có văn bản gửi khách)
+    vnote = review_note(db, task.id)
+    if vnote:
+        res_text += "\n" + vnote
     prompt = CLEAN_REVIEW_PROMPT.format(id=task.id, title=task.title, description=(task.description or "")[:6000],
                                         criteria=task.acceptance_criteria or "(chưa ghi — dựa vào đề bài)",
                                         deliverables=deliver, results=res_text)

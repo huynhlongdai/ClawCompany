@@ -127,6 +127,12 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     embedding_api_key: str = ""
     embedding_api_key_file: str = ""                   # đọc key từ file (mount secret), ưu tiên hơn biến môi trường
+    # Giọng thương hiệu: TTS (OpenAI-compatible /audio/speech) + chấm giọng bằng model (/chat/completions).
+    # Trống → dùng chung base/key của embedding (CometAPI). tts_fake_enabled chỉ để kiểm thử, KHÔNG bật ở môi trường thật.
+    tts_api_base: str = ""
+    tts_api_key_file: str = ""
+    tts_fake_enabled: bool = False
+    voice_check_model: str = "gpt-5-nano"
     openclaw_rpc_create_agent: str = "agents.create"
     openclaw_rpc_run_agent: str = "agents.run"
     openclaw_rpc_cancel_run: str = "runs.cancel"

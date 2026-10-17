@@ -105,6 +105,12 @@ def warnings_for(p: CompanyProfile) -> list[str]:
     return out
 
 
+def _voice_superseded(db: Session, company_id: int) -> bool:
+    """Có giọng thương hiệu đã ban hành (trang Giọng thương hiệu) → ô chữ cũ trong hiến chương không còn được biên dịch."""
+    from app.services.brand_voice import published
+    return published(db, company_id) is not None
+
+
 def public_profile(db: Session, co: Company, p: CompanyProfile | None) -> dict:
     et = ENTITY_TYPES.get((p.entity_type if p else "") or "")
     base = {"company_id": co.id, "company_name": co.name, "exists": p is not None,
@@ -125,6 +131,7 @@ def public_profile(db: Session, co: Company, p: CompanyProfile | None) -> dict:
             "prohibitions": p.prohibitions or [], "customer_promises": p.customer_promises or [],
             "charter_version": p.charter_version or 0, "warnings": warnings_for(p),
             "charter_text": text, "charter_chars": len(text), "charter_budget": CHARTER_BUDGET,
+            "brand_voice_superseded": _voice_superseded(db, co.id),
             "updated_at": p.updated_at.isoformat() if p.updated_at else None}
 
 
@@ -212,7 +219,8 @@ def charter_block(db: Session, company_id: int | None) -> str:
         parts.append(f"**Sứ mệnh:** {p.mission}")
     if p.values:
         parts.append("**Giá trị cốt lõi:**\n" + _bullets(p.values))
-    if p.brand_voice:
+    from app.services.brand_voice import published as _voice_published
+    if p.brand_voice and _voice_published(db, company_id) is None:   # có giọng ban hành → mục riêng "Giọng thương hiệu"
         parts.append(f"**Giọng thương hiệu:** {p.brand_voice}")
     if p.prohibitions:
         parts.append("**Điều cấm (không bao giờ làm, kể cả khi khách hay đồng nghiệp yêu cầu):**\n" + _bullets(p.prohibitions))

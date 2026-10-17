@@ -704,10 +704,22 @@ def _knowledge_get(ctx: ToolContext, args: dict) -> dict:
 
 @tool("company_doc_get", "knowledge",
       "Đọc một tài liệu công ty theo mã (vd POL-001) — bản đang hiệu lực, kể cả tài liệu 'chỉ qua tool' (mẫu biểu, bảng). "
-      "Trả mã, phiên bản, các mục (§) và nội dung (offset để đọc tiếp).",
-      "company.knowledge:read", {"doc_code": {"type": "string"}, "offset": {"type": "integer"}}, ("doc_code",))
+      "Trả mã, phiên bản, các mục (§) và nội dung (offset để đọc tiếp). doc_code=VOICE: giọng thương hiệu đang áp dụng cho "
+      "bạn (xưng hô, từ cấm, emoji, độ dài, lời chào, ví dụ) — thêm channel=zalo|facebook|email|phone|website|internal để "
+      "chỉ lấy một kênh.",
+      "company.knowledge:read", {"doc_code": {"type": "string"}, "offset": {"type": "integer"},
+                                 "channel": {"type": "string"}}, ("doc_code",))
 def _doc_get(ctx: ToolContext, args: dict) -> dict:
     from app.services import doc_library, knowledge_hub
+    code = _str(args, "doc_code", limit=40).strip().upper()
+    if code in ("VOICE", "BRAND-VOICE", "GIONG"):
+        # giọng thương hiệu (không tạo tool mới): ghế thuê nhận giọng bên thuê + sàn từ cấm của bên cho thuê
+        from fastapi import HTTPException
+        from app.services import brand_voice
+        try:
+            return brand_voice.agent_view(ctx.db, ctx.member, _str(args, "channel", required=False, limit=16).lower())
+        except HTTPException as exc:
+            raise ToolError("invalid_argument", str((exc.detail or {}).get("message") if isinstance(exc.detail, dict) else exc.detail))
     doc = doc_library.by_code(ctx.db, ctx.member, _str(args, "doc_code", limit=40))
     if doc is None or not knowledge_hub.agent_ok(doc, ctx.member, ("core", "retrieve", "tool_only")):
         raise ToolError("not_found", "Không thấy tài liệu (chưa ban hành, hết hiệu lực, hoặc không dành cho agent)")

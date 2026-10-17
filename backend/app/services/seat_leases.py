@@ -160,6 +160,10 @@ def floor_section(db: Session, ls: SeatLease) -> str:
     pro = [p for p in ((prof.prohibitions if prof else None) or []) if str(p).strip()]
     if pro:
         lines.append("### Điều cấm của bên cho thuê\n" + "\n".join(f"- {p}" for p in pro[:12]))
+    from app.services.brand_voice import floor_lines   # từ/cam kết cấm trong giọng của bên cho thuê
+    vf = floor_lines(db, ls.provider_company_id)
+    if vf:
+        lines.append(vf)
     rules = provider_rules(db, ls)
     if rules:
         what = []

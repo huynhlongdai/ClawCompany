@@ -570,6 +570,16 @@ def submit(db: Session, task: Task, member: Member | None, output, *, via: str =
     errors = ([{"path": "(gốc)", "message": forced_error}] if forced_error
               else (_all_errors(tc.output_schema, tc.acceptance, output) if "__raw__" not in (output or {})
                     else [{"path": "(gốc)", "message": "output không phải JSON — gửi một đối tượng {trường: giá trị}"}]))
+    # giọng thương hiệu: kết quả đúng schema nhưng văn bản gửi khách lệch giọng → làm lại (cài đặt rework / sàn bên cho thuê)
+    vres = None
+    if not errors:
+        try:
+            from app.services import brand_voice
+            vres = brand_voice.check_output(db, member, output)
+        except Exception as exc:  # noqa: BLE001 — bộ chấm giọng không được làm hỏng đường nộp
+            print(f"[brand_voice] check: {exc}"); vres = None
+        if vres and vres["action"] == "rework":
+            errors = vres["errors"]
     tc.attempts = (tc.attempts or 0) + 1
     o = TaskOutput(organization_id=member.organization_id if member else 0, company_id=_company_of(db, task),
                    task_id=task.id, contract_id=tc.contract_id, member_id=member.id if member else task.assignee_member_id,
@@ -582,6 +592,12 @@ def submit(db: Session, task: Task, member: Member | None, output, *, via: str =
         o.organization_id = co.organization_id if co else 0
     db.add(o); db.flush()
     actor = member.id if member else None
+    if vres:
+        try:
+            from app.services import brand_voice
+            brand_voice.after_submit(db, task, member, vres, o.id)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[brand_voice] record: {exc}")
     if not errors:
         tc.status, tc.accepted_output_id, tc.last_errors = "accepted", o.id, None
         db.commit()

@@ -737,11 +737,15 @@ def core_section(db: Session, org_id: int, *, company_id: int | None, department
     # M2b: hiến chương công ty đứng đầu phần cốt lõi (không bị cắt bởi CORE_BUDGET ở cuối).
     from app.services.company_foundation import charter_block
     charter = charter_block(db, company_id)
-    if not docs and not charter:
+    from app.services.brand_voice import core_block   # giọng thương hiệu đã ban hành (ngắn; chi tiết kênh qua tool)
+    voice = core_block(db, company_id)
+    if not docs and not charter and not voice:
         return ""
     parts = ["## Kiến thức cốt lõi (luôn áp dụng khi trả lời; chi tiết khác: company_knowledge_search)"]
     if charter:
         parts.append(charter)
+    if voice:
+        parts.append(voice)
     used = len("\n\n".join(parts))
     for layer in ("personal", "profession", "company"):
         mine = [d for d in docs if layer_of(d) == layer]

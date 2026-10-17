@@ -10,6 +10,7 @@ Mỗi ghế agent (30 ngày):
 * **Giờ làm 24/7** — tổng thời lượng lượt chạy, phần ngoài giờ hành chính (T2–T6 08:00–17:30 giờ VN), số ô giờ trong
   tuần (7×24) có hoạt động.
 * **Chi phí mỗi việc (USD)** — chi phí lượt chạy / việc xong.
+* **Điểm giọng thương hiệu** — trung bình điểm chấm giọng của văn bản gửi khách (``brand_voice.voice_metrics``).
 
 Ghế người giữ trường HR thường (chức danh, giờ làm/tuần, trong giờ hay không, nghỉ phép, việc xong, SLA)."""
 from __future__ import annotations
@@ -95,7 +96,9 @@ def seat_metrics(db: Session, m: Member, *, days: int = 30, now: datetime | None
     rules = runtime_rules.compliance(db, m, days=days, now=now)
     conf = io_contracts.conformance(db, member_ids=[m.id], days=days)
     sla = operating_time.attainment(db, member_ids=[m.id], days=days)
-    return {"member_id": m.id, "agent_id": ag.id if ag else None, "days": days,
+    from app.services.brand_voice import voice_metrics
+    voice = voice_metrics(db, [m.id], days=days, now=now)
+    return {"voice_score": voice["score"], "voice_checks": voice["checks"], "voice_pass_rate": voice["pass_rate"],"member_id": m.id, "agent_id": ag.id if ag else None, "days": days,
             "rule_compliance_rate": rules["rate"], "rule_violations": rules["violations"],
             "output_conformance_rate": conf["rate"], "output_first_try_rate": conf["first_try_rate"], "output_submissions": conf["submissions"],
             "consistency": consistency(db, ag.id) if ag else {"score": None, "variance": None, "cases": 0, "eval_runs": 0},
@@ -140,6 +143,7 @@ def company_summary(db: Session, org_id: int, company_id: int | None, *, days: i
                        "output_conformance_rate": _avg([a["output_conformance_rate"] for a in agents]),
                        "consistency": _avg([a["consistency"]["score"] for a in agents]),
                        "sla_attainment_rate": _avg([a["sla_attainment_rate"] for a in agents]),
+                       "voice_score": _avg([a["voice_score"] for a in agents]),
                        "hours": round(hours, 2), "after_hours": round(after, 2),
                        "after_hours_share": round(after / hours, 4) if hours else None,
                        "cost_usd": cost, "tasks_done": done, "cost_per_task_usd": round(cost / done, 4) if done else None}}
