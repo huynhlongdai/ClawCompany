@@ -200,6 +200,11 @@ async def decide(
             "stream_source": STREAM_SOURCE,
         },
     )
+    try:   # W1: việc đang chờ đúng lệnh này → lượt chạy tiếp, nhận lại chỗ chạy của ghế
+        from app.services import task_wait
+        task_wait.end_for_approval(db, approval, actor_member_id=actor_member_id)
+    except Exception as exc:  # noqa: BLE001
+        db.rollback(); print(f"[W1] end wait after decide #{approval.id} failed: {exc}")
     return {
         "approval_id": approval.id,
         "status": approval.status,

@@ -212,3 +212,23 @@ async def run_now(task_id: int, principal: Principal = Depends(require_role("mem
     out = await svc.run_now(db, org, task)
     db.refresh(task)
     return {**out, "task": svc.detail(db, org, task)}
+
+
+class AnswerIn(BaseModel):
+    answer: str = Field(min_length=1, max_length=4000)
+
+
+@router.post("/tasks/{task_id}/answer")
+def answer(task_id: int, payload: AnswerIn, principal: Principal = Depends(require_role("member")),
+           db: Session = Depends(get_db)):
+    """W1: trả lời câu hỏi agent đã hỏi (việc đang chờ người) → hết chờ, agent làm tiếp trong đúng phiên của việc."""
+    from app.services import task_wait
+    task = ensure_task(db, task_id, principal)
+    if not (task.wait_ref or "").startswith("question:"):
+        raise HTTPException(409, {"error": "not_waiting_for_answer",
+                                  "message": "Việc này không chờ câu trả lời nào"})
+    who = db.get(Member, principal.member_id) if principal.member_id else None
+    out = task_wait.answer(db, task, payload.answer, actor_member_id=principal.member_id,
+                           actor_name=who.name if who else "")
+    db.refresh(task)
+    return {"resumed": out, "task": svc.detail(db, active_org(principal), task)}

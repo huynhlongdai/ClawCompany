@@ -171,7 +171,8 @@ def snapshot(db, organization_id: int, *, task=None, company_id: int | None = No
     rows = q.order_by(Member.id).all()
     ids = [m.id for m, _ in rows]
     open_by = dict(db.query(TaskRun.member_id, func.count(TaskRun.id)).filter(
-        TaskRun.member_id.in_(ids or [-1]), TaskRun.status.in_(OPEN_RUN_STATUSES)).group_by(TaskRun.member_id).all())
+        TaskRun.member_id.in_(ids or [-1]), TaskRun.status.in_(OPEN_RUN_STATUSES),
+        TaskRun.waiting_since.is_(None)).group_by(TaskRun.member_id).all())   # W1: lượt chờ người không tính tải
     out = []
     for member, agent in rows:
         envs = bs.applicable(db, member, task)

@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from app.models import Agent, Company, Department, Member, Project, Task, TaskRun
 from app.models.work_graph import OPEN_RUN_STATUSES
 from app.services import task_lifecycle as lifecycle
+from app.services import task_wait
 
 STATUS_VI = lifecycle.STATUS_VI
 PRIORITY_VI = {"urgent": "Khẩn", "high": "Cao", "medium": "Vừa", "low": "Thấp"}
@@ -32,7 +33,8 @@ TRIGGER_VI = {"manual": "Giao tay", "assigned": "Được giao việc", "mention
               "handoff": "Nhận bàn giao", "approval_resolved": "Có kết quả phê duyệt",
               "blocker_cleared": "Hết bị chặn", "review_requested": "Được nhờ review",
               "routine": "Việc định kỳ", "goal_created": "Mục tiêu mới", "changes_requested": "Bị yêu cầu sửa",
-              "routed": "Trưởng phòng chọn người", "run_now": "Chạy ngay"}
+              "routed": "Trưởng phòng chọn người", "run_now": "Chạy ngay",
+              "input_received": "Có câu trả lời của người"}
 REVIEW_STATE_VI = {"in_review": "Đang review", "changes_requested": "Được yêu cầu sửa", "approved": "Đã duyệt",
                    "needs_reviewer": "Thiếu người review"}
 ENTRY_KIND_VI = {"attempt": "Bắt đầu làm", "result": "Kết quả", "review": "Review", "handoff": "Bàn giao",
@@ -174,6 +176,7 @@ def list_items(db: Session, org_id: int, *, status: str | None = None, assignee:
             "runs": {**r, "cost_usd": round(r["cost_usd"], 6), "last_status_vi": RUN_STATUS_VI.get(r["last_status"] or "", "")},
             "review": review_of(t, names),
             "blocked_by": blocked.get(t.id, 0) if t.status not in ("done", "cancelled") else 0,
+            "waiting": task_wait.public(t, now),   # W1: đang chờ người — không giữ ghế
         })
     return {"items": items, "counts": counts, "total": sum(counts.values()), "statuses": statuses()}
 
@@ -351,6 +354,7 @@ def detail(db: Session, org_id: int, task: Task) -> dict:
         "blocked_by": [{"id": b.id, "title": b.title, "status": b.status, "status_vi": STATUS_VI.get(b.status, b.status)}
                        for b in blockers],
         "session_key": task.runtime_session_key,
+        "waiting": task_wait.public(task),   # W1
         "totals": {"runs": len(runs), "failed": sum(1 for r in runs if r.status == "failed"),
                    "running": any(r.status in OPEN_RUN_STATUSES for r in runs),
                    "cost_usd": round(run_cost + room_cost, 6), "run_cost_usd": round(run_cost, 6),
@@ -577,6 +581,8 @@ def explain_skip(reason: str) -> str:
     r = reason or ""
     if r in SKIP_VI:
         return SKIP_VI[r]
+    if r.startswith("task_waiting"):
+        return "Việc đang chờ người (duyệt / trả lời) — sẽ tự chạy tiếp đúng phiên khi có kết quả."
     if r.startswith("seat_busy"):
         return f"Agent đang bận lượt khác ({r.split(':', 1)[1].strip()}) — lượt này sẽ chạy khi xong."
     if r.startswith("task_status"):

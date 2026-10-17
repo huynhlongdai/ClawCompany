@@ -149,6 +149,9 @@ def _wake_requester(db: Session, obj: Approval) -> None:
     gateway nhận quyết định, đánh thức thêm chỉ sinh lượt thứ hai."""
     if obj.status not in ("approved", "rejected") or not obj.requester_member_id:
         return
+    from app.services import task_wait   # W1: việc chờ đúng phê duyệt này → tiếp tục đúng việc, đúng phiên
+    if task_wait.end_for_approval(db, obj) is not None:
+        return
     from app.models import Task, TaskRun
     from app.services import wakeup
     last = (db.query(TaskRun).filter(TaskRun.member_id == obj.requester_member_id)

@@ -294,8 +294,8 @@ def route(db: Session, task: Task, now: datetime | None = None) -> dict | None:
     agents = [s for s in db.query(Member).filter(Member.position_id == pid, Member.member_type == "agent").all() if _active(s)] if pid else []
     nxt = next_on_duty(db, m, now)
     if agents:
-        from app.services.process_map import _open_load
-        to = min(agents, key=lambda s: (_open_load(db, s.id), s.id))
+        from app.services.seat_concurrency import routing_load   # W1: tải theo số lượt cùng lúc, bỏ việc đang chờ người
+        to = min(agents, key=lambda s: (routing_load(db, s.id), s.id))
         r = AfterHoursRoute(organization_id=org or m.organization_id, company_id=co, task_id=task.id, from_member_id=m.id,
                             to_member_id=to.id, position_id=pid, action="rerouted", next_available_at=nxt,
                             reason=f"{m.name} ngoài giờ (trực lại {local_hm(db, m, nxt)}) → {to.name} (agent cùng chức danh, trực 24/7)",

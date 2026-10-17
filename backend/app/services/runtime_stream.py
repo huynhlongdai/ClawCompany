@@ -368,6 +368,7 @@ def record_approval(db: Session, state: ConsumerState, event: dict, member: Memb
         _audit(db, existing, "approval.resolved", result="allowed" if allowed else "denied", once=True,
                payload={"decision": decision, "request_id": request_id, "session_key": state.session_key,
                         "status": existing.status})
+        _end_wait(db, existing)
         return existing
 
     if existing is not None:
@@ -420,7 +421,31 @@ def record_approval(db: Session, state: ConsumerState, event: dict, member: Memb
            payload={"command": command, "tool": tool, "request_id": request_id,
                     "session_key": state.session_key, "task_id": state.task_id,
                     "cwd": req.get("cwd"), "expires_at_ms": raw.get("expiresAtMs")})
+    _begin_wait(db, state, approval)
     return approval
+
+
+def _begin_wait(db: Session, state: ConsumerState, approval: Approval) -> None:
+    """W1: lệnh exec chờ duyệt → lượt vẫn mở trên gateway nhưng nhả chỗ chạy của ghế."""
+    if not state.task_id:
+        return
+    try:
+        from app.services import task_wait
+        task = db.get(Task, state.task_id)
+        run = task_wait.open_run_of(db, task) if task is not None else None
+        if task is not None and run is not None:
+            task_wait.begin(db, task, kind="human", ref=f"approval:{approval.id}", run=run, in_turn=True,
+                            note=(approval.action or "")[:200])
+    except Exception as exc:  # noqa: BLE001 — chờ hỏng không được làm mất hàng duyệt
+        db.rollback(); print(f"[W1] begin wait for approval #{approval.id} failed: {exc}")
+
+
+def _end_wait(db: Session, approval: Approval) -> None:
+    try:
+        from app.services import task_wait
+        task_wait.end_for_approval(db, approval)
+    except Exception as exc:  # noqa: BLE001
+        db.rollback(); print(f"[W1] end wait for approval #{approval.id} failed: {exc}")
 
 
 def assistant_text(raw: dict) -> str:
@@ -486,6 +511,13 @@ def apply_terminal_state(db: Session, task: Task, state: ConsumerState, event: d
     previous = task.status
     holder = lifecycle.current_run(db, task)
     reason = f"run {upstream_state}"
+    from app.services import task_wait
+    if new_status == "review" and task_wait.on_turn_end(db, task):
+        # W1: lượt kết thúc trong lúc việc chờ người → giữ chờ (blocked + wait_kind), không sang review,
+        # không thẻ "run lỗi"; hết chờ thì tiếp tục đúng phiên này.
+        new_status, reason = "blocked", f"waiting:{task.wait_ref}"
+    elif new_status != "review" and task_wait.is_waiting(task):
+        task_wait.drop(db, task, f"run {upstream_state}")
     if new_status == "review":
         # D2.2: báo cáo là bắt buộc. Run xong mà người làm chưa ghi comment nào
         # vào sổ thì việc không được đi tiếp sang review.
@@ -509,7 +541,8 @@ def apply_terminal_state(db: Session, task: Task, state: ConsumerState, event: d
                 new_status, reason = gate
     if holder is not None:
         lifecycle.finish_run(db, holder, RUN_OUTCOME.get(new_status, "completed")
-                             if reason not in ("missing_report", "contract_missing_output", "contract_escalated") else "completed",
+                             if reason not in ("missing_report", "contract_missing_output", "contract_escalated")
+                             and not reason.startswith("waiting:") else "completed",
                              error_reason=str(event.get("errorMessage") or "")
                              or ("missing_report" if reason == "missing_report" else ""), commit=False)
     lifecycle.transition(db, task, new_status, system=True, via="runtime",
@@ -518,7 +551,7 @@ def apply_terminal_state(db: Session, task: Task, state: ConsumerState, event: d
         from app.services import wakeup
         wakeup.enqueue_for_task(db, task, "changes_requested", dedupe_key=f"contract:t{task.id}:run-end:{holder.id if holder else 0}",
                                 payload={"reason": "contract_missing_output"})
-    if new_status == "blocked" and reason != "contract_escalated":
+    if new_status == "blocked" and reason != "contract_escalated" and not reason.startswith("waiting:"):
         # D3.5: run lỗi / thiếu báo cáo → quản lý (người) của người làm nhận báo.
         from app.services import inbox
         inbox.run_failed(db, task, str(event.get("errorMessage") or reason),

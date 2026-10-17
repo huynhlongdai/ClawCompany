@@ -334,6 +334,29 @@ def hr_limits(agent_id: int, principal: Principal = Depends(require_human()), db
             "model_policy": spec.get("model_policy") or {}, "options": seat_limits.options()}
 
 
+class ParallelIn(BaseModel):
+    max_parallel_runs: int
+
+
+@router.get("/{agent_id}/concurrency")
+def hr_concurrency(agent_id: int, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
+    """W1: số lượt chạy cùng lúc của ghế (mặc định 1, tối đa 3 — default, chưa chốt), đang chạy / đang chờ người."""
+    from app.services import seat_concurrency
+    agent, member = agent_hr.seat(db, active_org(principal), agent_id)
+    return seat_concurrency.view(db, agent, member)
+
+
+@router.put("/{agent_id}/concurrency")
+def hr_concurrency_set(agent_id: int, payload: ParallelIn, principal: Principal = Depends(require_role("manager")),
+                       db: Session = Depends(get_db)):
+    from app.services import seat_concurrency
+    agent, member = agent_hr.seat(db, active_org(principal), agent_id)
+    from app.core import company_scope
+    company_scope.check(member.company_id, min_role="manager")
+    return seat_concurrency.set_limit(db, agent, member, payload.max_parallel_runs,
+                                      actor_member_id=principal.seat_in(member.company_id))
+
+
 @router.get("/{agent_id}/tools")
 def hr_tools(agent_id: int, principal: Principal = Depends(require_human()), db: Session = Depends(get_db)):
     """Quyền tool công ty của seat này: mức hiệu dụng + nguồn (member/bậc/mặc định)."""

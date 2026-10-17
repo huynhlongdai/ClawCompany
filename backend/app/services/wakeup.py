@@ -7,8 +7,10 @@ chỉ chạy khi người bấm nút. Ở đây mọi nguồn chỉ làm một v
 
 - gộp các lý do của cùng seat trong cửa sổ ``wakeup_window_seconds`` (10 giây)
   thành **một** run; lý do khác cùng task thành ``coalesced``;
-- bỏ qua, có ``skip_reason``, khi seat không ``active``, seat đang có run (hàng
-  đợi ``steer`` của OpenClaw sẽ chèn tin thứ hai vào lượt đang chạy), ngoài
+- bỏ qua, có ``skip_reason``, khi seat không ``active``, seat đã chạy đủ số lượt
+  cùng lúc (W1: ``agents.max_parallel_runs``, mặc định 1; mỗi việc một phiên riêng
+  nên hàng ``steer`` của OpenClaw không trộn hai việc; lượt đang CHỜ người không
+  tính — ``seat_concurrency``), ngoài
   ``heartbeat.activeHours`` của seat, hoặc ``budget.can_reserve`` trả false;
 - lý do bị bỏ vì seat bận được xếp lại khi lượt đang chạy kết thúc
   (``requeue_deferred``), nên giao việc lúc seat bận không bị mất.
@@ -172,9 +174,10 @@ async def skip_reason(db: Session, member: Member | None, agent: Agent | None, n
             return f"budget: {spent[0].name}: đã hết hạn mức — seat tạm dừng"
     if member.status != "active" or agent is None or (agent.lifecycle or "active") != "active":
         return "seat_inactive"
-    busy = open_run_for(db, member.id, now)
-    if busy is not None:
-        return f"seat_busy: run #{busy.id} (task #{busy.task_id})"
+    from app.services import seat_concurrency  # W1: đếm lượt đang chạy (không tính lượt chờ người) so với giới hạn ghế
+    busy = seat_concurrency.busy_reason(db, member.id, now, agent)
+    if busy:
+        return busy
     if not within_active_hours(await ACTIVE_HOURS_LOOKUP(agent), now):
         return "outside_active_hours"
     return ""
@@ -314,6 +317,9 @@ async def _process(db: Session, member_id: int, items: list[Wakeup], now: dateti
             why_one = "no_task"
         elif t.assignee_member_id != member_id:
             why_one = "not_assignee"
+        elif t.wait_kind:
+            # W1: việc đang chờ người — chỉ hết chờ (task_wait.end) mới chạy lại, và chạy đúng phiên cũ
+            why_one = f"task_waiting: {t.wait_ref}"
         elif t.status not in DISPATCHABLE:
             why_one = f"task_status: {t.status}"
         else:
@@ -341,10 +347,23 @@ async def _process(db: Session, member_id: int, items: list[Wakeup], now: dateti
     budget_scope.hold(db, envs, amount, hold_key,
                       memo=f"giữ chỗ khi drain wakeup #{primary.id} (task #{task.id}, ước tính {amount:.4f})")
 
-    from app.services import agent_dispatch
+    from app.services import agent_dispatch, task_wait
     from app.services import task_lifecycle as lifecycle
+    resume = task_wait.resume_from_payloads([w.payload for w in [primary, *same]])
     try:
-        task = await agent_dispatch.dispatch_task(db, task, trigger_kind=primary.reason, wakeup_id=primary.id)
+        # W1: giành chỗ chạy nguyên tử (seat_slot) — hai drain song song không cùng lấy một chỗ của ghế
+        task = await agent_dispatch.dispatch_task(db, task, trigger_kind=primary.reason, wakeup_id=primary.id,
+                                                  seat_slot=True, resume=resume)
+    except agent_dispatch.SeatBusyConflict as exc:
+        budget_scope.release_key(db, hold_key, "ghế hết chỗ chạy — trả phần giữ")
+        why = exc.reason
+        for wk in [primary, *same]:
+            _close(wk, "skipped", skip=why, now=now)
+        db.commit()
+        for wk in [primary, *same]:
+            _emit(db, wk, "wakeup.skipped", why)
+        return {"member_id": member_id, "decision": "skipped", "reason": why,
+                "wakeups": [w.id for w in [primary, *same]]}
     except agent_dispatch.DispatchError as exc:
         budget_scope.release_key(db, hold_key, "dispatch lỗi — trả phần giữ")
         why = f"dispatch_error: {exc}"
@@ -408,7 +427,18 @@ async def drain(db: Session, *, now: datetime | None = None, member_id: int | No
             out.append({"member_id": mid, "decision": "claimed_elsewhere", "wakeups": [w.id for w in items]})
             continue
         try:
-            out.append(await _process(db, mid, mine, now, follow, prefer))
+            res = await _process(db, mid, mine, now, follow, prefer)
+            out.append(res)
+            # W1: ghế chạy được nhiều lượt cùng lúc → mỗi drain lấp hết chỗ còn trống (mỗi vòng một việc khác)
+            for _ in range(8):
+                rest = [w for w in mine if w.status == "queued"]
+                if res.get("decision") != "dispatched" or not rest:
+                    break
+                from app.services import seat_concurrency
+                if seat_concurrency.free_slots(db, mid, now) <= 0:
+                    break   # hết chỗ: phần còn lại giữ nguyên hàng đợi như trước W1
+                res = await _process(db, mid, rest, now, follow, None)
+                out.append(res)
         finally:
             _unclaim(db, mine)
     return out
@@ -457,9 +487,10 @@ def _unclaim(db: Session, items: list[Wakeup]) -> None:
                 print(f"[M4a] unclaim wakeups failed: {exc}")
 
 
-def requeue_deferred(db: Session, member_id: int, *, after_run_id: int) -> list[Wakeup]:
-    """Lượt chạy vừa xong: xếp lại các lý do đã bị bỏ vì seat bận (mỗi task một lần)."""
-    return _requeue(db, member_id, "seat_busy%", f"after-run-{after_run_id}")
+def requeue_deferred(db: Session, member_id: int, *, after_run_id: int, suffix: str | None = None) -> list[Wakeup]:
+    """Lượt chạy vừa xong (hoặc W1: vừa chuyển sang chờ người): xếp lại các lý do đã bị bỏ vì seat bận
+    (mỗi task một lần)."""
+    return _requeue(db, member_id, "seat_busy%", suffix or f"after-run-{after_run_id}")
 
 
 async def requeue_when_hours_open(db: Session, now: datetime) -> list[Wakeup]:
@@ -488,9 +519,10 @@ def _requeue(db: Session, member_id: int, pattern: str, suffix: str) -> list[Wak
         if meta.get("requeued_as") or old.task_id in seen:
             continue
         seen.add(old.task_id)
+        carry = {"resume": meta["resume"]} if isinstance(meta.get("resume"), dict) else {}  # W1: giữ tin tiếp tục
         new, _ = enqueue(db, organization_id=old.organization_id, member_id=member_id, reason=old.reason,
                          task_id=old.task_id, dedupe_key=f"{old.dedupe_key}:{suffix}",
-                         payload={"requeued_from": old.id})
+                         payload={"requeued_from": old.id, **carry})
         meta["requeued_as"] = new.id
         old.payload = json.dumps(meta)
         db.commit()

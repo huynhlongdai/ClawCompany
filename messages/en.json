@@ -717,7 +717,16 @@
   "viec_xong": "Tasks done",
   "han_chot_2": "Deadline {p0}",
   "xong": "done",
-  "xong_hoa": "Done"
+  "xong_hoa": "Done",
+  "w_badge": "Waiting for {p0}",
+  "w_on_approval": "approval",
+  "w_on_question": "an answer",
+  "w_on_other": "a person",
+  "w_min": "{p0} min",
+  "w_hint": "The agent's seat was released for other work; when the result arrives, the agent continues in this task's own session.",
+  "w_open_inbox": "Open Inbox to approve",
+  "w_answer_ph": "Answer the agent's question…",
+  "w_answer_btn": "Send answer"
  },
  "task": {
   "bat_tay_lam": "Started",
@@ -1455,7 +1464,18 @@
   "lan_danh_gia": "Eval runs",
   "ly_do_doi_cap": "Reason for the change (saved in version history):",
   "da_doi_cap": "Autonomy level changed",
-  "ket_qua_danh_gia": "All {p1} tries correct: {p0} of cases · per try: {p2}"
+  "ket_qua_danh_gia": "All {p1} tries correct: {p0} of cases · per try: {p2}",
+  "par_title": "Parallel work",
+  "par_desc": "How many tasks the agent runs at once — each in its own session; tasks waiting on a person don't take a slot.",
+  "par_unsettled": "Default, not final",
+  "par_label": "Runs at the same time",
+  "par_default": "default",
+  "par_running": "Running",
+  "par_waiting": "Tasks waiting on a person",
+  "par_floor": "Leased agent: the provider allows at most {p0} at once.",
+  "par_over": "Over the limit because an approved task just resumed — the agent takes no new work until it is back under the limit.",
+  "par_hint": "Default 1, maximum {p0}. Raising it makes daily spend grow faster — daily/monthly caps still apply.",
+  "par_saved": "Saved: {p0} runs at once"
  },
  "seat": {
   "ho_so": "Profile",

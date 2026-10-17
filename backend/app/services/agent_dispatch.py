@@ -45,6 +45,14 @@ class DispatchConflict(DispatchError):
     """D1.3/D1.4: việc đang bị chặn hoặc đang có lượt chạy khác giữ (HTTP 409)."""
 
 
+class SeatBusyConflict(DispatchConflict):
+    """W1: ghế đã chạy đủ số lượt cùng lúc (giành chỗ nguyên tử thua)."""
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
 def resolve_seat(db: Session, task: Task) -> tuple[Member, Agent]:
     """Find the agent seat responsible for a task, with explicit failures."""
     if not task.assignee_member_id:
@@ -69,7 +77,10 @@ def resolve_seat(db: Session, task: Task) -> tuple[Member, Agent]:
 
 
 async def dispatch_task(db: Session, task: Task, *, trigger_kind: str = "manual",
-                        wakeup_id: int | None = None) -> Task:
+                        wakeup_id: int | None = None, seat_slot: bool = False,
+                        resume: dict | None = None) -> Task:
+    """``seat_slot`` (W1, đường wakeup): giành chỗ chạy của ghế nguyên tử cùng lúc tạo ``task_runs``.
+    ``resume`` (W1): việc vừa hết chờ người — gửi tin tiếp tục ngắn vào đúng phiên của việc thay cho gói ngữ cảnh."""
     member, agent = resolve_seat(db, task)
     # Phase B việc 6: trần chi USD của ghế (ngày/tháng) — chạm trần thì không giao lượt mới.
     from app.services import seat_limits
@@ -83,9 +94,18 @@ async def dispatch_task(db: Session, task: Task, *, trigger_kind: str = "manual"
                                + ", ".join(f"#{t.id}" for t in waiting) + " chưa xong")
     # D1.4: mỗi lượt là một hàng task_runs, và lượt phải giữ được task trước
     # khi chạy. Thua cuộc giữ chỗ thì dừng ngay, không thử lại.
-    run_row = lifecycle.open_run(db, task, organization_id=member.organization_id,
-                                 member_id=member.id, trigger_kind=trigger_kind,
-                                 wakeup_id=wakeup_id)
+    if seat_slot:
+        from app.services import seat_concurrency
+        try:
+            run_row = seat_concurrency.open_run(db, task, organization_id=member.organization_id,
+                                                member_id=member.id, trigger_kind=trigger_kind,
+                                                wakeup_id=wakeup_id)
+        except seat_concurrency.SeatBusy as exc:
+            raise SeatBusyConflict(exc.reason) from exc
+    else:
+        run_row = lifecycle.open_run(db, task, organization_id=member.organization_id,
+                                     member_id=member.id, trigger_kind=trigger_kind,
+                                     wakeup_id=wakeup_id)
     try:
         lifecycle.checkout(db, task, run_row.id)
     except lifecycle.CheckoutConflict as exc:
@@ -105,6 +125,11 @@ async def dispatch_task(db: Session, task: Task, *, trigger_kind: str = "manual"
     # `task_brief` không bị xoá: nội dung của nó thành khối 7 (thoả thuận làm
     # việc) trong gói, vì bốn dòng đó là một hợp đồng chứ không phải mô tả.
     pack = work_context.build_pack(db, task, organization_id=member.organization_id)
+    if resume:
+        # W1: phiên của việc còn nguyên lịch sử tới điểm dừng → chỉ gửi kết quả chờ + lời "làm tiếp".
+        from app.services import task_wait
+        text = task_wait.resume_text(task, resume)
+        pack = {**pack, "text": text, "chars": len(text), "trimmed": [], "resumed": True}
     # Quyết định định tuyến đi kèm gói (chữ ký _run_agent giữ nguyên 6 tham số).
     pack["route"] = _route(db, task, member, pack, run_id=run_row.id)
 
@@ -275,6 +300,9 @@ async def abort_task(db: Session, task: Task, *, back_to: str = "todo") -> dict:
     if back_to not in ("todo", "backlog", "review", "cancelled"):
         raise DispatchError(f"Unsupported status after abort: {back_to}")
     holder = lifecycle.current_run(db, task)
+    if task.wait_kind:   # W1: huỷ lượt đang chờ người → bỏ chờ
+        from app.services import task_wait
+        task_wait.drop(db, task, "aborted by operator")
     if holder is not None:
         lifecycle.finish_run(db, holder, "cancelled", error_reason="aborted by operator",
                              commit=False)

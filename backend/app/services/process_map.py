@@ -477,7 +477,8 @@ def pick_assignee(db: Session, org_id: int, company_id: int, position_id: int | 
         if seats:
             # M2e.4: ghế đang trực trước (agent luôn trực; người ngoài giờ / nghỉ phép xếp sau), rồi ít việc mở nhất
             from app.services.operating_time import on_duty
-            best = min(seats, key=lambda m: (0 if on_duty(db, m) else 1, _open_load(db, m.id), m.id))
+            from app.services.seat_concurrency import routing_load   # W1
+            best = min(seats, key=lambda m: (0 if on_duty(db, m) else 1, routing_load(db, m.id), m.id))
             return best.id, ""
         pos = db.get(Position, position_id)
         dept = db.get(Department, pos.department_id) if pos and pos.department_id else None

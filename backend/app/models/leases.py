@@ -50,6 +50,8 @@ class SeatLease(Base):
     allowed_tools: Mapped[list | None] = mapped_column(JSON, nullable=True)      # None/[] = theo chức danh nguồn
     knowledge_scope: Mapped[dict | None] = mapped_column(JSON, nullable=True)    # {"doc_ids": [...]}
     data_handling: Mapped[str] = mapped_column(Text, default="")
+    # W1 (0064): sàn số lượt chạy cùng lúc của ghế thuê (NULL = 1); bên thuê không đặt cao hơn.
+    max_parallel_runs: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # ai duyệt / ai trả (mặc định: business=renter, policy=provider, payer=renter)
     approval_policy: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     change_requests: Mapped[list | None] = mapped_column(JSON, nullable=True)

@@ -67,6 +67,9 @@ class Agent(Base, TimestampMixin):
     success_rate: Mapped[float] = mapped_column(Float, default=0.0)
     cost_30d: Mapped[float] = mapped_column(Float, default=0.0)
     risk: Mapped[str] = mapped_column(String(32), default="low")
+    # W1 (0064_work_wait_parallel): số lượt chạy cùng lúc của ghế (mặc định 1, tối đa 3 — default, chưa chốt).
+    # Chỉ services/seat_concurrency.py đọc/ghi; ghế thuê còn bị chặn bởi sàn của hợp đồng (seat_leases.max_parallel_runs).
+    max_parallel_runs: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
 
 class Project(Base, TimestampMixin, RevisionMixin):
     __tablename__ = "projects"
@@ -117,6 +120,11 @@ class Task(Base, TimestampMixin, RevisionMixin):
     # (trước đó dùng updated_at, lệch khi việc đã xong bị sửa lại). Ghi bởi listener bên dưới cho MỌI
     # đường đổi trạng thái qua ORM; rời "done" (mở lại) thì xoá.
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    # W1 (0064_work_wait_parallel): việc đang CHỜ (người duyệt / người trả lời / ...) — không giữ chỗ chạy của ghế.
+    # wait_kind ∈ task_wait.WAIT_KINDS, wait_ref = "approval:<id>" | "question:<inbox id>" ...; chỉ services/task_wait.py ghi.
+    wait_kind: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
+    wait_ref: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    wait_since: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 class KnowledgeDocument(Base, TimestampMixin):
     __tablename__ = "knowledge_documents"

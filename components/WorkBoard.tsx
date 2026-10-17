@@ -22,7 +22,16 @@ export type WorkItem = {
   runs: {count: number; cost_usd: number; tokens: number; running: boolean; last_status: string | null; failed: number};
   review: {needed: boolean; state: string | null; state_vi: string; reviewer: Who; reviewers: Who[]; round: number};
   blocked_by: number;
+  waiting?: Waiting | null;
 };
+/* W1: việc đang chờ người (duyệt / trả lời) — ghế agent đã được nhả, làm tiếp đúng phiên khi có kết quả. */
+type Waiting = {kind: string; ref: string; on: string; since: string | null; minutes: number | null};
+const waitOn = (w: Waiting) => w.on === "approval" ? tr("work.w_on_approval") : w.on === "question" ? tr("work.w_on_question") : tr("work.w_on_other");
+export function WaitBadge({w}: {w?: Waiting | null}) {
+  if (!w) return null;
+  return <span className="wkBadge is-waiting" data-testid="wk-waiting" title={tr("work.w_hint")}>
+    <Icon name="clock" size={11}/>{tr("work.w_badge", {p0: waitOn(w)})}{w.minutes ? ` · ${tr("work.w_min", {p0: w.minutes})}` : ""}</span>;
+}
 
 const BOARD = ["backlog", "todo", "in_progress", "review", "blocked", "done"];
 const LIST_ORDER = ["in_progress", "review", "blocked", "todo", "backlog", "done", "cancelled"];
@@ -80,6 +89,7 @@ function Badges({t}: {t: WorkItem}) {
       {t.review.reviewer ? `${t.review.reviewer.name} review` : t.review.state_vi}</span>}
     {t.review.needed && t.status !== "review" && t.status !== "done" && <span className="wkBadge" title={tr("work.co_review_cheo_truoc_khi")}>{tr("work.review_cheo")}</span>}
     {t.blocked_by > 0 && <span className="wkBadge is-blocked">{tr("work.cho")} {t.blocked_by} {tr("work.viec")}</span>}
+    <WaitBadge w={t.waiting}/>
     {t.due_at && <span className={"wkBadge" + (t.overdue ? " is-overdue" : "")}><Icon name="clock" size={11}/>{dueLabel(t.due_at)}</span>}
   </>;
 }
@@ -373,6 +383,7 @@ export function TaskPeek({id, meta, onClose, onChanged}: {id: number; meta: any;
         {t.assignee?.lifecycle && t.assignee.lifecycle !== "active" && <p className="wkWarn">
           {t.assignee.name} {tr("work.dang")} {LC_VI[t.assignee.lifecycle] || t.assignee.lifecycle} {tr("work.khong_nhan_luot_moi_giao")} <Link href={`/app/agents/${t.assignee.id}`}>{tr("work.ho_so_agent")}</Link>.</p>}
         {t.blocked_by.length > 0 && <p className="wkWarn">{tr("work.dang_cho")} {t.blocked_by.map((b: any) => `#${b.id} ${b.title} (${b.status_vi})`).join(", ")}.</p>}
+        {t.waiting && <WaitPanel t={t} busy={busy} act={act}/>}
 
         <div className="wkTotals" data-testid="wk-totals">
           <span><b className="ui-num">{t.totals.runs}</b> {tr("work.luot_chay_2")}{t.totals.failed ? tr("work.loi", {p0: t.totals.failed}) : ""}</span>
@@ -560,5 +571,22 @@ function CreateTask({meta, onClose, onCreated}: {meta: any; onClose: () => void;
         <button type="button" className="ui-btn is-ghost" onClick={onClose}>{tr("work.huy")}</button>
       </div>
     </form>
+  </div>;
+}
+
+
+/* W1: side-peek — việc đang chờ người. Câu hỏi của agent thì trả lời ngay tại đây (về đúng phiên của việc). */
+function WaitPanel({t, busy, act}: {t: any; busy: boolean; act: (fn: () => Promise<any>) => any}) {
+  const [text, setText] = useState("");
+  const w: Waiting = t.waiting;
+  return <div className="wkWarn wkWait" data-testid="wk-wait-panel">
+    <b>{tr("work.w_badge", {p0: waitOn(w)})}{w.minutes ? ` · ${tr("work.w_min", {p0: w.minutes})}` : ""}</b>
+    <span>{tr("work.w_hint")}</span>
+    {w.on === "approval" && <Link href="/app/inbox">{tr("work.w_open_inbox")}</Link>}
+    {w.on === "question" && <div className="tmRow">
+      <input value={text} onChange={e => setText(e.target.value)} placeholder={tr("work.w_answer_ph")} disabled={busy}
+             data-testid="wk-answer-input" maxLength={4000}/>
+      <button className="ui-btn is-primary is-sm" disabled={busy || !text.trim()} data-testid="wk-answer"
+              onClick={() => act(() => apiWork.answer(t.id, text.trim()))}>{tr("work.w_answer_btn")}</button></div>}
   </div>;
 }

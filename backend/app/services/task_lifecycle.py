@@ -132,6 +132,10 @@ def transition(db: Session, task: Task, to: str, *, reason: str = "", via: str =
                        company_id=company_id or company, source=source,
                        aggregate_type="task", aggregate_id=str(task.id),
                        actor_member_id=actor_member_id)
+    if task.wait_kind and (to in ("done", "cancelled") or (not system and current == "blocked")):
+        # W1: người đóng việc / tự gỡ "bị chặn" của việc đang chờ → bỏ chờ (không tiếp tục kiểu cũ nữa)
+        from app.services import task_wait
+        task_wait.drop(db, task, f"{current} → {to} ({via})")
     from app.services import operating_time  # M2e.4: đồng hồ SLA (phản hồi đầu / xử lý xong)
     operating_time.on_task_status(db, task, to)
     if to in ("in_progress", "done", "cancelled"):

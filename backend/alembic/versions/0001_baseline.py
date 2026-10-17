@@ -82,6 +82,7 @@ BASELINE_TABLES = [
 # index ``ix_api_keys_member_id`` mà model khai -- một việc vô ích.
 COLUMNS_OWNED_BY_LATER_MIGRATIONS = {
     "companies": ["row_revision"],                  # 0013_v30_row_revision_counter
+    "agents": ["max_parallel_runs"],                 # 0064_work_wait_parallel
     "members": ["row_revision",                     # 0013
                 "position_id"],                     # 0038_company_foundation
     "projects": ["row_revision", "due_date"],       # 0013, 0016
@@ -91,7 +92,8 @@ COLUMNS_OWNED_BY_LATER_MIGRATIONS = {
               "checkout_run_id",                     # 0019_task_runs
               "execution_policy", "execution_state",  # 0022_execution_policy
               "assignee_department_id",              # 0024_department_routing
-              "completed_at"],                       # 0045_kpi_history
+              "completed_at",                        # 0045_kpi_history
+              "wait_kind", "wait_ref", "wait_since"],  # 0064_work_wait_parallel
     "departments": ["row_revision", "status",       # 0013, 0014
                     "guide"],                       # 0024
     "inbox_items": ["task_id", "group_key", "kinds", "count", "body",   # 0025_inbox_escalation

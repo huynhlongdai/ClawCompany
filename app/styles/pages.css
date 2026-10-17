@@ -118,7 +118,9 @@
 .wkDept{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .wkBadge{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:var(--radius-full);font-size:var(--fs-11);font-weight:var(--fw-medium);
   background:var(--neutral-bg);color:var(--neutral);white-space:nowrap}
-.wkBadge.is-review{background:var(--wait-bg);color:var(--wait)}
+.wkBadge.is-review,.wkBadge.is-waiting{background:var(--wait-bg);color:var(--wait)}
+.wkWait{display:flex;flex-direction:column;gap:6px}
+.wkWait>span{color:var(--text-muted)}
 .wkBadge.is-failed,.wkBadge.is-blocked,.wkBadge.is-overdue{background:var(--risk-bg);color:var(--risk)}
 .wkBadge.is-running{background:var(--ok-bg);color:var(--ok)}
 .wkPrio{display:inline-flex;align-items:flex-end;gap:1.5px;height:12px;width:14px;color:var(--text-muted)}

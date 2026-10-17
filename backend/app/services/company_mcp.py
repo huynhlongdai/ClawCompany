@@ -273,12 +273,24 @@ def _task_get(ctx: ToolContext, args: dict) -> dict:
       "(backlog→todo→in_progress→review→done…). Bắt buộc nêu lý do.", "company.tasks:write",
       {"task_id": {"type": "integer"}, "status": {"type": "string",
                                                   "enum": list(lifecycle.TASK_STATUSES)},
-       "reason": {"type": "string"}}, ("task_id", "status", "reason"), writes=True)
+       "reason": {"type": "string"},
+       "wait_for": {"type": "string", "enum": ["human"],
+                    "description": "W1: status=blocked vì cần NGƯỜI trả lời — reason là câu hỏi; ghế được nhả, "
+                                   "câu trả lời về đúng phiên này"}}, ("task_id", "status", "reason"), writes=True)
 def _task_status(ctx: ToolContext, args: dict) -> dict:
     task = _task_or_404(ctx, _int(args, "task_id"))
     if task.assignee_member_id != ctx.member.id:
         raise ToolError("forbidden", "Chỉ người nhận việc mới đổi được trạng thái")
     before = task.status
+    if args.get("wait_for") is not None:
+        if args.get("wait_for") != "human" or _str(args, "status", limit=32) != "blocked":
+            raise ToolError("invalid_argument", "wait_for=human chỉ đi với status=blocked")
+        if task.status != "in_progress" or ctx.run is None or ctx.run.task_id != task.id:
+            raise ToolError("conflict", "Chỉ hỏi người được khi đang làm việc này trong lượt của nó")
+        from app.services import task_wait
+        asked = task_wait.ask_human(ctx.db, task, ctx.member, _str(args, "reason", limit=500), run=ctx.run)
+        return {"task_id": task.id, "from": before, "to": "blocked", "waiting": asked,
+                "next": "Kết thúc lượt này. Câu trả lời sẽ được gửi vào ĐÚNG phiên này để anh/chị làm tiếp."}
     from app.services import io_contracts   # M2e.3: việc có hợp đồng chưa đạt chuẩn không tự sang Chờ duyệt/Xong
     gate = io_contracts.gate_transition(ctx.db, task, _str(args, "status", limit=32))
     if gate:
@@ -957,8 +969,19 @@ def _approval_request(ctx: ToolContext, args: dict) -> dict:
                   fallback_role="member", company_id=ctx.member.company_id,
                   evidence=_str(args, "evidence", required=False, limit=4000),
                   amount_usd=_amount(args), risk=_str(args, "risk", required=False, limit=16) or None)
-    return {"decision": d.decision, "reason": d.reason, "policy_key": d.policy_key,
-            "approval_id": d.approval_id}
+    out = {"decision": d.decision, "reason": d.reason, "policy_key": d.policy_key,
+           "approval_id": d.approval_id}
+    if d.decision == "approval_required" and d.approval_id and ctx.run is not None:
+        # W1: việc chờ người duyệt — ghế được nhả khi lượt này kết thúc; có quyết định thì tiếp tục đúng phiên này.
+        task = ctx.db.get(Task, ctx.run.task_id)
+        if task is not None and task.assignee_member_id == ctx.member.id:
+            from app.services import task_wait
+            task_wait.begin(ctx.db, task, kind="human", ref=f"approval:{d.approval_id}", run=ctx.run,
+                            note=_str(args, "action", limit=120), actor_member_id=ctx.member.id)
+            out["waiting"] = {"task_id": task.id, "ref": f"approval:{d.approval_id}",
+                              "next": "Kết thúc lượt này và báo đang chờ duyệt. Khi có quyết định, hệ thống gửi kết "
+                                      "quả vào ĐÚNG phiên này để anh/chị làm tiếp từ chỗ dừng."}
+    return out
 
 
 def _amount(args: dict) -> float | None:

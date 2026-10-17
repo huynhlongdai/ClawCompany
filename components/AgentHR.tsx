@@ -189,6 +189,7 @@ export function AgentHRPanel({memberId}: {memberId: number}) {
     <Career seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Lessons seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Limits seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
+    <Parallel seat={seat} canEdit={canEdit} busy={busy} act={act} tick={tick}/>
     <Tools seat={seat} isAdmin={isAdmin} busy={busy} act={act} tick={tick}/>
   </div>;
 }
@@ -565,6 +566,41 @@ function Limits({seat, canEdit, busy, act, tick}: any) {
         {o.fallbacks.map((m: string) => <option key={m} value={m}>{m}</option>)}</select></label>
       <small className="tmGuide">{tr("agentHr.san_an_toan_van_ap")}</small>
       {canEdit && <div className="tmRow"><button className="ui-btn is-primary" disabled={busy} onClick={save} data-testid="hr-limits-save">{tr("agentHr.luu")}</button></div>}
+    </div>
+  </section>;
+}
+
+
+// ------------------------------------------------------------------ W1: số lượt chạy cùng lúc của ghế
+
+function Parallel({seat, canEdit, busy, act, tick}: any) {
+  const [d, setD] = useState<any>(null), [err, setErr] = useState(""), [v, setV] = useState<number>(1);
+  useEffect(() => {
+    apiAgentsHR.concurrency(seat.agent_id).then((x: any) => { setD(x); setV(x.max_parallel_runs); })
+      .catch(e => setErr(errorText(e)));
+  }, [seat.agent_id, tick]);
+  if (err) return <section className="ui-panel ui-panel-body"><div className="ui-banner is-error">{err}</div></section>;
+  if (!d) return null;
+  const opts = Array.from({length: d.max_allowed}, (_, i) => i + 1);
+  const save = () => act(async () => { const r = await apiAgentsHR.setConcurrency(seat.agent_id, v); setD(r); return r; },
+    () => tr("agentHr.par_saved", {p0: v}));
+  return <section className="ui-panel ui-panel-body" data-testid="hr-parallel">
+    <div className="lab-cardhead"><div><b>{tr("agentHr.par_title")}</b><span>{tr("agentHr.par_desc")}</span></div>
+      {!d.settled && <span className="ui-pill is-wait" data-testid="hr-parallel-unsettled">{tr("agentHr.par_unsettled")}</span>}</div>
+    <div className="ui-form">
+      <div className="ui-form-row">
+        <label>{tr("agentHr.par_label")}
+          <select value={v} disabled={!canEdit || busy} onChange={e => setV(Number(e.target.value))} data-testid="hr-parallel-select">
+            {opts.map(n => <option key={n} value={n}>{n}{n === d.default ? ` (${tr("agentHr.par_default")})` : ""}</option>)}</select></label>
+        <div className="hrFacts" data-testid="hr-parallel-now">
+          <span>{tr("agentHr.par_running")}</span><b className="ui-num">{d.running} / {d.effective_limit}</b>
+          <span>{tr("agentHr.par_waiting")}</span><b className="ui-num">{d.waiting_tasks}</b></div>
+      </div>
+      {d.lease_floor !== null && d.lease_floor !== undefined && <small className="tmGuide">{tr("agentHr.par_floor", {p0: d.lease_floor})}</small>}
+      {d.over_limit && <small className="hrWarn">{tr("agentHr.par_over")}</small>}
+      <small className="tmGuide">{tr("agentHr.par_hint", {p0: d.max_allowed})}</small>
+      {canEdit && <div className="tmRow"><button className="ui-btn is-primary" disabled={busy || v === d.max_parallel_runs}
+        onClick={save} data-testid="hr-parallel-save">{tr("agentHr.luu")}</button></div>}
     </div>
   </section>;
 }

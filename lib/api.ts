@@ -940,6 +940,9 @@ export const apiAgentsHR = {
     request<any>(`/agents/${agentId}/lifecycle`, {method: "POST", body: JSON.stringify(body)}),
   tools: (agentId: number) => request<any>(`/agents/${agentId}/tools`),
   limits: (agentId: number) => request<any>(`/agents/${agentId}/limits`),
+  concurrency: (agentId: number) => request<any>(`/agents/${agentId}/concurrency`),
+  setConcurrency: (agentId: number, max_parallel_runs: number) =>
+    request<any>(`/agents/${agentId}/concurrency`, {method: "PUT", body: JSON.stringify({max_parallel_runs})}),
   memory: (agentId: number) => request<any>(`/agents/${agentId}/memory`),
   lessons: (agentId: number) => request<any>(`/agents/${agentId}/lessons`),
   lessonsExtract: (agentId: number) => request<any>(`/agents/${agentId}/lessons/extract`, {method: "POST"}),
@@ -969,6 +972,8 @@ export const apiWork = {
   decide: (id: number, decision: "approve" | "revise", note = "") =>
     request<any>(`/work/tasks/${id}/review`, {method: "POST", body: JSON.stringify({decision, note})}),
   run: (id: number) => request<any>(`/work/tasks/${id}/run`, {method: "POST"}),
+  answer: (id: number, answer: string) =>
+    request<any>(`/work/tasks/${id}/answer`, {method: "POST", body: JSON.stringify({answer})}),
 };
 
 // M4b — Hộp việc & phê duyệt một chạm (/api/inbox), Chi phí & ngân sách 3 nấc (/api/costs).

@@ -717,7 +717,16 @@
   "viec_xong": "Việc xong",
   "han_chot_2": "Hạn chót {p0}",
   "xong": "xong",
-  "xong_hoa": "Xong"
+  "xong_hoa": "Xong",
+  "w_badge": "Chờ {p0}",
+  "w_on_approval": "người duyệt",
+  "w_on_question": "người trả lời",
+  "w_on_other": "người",
+  "w_min": "{p0} phút",
+  "w_hint": "Ghế agent đã được nhả để làm việc khác; khi có kết quả, agent làm tiếp đúng phiên của việc này.",
+  "w_open_inbox": "Mở Hộp việc để duyệt",
+  "w_answer_ph": "Trả lời câu hỏi của agent…",
+  "w_answer_btn": "Gửi trả lời"
  },
  "task": {
   "bat_tay_lam": "Bắt tay làm",
@@ -1455,7 +1464,18 @@
   "lan_danh_gia": "Các lần đánh giá",
   "ly_do_doi_cap": "Lý do đổi cấp (lưu vào lịch sử phiên bản):",
   "da_doi_cap": "Đã đổi cấp tự chủ",
-  "ket_qua_danh_gia": "Đúng cả {p1} lần: {p0} số ca · từng lần: {p2}"
+  "ket_qua_danh_gia": "Đúng cả {p1} lần: {p0} số ca · từng lần: {p2}",
+  "par_title": "Làm song song",
+  "par_desc": "Số việc agent chạy cùng lúc — mỗi việc một phiên riêng; việc đang chờ người không chiếm chỗ.",
+  "par_unsettled": "Mặc định, chưa chốt",
+  "par_label": "Số lượt chạy cùng lúc",
+  "par_default": "mặc định",
+  "par_running": "Đang chạy",
+  "par_waiting": "Việc đang chờ người",
+  "par_floor": "Agent thuê: bên cho thuê cho tối đa {p0} lượt cùng lúc.",
+  "par_over": "Đang vượt giới hạn vì một việc chờ duyệt vừa chạy tiếp — agent không nhận việc mới cho tới khi về dưới giới hạn.",
+  "par_hint": "Mặc định 1, tối đa {p0}. Tăng lên thì chi phí trong ngày tăng nhanh hơn — trần chi ngày/tháng vẫn áp.",
+  "par_saved": "Đã lưu: {p0} lượt cùng lúc"
  },
  "seat": {
   "ho_so": "Hồ sơ",

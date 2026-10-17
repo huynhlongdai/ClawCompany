@@ -36,7 +36,8 @@ FLOOR_BUDGET = 4_000
 SCOPE_BUDGET = 3_000
 APPROVAL_DEFAULTS = {"business": "renter", "policy": "provider", "payer": "renter"}
 SUPPORTED = {"business": ("renter",), "policy": ("provider",), "payer": ("renter",)}
-CHANGE_FIELDS = ("allowed_tools", "monthly_cost_cap_usd", "data_handling", "knowledge_doc_ids", "ends_at")
+CHANGE_FIELDS = ("allowed_tools", "monthly_cost_cap_usd", "data_handling", "knowledge_doc_ids", "ends_at",
+                 "max_parallel_runs")   # W1: sàn số lượt cùng lúc
 
 
 def _err(status: int, msg: str) -> HTTPException:
@@ -465,6 +466,19 @@ def _apply_terms(db: Session, ls: SeatLease, data: dict) -> None:
         ls.knowledge_scope = {"doc_ids": ids}
     if "data_handling" in data:
         ls.data_handling = str(data["data_handling"] or "")[:2000]
+    if "max_parallel_runs" in data:   # W1: sàn số lượt chạy cùng lúc (NULL = 1)
+        from app.services import seat_concurrency
+        v = data["max_parallel_runs"]
+        if v in (None, ""):
+            ls.max_parallel_runs = None
+        else:
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                raise _err(422, "Số lượt cùng lúc phải là số nguyên.")
+            if v < 1 or v > seat_concurrency.MAX_LIMIT:
+                raise _err(422, f"Số lượt cùng lúc phải từ 1 đến {seat_concurrency.MAX_LIMIT}.")
+            ls.max_parallel_runs = v
     for f in ("starts_at", "ends_at", "offer_expires_at"):
         if f in data:
             setattr(ls, f, _dt(data[f], f))
@@ -791,7 +805,8 @@ def view(db: Session, ls: SeatLease, org_id: int) -> dict:
                      "price_per_month_usd": ls.price_per_month_usd, "markup_pct": ls.markup_pct,
                      "monthly_cost_cap_usd": ls.monthly_cost_cap_usd, "line": terms_line(ls)},
            "floor": {"allowed_tools": provider_allowed_tools(db, ls), "knowledge_doc_ids": scope_doc_ids(ls),
-                     "data_handling": ls.data_handling, "rules": len(provider_rules(db, ls))},
+                     "data_handling": ls.data_handling, "rules": len(provider_rules(db, ls)),
+                     "max_parallel_runs": ls.max_parallel_runs or 1},
            "approval_policy": _policy(ls), "usage": usage_summary(db, ls),
            "change_requests": ls.change_requests or [], "wipe_report": ls.wipe_report}
     if side == "provider":

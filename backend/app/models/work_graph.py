@@ -48,11 +48,14 @@ class TaskRun(Base):
     # R2 (0052): lượt chạy của ghế agent đi thuê — hợp đồng thuê + số tiền đã tính cho bên thuê (USD)
     lease_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     billed_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    # W1 (0064): lượt vẫn mở trên gateway nhưng đang chờ người (lệnh exec chờ duyệt) — không tính vào chỗ chạy của ghế.
+    waiting_since: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 WAKEUP_REASONS = ("assigned", "mentioned", "handoff", "approval_resolved", "blocker_cleared",
-                  "review_requested", "routine", "goal_created", "changes_requested", "routed")
+                  "review_requested", "routine", "goal_created", "changes_requested", "routed",
+                  "input_received")   # W1: người trả lời câu hỏi của agent → tiếp tục đúng phiên
 WAKEUP_STATUSES = ("queued", "coalesced", "dispatched", "skipped", "failed")
 
 
