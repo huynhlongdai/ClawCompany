@@ -28,13 +28,13 @@ export type NavPage = {href: string; label: string; icon: IconName; desc: string
    Tab cũ /app/team?tab=<x> chuyển hướng sang /app/company?tab=<x> (TeamConsole). */
 export const COMPANY_TAB_IDS = ["overview", "readiness", "build", "profile", "roles", "authority", "rules", "departments", "positions",
   "processes", "contracts", "rhythm", "coverage", "compliance", "kpi", "agenthr", "leaseout", "leased",
-  "docs", "ingest", "learning", "facts", "records", "catalog", "customers", "privacy", "partners", "meetings", "finance"] as const;
+  "docs", "ingest", "learning", "facts", "records", "catalog", "customers", "privacy", "partners", "meetings", "finance", "voice"] as const;
 export type CompanyTab = typeof COMPANY_TAB_IDS[number];
 const ct = (tab: string, label: string): NavTab => ({href: tab === "overview" ? "/app/company" : `/app/company?tab=${tab}`, label});
 function companySection(): NavSection {
   const groups: NavGroup[] = [
     {key: "overview", label: tr("nav.co_tong_quan"), tabs: [ct("overview", tr("nav.co_cong_ty_cua_anh")), ct("readiness", tr("nav.san_sang")), ct("build", tr("nav.co_tao_nhap"))]},
-    {key: "governance", label: tr("nav.co_phap_nhan_quan_tri"), tabs: [ct("profile", tr("nav.co_ho_so_hien_chuong")), ct("roles", tr("nav.vai_tro_cong_ty")), ct("authority", tr("nav.co_ma_tran_tham_quyen")), ct("rules", tr("nav.luat_cung")), ct("meetings", tr("nav.co_hop_quyet_dinh"))]},
+    {key: "governance", label: tr("nav.co_phap_nhan_quan_tri"), tabs: [ct("profile", tr("nav.co_ho_so_hien_chuong")), ct("voice", tr("nav.co_giong_thuong_hieu")), ct("roles", tr("nav.vai_tro_cong_ty")), ct("authority", tr("nav.co_ma_tran_tham_quyen")), ct("rules", tr("nav.luat_cung")), ct("meetings", tr("nav.co_hop_quyet_dinh"))]},
     {key: "knowledge", label: tr("nav.co_tai_lieu"), tabs: [ct("docs", tr("nav.co_thu_vien")), ct("ingest", tr("nav.co_nap_tai_lieu")), ct("learning", tr("nav.co_vong_hoc")), ct("facts", tr("nav.co_su_kien")), ct("records", tr("nav.co_ho_so_bat_buoc")), ct("catalog", tr("nav.co_san_pham_gia"))]},
     {key: "business", label: tr("nav.co_kinh_doanh"), tabs: [ct("customers", tr("nav.co_khach_hang")), ct("privacy", tr("nav.co_du_lieu_ca_nhan")), ct("partners", tr("nav.co_hop_dong_doi_tac")), ct("finance", tr("nav.co_thu_chi"))]},
     {key: "structure", label: tr("nav.co_co_cau"), tabs: [ct("departments", tr("nav.phong_ban")), ct("positions", tr("nav.chuc_danh"))]},

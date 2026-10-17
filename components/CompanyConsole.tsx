@@ -17,6 +17,7 @@ import {DocLibraryTab, FactsTab, RecordsTab} from "./DocLibrary";
 import {CatalogTab} from "./Catalog";
 import {CustomersTab, FinanceTab, MeetingsTab, PartnersTab, PrivacyTab} from "./Business";
 import {DocIngestTab} from "./DocIngest";
+import {BrandVoiceTab} from "./BrandVoice";
 import {DocLearningTab} from "./DocLearning";
 import {DepartmentsTab, BuildTab, flatten} from "./TeamConsole";
 import {ErrorBanner, EmptyState} from "./ui/EmptyState";
@@ -95,6 +96,7 @@ export function CompanyConsole() {
       {tab === "partners" && <PartnersTab companyId={companyId} caps={caps}/>}
       {tab === "meetings" && <MeetingsTab companyId={companyId} caps={caps}/>}
       {tab === "finance" && <FinanceTab companyId={companyId} caps={caps}/>}
+      {tab === "voice" && <BrandVoiceTab companyId={companyId} caps={caps}/>}
     </>}
   </PageFrame>;
 }

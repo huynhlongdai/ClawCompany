@@ -1166,3 +1166,29 @@ export const apiFinance = {
   agentPreview: (companyId: number, departmentId?: number | null) => request<any>(`/team/finance/agent-preview`, j({company_id: companyId, department_id: departmentId || null})),
   exportUrl: (companyId: number, period: string) => `/team/finance/export?company_id=${companyId}&period=${period}`,
 };
+
+// Giọng thương hiệu — văn bản (phiên bản, duyệt để ban hành) + giọng nói (/api/team/brand-voice…, /voice-profile…)
+export const apiVoice = {
+  get: (companyId: number | null) => request<any>(`/team/brand-voice?${qs({company_id: companyId}).slice(1)}`),
+  saveDraft: (body: any) => request<any>(`/team/brand-voice/draft`, j(body, "PUT")),
+  version: (id: number) => request<any>(`/team/brand-voice/versions/${id}`),
+  submit: (id: number, note = "") => request<any>(`/team/brand-voice/versions/${id}/submit`, j({note})),
+  discard: (id: number) => request<any>(`/team/brand-voice/versions/${id}/discard`, j({})),
+  decide: (id: number, decision: "approve" | "reject", note = "") => request<any>(`/team/brand-voice/versions/${id}/decide`, j({decision, note})),
+  settings: (body: any) => request<any>(`/team/brand-voice/settings`, j(body, "PUT")),
+  check: (body: any) => request<any>(`/team/brand-voice/check`, j(body)),
+  checks: (companyId: number) => request<any>(`/team/brand-voice/checks?company_id=${companyId}`),
+  selftest: (body: any) => request<any>(`/team/brand-voice/selftest`, j(body)),
+  evalSuite: (companyId: number) => request<any>(`/team/brand-voice/eval-suite`, j({company_id: companyId})),
+  profile: (companyId: number) => request<any>(`/team/voice-profile?company_id=${companyId}`),
+  saveProfile: (body: any) => request<any>(`/team/voice-profile`, j(body, "PUT")),
+  preview: (body: any) => request<any>(`/team/voice-profile/preview`, j(body)),
+  spoken: (companyId: number, text: string) => request<any>(`/team/voice-profile/spoken-text`, j({company_id: companyId, text})),
+  samples: (companyId: number) => request<any>(`/team/voice-samples?company_id=${companyId}`),
+  audioUrl: async (path: string) => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("clawcompany_token") : null;
+    const r = await fetch(`${API_BASE}${path}`, {headers: token ? {Authorization: `Bearer ${token}`} : {}});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return URL.createObjectURL(await r.blob());
+  },
+};
