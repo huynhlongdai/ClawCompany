@@ -548,7 +548,7 @@ def core_block(db: Session, company_id: int | None) -> str:
         tail.append(f"ký tên email: {sp['signature'].splitlines()[0]}")
     if sp["closing"]:
         tail.append(f"lời kết: {sp['closing']}")
-    lines.append("**Định dạng:** " + "; ".join(tail) + (f". {sp['formatting'][:200]}" if sp["formatting"] else ""))
+    lines.append("**Định dạng:** " + "; ".join(tail).rstrip(".") + (f". {sp['formatting'][:200]}" if sp["formatting"] else ""))
     lens = ", ".join(f"{CHANNEL_VI[c]} ≤{channel_rules(sp, c)['max_chars']}" for c in CHANNELS)
     lines.append(f"**Theo kênh (ký tự):** {lens}. Chi tiết, lời chào và ví dụ từng kênh: company_doc_get doc_code=VOICE "
                  "channel=<zalo|facebook|email|phone|website|internal>. Văn bản gửi khách được hệ thống chấm giọng.")
@@ -969,7 +969,8 @@ def apply_lexicon(text: str, lexicon: list[dict]) -> str:
 
 
 def _lexicon(db: Session, company_id: int) -> list[dict]:
-    v = published(db, company_id) or _draft(db, company_id)
+    """Từ điển cho nghe thử: bản nháp đang soạn (nếu có) — để nghe ngay điều đang sửa — rồi mới tới bản ban hành."""
+    v = _draft(db, company_id) or published(db, company_id)
     return clean_spec(v.spec)["lexicon"] if v else []
 
 

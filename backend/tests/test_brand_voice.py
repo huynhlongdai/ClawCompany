@@ -288,6 +288,11 @@ def test_voice_profile_preview_uses_lexicon_and_adapter(E, monkeypatch):
     assert f["mime"] == "audio/wav" and f["provider"] == "fake"
     sp = ok(E.c.post("/api/team/voice-profile/spoken-text", json={"company_id": E.co.id, "text": "Ship COD"}, headers=E.tok("member")))
     assert sp["text"] == "Ship xi ô đi"
+    # đang soạn bản nháp có từ điển mới → nghe thử dùng từ điển của bản nháp
+    ok(E.c.put("/api/team/brand-voice/draft", json={"company_id": E.co.id, "spec": {**SPEC, "lexicon": [{"term": "Ship", "say": "giao"}]}},
+               headers=E.tok("manager")))
+    sp = ok(E.c.post("/api/team/voice-profile/spoken-text", json={"company_id": E.co.id, "text": "Ship COD"}, headers=E.tok("member")))
+    assert sp["text"] == "giao COD"
 
 
 def test_tts_provider_quota_error_is_reported_not_faked(E, monkeypatch):
