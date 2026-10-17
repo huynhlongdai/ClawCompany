@@ -793,3 +793,7 @@ textarea.ops-json{width:100%}
 .bv-sticky{position:sticky;bottom:0;background:var(--surface);padding:8px 0;border-top:1px solid var(--track);margin-top:12px;z-index:2}
 [data-testid=brand-voice] pre.biz-minutes{white-space:pre-wrap;word-break:break-word}
 @media (max-width:640px){.bv-grid{grid-template-columns:1fr}.bv-row .ui-btn{flex:none}}
+.bv-form .ui-field,.bv-form .ui-form-row>*{min-width:0}
+.bv-form select.ui-input,.bv-form input.ui-input,.bv-form textarea.ui-input{max-width:100%;min-width:0}
+.bv-viol,.bv-tts-err p,[data-testid=bv-samples] small{overflow-wrap:anywhere;word-break:break-word}
+[data-testid=bv-voice] .ui-panel,[data-testid=brand-voice] .ui-panel{min-width:0;overflow-wrap:anywhere}

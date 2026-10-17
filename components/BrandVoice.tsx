@@ -315,7 +315,7 @@ function VoiceTab({companyId, canEdit}: {companyId: number; canEdit: boolean}) {
 
 function CheckTab({companyId, d, canEdit, canPublish, onChanged}: any) {
   const [text, setText] = useState(""), [channel, setChannel] = useState("zalo"), [segment, setSegment] = useState("");
-  const [useDraft, setUseDraft] = useState(!d.published && !!d.draft), [useModel, setUseModel] = useState(false);
+  const [useDraft, setUseDraft] = useState(!!d.draft)   /* đang soạn → mặc định thử theo bản nháp */, [useModel, setUseModel] = useState(false);
   const [res, setRes] = useState<any>(null), [err, setErr] = useState<unknown>(null), [busy, setBusy] = useState(false);
   const {data: hist, reload} = useLoad(() => apiVoice.checks(companyId), [companyId]);
   const [st, setSt] = useState<any>(d.settings);
