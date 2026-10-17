@@ -203,7 +203,7 @@ Cột **Kiểm** : 🟢 tất định (SQLite + Postgres VM, runtime giả hoặ
 | Gói | Nội dung | Migration | Định nghĩa xong (acceptance) | Kiểm |
 |---|---|---|---|---|
 | **W0 · An toàn & dọn trùng** ✅ 17/10 | (1) đo trên 9.8 bằng `config.schema.lookup` + `config.get`; biên dịch `tools.sessions.visibility=self`, `tools.agentToAgent.enabled=false` (khoá **toàn gateway** — 9.8 không có bản theo agent), `agents.entries.<ghế>.subagents.allowAgents=[<ghế>]`; đặt trong `wire_gateway`, khi API khởi động (native) và `POST /api/agents/gateway/isolation`; `GET` cùng path báo lệch. (2) bỏ `operations.tick_cycles`, `events.monitor_sla`, `operations.scan_recurring` khỏi beat; chủ duy nhất: strategy (mục tiêu), `sla.tick` (SLA mới + hồ sơ SLAProfile cũ cho việc chưa có đồng hồ), `routines.tick` (routine + việc định kỳ cũ, claim CAS) | — | xem §4.3a | 🟢 xong · 🔴 1 lượt model thật thử đọc phiên người khác vẫn nên chạy khi có quota |
-| **W1 · Chờ không giữ ghế + đồng thời ghế** | việc `blocked` có `wait_kind` ∈ `human|children|external|budget` + `wait_ref`; lượt kết thúc khi xin duyệt → ghế rảnh; kết quả duyệt → wakeup `approval_resolved` **cùng phiên việc**. `agents.max_parallel_runs` (mặc định 1, tối đa theo `agents.defaults.maxConcurrent`), `skip_reason` đếm lượt mở thay vì "có lượt" | `0064_work_wait_parallel` (tasks.wait_kind/wait_ref/wait_since; agents.max_parallel_runs) | việc A chờ duyệt, việc B của cùng ghế chạy ngay; duyệt A → A tiếp tục đúng session key; ghế `max_parallel_runs=2` chạy 2 việc 2 phiên, việc thứ 3 `seat_busy`; Hộp việc hiện "chờ anh" kèm phút chờ | 🟢 mock · 🔴 1 lượt thật |
+| **W1 · Chờ không giữ ghế + đồng thời ghế** ✅ 17/10 (🟢 VM tất định, xem §4.3b) | việc `blocked` có `wait_kind` ∈ `human|children|external|budget` + `wait_ref`; lượt kết thúc khi xin duyệt → ghế rảnh; kết quả duyệt → wakeup `approval_resolved` **cùng phiên việc**. `agents.max_parallel_runs` (mặc định 1, tối đa theo `agents.defaults.maxConcurrent`), `skip_reason` đếm lượt mở thay vì "có lượt" | `0064_work_wait_parallel` (tasks.wait_kind/wait_ref/wait_since; agents.max_parallel_runs) | việc A chờ duyệt, việc B của cùng ghế chạy ngay; duyệt A → A tiếp tục đúng session key; ghế `max_parallel_runs=2` chạy 2 việc 2 phiên, việc thứ 3 `seat_busy`; Hộp việc hiện "chờ anh" kèm phút chờ | 🟢 mock · 🔴 1 lượt thật |
 | **W2 · Trần, thử lại, việc chết** | `tasks.max_cost_usd`, `max_runs`, `max_revisions` (mặc định theo công ty); `budget_scope.gate` cộng phạm vi `task`; vòng SỬA thứ N+1 → leo thang người; lỗi tạm (mạng/429/gateway restart/`runtime_error`) → retry 1′/5′/30′ qua `wakeups.not_before`; hết lượt → `work_dead_letters` + 1 thẻ Hộp việc | `0065_work_limits` (cột tasks + bảng work_dead_letters + wakeups.not_before) | vượt `max_runs` → blocked `run_cap` + đúng 1 thẻ; lỗi tạm thử lại đúng lịch rồi vào dead-letter; nút chạy lại/giao người khác/huỷ; review SỬA lần 4 (max 3) → người | 🟢 |
 | **W3 · Agent trưởng nhóm điều phối + fan-in** | Theo quyết định 17/10 (§5 Q1): agent **cấp trưởng nhóm** (`seat_tier=lead`, trưởng phòng/quản lý theo chức danh M2b) có **quyền điều phối**: gọi agent trong nhóm, tạo/quản lý/giao việc. MCP `company_task_delegate` (tiêu đề, mô tả, người nhận/phòng, hợp đồng, hạn, lát ngân sách, reviewer mặc định = người giao), `company_task_children`, `company_task_manage` (đổi hạn/ưu tiên/người nhận, huỷ, mở lại việc con của mình); quyền theo `authority` (`task_delegate`: trong phòng = trưởng nhóm tự làm; ngoài phòng → *yêu cầu* tới trưởng nhóm kia); cha `wait_kind=children`, đánh thức **một lần** khi con đóng hết, khối "Kết quả việc con" trong gói ngữ cảnh; trần độ sâu 3, fan-out 8 (mặc định, chưa chốt); `tasks.accountable_member_id` = **lãnh đạo người** chịu trách nhiệm (mặc định quản lý người của ghế). Agent thừa hành **không** giao việc; agent trợ lý chỉ *đề xuất* (§5 vai trò trợ lý) | `0066_task_delegation` (tasks.accountable_member_id, delegated_by_member_id, origin; authority seed `task_delegate`) | agent trưởng nhóm giao 3 việc con song song cho 3 ghế → cha thức dậy 1 lần với 3 kết quả; nhân viên/trợ lý gọi delegate → 403 + gợi ý đường đề xuất; giao sang phòng khác → thành yêu cầu cho trưởng nhóm đó; vượt độ sâu/fan-out → lỗi tiếng Việt; con có hợp đồng nộp sai → làm lại như M2e.3 | 🟢 · 🔴 agent tự phân việc |
 | **W3b · Agent trưởng nhóm tuyển agent** | Agent trưởng nhóm được **tạo agent mới** (mở ghế theo chức danh có sẵn → `agent_hr.hire` + `seat_provision`) hoặc **thêm agent từ chợ agent** (thuê ghế — dùng lại R2 `seat_leases`: offer/accept, sàn bên cho thuê, trần, đo phí). MCP `company_seat_request` {position_id, cách: `create`\|`lease`, offer_code?, lý do, ngân sách tháng}. **Mặc định:** còn chỉ tiêu (`positions.headcount` M2b > số ghế đang có) **và** trong ngân sách (phòng/công ty, `budget_scope`; phí thuê ước tính tháng ≤ phần còn lại) → agent trưởng nhóm tự làm, ghi audit + báo lãnh đạo người (thẻ thông tin). **Vượt** chỉ tiêu hoặc ngân sách, hoặc chức danh chưa có → Approval theo ma trận thẩm quyền (`hire_agent` M2b; thêm `lease_agent`), người duyệt là lãnh đạo người. Ghế mới luôn ở `probation` (career M5b), quản lý người = lãnh đạo của nhóm; cách ly phiên W0 áp ngay khi tạo. Không tự nới chính sách/quyền công cụ của ghế mới quá sàn chức danh | `0066b`/`0067` tuỳ thứ tự (authority seed `lease_agent`; `agent_hires` nhật ký: ai đề xuất, cách, lease_id, approval_id) | trong chỉ tiêu + ngân sách → ghế mới có trên gateway (AGENTS.md theo chức danh, `subagents.allowAgents=[chính nó]`), không thẻ duyệt; chỉ tiêu đầy → đúng 1 Approval cho lãnh đạo người, duyệt → tạo, từ chối → không tạo; thuê từ chợ → lease active với sàn bên cho thuê, vượt ngân sách → Approval; agent thừa hành/trợ lý gọi → 403; tạo trùng (gọi 2 lần) → 1 ghế | 🟢 · 🔴 agent tự quyết tuyển |
@@ -245,6 +245,47 @@ phiên việc khác của chính mình (ngữ cảnh đã có gói 7 khối + s�
 `routines.tick_all` (routine + `RecurringOperation` giành bằng CAS trên `next_run_at`). Phát hiện trên VM: việc định kỳ cũ
 "Daily growth & risk review" (org 1) mỗi 08:00 tạo một mục tiêu + chu kỳ cũ; 2 chu kỳ (#1, #2) đang `running` mãi với 1
 assignment `failed` + 3 `queued` — sau W0 không còn beat nào tick chúng (chạy tay qua `/api/v9/cycles/{id}/tick`).
+
+### 4.3b Kết quả W1 (17/10/2026)
+
+**Đã làm** (commit `12577c4`, migration `0064_work_wait_parallel`, VM Postgres đã lên 0064):
+
+- **Chờ trong lượt** (lệnh exec chờ người duyệt): `record_approval` → `task_wait.begin(in_turn)` đặt
+  `task_runs.waiting_since` — lượt vẫn mở trên gateway nhưng **không tính** vào chỗ chạy của ghế, lý do `seat_busy` được
+  xếp lại ngay. Có quyết định (`approval_bridge.decide` hoặc frame `exec.approval.resolved`) → xoá dấu chờ, **đúng lượt
+  cũ** chạy tiếp (gateway tự tiếp tục; không `chat.send` mới, không hàng `task_runs` mới). Việc vẫn `in_progress`.
+- **Chờ ngoài lượt**: `company_approval_request` trả `approval_required` trong lượt của việc, hoặc `company_task_status`
+  `status=blocked, wait_for=human` (câu hỏi → thẻ Hộp việc `agent_question` cho quản lý người) → lượt kết thúc
+  (`completed`), việc `blocked` + `wait_kind=human`, `wait_ref=approval:<id>|question:<inbox id>`; **không** sang review,
+  **không** thẻ "run lỗi". Hết chờ (duyệt/từ chối qua API/Hộp việc, hoặc `POST /api/work/tasks/{id}/answer`) → việc về
+  `todo` + wakeup (`approval_resolved` / mới: `input_received`) mang `resume` → drain gửi **tin ngắn** vào đúng phiên
+  `agent:<rid>:company-task-<id>` ("[Tiếp tục việc #…] … ĐÃ ĐƯỢC DUYỆT / BỊ TỪ CHỐI / Câu trả lời: …"), không dựng lại gói
+  7 khối. Duyệt trong lúc agent còn trong lượt → hết chờ ngay, lượt kết thúc bình thường. Huỷ/đóng/gỡ "bị chặn" bằng tay,
+  hoặc lượt lỗi/huỷ → bỏ chờ. Review của người vốn đã không giữ ghế (lượt kết thúc ở `review`) — có test giữ điều đó.
+- **Đồng thời theo ghế**: `agents.max_parallel_runs` mặc định 1, tối đa **3 (default, chưa chốt — D2)**; giới hạn hiệu
+  dụng = min(ghế, sàn hợp đồng thuê `seat_leases.max_parallel_runs`, NULL = 1); bên thuê đặt cao hơn sàn → 422
+  `above_lease_floor`. Giành chỗ **nguyên tử** (`seat_concurrency.open_run`): khoá dòng `agents` của ghế bằng UPDATE,
+  đếm lượt đang chạy (mở, không chờ, chưa quá 30′), còn chỗ thì tạo `task_runs` trong **cùng giao dịch**. Đường wakeup
+  dùng nó; drain lấp đủ chỗ trống trong một lần (giới hạn 1 thì hành vi y như trước). Định tuyến ngoài giờ (`operating_time.route`)
+  và chọn người theo chức danh (`process_map.pick_assignee`) xếp theo tải/giới hạn, bỏ việc đang chờ; `dispatch_policy`
+  không tính lượt đang chờ.
+- **API/UI**: `GET/PUT /api/agents/{id}/concurrency`; thẻ "Làm song song" ở Hồ sơ agent › Nhân sự (nhãn "Mặc định, chưa
+  chốt"); bảng việc có huy hiệu "Chờ người duyệt / người trả lời · N phút" và khung chờ ở side-peek (trả lời ngay tại đó);
+  i18n vi+en.
+
+**Giới hạn nói thẳng:** (1) lượt chờ exec được tiếp tục luôn được nhận lại kể cả khi ghế đã đầy (gateway chạy tiếp ngay,
+ta không chặn được) → ghế tạm vượt giới hạn, không nhận lượt MỚI tới khi về dưới (`over_limit` trong API/UI). (2) Giành chỗ
+nguyên tử chỉ ở đường wakeup; dispatch tay cũ (`/api/tasks/{id}/dispatch`, v19/v20) vẫn là thao tác người chủ động, chỉ kiểm
+trước như trước; lượt định tuyến trưởng phòng vẫn kiểm trước (không nguyên tử). (3) Agent có *tự* gọi
+`wait_for=human`/kết thúc lượt khi được bảo chờ hay không — **chưa đóng dấu** (cần model thật, quota CometAPI rỗng).
+(4) `wait_kind` `children/external/budget` mới có trong từ vựng, chưa có nguồn phát (W3/W7/W2). (5) Dòng thời gian việc
+hiện mã sự kiện thô `task.waiting`/`task.resumed`.
+
+**Kiểm:** `tests/test_w1_wait_parallel.py` 12 test; cả bộ backend 1 372 passed / 2 skipped / 0 failed (không sửa test cũ);
+`tsc` sạch; `next build` qua. VM (Postgres thật, runtime giả trong tiến trình, không gọi model/gateway; ghế thử "W1 Probe"
+ở org 2/công ty 4 — `work/vm_w1.py`): đua 8 luồng/8 phiên Postgres × 6 vòng (giới hạn 1/2/2/1/2/3) → đúng 1/2/2/1/2/3 lượt,
+0 lỗi; luồng 15/15 PASS; HTTP concurrency 200/422/422/200, danh sách + chi tiết việc có `waiting`; ảnh
+`_reports/ui/w1-*.png` (vi/en/mobile 390 px, scrollWidth đúng). Dữ liệu thử đã huỷ, ghế thử để `paused`.
 
 ### 4.3 Kiểm được gì khi chưa có quota
 
